@@ -1,0 +1,110 @@
+@import "tailwindcss";
+
+.input {
+  @apply w-full border px-3 py-2 rounded-lg focus:ring-2 focus:ring-indigo-400 outline-none;
+}
+
+/* Sidebar Scrollbar */
+
+::-webkit-scrollbar {
+  width: 6px;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #d1d5db;
+  border-radius: 10px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #9ca3af;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+:root {
+  --primary:         79 70 229;    /* indigo-600 */
+  --primary-light:   99 102 241;   /* indigo-500  — hover / ring */
+  --sidebar:         30 27 75;     /* indigo-950  — sidebar bg */
+  --sidebar-text:    199 210 254;  /* indigo-200  — nav labels */
+  --sidebar-active:  165 180 252;  /* indigo-300  — active item text */
+  --bg:              248 247 255;  /* lavender-tinted white */
+  --surface:         238 242 255;  /* indigo-50   — cards / panels */
+  --text:            15 23 42;     /* slate-900 */
+  --text-muted:      100 116 139;  /* slate-500 */
+  --accent:          124 58 237;   /* violet-600  — badges / tags */
+  --border:          199 210 254;  /* indigo-200  — default borders */
+  --border-strong:   129 140 248;  /* indigo-400  — focus / dividers */
+}
+ 
+/* ─────────────────────────────────────────────
+   LIGHT  — refined indigo
+───────────────────────────────────────────── */
+.theme-light {
+  --primary:         79 70 229;    /* indigo-600 */
+  --primary-light:   99 102 241;   /* indigo-500  — hover / ring */
+  --sidebar:         30 27 75;     /* indigo-950  — sidebar bg */
+  --sidebar-text:    199 210 254;  /* indigo-200  — nav labels */
+  --sidebar-active:  165 180 252;  /* indigo-300  — active item text */
+  --bg:              248 247 255;  /* lavender-tinted white */
+  --surface:         238 242 255;  /* indigo-50   — cards / panels */
+  --text:            15 23 42;     /* slate-900 */
+  --text-muted:      100 116 139;  /* slate-500 */
+  --accent:          124 58 237;   /* violet-600  — badges / tags */
+  --border:          199 210 254;  /* indigo-200  — default borders */
+  --border-strong:   129 140 248;  /* indigo-400  — focus / dividers */
+}
+ 
+/* ─────────────────────────────────────────────
+   DARK  — deep professional (not dull)
+───────────────────────────────────────────── */
+.theme-dark {
+  --primary:         139 92 246;   /* violet-500 */
+  --primary-light:   167 139 250;  /* violet-400  — hover / ring */
+  --sidebar:         11 11 24;     /* near-black with purple undertone */
+  --sidebar-text:    167 139 250;  /* violet-400  — nav labels */
+  --sidebar-active:  196 181 253;  /* violet-300  — active item text */
+  --bg:              15 15 30;     /* deep navy-purple (not flat black) */
+  --surface:         26 26 53;     /* card / panel bg */
+  --text:            237 233 254;  /* violet-100  — warm white */
+  --text-muted:      167 139 250;  /* violet-400  — muted text */
+  --accent:          109 40 217;   /* violet-700  — deep accents */
+  --border:          55 48 163;    /* indigo-800  — subtle borders */
+  --border-strong:   99 102 241;   /* indigo-500  — focus / dividers */
+}
+ 
+/* ─────────────────────────────────────────────
+   BLUE  — premium fintech
+───────────────────────────────────────────── */
+.theme-blue {
+  --primary:         29 78 216;    /* blue-700 — deep, not washed out */
+  --primary-light:   59 130 246;   /* blue-500  — hover / ring */
+  --sidebar:         12 36 97;     /* navy-900  — dark authority */
+  --sidebar-text:    191 219 254;  /* blue-200  — nav labels */
+  --sidebar-active:  147 197 253;  /* blue-300  — active item text */
+  --bg:              240 247 255;  /* barely-blue white */
+  --surface:         219 234 254;  /* blue-100  — cards / panels */
+  --text:            15 23 42;     /* slate-900 */
+  --text-muted:      30 64 175;    /* blue-800 */
+  --accent:          96 165 250;   /* blue-400  — badges / icons */
+  --border:          191 219 254;  /* blue-200  — default borders */
+  --border-strong:   96 165 250;   /* blue-400  — focus / dividers */
+}
+ 
+/* ─────────────────────────────────────────────
+   GREEN  — premium emerald
+───────────────────────────────────────────── */
+.theme-green {
+  --primary:         5 150 105;    /* emerald-600 — rich, not neon */
+  --primary-light:   16 185 129;   /* emerald-500 — hover / ring */
+  --sidebar:         6 78 59;      /* emerald-900 — deep forest */
+  --sidebar-text:    110 231 183;  /* emerald-300 — nav labels */
+  --sidebar-active:  167 243 208;  /* emerald-200 — active item text */
+  --bg:              240 253 246;  /* emerald-50 */
+  --surface:         209 250 229;  /* emerald-100 — cards / panels */
+  --text:            6 78 59;      /* emerald-900 */
+  --text-muted:      4 120 87;     /* emerald-700 */
+  --accent:          52 211 153;   /* emerald-400 — badges */
+  --border:          167 243 208;  /* emerald-200 — default borders */
+  --border-strong:   52 211 153;   /* emerald-400 — focus / dividers */
+}
