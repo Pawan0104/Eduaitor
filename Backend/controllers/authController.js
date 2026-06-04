@@ -132,7 +132,7 @@ export const changePassWord = async (req, res) => {
 
   const okkreport = await Student.findByIdAndUpdate(req.user._id, {
     password: hashed,
-   
+   firstTimeLogin: false,  // ye set nhi tha bs 
   });
 
   res.json({ message: "Password updated successfully" });
