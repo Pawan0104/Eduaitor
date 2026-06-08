@@ -15,25 +15,27 @@ import {
   FaUserAlt,
 } from "react-icons/fa";
 
-import {FaBookJournalWhills,
+import {
+  FaBookJournalWhills,
   FaSchoolFlag,
-  FaUserGroup,} from "react-icons/fa6";
+  FaUserGroup,
+} from "react-icons/fa6";
 import { FiUsers } from "react-icons/fi";
-import { GiOpenBook, GiTeacher,GiSchoolBag } from "react-icons/gi";
+import { GiOpenBook, GiTeacher, GiSchoolBag } from "react-icons/gi";
 import { HiAcademicCap } from "react-icons/hi2";
 import { toast } from "react-toastify";
 import { useAuth } from "../context/AuthContext";
 import axios from "axios";
-
+import BlogFeed from "../components/BlogFeed";
 
 /* ─── Color map ─────────────────────────────────────────────── */
 const COLOR_MAP = {
   Dashboard: { bg: "#FFF7ED", icon: "#F97316", dot: "#FED7AA" },
   Students: { bg: "#EFF6FF", icon: "#3B82F6", dot: "#BFDBFE" },
   Teachers: { bg: "#F0FDF4", icon: "#22C55E", dot: "#BBF7D0" },
-  Classes: { bg: "#FAF5FF", icon: "#A855F7", dot: "#E9D5FF" },
+  "My Classes": { bg: "#FAF5FF", icon: "#A855F7", dot: "#E9D5FF" },
   Attendance: { bg: "#FFF1F2", icon: "#F43F5E", dot: "#FFD5DB" },
-  "Exam Management": { bg: "#FFF7ED", icon: "#EF4444", dot: "#FEE2E2" },
+  Exams: { bg: "#FFF7ED", icon: "#EF4444", dot: "#FEE2E2" },
   Syllabus: { bg: "#F0FDF4", icon: "#10B981", dot: "#A7F3D0" },
   Timetable: { bg: "#EFF6FF", icon: "#6366F1", dot: "#C7D2FE" },
   "Fee Management": { bg: "#FFFBEB", icon: "#D97706", dot: "#FDE68A" },
@@ -43,6 +45,16 @@ const COLOR_MAP = {
   Calendar: { bg: "#EFF6FF", icon: "#0EA5E9", dot: "#BAE6FD" },
   "Transport Management": { bg: "#F8FAFC", icon: "#64748B", dot: "#CBD5E1" },
   Library: { bg: "#F0FDFA", icon: "#0D9488", dot: "#99F6E4" },
+  Assignment: {
+    bg: "#F8FAFC",
+    icon: "#64748B",
+    dot: "#CBD5E1",
+  },
+  Blog: {
+    bg: "#F0FDFA",
+    icon: "#0D9488",
+    dot: "#99F6E4",
+  },
 };
 const DEFAULT_COLOR = { bg: "#F3F4F6", icon: "#6B7280", dot: "#E5E7EB" };
 
@@ -256,60 +268,65 @@ export default function TeacherMenu() {
   };
 
   const menu = [
-      {
-        name: "Dashboard",
-        icon: <FaTachometerAlt />,
-        path: "/teacher/dashboard",
-      },
-  
-      {
-        name: "Students",
-        icon: <FaUserGraduate />,
-        path: "/teacher/students",
-      },
-  
-      {
-        name: "Attendance",
-        icon: <FaUserAlt />,
-        children: [
-          { name: "Mark Attendance", path: "/teacher/attendance/mark" },
-          { name: "Attendance Report", path: "/teacher/attendance/report" },
-        ],
-      },
-  
-      {
-        name: "My Classes",
-        icon: <HiAcademicCap />,
-        path: "/teacher/classes",
-      },
-      { name: "Syllabus", icon: <FaBookDead />, path: "/teacher/syllabus" },
-      {
-        name: "Assignment",
-        icon: <GiSchoolBag />,
-        children: [
-          { name: "My Assignments", path: "/teacher/assignment" },
-          { name: "Assignment   Result", path: "/teacher/assignment/result" },
-        ],
-      },
-  
-      {
-        name: "Exams",
-        icon: <GiOpenBook />,
-        children: [{ name: "Marks Entry", path: "/teacher/marks-entry" }],
-      },
-  
-      { name: "Timetable", icon: <FaClock />, path: "/teacher/timetable" },
-  
-      { name: "Diary", icon: <FaBookOpen />, path: "/teacher/diary" },
-  
-      { name: "Group", icon: <FaUserGroup />, path: "/teacher/group" },
-  
-      { name: "Notices", icon: <FaBell />, path: "/teacher/notice" },
-  
-      { name: "Events", icon: <FaCalendar />, path: "/teacher/event" },
-  
-      { name: "Calendar", icon: <FaCalendarAlt />, path: "/teacher/calendar" },
-    ];
+    {
+      name: "Dashboard",
+      icon: <FaTachometerAlt />,
+      path: "/teacher/dashboard",
+    },
+
+    {
+      name: "Students",
+      icon: <FaUserGraduate />,
+      path: "/teacher/students",
+    },
+
+    {
+      name: "Attendance",
+      icon: <FaUserAlt />,
+      children: [
+        { name: "Mark Attendance", path: "/teacher/attendance/mark" },
+        { name: "Attendance Report", path: "/teacher/attendance/report" },
+      ],
+    },
+
+    {
+      name: "My Classes",
+      icon: <HiAcademicCap />,
+      path: "/teacher/classes",
+    },
+    { name: "Syllabus", icon: <FaBookDead />, path: "/teacher/syllabus" },
+    {
+      name: "Assignment",
+      icon: <GiSchoolBag />,
+      children: [
+        { name: "My Assignments", path: "/teacher/assignment" },
+        { name: "Assignment   Result", path: "/teacher/assignment/result" },
+      ],
+    },
+
+    {
+      name: "Exams",
+      icon: <GiOpenBook />,
+      children: [{ name: "Marks Entry", path: "/teacher/marks-entry" }],
+    },
+
+    { name: "Timetable", icon: <FaClock />, path: "/teacher/timetable" },
+
+    { name: "Diary", icon: <FaBookOpen />, path: "/teacher/diary" },
+
+    { name: "Group", icon: <FaUserGroup />, path: "/teacher/group" },
+
+    { name: "Notices", icon: <FaBell />, path: "/teacher/notice" },
+
+    { name: "Events", icon: <FaCalendar />, path: "/teacher/event" },
+
+    { name: "Calendar", icon: <FaCalendarAlt />, path: "/teacher/calendar" },
+    {
+      name: "Blog",
+      icon: <FaBookJournalWhills />,
+      path: "/teacher/blogs",
+    },
+  ];
   /* Group into rows of 2 — keeps grid columns stable */
   const rows = [];
   for (let i = 0; i < menu.length; i += 2) rows.push(menu.slice(i, i + 2));
@@ -418,6 +435,7 @@ export default function TeacherMenu() {
         })}
       </div>
 
+      <BlogFeed />
       {showExit && (
         <ExitPopup
           onConfirm={handleLogout}

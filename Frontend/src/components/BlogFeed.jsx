@@ -10,6 +10,7 @@ import {
   X,
   Copy,
   Check,
+  EyeOff,
 } from "lucide-react";
 
 const API = `${import.meta.env.VITE_API_URL}/blogs`;
@@ -255,6 +256,22 @@ function BlogCard({ blog, onLikeUpdate }) {
               month: "short",
               year: "numeric",
             })}
+            {blog.studentName ? (
+              <>
+                <span className="ml-1.5 before:content-['·'] before:mr-1.5">
+                  {blog.studentName}
+                </span>
+                {blog.studentClass && (
+                  <span className="ml-1.5 before:content-['·'] before:mr-1.5">
+                    {blog.studentClass}
+                  </span>
+                )}
+              </>
+            ) : blog.createdByName ? (
+              <span className="ml-1.5 before:content-['·'] before:mr-1.5">
+                {blog.createdByName}
+              </span>
+            ) : null}
           </p>
 
           {/* Content */}
@@ -297,6 +314,13 @@ function BlogCard({ blog, onLikeUpdate }) {
               <Share2 className="w-4.5 h-4.5" />
               <span>Share</span>
             </button>
+
+            {/* Private tag */}
+            {blog.canEdit && !blog.isPublic && (
+              <span className="ml-auto flex items-center gap-1 text-xs bg-red-200 px-2 py-0.5 rounded-full">
+                <EyeOff className="w-3 h-3" /> Private
+              </span>
+            )}
           </div>
         </div>
       </div>
@@ -321,12 +345,17 @@ export default function BlogFeed() {
     fetchBlogs();
   }, []);
 
+  // BlogFeed.jsx — in fetchBlogs, filter after fetch as safety net
   const fetchBlogs = async () => {
     setLoading(true);
     setError("");
     try {
       const { data } = await axios.get(API, { withCredentials: true });
-      setBlogs(data.data);
+      // safety net: only show public published blogs in the feed component
+      const publicBlogs = (data.data || []).filter(
+        (b) => b.isPublic && (!b.status || b.status === "published"),
+      );
+      setBlogs(publicBlogs);
     } catch (err) {
       setError("Failed to load blogs. Please try again.");
       console.error(err);

@@ -39,6 +39,7 @@ const COLOR_MAP = {
   Calendar: { bg: "#EFF6FF", icon: "#0EA5E9", dot: "#BAE6FD" },
   "Transport Management": { bg: "#F8FAFC", icon: "#64748B", dot: "#CBD5E1" },
   Library: { bg: "#F0FDFA", icon: "#0D9488", dot: "#99F6E4" },
+  Blog: { bg: "#FFF7ED", icon: "#F97316", dot: "#FED7AA" },
 };
 const DEFAULT_COLOR = { bg: "#F3F4F6", icon: "#6B7280", dot: "#E5E7EB" };
 
@@ -311,6 +312,11 @@ export default function SchoolMenu() {
       ],
     },
     { name: "Library", icon: <FaBookJournalWhills />, path: "/school/library" },
+    {
+      name: "Blog",
+      icon: <FaBookJournalWhills />,
+      path: "/school/blogs",
+    },
   ];
 
   /* Group into rows of 2 — keeps grid columns stable */

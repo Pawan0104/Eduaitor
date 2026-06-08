@@ -103,13 +103,14 @@ const Students = () => {
       {/* HEADER */}
       <div className="mb-6 flex flex-col md:flex-row md:items-center md:justify-between gap-3">
         <div>
-          <h1 className="text-2xl sm:text-3xl font-bold">
-            Students
-          </h1>
 
-          <p className="text-sm sm:text-base">
+           <h1 className="text-2xl sm:text-3xl font-bold">
+            Students
+          </h1> 
+
+          {/* <p className="text-sm sm:text-base">
             Good Morning, Dr. Rajesh Kumar! Welcome to the Students panel.
-          </p>
+          </p> */}
         </div>
 
         <button

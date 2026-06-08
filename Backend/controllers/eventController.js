@@ -108,6 +108,7 @@ export const getEventById = async (req, res) => {
 
 // POST create event
 export const createEvent = async (req, res) => {
+  console.log(req.user?._id, req.user?.id)
   try {
     const schoolId = req.user?.school_id;
     const event = await Event.create({ ...req.body, schoolId });
@@ -119,7 +120,7 @@ export const createEvent = async (req, res) => {
       notificationType: "general",
       targets,
       schoolId,
-      createdBy: req.user._id,
+      createdBy: req.user.id,
       startingDate:event.startDate || date.now,
       endingDate:event.endDate || "",
     });
@@ -152,7 +153,7 @@ export const updateEvent = async (req, res) => {
       notificationType: "general",
       targets,
       schoolId,
-      createdBy: req.user._id,
+      createdBy: req.user.id,
       startingDate:event.startDate || date.now,
       endingDate:event.endDate || "",
     });

@@ -75,6 +75,8 @@ import ChangePassword from "./components/ChangePassword";
 import NotificationPage from "./pages/NotificationPage";
 import Blogs from "./pages/Blogs";
 import BlogDetail from "./components/BlogDetail";
+import AttendanceWithTabs from "./pages/AttendanceWithTabs";
+import StudentAttendanceDetail from "./pages/StudentAttendanceDetail";
 
 const App = () => {
   return (
@@ -145,6 +147,7 @@ const App = () => {
           <Route path="subject" element={<Subject />} />
           <Route path="syllabus" element={<Syllabus />} />
           <Route path="attendance" element={<AttendanceReportPrincipal />} />
+          <Route path="attendance/student/:studentId" element={<StudentAttendanceDetail />} />
           <Route path="timetable" element={<TimeTable />} />
           <Route path="fee-structure" element={<FeeStructure />} />
           <Route path="fee-collection" element={<FeeCollection />} />
@@ -189,7 +192,8 @@ const App = () => {
             element={<TeacherAssignmentResult />}
           />
           <Route path="exam" element={<TeacherExam />} />
-          <Route path="attendance/mark" element={<Attendance />} />
+          <Route path="attendance/mark" element={<AttendanceWithTabs />} />
+          <Route path="attendance/student/:studentId" element={<StudentAttendanceDetail />} />
           <Route
             path="attendance/report"
             element={<AttendanceReportTeacher />}

@@ -1,172 +1,117 @@
-import React, { useState, useEffect, useMemo } from "react";
+import React, { useState, useEffect, useMemo, useCallback } from "react";
 import axios from "axios";
 import { toast } from "react-toastify";
 import { useNavigate } from "react-router-dom";
-import { FaArrowLeft } from "react-icons/fa";
+import { FaArrowLeft, FaChevronLeft, FaChevronRight, FaTimes } from "react-icons/fa";
 
-/* ─── Constants ──────────────────────────────────────────── */
+const API = import.meta.env.VITE_API_URL;
+const TAB_KEY = "attendance_tab_preference";
+
 const MONTHS = [
-  "January",
-  "February",
-  "March",
-  "April",
-  "May",
-  "June",
-  "July",
-  "August",
-  "September",
-  "October",
-  "November",
-  "December",
+  "January","February","March","April","May","June",
+  "July","August","September","October","November","December",
 ];
-
-const DAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
-
-const CURRENT_YEAR = new Date().getFullYear();
+const DAYS_SHORT  = ["Sun","Mon","Tue","Wed","Thu","Fri","Sat"];
+const CURRENT_YEAR  = new Date().getFullYear();
 const CURRENT_MONTH = new Date().getMonth() + 1;
 
-const STATUS_CONFIG = {
-  Present: {
-    pill: "bg-emerald-50 text-emerald-700 border-emerald-200 ring-emerald-100",
-    dot: "bg-emerald-500",
-    icon: "✓",
-  },
-  Absent: {
-    pill: "bg-rose-50 text-rose-600 border-rose-200 ring-rose-100",
-    dot: "bg-rose-500",
-    icon: "✗",
-  },
-  Late: {
-    pill: "bg-amber-50 text-amber-700 border-amber-200 ring-amber-100",
-    dot: "bg-amber-400",
-    icon: "◷",
-  },
+/* ─── Status colours ───────────────────────────────────────── */
+const STATUS_DOT = {
+  Present: { dot: "bg-emerald-500", text: "text-emerald-700", bg: "bg-emerald-50",  border: "border-emerald-200", letter: "P", label: "Present" },
+  Absent:  { dot: "bg-rose-500",    text: "text-rose-700",    bg: "bg-rose-50",     border: "border-rose-200",    letter: "A", label: "Absent"  },
+  Late:    { dot: "bg-amber-400",   text: "text-amber-700",   bg: "bg-amber-50",    border: "border-amber-200",   letter: "L", label: "Late"    },
 };
 
-const PCT_BG = (p) =>
-  p >= 75 ? "bg-emerald-500" : p >= 50 ? "bg-amber-400" : "bg-rose-500";
-const PCT_TEXT = (p) =>
-  p >= 75 ? "text-emerald-600" : p >= 50 ? "text-amber-600" : "text-rose-600";
-const PCT_RING = (p) =>
-  p >= 75 ? "ring-emerald-200" : p >= 50 ? "ring-amber-200" : "ring-rose-200";
+const EVENT_TYPE_STYLE = {
+  Holiday: { bg: "bg-violet-100", text: "text-violet-700", border: "border-violet-200", dot: "bg-violet-500", letter: "H" },
+  Event:   { bg: "bg-blue-100",   text: "text-blue-700",   border: "border-blue-200",   dot: "bg-blue-500",   letter: "E" },
+  Exam:    { bg: "bg-orange-100", text: "text-orange-700", border: "border-orange-200", dot: "bg-orange-500", letter: "X" },
+  Meeting: { bg: "bg-teal-100",   text: "text-teal-700",   border: "border-teal-200",   dot: "bg-teal-500",   letter: "M" },
+};
 
-/* ─── Ring Progress ──────────────────────────────────────── */
+/* ─── Helpers ──────────────────────────────────────────────── */
+function toDateKey(date) {
+  const d = new Date(date);
+  return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`;
+}
+
+function buildCalendarGrid(year, month) {
+  // Returns array of 42 cells (6 weeks × 7 days), some null (padding)
+  const firstDay = new Date(year, month - 1, 1).getDay();
+  const daysInMonth = new Date(year, month, 0).getDate();
+  const cells = [];
+  for (let i = 0; i < firstDay; i++) cells.push(null);
+  for (let d = 1; d <= daysInMonth; d++) cells.push(d);
+  while (cells.length % 7 !== 0) cells.push(null);
+  return cells;
+}
+
+/* Check if a calendar event covers a given date */
+function eventCoversDate(event, dateKey) {
+  const start = toDateKey(event.startDate);
+  const end   = event.endDate ? toDateKey(event.endDate) : start;
+  return dateKey >= start && dateKey <= end;
+}
+
+/* ─── Ring progress (for summary) ─────────────────────────── */
 function RingProgress({ pct }) {
-  const r = 28;
-  const circ = 2 * Math.PI * r;
+  const r = 26, circ = 2 * Math.PI * r;
   const dash = (pct / 100) * circ;
-
+  const color = pct >= 75 ? "#10b981" : pct >= 50 ? "#f59e0b" : "#f43f5e";
   return (
-    <svg width="72" height="72" className="-rotate-90">
-      <circle
-        cx="36"
-        cy="36"
-        r={r}
-        fill="none"
-        stroke="#f1f5f9"
-        strokeWidth="6"
-      />
-      <circle
-        cx="36"
-        cy="36"
-        r={r}
-        fill="none"
-        stroke={pct >= 75 ? "#10b981" : pct >= 50 ? "#f59e0b" : "#f43f5e"}
-        strokeWidth="6"
+    <svg width="68" height="68" className="-rotate-90">
+      <circle cx="34" cy="34" r={r} fill="none" stroke="#e2e8f0" strokeWidth="5" />
+      <circle cx="34" cy="34" r={r} fill="none" stroke={color} strokeWidth="5"
         strokeLinecap="round"
         strokeDasharray={`${dash} ${circ - dash}`}
-        style={{ transition: "stroke-dasharray 0.8s cubic-bezier(.4,0,.2,1)" }}
+        style={{ transition: "stroke-dasharray 0.6s ease" }}
       />
-      <text
-        x="36"
-        y="40"
-        textAnchor="middle"
-        className="rotate-90"
-        style={{
-          fill: pct >= 75 ? "#059669" : pct >= 50 ? "#d97706" : "#e11d48",
-          fontSize: "11px",
-          fontWeight: 700,
-          transform: "rotate(90deg)",
-          transformOrigin: "36px 36px",
-        }}
-      >
+      <text x="34" y="38" textAnchor="middle"
+        style={{ fill: color, fontSize: "11px", fontWeight: 700,
+          transform: "rotate(90deg)", transformOrigin: "34px 34px" }}>
         {pct}%
       </text>
     </svg>
   );
 }
 
-/* ─── Summary Card ───────────────────────────────────────── */
-function SummaryCard({ records }) {
-  const total = records.length;
-  const present = records.filter((r) => r.status === "Present").length;
-  const absent = records.filter((r) => r.status === "Absent").length;
-  const late = records.filter((r) => r.status === "Late").length;
-  const pct = total ? Math.round(((present + late) / total) * 100) : 0;
-
-  const pills = [
-    {
-      label: "Present",
-      val: present,
-      color: "bg-emerald-50 text-emerald-700 border-emerald-200",
-    },
-    {
-      label: "Absent",
-      val: absent,
-      color: "bg-rose-50 text-rose-600 border-rose-200",
-    },
-    {
-      label: "Late",
-      val: late,
-      color: "bg-amber-50 text-amber-700 border-amber-200",
-    },
-    {
-      label: "Total",
-      val: total,
-      color: "bg-slate-100 text-slate-600 border-slate-200",
-    },
-  ];
-
+/* ─── Summary card ─────────────────────────────────────────── */
+function SummaryCard({ summary }) {
+  const { present = 0, absent = 0, late = 0, total = 0, percentage = 0 } = summary;
   return (
-    <div
-      className="rounded-2xl border border-slate-100 shadow-sm overflow-hidden mb-4 bg-[rgb(var(--surface))]"
-    >
-      <div className="flex items-center gap-4 p-4 ">
-        <RingProgress pct={pct} />
+    <div className="bg-[rgb(var(--surface))] rounded-2xl border border-slate-200 shadow-sm overflow-hidden mb-3">
+      <div className="flex items-center gap-4 p-4">
+        <RingProgress pct={percentage} />
         <div className="flex-1 min-w-0">
           <p className="text-xs font-semibold text-[rgb(var(--text))] uppercase tracking-wider mb-0.5">
             Attendance this month
           </p>
-          <p className={`text-2xl font-bold leading-none ${PCT_TEXT(pct)}`}>
-            {pct}%
-            <span className="text-sm font-normal text-[rgb(var(--text))] ml-1">
+          <p className={`text-2xl font-bold leading-none
+            ${percentage >= 75 ? "text-emerald-600" : percentage >= 50 ? "text-amber-600" : "text-rose-600"}`}>
+            {percentage}%
+            <span className="text-sm font-normal text-[rgb(var(--text))] ml-1.5">
               ({present + late}/{total} classes)
             </span>
           </p>
           <div className="h-1.5 bg-slate-200 rounded-full mt-2 overflow-hidden">
             <div
-              className={`h-full rounded-full ${PCT_BG(pct)}`}
-              style={{
-                width: `${pct}%`,
-                transition: "width 0.8s cubic-bezier(.4,0,.2,1)",
-              }}
+              className={`h-full rounded-full transition-all duration-700
+                ${percentage >= 75 ? "bg-emerald-500" : percentage >= 50 ? "bg-amber-400" : "bg-rose-500"}`}
+              style={{ width: `${percentage}%` }}
             />
           </div>
         </div>
       </div>
-
       <div className="grid grid-cols-4 border-t border-slate-100">
-        {pills.map(({ label, val, color }) => (
-          <div
-            key={label}
-            className={`flex flex-col items-center py-3 border-r last:border-0 border-slate-100`}
-          >
-            <span className="text-lg font-bold text-[rgb(var(--text))] leading-none">
-              {val}
-            </span>
-            <span className="text-[10px] text-[rgb(var(--text))] mt-0.5 font-medium">
-              {label}
-            </span>
+        {[
+          { label: "Present", val: present, cls: "text-emerald-600" },
+          { label: "Absent",  val: absent,  cls: "text-rose-600"    },
+          { label: "Late",    val: late,    cls: "text-amber-600"   },
+          { label: "Total",   val: total,   cls: "text-[rgb(var(--text))]" },
+        ].map(({ label, val, cls }) => (
+          <div key={label} className="flex flex-col items-center py-3 border-r last:border-0 border-slate-100">
+            <span className={`text-lg font-bold leading-none ${cls}`}>{val}</span>
+            <span className="text-[10px] text-[rgb(var(--text))] mt-0.5 font-medium">{label}</span>
           </div>
         ))}
       </div>
@@ -174,357 +119,613 @@ function SummaryCard({ records }) {
   );
 }
 
-/* ─── Subject Tab ────────────────────────────────────────── */
-function SubjectTabs({ subjects, active, onChange }) {
+/* ─── Day detail popup / bottom sheet ─────────────────────── */
+function DayPopup({ day, year, month, activeTab, subjectRecords, classRecords, calendarEvents, subjects, onClose }) {
+  if (!day) return null;
+
+  const dateKey = `${year}-${String(month).padStart(2,"0")}-${String(day).padStart(2,"0")}`;
+  const dateLabel = new Date(year, month - 1, day).toLocaleDateString("en-IN", {
+    weekday: "long", day: "numeric", month: "long", year: "numeric",
+  });
+
+  // Subject-wise records for this day
+  const daySubjectRecords = subjectRecords.filter(r => toDateKey(r.date) === dateKey);
+
+  // Class attendance for this day
+  const dayClassRecord = classRecords.find(r => toDateKey(r.date) === dateKey);
+
+  // Calendar events for this day
+  const dayEvents = calendarEvents.filter(e => eventCoversDate(e, dateKey));
+
+  const hasAttendance = activeTab === "subject" ? daySubjectRecords.length > 0 : !!dayClassRecord;
+  const hasEvents     = dayEvents.length > 0;
+  const isEmpty       = !hasAttendance && !hasEvents;
+
   return (
-    <div className="flex gap-2 overflow-x-auto pb-1 scrollbar-hide mb-4 -mx-3 px-3">
-      <button
-        onClick={() => onChange("")}
-        className={`shrink-0 px-3.5 py-1.5 rounded-full text-xs font-semibold border transition-all ${
-          active === ""
-            ? "bg-[rgb(var(--primary))] text-[rgb(var(--text))] shadow-sm"
-            : "text-[rgb(var(--primary))] bg-[rgb(var(--surface))]"
-        }`}
-      >
-        All Subjects
-      </button>
-      {subjects.map((s) => (
+    <>
+      {/* Backdrop */}
+      <div
+        className="fixed inset-0 bg-black/40 z-40 backdrop-blur-sm"
+        onClick={onClose}
+      />
+
+      {/* Sheet — bottom on mobile, centered on desktop */}
+      <div className="fixed z-50
+        bottom-0 left-0 right-0 rounded-t-2xl
+        sm:bottom-auto sm:top-1/2 sm:left-1/2 sm:-translate-x-1/2 sm:-translate-y-1/2
+        sm:w-full sm:max-w-md sm:rounded-2xl
+        bg-[rgb(var(--surface))] shadow-2xl
+        max-h-[85vh] overflow-y-auto
+      ">
+        {/* Handle bar (mobile) */}
+        <div className="flex justify-center pt-3 pb-1 sm:hidden">
+          <div className="w-10 h-1 rounded-full bg-slate-300" />
+        </div>
+
+        {/* Header */}
+        <div className="flex items-start justify-between px-5 py-4 border-b border-slate-100">
+          <div>
+            <p className="text-base font-bold text-[rgb(var(--text))]">{dateLabel}</p>
+            <div className="flex items-center gap-1.5 mt-1 flex-wrap">
+              {activeTab === "subject"
+                ? <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-[rgb(var(--primary))]/10 text-[rgb(var(--primary))]">Subject-wise</span>
+                : <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-[rgb(var(--primary))]/10 text-[rgb(var(--primary))]">Class Attendance</span>
+              }
+              {dayEvents.map(e => {
+                const s = EVENT_TYPE_STYLE[e.type] ?? EVENT_TYPE_STYLE.Event;
+                return (
+                  <span key={e._id} className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${s.bg} ${s.text}`}>
+                    {e.type}
+                  </span>
+                );
+              })}
+            </div>
+          </div>
+          <button
+            onClick={onClose}
+            className="w-8 h-8 flex items-center justify-center rounded-full hover:bg-slate-100 text-[rgb(var(--text))] transition-colors shrink-0 ml-2"
+          >
+            <FaTimes size={13} />
+          </button>
+        </div>
+
+        <div className="px-5 py-4 space-y-4">
+
+          {/* ── Calendar events section ── */}
+          {hasEvents && (
+            <div>
+              <p className="text-[10px] font-bold text-[rgb(var(--text))] uppercase tracking-widest mb-2">
+                School Event
+              </p>
+              <div className="space-y-2">
+                {dayEvents.map(event => {
+                  const s = EVENT_TYPE_STYLE[event.type] ?? EVENT_TYPE_STYLE.Event;
+                  return (
+                    <div key={event._id} className={`rounded-xl border ${s.border} ${s.bg} p-3`}>
+                      <div className="flex items-start gap-2">
+                        <span className={`w-2 h-2 rounded-full ${s.dot} shrink-0 mt-1.5`} />
+                        <div>
+                          <p className={`text-sm font-bold ${s.text}`}>{event.title}</p>
+                          {event.description && (
+                            <p className={`text-xs mt-0.5 ${s.text} opacity-80`}>{event.description}</p>
+                          )}
+                          {event.location && (
+                            <p className={`text-xs mt-0.5 ${s.text} opacity-70`}>📍 {event.location}</p>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
+          {/* ── Subject-wise attendance ── */}
+          {activeTab === "subject" && (
+            <div>
+              <p className="text-[10px] font-bold text-[rgb(var(--text))] uppercase tracking-widest mb-2">
+                Subject Attendance
+              </p>
+              {daySubjectRecords.length === 0 ? (
+                <div className="rounded-xl border border-slate-200 bg-[rgb(var(--bg))] p-4 text-center">
+                  <p className="text-sm text-[rgb(var(--text))]">
+                    {hasEvents ? "No classes on this day" : "No attendance recorded"}
+                  </p>
+                </div>
+              ) : (
+                <div className="space-y-2">
+                  {daySubjectRecords.map((r, i) => {
+                    const st  = r.status ?? "Present";
+                    const cfg = STATUS_DOT[st];
+                    const subjectName = r.subjectId?.name ?? subjects.find(s => s._id === r.subjectId)?.name ?? "—";
+                    return (
+                      <div key={r._id ?? i} className={`flex items-center justify-between rounded-xl border ${cfg.border} ${cfg.bg} px-3 py-2.5`}>
+                        <div className="flex items-center gap-2">
+                          <span className={`w-2 h-2 rounded-full ${cfg.dot} shrink-0`} />
+                          <span className="text-sm font-semibold text-[rgb(var(--text))]">{subjectName}</span>
+                        </div>
+                        <span className={`text-xs font-bold px-2.5 py-1 rounded-full ${cfg.bg} ${cfg.text} border ${cfg.border}`}>
+                          {cfg.label}
+                        </span>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* ── Class attendance ── */}
+          {activeTab === "class" && (
+            <div>
+              <p className="text-[10px] font-bold text-[rgb(var(--text))] uppercase tracking-widest mb-2">
+                Class Attendance
+              </p>
+              {!dayClassRecord ? (
+                <div className="rounded-xl border border-slate-200 bg-[rgb(var(--bg))] p-4 text-center">
+                  <p className="text-sm text-[rgb(var(--text))]">
+                    {hasEvents ? "No class on this day" : "Not marked for this day"}
+                  </p>
+                </div>
+              ) : (
+                <div className={`rounded-xl border px-4 py-3
+                  ${STATUS_DOT[dayClassRecord.status]?.border ?? "border-slate-200"}
+                  ${STATUS_DOT[dayClassRecord.status]?.bg ?? "bg-slate-50"}`}
+                >
+                  <div className="flex items-center justify-between">
+                    <p className="text-sm font-semibold text-[rgb(var(--text))]">Daily Attendance</p>
+                    <span className={`text-xs font-bold px-2.5 py-1 rounded-full
+                      ${STATUS_DOT[dayClassRecord.status]?.bg ?? "bg-slate-100"}
+                      ${STATUS_DOT[dayClassRecord.status]?.text ?? "text-slate-600"}
+                      border ${STATUS_DOT[dayClassRecord.status]?.border ?? "border-slate-200"}`}
+                    >
+                      {STATUS_DOT[dayClassRecord.status]?.label ?? dayClassRecord.status}
+                    </span>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* ── Empty state ── */}
+          {isEmpty && (
+            <div className="flex flex-col items-center justify-center py-6 text-center">
+              <span className="text-3xl mb-2">📅</span>
+              <p className="text-sm font-semibold text-[rgb(var(--text))]">No data</p>
+              <p className="text-xs text-[rgb(var(--text))] mt-0.5">No attendance or events for this day</p>
+            </div>
+          )}
+        </div>
+      </div>
+    </>
+  );
+}
+
+/* ─── Calendar grid ─────────────────────────────────────────── */
+function CalendarGrid({ year, month, activeTab, subjectRecords, classRecords, calendarEvents, onDayClick }) {
+  const cells  = useMemo(() => buildCalendarGrid(year, month), [year, month]);
+  const todayKey = toDateKey(new Date());
+
+  return (
+    <div className="bg-[rgb(var(--surface))] rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+      {/* Day headers */}
+      <div className="grid grid-cols-7 border-b border-slate-100">
+        {DAYS_SHORT.map(d => (
+          <div key={d} className="py-2 text-center text-[10px] font-bold text-[rgb(var(--text))] uppercase tracking-wide">
+            {d}
+          </div>
+        ))}
+      </div>
+
+      {/* Day cells */}
+      <div className="grid grid-cols-7">
+        {cells.map((day, idx) => {
+          if (!day) {
+            return <div key={`empty-${idx}`} className="border-r border-b border-slate-100 last:border-r-0" style={{ minHeight: 64 }} />;
+          }
+
+          const dateKey = `${year}-${String(month).padStart(2,"0")}-${String(day).padStart(2,"0")}`;
+          const isToday = dateKey === todayKey;
+          const isFuture = dateKey > todayKey;
+
+          /* Attendance status for this day */
+          let attStatus  = null;
+          let attStyle   = null;
+
+          if (activeTab === "subject") {
+            const recs = subjectRecords.filter(r => toDateKey(r.date) === dateKey);
+            if (recs.length > 0) {
+              // Aggregate: if any absent → Absent; if any late → Late; else Present
+              const hasAbsent  = recs.some(r => r.status === "Absent");
+              const hasLate    = recs.some(r => r.status === "Late");
+              attStatus = hasAbsent ? "Absent" : hasLate ? "Late" : "Present";
+              attStyle  = STATUS_DOT[attStatus];
+            }
+          } else {
+            const rec = classRecords.find(r => toDateKey(r.date) === dateKey);
+            if (rec) {
+              attStatus = rec.status;
+              attStyle  = STATUS_DOT[attStatus];
+            }
+          }
+
+          /* Calendar event for this day */
+          const dayEvents = calendarEvents.filter(e => eventCoversDate(e, dateKey));
+          const topEvent  = dayEvents[0] ?? null;
+          const evStyle   = topEvent ? (EVENT_TYPE_STYLE[topEvent.type] ?? EVENT_TYPE_STYLE.Event) : null;
+
+          /* Holiday takes priority over attendance display at top */
+          const isHoliday = dayEvents.some(e => e.type === "Holiday");
+
+          return (
+            <button
+              key={dateKey}
+              onClick={() => !isFuture && onDayClick(day)}
+              disabled={isFuture}
+              className={`
+                border-r border-b border-slate-100
+                flex flex-col
+                transition-colors text-left
+                ${isFuture ? "opacity-30 cursor-not-allowed" : "hover:bg-[rgb(var(--bg))] cursor-pointer active:scale-95"}
+                ${isToday ? "ring-2 ring-inset ring-[rgb(var(--primary))]" : ""}
+              `}
+              style={{ minHeight: 64 }}
+            >
+              {/* TOP HALF — date number + status dot */}
+              <div className="flex items-start justify-between px-1.5 pt-1.5 pb-0.5 flex-1">
+                <span className={`text-xs font-bold leading-none
+                  ${isToday
+                    ? "w-5 h-5 flex items-center justify-center rounded-full bg-[rgb(var(--primary))] text-white text-[10px]"
+                    : "text-[rgb(var(--text))]"
+                  }`}
+                >
+                  {day}
+                </span>
+
+                {/* Status indicator */}
+                {!isFuture && (
+                  <div className="flex flex-col items-end gap-0.5">
+                    {attStyle && !isHoliday && (
+                      <span className={`w-2 h-2 rounded-full shrink-0 ${attStyle.dot}`} />
+                    )}
+                    {isHoliday && (
+                      <span className="w-2 h-2 rounded-full shrink-0 bg-violet-500" />
+                    )}
+                    {!attStyle && !isHoliday && topEvent && (
+                      <span className={`w-2 h-2 rounded-full shrink-0 ${evStyle.dot}`} />
+                    )}
+                  </div>
+                )}
+              </div>
+
+              {/* BOTTOM HALF — event name */}
+              {topEvent && (
+                <div className={`mx-1 mb-1 px-1 py-0.5 rounded text-[8px] sm:text-[9px] font-semibold leading-tight truncate
+                  ${evStyle.bg} ${evStyle.text}`}
+                >
+                  {topEvent.title}
+                </div>
+              )}
+              {!topEvent && attStatus && (
+                <div className={`mx-1 mb-1 px-1 py-0.5 rounded text-[8px] sm:text-[9px] font-semibold leading-tight
+                  ${attStyle.bg} ${attStyle.text}`}
+                >
+                  {attStyle.letter}
+                </div>
+              )}
+            </button>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+/* ─── Tab bar ────────────────────────────────────────────────── */
+function TabBar({ active, onChange }) {
+  const tabs = [
+    { id: "subject", label: "Subject-wise" },
+    { id: "class",   label: "Class Attendance" },
+  ];
+  return (
+    <div className="flex gap-0 bg-[rgb(var(--surface))] rounded-xl border border-slate-200 p-1 mb-4">
+      {tabs.map(({ id, label }) => (
         <button
-          key={s._id}
-          onClick={() => onChange(s._id)}
-          className={`shrink-0 px-3.5 py-1.5 rounded-full text-xs font-semibold border transition-all ${
-            active === s._id
-              ? "bg-[rgb(var(--primary))] text-[rgb(var(--text))] shadow-sm"
-              : "text-[rgb(var(--primary))] bg-[rgb(var(--surface))]"
-          }`}
+          key={id}
+          onClick={() => onChange(id)}
+          className={`flex-1 py-2 rounded-lg text-xs sm:text-sm font-semibold transition-all
+            ${active === id
+              ? "bg-[rgb(var(--primary))] text-white shadow-sm"
+              : "text-[rgb(var(--text))] hover:bg-[rgb(var(--bg))]"
+            }`}
         >
-          {s.name}
+          {label}
         </button>
       ))}
     </div>
   );
 }
 
-/* ─── Date Row ───────────────────────────────────────────── */
-function DateRow({ record, isLatest }) {
-  const date = new Date(record.date);
-  const day = DAYS[date.getDay()];
-  const dayNum = date.getDate();
-  const st = record.status ?? "Present";
-  const cfg = STATUS_CONFIG[st];
-  const subjName = record.subjectId?.name ?? "—";
-
+/* ─── Legend ─────────────────────────────────────────────────── */
+function Legend() {
+  const items = [
+    { dot: "bg-emerald-500", label: "Present" },
+    { dot: "bg-rose-500",    label: "Absent"  },
+    { dot: "bg-amber-400",   label: "Late"    },
+    { dot: "bg-violet-500",  label: "Holiday" },
+    { dot: "bg-blue-500",    label: "Event"   },
+  ];
   return (
-    <div
-      className={`flex items-center gap-3 py-3 border-b border-slate-50 last:border-0 ${isLatest ? "animate-pulse-once" : ""}`}
-    >
-      {/* Date block */}
-      <div className="flex flex-col items-center justify-center w-11 h-11 rounded-xl  border border-slate-100 shrink-0">
-        <span className="text-[10px] font-semibold text-[rgb(var(--text))] uppercase leading-none">
-          {day}
-        </span>
-        <span className="text-base font-bold text-[rgb(var(--text))] leading-tight">
-          {dayNum}
-        </span>
-      </div>
-
-      {/* Info */}
-      <div className="flex-1 min-w-0">
-        <p className="text-sm font-semibold text-[rgb(var(--text))] leading-tight truncate">
-          {subjName}
-        </p>
-        <p className="text-xs text-[rgb(var(--text))] mt-0.5">
-          {date.toLocaleDateString("en-IN", {
-            day: "2-digit",
-            month: "short",
-            year: "numeric",
-          })}
-        </p>
-      </div>
-
-      {/* Status */}
-      <span
-        className={`shrink-0 text-xs font-bold px-3 py-1.5 rounded-full border ring-2 ${cfg.pill} ${cfg.ring}`}
-      >
-        {cfg.icon} {st}
-      </span>
+    <div className="flex gap-3 flex-wrap justify-center mt-4">
+      {items.map(({ dot, label }) => (
+        <div key={label} className="flex items-center gap-1.5">
+          <span className={`w-2 h-2 rounded-full ${dot}`} />
+          <span className="text-xs text-[rgb(var(--text))]">{label}</span>
+        </div>
+      ))}
     </div>
   );
 }
 
-/* ─── Month Nav ──────────────────────────────────────────── */
-function MonthNav({ month, year, onChange }) {
-  const prev = () => {
-    if (month === 1) onChange(12, year - 1);
-    else onChange(month - 1, year);
-  };
-  const next = () => {
-    const now = new Date();
-    if (year === now.getFullYear() && month === now.getMonth() + 1) return; // can't go future
-    if (month === 12) onChange(1, year + 1);
-    else onChange(month + 1, year);
-  };
-  const isCurrentMonth =
-    year === new Date().getFullYear() && month === new Date().getMonth() + 1;
-
-  return (
-    <div className="flex items-center justify-between text-[rgb(var(--text))] bg-[rgb(var(--surface))] rounded-xl border border-slate-200 px-3 py-2 mb-4">
-      <button
-        onClick={prev}
-        className="w-8 h-8 flex items-center justify-center rounded-lg hover:bg-slate-50 text-slate-500 transition-colors"
-      >
-        ‹
-      </button>
-      <div className="text-center">
-        <p className="text-sm font-bold text-[rgb(var(--text))]">
-          {MONTHS[month - 1]} {year}
-        </p>
-      </div>
-      <button
-        onClick={next}
-        disabled={isCurrentMonth}
-        className="w-8 h-8 flex items-center justify-center rounded-lg hover:bg-slate-50 text-slate-500 transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
-      >
-        ›
-      </button>
-    </div>
-  );
-}
-
-/* ─── Empty State ────────────────────────────────────────── */
-function EmptyState({ month, year }) {
-  return (
-    <div className="flex flex-col items-center justify-center py-14 text-center">
-      <div className="w-16 h-16 rounded-2xl bg-[rgb(var(--surface))] flex items-center justify-center mb-3 text-2xl">
-        📅
-      </div>
-      <p className="text-sm font-semibold ">No records found</p>
-      <p className="text-xs text-[rgb(var(--text))] mt-1">
-        No attendance for {MONTHS[month - 1]} {year}
-      </p>
-    </div>
-  );
-}
-
-/* ── Group records by date for multi-subject view ─────────── */
-function groupByDate(records) {
-  const map = {};
-  records.forEach((r) => {
-    const key = new Date(r.date).toISOString().split("T")[0];
-    if (!map[key]) map[key] = [];
-    map[key].push(r);
-  });
-  return Object.entries(map).sort(([a], [b]) => new Date(b) - new Date(a));
-}
-
-/* ══════════════════════════════════════════════════════════
-   MAIN COMPONENT
-══════════════════════════════════════════════════════════ */
+/* ══════════════════════════════════════════════════════════════
+   MAIN
+══════════════════════════════════════════════════════════════ */
 export default function AttendanceParent() {
-  const API = import.meta.env.VITE_API_URL;
+  const navigate  = useNavigate();
+  const isMobile  = window.innerWidth <= 768;
 
-  /* Student meta comes from auth/parent context */
-  const [student, setStudent] = useState(null); // { name, rollNumber, className, sectionName, _id }
+  /* ── Tab ── */
+  const [activeTab, setActiveTab] = useState(
+    () => localStorage.getItem(TAB_KEY) ?? "subject"
+  );
+
+  /* ── Student meta ── */
+  const [student,  setStudent]  = useState(null);
   const [subjects, setSubjects] = useState([]);
 
+  /* ── Month nav ── */
   const [month, setMonth] = useState(CURRENT_MONTH);
-  const [year, setYear] = useState(CURRENT_YEAR);
+  const [year,  setYear]  = useState(CURRENT_YEAR);
 
-  const [activeSubject, setActiveSubject] = useState(""); // "" = all
-  const [records, setRecords] = useState([]);
-  const [loading, setLoading] = useState(false);
-  const [initialized, setInitialized] = useState(false);
-  const navigate = useNavigate();
-  const isMobile = window.innerWidth <= 768;
+  /* ── Data ── */
+  const [subjectRecords,  setSubjectRecords]  = useState([]);
+  const [classRecords,    setClassRecords]    = useState([]);
+  const [calendarEvents,  setCalendarEvents]  = useState([]);
+  const [summary,         setSummary]         = useState({ present:0, absent:0, late:0, total:0, percentage:0 });
 
-  /* ── Fetch student meta on mount ── */
+  /* ── Loading ── */
+  const [loadingMeta, setLoadingMeta]     = useState(true);
+  const [loadingData, setLoadingData]     = useState(false);
+
+  /* ── Popup ── */
+  const [selectedDay, setSelectedDay] = useState(null);
+
+  /* ── 1. Fetch student meta on mount ── */
   useEffect(() => {
     (async () => {
       try {
-        const res = await axios.get(`${API}/attendance/parent/student-meta`, {
-          withCredentials: true,
-        });
+        const res = await axios.get(`${API}/attendance/parent/student-meta`, { withCredentials: true });
         setStudent(res.data.student);
         setSubjects(res.data.subjects ?? []);
       } catch {
         toast.error("Failed to load student info");
+      } finally {
+        setLoadingMeta(false);
       }
     })();
   }, []);
 
-  /* ── Fetch attendance whenever month/year/subject changes ── */
+  /* ── 2. Fetch attendance + calendar when student/month/year/tab changes ── */
   useEffect(() => {
     if (!student) return;
-    fetchAttendance();
-  }, [student, month, year, activeSubject]);
+    fetchMonthData();
+  }, [student, month, year, activeTab]);
 
-  const fetchAttendance = async () => {
+  const fetchMonthData = async () => {
+    setLoadingData(true);
     try {
-      setLoading(true);
-      const params = {
-        studentId: student._id,
-        month,
-        year,
-      };
-      if (activeSubject) params.subjectId = activeSubject;
+      const monthStart = `${year}-${String(month).padStart(2,"0")}-01`;
+      const lastDay    = new Date(year, month, 0).getDate();
+      const monthEnd   = `${year}-${String(month).padStart(2,"0")}-${String(lastDay).padStart(2,"0")}`;
 
-      const res = await axios.get(`${API}/attendance/parent/report`, {
-        params,
-        withCredentials: true,
-      });
-      setRecords(res.data.data ?? []);
-      setInitialized(true);
+      const promises = [
+        /* Calendar events for this month */
+        axios.get(`${API}/calendar/`, {
+          params: { start: monthStart, end: monthEnd },
+          withCredentials: true,
+        }),
+      ];
+
+      if (activeTab === "subject") {
+        promises.push(
+          axios.get(`${API}/attendance/parent/report`, {
+            params: { studentId: student._id, month, year },
+            withCredentials: true,
+          })
+        );
+      } else {
+        promises.push(
+          axios.get(`${API}/class-attendance/parent/report`, {
+            params: { studentId: student._id, month, year },
+            withCredentials: true,
+          })
+        );
+      }
+
+      const [calRes, attRes] = await Promise.all(promises);
+
+      setCalendarEvents(calRes.data.events ?? []);
+
+      if (activeTab === "subject") {
+        const records = attRes.data.data ?? [];
+        setSubjectRecords(records);
+        setClassRecords([]);
+        // Summary from subject records
+        const present    = records.filter(r => r.status === "Present").length;
+        const absent     = records.filter(r => r.status === "Absent").length;
+        const late       = records.filter(r => r.status === "Late").length;
+        const total      = records.length;
+        const percentage = total ? Math.round(((present + late) / total) * 100) : 0;
+        setSummary({ present, absent, late, total, percentage });
+      } else {
+        const records = attRes.data.records ?? [];
+        setClassRecords(records);
+        setSubjectRecords([]);
+        setSummary(attRes.data.summary ?? { present:0, absent:0, late:0, total:0, percentage:0 });
+      }
     } catch (err) {
-      toast.error(err?.response?.data?.message || "Failed to load attendance");
+      // Silently handle 404 (no records yet)
+      if (err?.response?.status !== 404) {
+        toast.error("Failed to load attendance data");
+      }
+      setSubjectRecords([]);
+      setClassRecords([]);
+      setCalendarEvents([]);
+      setSummary({ present:0, absent:0, late:0, total:0, percentage:0 });
     } finally {
-      setLoading(false);
+      setLoadingData(false);
     }
   };
 
-  /* Sort records newest first */
-  const sortedRecords = useMemo(
-    () => [...records].sort((a, b) => new Date(b.date) - new Date(a.date)),
-    [records],
-  );
+  /* ── Month navigation ── */
+  const prevMonth = () => {
+    if (month === 1) { setMonth(12); setYear(y => y - 1); }
+    else setMonth(m => m - 1);
+  };
+  const nextMonth = () => {
+    if (year === CURRENT_YEAR && month === CURRENT_MONTH) return;
+    if (month === 12) { setMonth(1); setYear(y => y + 1); }
+    else setMonth(m => m + 1);
+  };
+  const isCurrentMonth = year === CURRENT_YEAR && month === CURRENT_MONTH;
 
-  const handleMonthChange = (m, y) => {
-    setMonth(m);
-    setYear(y);
+  /* ── Tab change ── */
+  const handleTabChange = (id) => {
+    setActiveTab(id);
+    localStorage.setItem(TAB_KEY, id);
+    setSelectedDay(null);
   };
 
-  /* ────────────────── RENDER ────────────────── */
+  /* ══════════════ RENDER ══════════════ */
   return (
-    <div className="min-h-screen">
+    <div className="min-h-screen bg-[rgb(var(--bg))]">
       <div className="max-w-lg mx-auto px-3 py-5 sm:px-5 sm:py-8">
-        {/* Back button (mobile) */}
+
+        {/* Back (mobile) */}
         {isMobile && (
           <button
             onClick={() => navigate(-1)}
             className="flex items-center gap-2 px-3 py-1.5 mb-4 rounded-xl
-                     bg-white shadow-sm border border-slate-100
-                     text-sm font-bold text-slate-600 active:scale-95 transition-transform"
+              bg-[rgb(var(--surface))] shadow-sm border border-slate-100
+              text-sm font-bold text-[rgb(var(--text))] active:scale-95 transition-transform"
           >
             <FaArrowLeft size={14} /> Back
           </button>
         )}
 
-        {/* ── Student Header ── */}
-        {student && (
+        {/* ── Student header ── */}
+        {loadingMeta ? (
           <div className="flex items-center gap-3 mb-5">
-            <div
-              className="w-12 h-12 rounded-2xl flex items-center justify-center text-lg font-black text-[rgb(var(--text))] shadow-sm shrink-0 bg-[rgb(var(--primary))]"
-            >
+            <div className="w-12 h-12 rounded-2xl bg-slate-200 animate-pulse shrink-0" />
+            <div className="space-y-2">
+              <div className="h-4 w-36 bg-slate-200 rounded animate-pulse" />
+              <div className="h-3 w-24 bg-slate-200 rounded animate-pulse" />
+            </div>
+          </div>
+        ) : student && (
+          <div className="flex items-center gap-3 mb-5">
+            <div className="w-12 h-12 rounded-2xl flex items-center justify-center text-lg font-black
+              text-white shadow-sm shrink-0 bg-[rgb(var(--primary))]">
               {student.name?.[0]?.toUpperCase() ?? "S"}
             </div>
             <div>
-              <h1 className="text-lg font-bold text-[rgb(var(--text))] leading-tight">
-                {student.name}
-              </h1>
+              <h1 className="text-lg font-bold text-[rgb(var(--text))] leading-tight">{student.name}</h1>
               <p className="text-xs text-[rgb(var(--text))] mt-0.5">
-                {student.className} • {student.sectionName} • Roll{" "}
-                {student.rollNumber}
+                {student.className} · {student.sectionName} · Roll {student.rollNumber}
               </p>
             </div>
           </div>
         )}
 
-        {!student && (
-          <div className="mb-5">
-            <div className="h-12 w-48 bg-[rgb(var(--primary))] rounded-2xl animate-pulse" />
+        {/* ── Tab bar ── */}
+        <TabBar active={activeTab} onChange={handleTabChange} />
+
+        {/* ── Month navigator ── */}
+        <div className="flex items-center justify-between bg-[rgb(var(--surface))] rounded-xl border border-slate-200 px-3 py-2 mb-4">
+          <button
+            onClick={prevMonth}
+            className="w-8 h-8 flex items-center justify-center rounded-lg hover:bg-[rgb(var(--bg))] text-[rgb(var(--text))] transition-colors"
+          >
+            <FaChevronLeft size={12} />
+          </button>
+          <div className="text-center">
+            <p className="text-sm font-bold text-[rgb(var(--text))]">{MONTHS[month - 1]} {year}</p>
           </div>
-        )}
+          <button
+            onClick={nextMonth}
+            disabled={isCurrentMonth}
+            className="w-8 h-8 flex items-center justify-center rounded-lg hover:bg-[rgb(var(--bg))] text-[rgb(var(--text))] transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
+          >
+            <FaChevronRight size={12} />
+          </button>
+        </div>
 
-        {/* ── Month Nav ── */}
-        <MonthNav month={month} year={year} onChange={handleMonthChange} />
-
-        {/* ── Subject Tabs ── */}
-        {subjects.length > 0 && (
-          <SubjectTabs
-            subjects={subjects}
-            active={activeSubject}
-            onChange={setActiveSubject}
-          />
-        )}
+        {/* ── Summary card ── */}
+        {!loadingData && summary.total > 0 && <SummaryCard summary={summary} />}
 
         {/* ── Loading skeleton ── */}
-        {loading && (
-          <div className="space-y-3">
-            {[...Array(5)].map((_, i) => (
-              <div
-                key={i}
-                className="flex items-center gap-3 bg-[rgb(var(--surface))] rounded-xl p-3 border border-slate-100"
-              >
-                <div className="w-11 h-11 rounded-xl bg-[rgb(var(--primary))] animate-pulse shrink-0" />
-                <div className="flex-1 space-y-1.5">
-                  <div className="h-3 bg-[rgb(var(--primary))] rounded animate-pulse w-3/4" />
-                  <div className="h-2.5 bg-[rgb(var(--primary))] rounded animate-pulse w-1/2" />
-                </div>
-                <div className="w-16 h-7 rounded-full bg-[rgb(var(--primary))] animate-pulse" />
+        {loadingData && (
+          <div className="bg-[rgb(var(--surface))] rounded-2xl border border-slate-200 p-4 animate-pulse">
+            <div className="grid grid-cols-7 gap-1 mb-2">
+              {[...Array(7)].map((_,i) => <div key={i} className="h-4 bg-slate-200 rounded" />)}
+            </div>
+            {[...Array(5)].map((_,i) => (
+              <div key={i} className="grid grid-cols-7 gap-1 mb-1">
+                {[...Array(7)].map((_,j) => <div key={j} className="h-14 bg-slate-200 rounded" />)}
               </div>
             ))}
           </div>
         )}
 
-        {/* ── Results ── */}
-        {!loading && initialized && (
-          <>
-            {/* Summary */}
-            {sortedRecords.length > 0 && (
-              <SummaryCard records={sortedRecords} />
-            )}
-
-            {/* Records list */}
-            <div className="bg-[rgb(var(--surface))] rounded-2xl border border-slate-100 shadow-sm overflow-hidden">
-              <div className="flex items-center justify-between px-4 py-3 border-b border-slate-50">
-                <p className="text-sm font-bold text-[rgb(var(--text))]">
-                  {activeSubject
-                    ? (subjects.find((s) => s._id === activeSubject)?.name ??
-                      "Subject")
-                    : "All Subjects"}
-                </p>
-                {sortedRecords.length > 0 && (
-                  <span className="text-xs bg-slate-100 text-[rgb(var(--primary))] font-semibold px-2.5 py-1 rounded-full">
-                    {sortedRecords.length}{" "}
-                    {sortedRecords.length === 1 ? "class" : "classes"}
-                  </span>
-                )}
-              </div>
-
-              <div className="px-4">
-                {sortedRecords.length === 0 ? (
-                  <EmptyState month={month} year={year} />
-                ) : (
-                  sortedRecords.map((r, i) => (
-                    <DateRow key={r._id ?? i} record={r} isLatest={i === 0} />
-                  ))
-                )}
-              </div>
-            </div>
-
-            {/* Legend */}
-            {sortedRecords.length > 0 && (
-              <div className="flex gap-3 justify-center mt-4 flex-wrap">
-                {Object.entries(STATUS_CONFIG).map(([label, cfg]) => (
-                  <div key={label} className="flex items-center gap-1.5">
-                    <span className={`w-2 h-2 rounded-full ${cfg.dot}`} />
-                    <span className="text-xs text-[rgb(var(--text))]">{label}</span>
-                  </div>
-                ))}
-              </div>
-            )}
-          </>
+        {/* ── Calendar grid ── */}
+        {!loadingData && (
+          <CalendarGrid
+            year={year}
+            month={month}
+            activeTab={activeTab}
+            subjectRecords={subjectRecords}
+            classRecords={classRecords}
+            calendarEvents={calendarEvents}
+            onDayClick={setSelectedDay}
+          />
         )}
 
-        {/* ── Initial / Not loaded ── */}
-        {!loading && !initialized && (
-          <div className="text-center py-20">
-            <div className="text-4xl mb-3">📚</div>
-            <p className="text-sm text-[rgb(var(--text))]">
-              Loading your child's attendance…
-            </p>
-          </div>
+        {/* ── Legend ── */}
+        {!loadingData && <Legend />}
+
+        {/* ── Hint text ── */}
+        {!loadingData && (
+          <p className="text-center text-xs text-[rgb(var(--text))] mt-3">
+            Tap any day to see details
+          </p>
         )}
       </div>
+
+      {/* ── Day popup ── */}
+      {selectedDay && (
+        <DayPopup
+          day={selectedDay}
+          year={year}
+          month={month}
+          activeTab={activeTab}
+          subjectRecords={subjectRecords}
+          classRecords={classRecords}
+          calendarEvents={calendarEvents}
+          subjects={subjects}
+          onClose={() => setSelectedDay(null)}
+        />
+      )}
     </div>
   );
 }

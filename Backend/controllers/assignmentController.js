@@ -100,11 +100,11 @@ export const createAssignment = async (req, res) => {
       schoolId,
     });
 
-    await createNotificationHelper({
+  const noti =  await createNotificationHelper({
   title: "New Assignment 📚",
   message: `${title} has been assigned. Due date: ${new Date(dueDate).toLocaleDateString()}`,
   notificationType: "assignment", // ⚠️ add this in enum
-  createdBy: req.user._id,
+  createdBy: req.user._id ,
   schoolId,
   targets: [
     {
@@ -114,6 +114,7 @@ export const createAssignment = async (req, res) => {
     }
   ]
               });
+              console.log("Notification created:", noti);
 
     res.status(201).json({
       success: true,

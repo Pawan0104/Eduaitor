@@ -597,14 +597,26 @@ const Topbar = ({ toggleSidebar }) => {
         >
           <FaBars size={18} />
         </button>
-        <div className="flex items-center gap-2.5">
+        <div className="flex items-center gap-2.5 pl-2">
+        {user?.school_logo ? (
+          <img
+            src={user.school_logo}
+            alt="School Logo"
+            className="w-auto h-16 rounded-xl object-contain "
+          />
+        ) : (
+          <>
           <div className="w-10 h-10 rounded-xl bg-[rgb(var(--primary))] flex items-center justify-center text-lg shadow">
             🎓
           </div>
+        
           <div className="hidden sm:block">
             <h1 className="text-base font-bold text-[rgb(var(--text))]">EduAltor</h1>
             <p className="text-[11px] opacity-50 text-[rgb(var(--text))]">Track. Assess. Improve.</p>
           </div>
+          </>
+)}
+          
         </div>
       </div>
 

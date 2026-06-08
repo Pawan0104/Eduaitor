@@ -32,6 +32,52 @@ const NotificationPage = () => {
   const { user } = useAuth();
   const location = useLocation();
 
+  // helper 
+ const currentUserId =
+  user?._id ||
+  user?.id ||
+  user?.school_id;
+const isNotificationRead = (notification) => {
+  if (!notification?.readBy || !currentUserId) return false;
+
+  return notification.readBy.some((id) => {
+    if (!id) return false;
+
+    if (typeof id === "object" && id._id) {
+      return id._id.toString() === currentUserId.toString();
+    }
+
+    return id.toString() === currentUserId.toString();
+  });
+};
+const getPriority = (n) => {
+  if (!n.startingDate) return 3;
+
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+
+  const start = new Date(n.startingDate);
+  start.setHours(0, 0, 0, 0);
+
+  const diffDays = Math.floor(
+    (start - today) / (1000 * 60 * 60 * 24)
+  );
+
+  if (diffDays < 0) return 4; // passed
+  if (diffDays <= 1) return 0; // today/tomorrow
+  if (diffDays <= 3) return 1; // next 3 days
+  if (diffDays <= 7) return 2; // this week
+
+  return 3; // future
+};
+
+const sortedNotifications = [...notifications].sort((a, b) => {
+  const priorityDiff = getPriority(a) - getPriority(b);
+
+  if (priorityDiff !== 0) return priorityDiff;
+
+  return new Date(b.createdAt) - new Date(a.createdAt);
+});
   // ─── FETCH ALL NOTIFICATIONS (including dismissed ones) ──────────────────
   // Uses GET /notifications — no dismissedBy filter — full archive
   const fetchNotifications = async () => {
@@ -70,7 +116,7 @@ const NotificationPage = () => {
     setMobileView("detail");
 
     // Mark as read if not already
-    if (!notif.readBy?.includes(user._id)) {
+ if (!isNotificationRead(notif)) {
       try {
         await axios.patch(
           `${API}/notifications/${notif._id}/read`, {}, { withCredentials: true }
@@ -80,15 +126,16 @@ const NotificationPage = () => {
         setNotifications(
           source.map((n) =>
             n._id === notif._id
-              ? { ...n, readBy: [...(n.readBy || []), user._id] }
+              ? { ...n, readBy: [...(n.readBy || []), user._id || user.id] }
               : n
           )
         );
         // Also update selectedNotif so detail view shows correct read state
         setSelectedNotif((prev) => ({
           ...prev,
-          readBy: [...(prev?.readBy || []), user._id],
+          readBy: [...(prev?.readBy || []), user._id || user.id ],
         }));
+        fetchNotifications(); // Sync with server to get any other updates (optional)
       } catch {
         // silent — read state will sync on next fetch
       }
@@ -101,15 +148,14 @@ const NotificationPage = () => {
     setMobileView("detail");
   };
 
+
   // ─── FILTER ──────────────────────────────────────────────────────────────
-  const visible = filter === "unread"
-    ? notifications.filter((n) => !n.readBy?.includes(user._id))
-    : notifications;
-
-  const unreadCount = notifications.filter(
-    (n) => !n.readBy?.includes(user._id)
-  ).length;
-
+const visible = filter === "unread"
+  ? sortedNotifications.filter((n) => !isNotificationRead(n))
+  : sortedNotifications;
+ const unreadCount = notifications.filter(
+  (n) => !isNotificationRead(n)
+).length;
   // ─── RENDER ──────────────────────────────────────────────────────────────
   return (
     <div className="flex flex-col h-[calc(100vh-4rem)] w-full p-3 md:p-4 gap-3 md:gap-4">
@@ -209,8 +255,11 @@ const NotificationPage = () => {
               </div>
             ) : (
               visible.map((n) => {
-                const isUnread = !n.readBy?.includes(user._id);
-                const isActive = selectedNotif?._id === n._id && !showCreate;
+                const isUnread = !isNotificationRead(n);
+               const isActive =
+  (selectedNotif?._id === n._id ||
+    selectedNotif?.id === n.id) &&
+  !showCreate;
                 const colors   = TYPE_COLORS[n.notificationType] || TYPE_COLORS.general;
 
                 return (
@@ -300,12 +349,14 @@ const NotificationPage = () => {
                 </span>
                 {/* Show read status */}
                 <span className={`flex items-center gap-1 text-[11px] px-2 py-0.5 rounded-full font-medium
-                  ${selectedNotif.readBy?.includes(user._id)
+                ${isNotificationRead(selectedNotif)
                     ? "bg-emerald-100 text-emerald-600"
                     : "bg-amber-100 text-amber-600"
                   }`}
                 >
-                  {selectedNotif.readBy?.includes(user._id) ? "✓ Read" : "● Unread"}
+                 {isNotificationRead(selectedNotif)
+  ? "✓ Read"
+  : "● Unread"}
                 </span>
               </div>
 

@@ -495,7 +495,7 @@ export const getTopbarNotifications = async (req, res) => {
 
     const notifications = await Notification.find({
       ...targetQuery,
-      dismissedBy: { $ne: user._id }, // hide dismissed ones from topbar only
+      dismissedBy: { $ne: user._id || req.user.id }, // hide dismissed ones from topbar only
     })
       .sort({ createdAt: -1 })
       .limit(50);
@@ -529,7 +529,7 @@ export const getAllNotifications = async (req, res) => {
 export const markAsRead = async (req, res) => {
   try {
     const { id } = req.params;
-    const userId = req.user._id;
+    const userId = req.user._id || req.user.id;
 
     const updated = await Notification.findByIdAndUpdate(
       id,
@@ -553,8 +553,8 @@ export const markAllAsRead = async (req, res) => {
 
     // Only mark the notifications this user can actually see
     await Notification.updateMany(
-      { ...targetQuery, readBy: { $ne: user._id } },
-      { $addToSet: { readBy: user._id } }
+      { ...targetQuery, readBy: { $ne: user._id  || user.id } },
+      { $addToSet: { readBy: user._id || user.id } }
     );
 
     res.status(200).json({ message: "All marked as read" });
@@ -571,10 +571,10 @@ export const dismissAllNotifications = async (req, res) => {
   try {
     const user = req.user;
     const targetQuery = await buildTargetQuery(user);
-
-    await Notification.updateMany(
-      { ...targetQuery, dismissedBy: { $ne: user._id } },
-      { $addToSet: { dismissedBy: user._id } }
+    
+    const not =  await Notification.updateMany(
+      { ...targetQuery, dismissedBy: { $ne: user._id || user.id } },
+      { $addToSet: { dismissedBy: user._id  || user.id} }
     );
 
     res.status(200).json({ message: "All notifications dismissed from topbar" });

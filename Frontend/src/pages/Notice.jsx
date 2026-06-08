@@ -97,6 +97,7 @@ export default function Notice() {
   const [filter, setFilter] = useState("All");
   const [confirmSave, setConfirmSave] = useState(false);
   const [confirmDiscard, setConfirmDiscard] = useState(false);
+  const [errors, setErrors] = useState({});
 
   const isAdmin = user?.role === "school_admin";
   const isTeacher = user?.role === "teacher_admin";
@@ -198,7 +199,18 @@ export default function Notice() {
   /* ── form ── */
   const handleChange = (e) => {
     const { name, value, type, checked } = e.target;
-    setForm((p) => ({ ...p, [name]: type === "checkbox" ? checked : value }));
+
+    if (errors[name]) {
+      setErrors((prev) => ({
+        ...prev,
+        [name]: "",
+      }));
+    }
+
+    setForm((prev) => ({
+      ...prev,
+      [name]: type === "checkbox" ? checked : value,
+    }));
   };
 
   const handleAudienceSelect = (opt) => {
@@ -210,13 +222,48 @@ export default function Notice() {
   };
 
   const validate = () => {
-    if (!form.title.trim()) return "Notice title is required.";
-    if (!form.category) return "Category is required.";
-    if (!form.content.trim()) return "Content is required.";
-    if (!form.publishDate) return "Publish date is required.";
-    if (form.audience === "Class" && !form.assignedClass)
-      return "Please select a class for this notice.";
-    return "";
+    const newErrors = {};
+
+    if (!form.title.trim()) newErrors.title = "Notice title is required.";
+
+    if (!form.category) newErrors.category = "Category is required.";
+
+    if (!form.content.trim()) newErrors.content = "Content is required.";
+
+    if (!form.publishDate) {
+      newErrors.publishDate = "Publish Date is required.";
+    } else {
+      const tomorrow = new Date();
+      tomorrow.setDate(tomorrow.getDate() + 1);
+      tomorrow.setHours(0, 0, 0, 0);
+
+      const publishDate = new Date(form.publishDate);
+      publishDate.setHours(0, 0, 0, 0);
+
+      if (publishDate < tomorrow) {
+        newErrors.publishDate = "Publish Date must be tomorrow or later.";
+      }
+    }
+
+    if (form.expiryDate) {
+      const publishDate = new Date(form.publishDate);
+      const expiryDate = new Date(form.expiryDate);
+
+      publishDate.setHours(0, 0, 0, 0);
+      expiryDate.setHours(0, 0, 0, 0);
+
+      if (expiryDate <= publishDate) {
+        newErrors.expiryDate = "Expiry Date must be after Publish Date.";
+      }
+    }
+
+    if (form.audience === "Class" && !form.assignedClass) {
+      newErrors.assignedClass = "Please select a class.";
+    }
+
+    setErrors(newErrors);
+
+    return Object.keys(newErrors).length === 0;
   };
 
   /* check if form has been touched from EMPTY or from original edit values */
@@ -248,9 +295,8 @@ export default function Notice() {
   };
 
   const handleSubmit = () => {
-    const err = validate();
-    if (err) {
-      toast.error(err);
+    if (!validate()) {
+      toast.error("Please fix the highlighted fields.");
       return;
     }
     setConfirmSave(true); // show save confirm instead of saving directly
@@ -261,7 +307,11 @@ export default function Notice() {
     try {
       setSubmitting(true);
       if (editingId) {
-        await axios.put(`${API}/notices/${editingId}`, { ...form, createdBy },{withCredentials:true});
+        await axios.put(
+          `${API}/notices/${editingId}`,
+          { ...form, createdBy },
+          { withCredentials: true },
+        );
         toast.success("Notice updated successfully!");
       } else {
         await axios.post(
@@ -283,7 +333,9 @@ export default function Notice() {
   /* ── delete ── */
   const handleDelete = async () => {
     try {
-      await axios.delete(`${API}/notices/${deleteId}`,{withCredentials:true});
+      await axios.delete(`${API}/notices/${deleteId}`, {
+        withCredentials: true,
+      });
       toast.success("Notice deleted successfully!");
       setDeleteId(null);
       loadNotices();
@@ -570,26 +622,20 @@ export default function Notice() {
 
               <div className="grid grid-cols-2 gap-3 text-xs mb-4">
                 <div className="border rounded-lg p-3">
-                  <p className=" font-medium mb-0.5">
-                    Publish Date
-                  </p>
+                  <p className=" font-medium mb-0.5">Publish Date</p>
                   <p className="font-semibold ">
                     {viewNotice.publishDate?.slice(0, 10) || "—"}
                   </p>
                 </div>
                 <div className="border rounded-lg p-3">
-                  <p className=" font-medium mb-0.5">
-                    Expiry Date
-                  </p>
+                  <p className=" font-medium mb-0.5">Expiry Date</p>
                   <p className="font-semibold ">
                     {viewNotice.expiryDate?.slice(0, 10) || "—"}
                   </p>
                 </div>
                 <div className="border rounded-lg p-3 col-span-2">
                   <p className=" font-medium mb-0.5">Created By</p>
-                  <p className="font-semibold ">
-                    {viewNotice.createdBy}
-                  </p>
+                  <p className="font-semibold ">{viewNotice.createdBy}</p>
                 </div>
               </div>
 
@@ -628,7 +674,8 @@ export default function Notice() {
               {/* Title */}
               <div>
                 <label className="block text-sm font-mediummb-1">
-                  Notice Title <span className="text-[rgb(var(--primary))]">*</span>
+                  Notice Title{" "}
+                  <span className="text-[rgb(var(--primary))]">*</span>
                 </label>
                 <input
                   name="title"
@@ -637,13 +684,18 @@ export default function Notice() {
                   placeholder="Enter notice title"
                   className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-indigo-400"
                 />
+
+                {errors.title && (
+                  <p className="text-red-500 text-xs mt-1">{errors.title}</p>
+                )}
               </div>
 
               {/* Category + Priority */}
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <label className="block text-sm font-medium  mb-1">
-                    Category <span className="text-[rgb(var(--primary))]">*</span>
+                    Category{" "}
+                    <span className="text-[rgb(var(--primary))]">*</span>
                   </label>
                   <select
                     name="category"
@@ -661,6 +713,11 @@ export default function Notice() {
                     <option>Event</option>
                     <option>General</option>
                   </select>
+                  {errors.category && (
+                    <p className="text-red-500 text-xs mt-1">
+                      {errors.category}
+                    </p>
+                  )}
                 </div>
                 <div>
                   <label className="block text-sm font-medium  mb-1">
@@ -713,15 +770,28 @@ export default function Notice() {
                     text-[rgb(var(--text))] bg-[rgb(var(--surface))]
                     rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-indigo-400"
                   >
-                    <option value="" className="text-[rgb(var(--text))] bg-[rgb(var(--surface))]">— Select a class —</option>
+                    <option
+                      value=""
+                      className="text-[rgb(var(--text))] bg-[rgb(var(--surface))]"
+                    >
+                      — Select a class —
+                    </option>
                     {classes.length > 0 ? (
                       classes.map((cls, i) => (
-                        <option key={i} value={cls.name} className="text-[rgb(var(--text))] bg-[rgb(var(--surface))]">
+                        <option
+                          key={i}
+                          value={cls.name}
+                          className="text-[rgb(var(--text))] bg-[rgb(var(--surface))]"
+                        >
                           {cls.name}
                         </option>
                       ))
                     ) : (
-                      <option key={c} value={c} className="text-[rgb(var(--text))] bg-[rgb(var(--surface))]">
+                      <option
+                        key={c}
+                        value={c}
+                        className="text-[rgb(var(--text))] bg-[rgb(var(--surface))]"
+                      >
                         Class not available
                       </option>
                     )}
@@ -733,15 +803,26 @@ export default function Notice() {
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <label className="block text-sm font-medium t mb-1">
-                    Publish Date <span className="text-[rgb(var(--primary))]">*</span>
+                    Publish Date{" "}
+                    <span className="text-[rgb(var(--primary))]">*</span>
                   </label>
                   <input
                     type="date"
                     name="publishDate"
                     value={form.publishDate}
                     onChange={handleChange}
+                    min={
+                      new Date(Date.now() + 86400000)
+                        .toISOString()
+                        .split("T")[0]
+                    }
                     className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-indigo-400"
                   />
+                  {errors.publishDate && (
+                    <p className="text-red-500 text-xs mt-1">
+                      {errors.publishDate}
+                    </p>
+                  )}
                 </div>
                 <div>
                   <label className="block text-sm font-medium mb-1">
@@ -752,8 +833,22 @@ export default function Notice() {
                     name="expiryDate"
                     value={form.expiryDate}
                     onChange={handleChange}
+                    min={
+                      form.publishDate
+                        ? new Date(
+                            new Date(form.publishDate).getTime() + 86400000,
+                          )
+                            .toISOString()
+                            .split("T")[0]
+                        : ""
+                    }
                     className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-indigo-400"
                   />
+                  {errors.expiryDate && (
+                    <p className="text-red-500 text-xs mt-1">
+                      {errors.expiryDate}
+                    </p>
+                  )}
                 </div>
               </div>
 
@@ -785,6 +880,9 @@ export default function Notice() {
                   placeholder="Write notice content here..."
                   className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-indigo-400 resize-y"
                 />
+                {errors.content && (
+                  <p className="text-red-500 text-xs mt-1">{errors.content}</p>
+                )}
               </div>
             </div>
 
@@ -818,12 +916,8 @@ export default function Notice() {
             <div className="w-12 h-12 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-4">
               <FiTrash2 size={22} className="text-red-500" />
             </div>
-            <h3 className="text-base font-bold  mb-1">
-              Delete Notice?
-            </h3>
-            <p className="text-sm  mb-6">
-              This action cannot be undone.
-            </p>
+            <h3 className="text-base font-bold  mb-1">Delete Notice?</h3>
+            <p className="text-sm  mb-6">This action cannot be undone.</p>
             <div className="flex gap-3">
               <button
                 onClick={() => setDeleteId(null)}
@@ -856,9 +950,7 @@ export default function Notice() {
                 {editingId ? "Update this notice?" : "Create this notice?"}
               </h3>
               <p className="text-sm  mb-1">
-                <span className="font-semibold ">
-                  "{form.title}"
-                </span>
+                <span className="font-semibold ">"{form.title}"</span>
               </p>
               <p className="text-xs text-gray-400 mb-6">
                 Audience:{" "}
@@ -868,9 +960,7 @@ export default function Notice() {
                     : form.audience}
                 </span>
                 &nbsp;·&nbsp; Priority:{" "}
-                <span className="font-medium ">
-                  {form.priority}
-                </span>
+                <span className="font-medium ">{form.priority}</span>
               </p>
               <div className="flex gap-3">
                 <button
@@ -902,9 +992,7 @@ export default function Notice() {
               <div className="w-12 h-12 bg-amber-100 rounded-full flex items-center justify-center mx-auto mb-4">
                 <FiAlertTriangle size={22} className="text-amber-500" />
               </div>
-              <h3 className="text-base font-bold  mb-1">
-                Discard changes?
-              </h3>
+              <h3 className="text-base font-bold  mb-1">Discard changes?</h3>
               <p className="text-sm  mb-6">
                 You have unsaved changes. If you close now, all your changes
                 will be lost.

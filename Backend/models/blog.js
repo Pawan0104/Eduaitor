@@ -45,6 +45,32 @@ const blogSchema = new mongoose.Schema(
         ref: "User",
       },
     ],
+    createdBy: {
+      type: mongoose.Schema.Types.ObjectId,
+      refPath: "creatorModel",
+    },
+    creatorModel: {
+      type: String,
+      enum: ["Teacher", "School"], // extend if needed
+    },
+    creatorRole: {
+      type: String,
+      enum: ["school_admin", "teacher_admin"],
+    },
+    studentAuthor: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "Student",
+      default: null,
+    },
+    status: {
+      type: String,
+      enum: ["published", "pending", "rejected"],
+      default: "published", // existing blogs default to published
+    },
+    rejectionReason: {
+      type: String,
+      default: "",
+    },
   },
   { timestamps: true },
 );

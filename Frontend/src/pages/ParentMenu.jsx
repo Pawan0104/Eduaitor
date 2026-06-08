@@ -19,6 +19,7 @@ import {
   FaBookOpen,
   FaUserAlt,
   FaUsers,
+  FaBlog,
 } from "react-icons/fa";
 
 import {
@@ -52,6 +53,11 @@ const COLOR_MAP = {
   Calendar: { bg: "#EFF6FF", icon: "#0EA5E9", dot: "#BAE6FD" },
   "Transport Management": { bg: "#F8FAFC", icon: "#64748B", dot: "#CBD5E1" },
   Library: { bg: "#F0FDFA", icon: "#0D9488", dot: "#99F6E4" },
+  Blogs: {
+    bg: "#F0FDFA",
+    icon: "#0D9488",
+    dot: "#99F6E4",
+  },
 };
 const DEFAULT_COLOR = { bg: "#F3F4F6", icon: "#6B7280", dot: "#E5E7EB" };
 
@@ -275,6 +281,7 @@ export default function ParentMenu() {
     { name: "Timetable", icon: <FaClock />, path: "/parent/timetable" },
     { name: "Notices", icon: <FaBell />, path: "/parent/notice" },
     { name: "Events", icon: <FaCalendar />, path: "/parent/event" },
+    { name: "Blogs", icon: <FaBlog />, path: "/parent/blogs" },
   ];
 
   /* Group into rows of 2 — keeps grid columns stable */

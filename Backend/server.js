@@ -79,6 +79,7 @@ import messageRoute from "./routes/messageRoute.js";
 import groupRoute from "./routes/groupRoute.js";
 import notificationRoute from "./routes/notificationRoute.js";
 import blogRoute from "./routes/blogRoute.js";
+import classAttendanceRoute from "./routes/classAttendanceRoute.js";
 
 import { authMiddleware } from "./auth/auth.js";
 
@@ -100,7 +101,7 @@ app.get("/api/auth/me", authMiddleware, async (req, res) => {  // async added
     // school_id is in JWT for all 3 roles below
     const school = await School
       .findById(req.user.school_id)
-      .select("subscribed_modules");
+      .select("name school_logo subscribed_modules");
 
     const subscribed_modules = school?.subscribed_modules || [];
 
@@ -113,6 +114,8 @@ app.get("/api/auth/me", authMiddleware, async (req, res) => {  // async added
           role: req.user.role,
           school_id: req.user.school_id,
           name: req.user.name,
+          school_name: school?.name,
+          school_logo: school?.school_logo,
           _id: req.user._id,
           subscribed_modules, // ← added
         },
@@ -129,6 +132,8 @@ app.get("/api/auth/me", authMiddleware, async (req, res) => {  // async added
           school_id: req.user.school_id,
           teacher_id: req.user.teacher_id,
           name: req.user.name,
+          school_name: school?.name,
+          school_logo: school?.school_logo,
           _id: req.user._id,
           subscribed_modules, // ← added
         },
@@ -147,6 +152,8 @@ app.get("/api/auth/me", authMiddleware, async (req, res) => {  // async added
           name: req.user.name,
           _id: req.user._id,
           subscribed_modules, // ← added
+          school_name: school?.name,
+          school_logo: school?.school_logo,
         },
       });
     }
@@ -203,63 +210,8 @@ app.use("/api/messages", messageRoute);
 app.use("/api/groups", groupRoute);
 app.use("/api/notifications", notificationRoute)
 app.use("/api/blogs", blogRoute);
+ app.use("/api/class-attendance", classAttendanceRoute);
 
 // Server
 const PORT = process.env.PORT || 5000;
 app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
-
-// app.get("/api/auth/me", authMiddleware, async (req, res) => {
-//   try {
-//     const access = await getPermissionsForRole(req.user.role);
-
-//     if (req.user.role === "super_admin") {
-//       return res.json({
-//         success: true,
-//         user: {
-//           email: req.user.email,
-//           role: req.user.role,
-//           access,
-//         },
-//       });
-//     } else if (req.user.role === "school_admin") {
-//       return res.json({
-//         success: true,
-//         user: {
-//           email: req.user.email,
-//           role: req.user.role,
-//           school_id: req.user.school_id,
-//           name: req.user.name,
-//           access,
-//         },
-//       });
-//     } else if (req.user.role === "teacher_admin") {
-//       return res.json({
-//         success: true,
-//         user: {
-//           email: req.user.email,
-//           role: req.user.role,
-//           school_id: req.user.school_id,
-//           teacher_id: req.user.teacher_id,
-//           name: req.user.name,
-//           access,
-//         },
-//       });
-//     } else if (req.user.role === "student_admin") {
-//       return res.json({
-//         success: true,
-//         user: {
-//           username: req.user.username,
-//           role: req.user.role,
-//           school_id: req.user.school_id,
-//           student_id: req.user.student_id,
-//           name: req.user.name,
-//           access,
-//         },
-//       });
-//     }
-
-//     return res.status(401).json({ success: false, message: "Unauthorized" });
-//   } catch (error) {
-//     return res.status(500).json({ success: false, message: "Server error" });
-//   }
-// });

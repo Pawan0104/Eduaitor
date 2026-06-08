@@ -72,6 +72,7 @@ export default function EventsPage() {
   const [deleteId, setDeleteId] = useState(null);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState("");
+  const [errors, setErrors] = useState({});
   const [classes, setClasses] = useState([]);
   const [confirmSave, setConfirmSave] = useState(false);
   const [confirmDiscard, setConfirmDiscard] = useState(false);
@@ -166,25 +167,71 @@ export default function EventsPage() {
   /* ─── form ─── */
   const handleChange = (e) => {
     const { name, value, type, checked } = e.target;
-    setForm((p) => ({ ...p, [name]: type === "checkbox" ? checked : value }));
+
+    if (errors[name]) {
+      setErrors((prev) => ({
+        ...prev,
+        [name]: "",
+      }));
+    }
+
+    setForm((prev) => ({
+      ...prev,
+      [name]: type === "checkbox" ? checked : value,
+    }));
   };
 
   const validate = () => {
-    if (!form.title.trim()) return "Event title is required.";
-    if (!form.type) return "Event type is required.";
-    if (!form.organizer.trim()) return "Organizer is required.";
-    if (!form.startDate) return "Start date is required.";
-    if (!form.time) return "Time is required.";
-    if (!form.location.trim()) return "Location is required.";
-    if (!form.description.trim()) return "Description is required.";
-    return "";
+    const newErrors = {};
+
+    if (!form.title.trim()) newErrors.title = "Event title is required.";
+
+    if (!form.type) newErrors.type = "Event type is required.";
+
+    if (!form.organizer.trim()) newErrors.organizer = "Organizer is required.";
+
+    if (!form.startDate) {
+      newErrors.startDate = "Start date is required.";
+    } else {
+      const tomorrow = new Date();
+      tomorrow.setDate(tomorrow.getDate() + 1);
+      tomorrow.setHours(0, 0, 0, 0);
+
+      const startDate = new Date(form.startDate);
+      startDate.setHours(0, 0, 0, 0);
+
+      if (startDate < tomorrow) {
+        newErrors.startDate = "Start Date must be tomorrow or later.";
+      }
+    }
+
+    if (form.endDate) {
+      const startDate = new Date(form.startDate);
+      const endDate = new Date(form.endDate);
+
+      startDate.setHours(0, 0, 0, 0);
+      endDate.setHours(0, 0, 0, 0);
+
+      if (endDate < startDate) {
+        newErrors.endDate = "End Date must be on or after Start Date.";
+      }
+    }
+
+    if (!form.time) newErrors.time = "Time is required.";
+
+    if (!form.location.trim()) newErrors.location = "Location is required.";
+
+    if (!form.description.trim())
+      newErrors.description = "Description is required.";
+
+    setErrors(newErrors);
+
+    return Object.keys(newErrors).length === 0;
   };
 
   const handleSubmit = () => {
-    const err = validate();
-    if (err) {
-      setError(err);
-      toast.error(err);
+    if (!validate()) {
+      toast.error("Please fix the highlighted fields.");
       return;
     }
 
@@ -198,7 +245,9 @@ export default function EventsPage() {
       setSubmitting(true);
 
       if (editingId) {
-        await axios.put(`${API}/events/${editingId}`, form,{withCredentials:true});
+        await axios.put(`${API}/events/${editingId}`, form, {
+          withCredentials: true,
+        });
         toast.success("Event updated successfully!");
       } else {
         await axios.post(`${API}/events/create`, form, {
@@ -261,19 +310,19 @@ export default function EventsPage() {
   return (
     <div className="p-8 text-[rgb(var(--text))] bg-[rgb(var(--bg))]">
       {/* 🔙 BACK BUTTON */}
-        {isMobile && (
-            <div className="px-4 pt-4">
-              <button
-                onClick={() => navigate(-1)}
-                className="flex items-center gap-2 px-3 py-1.5 rounded-xl
+      {isMobile && (
+        <div className="px-4 pt-4">
+          <button
+            onClick={() => navigate(-1)}
+            className="flex items-center gap-2 px-3 py-1.5 rounded-xl
                  bg-[rgb(var(--primary))] shadow-sm border border-slate-100
                  text-sm font-bold 0 active:scale-95 transition-transform mb-2.5"
-              >
-                <FaArrowLeft size={16} />
-                Back
-              </button>
-            </div>
-          )}
+          >
+            <FaArrowLeft size={16} />
+            Back
+          </button>
+        </div>
+      )}
 
       {/* ── Header ── */}
       <div className="mb-6">
@@ -296,12 +345,8 @@ export default function EventsPage() {
               {s.icon}
             </div>
             <div>
-              <p className="text-xs  font-medium tracking-wide">
-                {s.label}
-              </p>
-              <p className="text-2xl font-bold  leading-tight">
-                {s.value}
-              </p>
+              <p className="text-xs  font-medium tracking-wide">{s.label}</p>
+              <p className="text-2xl font-bold  leading-tight">{s.value}</p>
             </div>
           </div>
         ))}
@@ -322,13 +367,9 @@ export default function EventsPage() {
 
       {/* ── Event Cards ── */}
       {loading ? (
-        <div className="text-center py-20 text-sm">
-          Loading events…
-        </div>
+        <div className="text-center py-20 text-sm">Loading events…</div>
       ) : events.length === 0 ? (
-        <div className="text-center py-20  text-sm">
-          No events found.
-        </div>
+        <div className="text-center py-20  text-sm">No events found.</div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-5">
           {events.map((ev) => {
@@ -457,7 +498,8 @@ export default function EventsPage() {
               {/* Title */}
               <div>
                 <label className="block text-sm font-medium text-[rgb(var(--text))] mb-1">
-                  Event Title <span className="text-[rgb(var(--primary))]">*</span>
+                  Event Title{" "}
+                  <span className="text-[rgb(var(--primary))]">*</span>
                 </label>
                 <input
                   name="title"
@@ -466,13 +508,17 @@ export default function EventsPage() {
                   placeholder="Enter event title (e.g., Annual Sports Day)"
                   className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-indigo-400"
                 />
+                {errors.title && (
+                  <p className="text-red-500 text-xs mt-1">{errors.title}</p>
+                )}
               </div>
 
               {/* Type + Priority */}
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <label className="block text-sm font-medium text-[rgb(var(--text))] mb-1">
-                    Event Type <span className="text-[rgb(var(--primary))]">*</span>
+                    Event Type{" "}
+                    <span className="text-[rgb(var(--primary))]">*</span>
                   </label>
                   <select
                     name="type"
@@ -487,6 +533,9 @@ export default function EventsPage() {
                     <option>Sports</option>
                     <option>Administrative</option>
                   </select>
+                  {errors.type && (
+                    <p className="text-red-500 text-xs mt-1">{errors.type}</p>
+                  )}
                 </div>
                 <div>
                   <label className="block text-sm font-medium  mb-1">
@@ -510,7 +559,8 @@ export default function EventsPage() {
               {/* Organizer */}
               <div>
                 <label className="block text-sm font-medium text-[rgb(var(--text))] mb-1">
-                  Organizer <span className="text-[rgb(var(--primary))]">*</span>
+                  Organizer{" "}
+                  <span className="text-[rgb(var(--primary))]">*</span>
                 </label>
                 <input
                   name="organizer"
@@ -519,21 +569,37 @@ export default function EventsPage() {
                   placeholder="Organizer name (e.g., Sports Committee)"
                   className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-indigo-400"
                 />
+                {errors.organizer && (
+                  <p className="text-red-500 text-xs mt-1">
+                    {errors.organizer}
+                  </p>
+                )}
               </div>
 
               {/* Start + End Date */}
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <label className="block text-sm font-medium text-[rgb(var(--text))] mb-1">
-                    Start Date <span className="text-[rgb(var(--primary))]">*</span>
+                    Start Date{" "}
+                    <span className="text-[rgb(var(--primary))]">*</span>
                   </label>
                   <input
                     type="date"
                     name="startDate"
                     value={form.startDate}
                     onChange={handleChange}
+                    min={
+                      new Date(Date.now() + 86400000)
+                        .toISOString()
+                        .split("T")[0]
+                    }
                     className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-indigo-400"
                   />
+                  {errors.startDate && (
+                    <p className="text-red-500 text-xs mt-1">
+                      {errors.startDate}
+                    </p>
+                  )}
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-[rgb(var(--text))] mb-1">
@@ -544,8 +610,14 @@ export default function EventsPage() {
                     name="endDate"
                     value={form.endDate}
                     onChange={handleChange}
+                    min={form.startDate}
                     className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-indigo-400"
                   />
+                  {errors.endDate && (
+                    <p className="text-red-500 text-xs mt-1">
+                      {errors.endDate}
+                    </p>
+                  )}
                 </div>
               </div>
 
@@ -562,10 +634,14 @@ export default function EventsPage() {
                     onChange={handleChange}
                     className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-indigo-400"
                   />
+                  {errors.time && (
+                    <p className="text-red-500 text-xs mt-1">{errors.time}</p>
+                  )}
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-[rgb(var(--text))] mb-1">
-                    Location <span className="text-[rgb(var(--primary))]">*</span>
+                    Location{" "}
+                    <span className="text-[rgb(var(--primary))]">*</span>
                   </label>
                   <input
                     name="location"
@@ -574,13 +650,19 @@ export default function EventsPage() {
                     placeholder="Enter location (e.g., School Ground)"
                     className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-indigo-400"
                   />
+                  {errors.location && (
+                    <p className="text-red-500 text-xs mt-1">
+                      {errors.location}
+                    </p>
+                  )}
                 </div>
               </div>
 
               {/* Assign Class */}
               <div>
                 <label className="block text-sm font-medium text-[rgb(var(--text))] mb-1">
-                  Assign Class <span className="text-[rgb(var(--primary))]">*</span>
+                  Assign Class{" "}
+                  <span className="text-[rgb(var(--primary))]">*</span>
                 </label>
                 <select
                   name="assignClass"
@@ -631,7 +713,8 @@ export default function EventsPage() {
               {/* Description */}
               <div>
                 <label className="block text-sm font-medium text-[rgb(var(--text))] mb-1">
-                  Description <span className="text-[rgb(var(--primary))]">*</span>
+                  Description{" "}
+                  <span className="text-[rgb(var(--primary))]">*</span>
                 </label>
                 <textarea
                   name="description"
@@ -641,6 +724,11 @@ export default function EventsPage() {
                   placeholder="Write event details here..."
                   className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-indigo-400 resize-y"
                 />
+                {errors.description && (
+                  <p className="text-red-500 text-xs mt-1">
+                    {errors.description}
+                  </p>
+                )}
               </div>
             </div>
 
@@ -675,12 +763,8 @@ export default function EventsPage() {
             <div className="w-12 h-12 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-4">
               <FiTrash2 size={22} className="text-red-500" />
             </div>
-            <h3 className="text-base font-bold  mb-1">
-              Delete Event?
-            </h3>
-            <p className="text-sm t mb-6">
-              This action cannot be undone.
-            </p>
+            <h3 className="text-base font-bold  mb-1">Delete Event?</h3>
+            <p className="text-sm t mb-6">This action cannot be undone.</p>
             <div className="flex gap-3">
               <button
                 onClick={() => setDeleteId(null)}
@@ -706,7 +790,10 @@ export default function EventsPage() {
 
             <div className="p-6 text-center">
               <div className="w-12 h-12 bg-indigo-100 rounded-full flex items-center justify-center mx-auto mb-4">
-                <FiCheckCircle size={22} className="text-[rgb(var(--primary))]" />
+                <FiCheckCircle
+                  size={22}
+                  className="text-[rgb(var(--primary))]"
+                />
               </div>
 
               <h3 className="text-base font-bold  mb-1">
@@ -714,9 +801,7 @@ export default function EventsPage() {
               </h3>
 
               <p className="text-sm  mb-6">
-                <span className="font-semibold ">
-                  "{form.title}"
-                </span>
+                <span className="font-semibold ">"{form.title}"</span>
               </p>
 
               <div className="flex gap-3">
@@ -750,9 +835,7 @@ export default function EventsPage() {
                 <FiAlertTriangle size={22} className="text-amber-500" />
               </div>
 
-              <h3 className="text-base font-bold  mb-1">
-                Discard changes?
-              </h3>
+              <h3 className="text-base font-bold  mb-1">Discard changes?</h3>
 
               <p className="text-sm mb-6">
                 You have unsaved changes. Closing will discard them.

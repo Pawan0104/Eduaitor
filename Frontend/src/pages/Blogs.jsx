@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import axios from "axios";
+import { useAuth } from "../context/AuthContext"; // adjust path if needed
 import {
   Plus,
   Edit2,
@@ -17,10 +18,10 @@ import {
   Check,
 } from "lucide-react";
 
-const API = `${import.meta.env.VITE_API_URL}/blogs`; // ← change to your base URL if needed
+const API = `${import.meta.env.VITE_API_URL}/blogs`;
 
 // ─────────────────────────────────────────────────────────────────────────────
-// SHARE BOTTOM SHEET
+// SHARE SHEET
 // ─────────────────────────────────────────────────────────────────────────────
 function ShareSheet({ shareUrl, onClose }) {
   const [copied, setCopied] = useState(false);
@@ -44,14 +45,13 @@ function ShareSheet({ shareUrl, onClose }) {
 
   return (
     <div
-      className="fixed top-0 left-0 w-screen h-screen inset-0 bg-black/50 z-50 flex items-center justify-center p-4"
+      className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4"
       onClick={onClose}
     >
       <div
         className="bg-white w-full max-w-sm rounded-2xl shadow-2xl overflow-hidden"
         onClick={(e) => e.stopPropagation()}
       >
-        {/* Header */}
         <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100">
           <p className="font-bold text-gray-800 text-base">Share this post</p>
           <button
@@ -61,23 +61,18 @@ function ShareSheet({ shareUrl, onClose }) {
             <X className="w-4 h-4 text-gray-500" />
           </button>
         </div>
-
-        {/* URL preview box */}
         <div className="mx-5 mt-4 px-3 py-2.5 bg-gray-50 rounded-xl border border-gray-200">
           <p className="text-xs text-gray-400 mb-0.5">Link</p>
           <p className="text-xs text-gray-600 truncate">{shareUrl}</p>
         </div>
-
-        {/* Share options */}
         <div className="p-5 flex flex-col gap-2.5">
-          {/* WhatsApp */}
           <button
             onClick={handleWhatsApp}
             className="flex items-center gap-4 w-full px-4 py-3 rounded-xl bg-green-50 hover:bg-green-100 transition text-left"
           >
             <div className="w-9 h-9 bg-green-500 rounded-full flex items-center justify-center shrink-0">
               <svg
-                className="w-4.5 h-4.5 text-white"
+                className="w-4 h-4 text-white"
                 fill="currentColor"
                 viewBox="0 0 24 24"
               >
@@ -89,8 +84,6 @@ function ShareSheet({ shareUrl, onClose }) {
               <p className="text-xs text-gray-400">Send as clickable link</p>
             </div>
           </button>
-
-          {/* Copy Link */}
           <button
             onClick={handleCopy}
             className="flex items-center gap-4 w-full px-4 py-3 rounded-xl bg-gray-50 hover:bg-gray-100 transition text-left"
@@ -148,39 +141,43 @@ function ImageSlider({ images }) {
     );
 
   return (
-    <div className="relative w-full rounded-t-xl overflow-hidden bg-gray-50 group">
-      {/* ✅ Full width, natural height, no crop */}
+    <div
+      className="relative w-full rounded-t-xl overflow-hidden bg-gray-50 group"
+      onMouseEnter={() => clearInterval(timerRef.current)}
+      onMouseLeave={() => {
+        if (images.length > 1)
+          timerRef.current = setInterval(
+            () => setCurrent((p) => (p + 1) % images.length),
+            3000,
+          );
+      }}
+    >
       <img
         src={images[current].url}
         alt=""
         className="w-full h-auto block"
         style={{ maxHeight: "480px", objectFit: "contain" }}
       />
-
       {images.length > 1 && (
         <>
           <button
             onClick={() => go(-1)}
-            className="absolute left-2 top-1/2 -translate-y-1/2 bg-black/40
-              text-white rounded-full p-1.5 opacity-0 group-hover:opacity-100 transition"
+            className="absolute left-2 top-1/2 -translate-y-1/2 bg-black/40 text-white rounded-full p-1.5 opacity-0 group-hover:opacity-100 transition"
           >
             <ChevronLeft className="w-4 h-4" />
           </button>
           <button
             onClick={() => go(1)}
-            className="absolute right-2 top-1/2 -translate-y-1/2 bg-black/40
-              text-white rounded-full p-1.5 opacity-0 group-hover:opacity-100 transition"
+            className="absolute right-2 top-1/2 -translate-y-1/2 bg-black/40 text-white rounded-full p-1.5 opacity-0 group-hover:opacity-100 transition"
           >
             <ChevronRight className="w-4 h-4" />
           </button>
-
           <div className="absolute bottom-2 left-1/2 -translate-x-1/2 flex gap-1.5">
             {images.map((_, i) => (
               <button
                 key={i}
                 onClick={() => setCurrent(i)}
-                className={`h-1.5 rounded-full transition-all duration-300
-                  ${i === current ? "bg-white w-4" : "bg-white/60 w-1.5"}`}
+                className={`h-1.5 rounded-full transition-all duration-300 ${i === current ? "bg-white w-4" : "bg-white/60 w-1.5"}`}
               />
             ))}
           </div>
@@ -193,9 +190,10 @@ function ImageSlider({ images }) {
 // ─────────────────────────────────────────────────────────────────────────────
 // BLOG CARD
 // ─────────────────────────────────────────────────────────────────────────────
-function BlogCard({ blog, onEdit, onDelete, onTogglePublic, onLike }) {
+function BlogCard({ blog, onEdit, onDelete, onTogglePublic, onLikeUpdate }) {
   const [liked, setLiked] = useState(blog.hasLiked ?? false);
   const [likesCount, setLikesCount] = useState(blog.likes ?? 0);
+  const [likeLoading, setLikeLoading] = useState(false);
   const [expanded, setExpanded] = useState(false);
   const [showShare, setShowShare] = useState(false);
 
@@ -206,11 +204,29 @@ function BlogCard({ blog, onEdit, onDelete, onTogglePublic, onLike }) {
     setLikesCount(blog.likes ?? 0);
   }, [blog.hasLiked, blog.likes]);
 
+  // ── proper toggle (not one-way) ────────────────────────────────────────────
   const handleLike = async () => {
-    if (liked) return;
-    setLiked(true);
-    setLikesCount((l) => l + 1);
-    await onLike(blog._id);
+    if (likeLoading) return;
+    setLikeLoading(true);
+    const wasLiked = liked;
+    setLiked(!wasLiked);
+    setLikesCount((c) => (wasLiked ? c - 1 : c + 1));
+    try {
+      const { data } = await axios.patch(
+        `${API}/${blog._id}/like`,
+        {},
+        { withCredentials: true },
+      );
+      setLiked(data.hasLiked);
+      setLikesCount(data.likes);
+      onLikeUpdate?.(blog._id, data.likes, data.hasLiked);
+    } catch (err) {
+      console.error("Like failed:", err);
+      setLiked(wasLiked);
+      setLikesCount((c) => (wasLiked ? c + 1 : c - 1));
+    } finally {
+      setLikeLoading(false);
+    }
   };
 
   const isLong = blog.content.length > 120;
@@ -218,17 +234,14 @@ function BlogCard({ blog, onEdit, onDelete, onTogglePublic, onLike }) {
   return (
     <>
       <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
-        <ImageSlider images={blog.images} />
-
+        <ImageSlider images={blog.images ?? []} />
         <div className="p-4">
-          {/* Title row + admin controls */}
           <div className="flex items-start justify-between gap-2 mb-2">
             <div className="flex-1 min-w-0">
-              {/* Category badge */}
               <span className="inline-block text-xs font-semibold text-blue-600 bg-blue-50 px-2 py-0.5 rounded-full mb-1">
                 {blog.category}
               </span>
-              <h3 className="text-base font-bold text-gray-800 leading-tight truncate">
+              <h3 className="text-base font-bold text-gray-800 leading-tight">
                 {blog.title}
               </h3>
               <p className="text-xs text-gray-400 mt-0.5">
@@ -237,42 +250,57 @@ function BlogCard({ blog, onEdit, onDelete, onTogglePublic, onLike }) {
                   month: "short",
                   year: "numeric",
                 })}
+                {blog.studentName ? (
+                  // student-authored blog: show student name + class
+                  <>
+                    <span className="ml-1.5 before:content-['·'] before:mr-1.5">
+                      {blog.studentName}
+                    </span>
+                    {blog.studentClass && (
+                      <span className="ml-1.5 before:content-['·'] before:mr-1.5">
+                        {blog.studentClass}
+                      </span>
+                    )}
+                  </>
+                ) : blog.createdByName ? (
+                  // teacher/admin authored blog: show their name
+                  <span className="ml-1.5 before:content-['·'] before:mr-1.5">
+                    {blog.createdByName}
+                  </span>
+                ) : null}
               </p>
             </div>
 
-            {/* Admin action buttons */}
-            <div className="flex items-center gap-1 shrink-0">
-              <button
-                onClick={() => onTogglePublic(blog._id)}
-                title={blog.isPublic ? "Make Private" : "Make Public"}
-                className={`p-1.5 rounded-lg transition ${
-                  blog.isPublic
-                    ? "bg-green-50 text-green-600 hover:bg-green-100"
-                    : "bg-gray-100 text-gray-400 hover:bg-gray-200"
-                }`}
-              >
-                {blog.isPublic ? (
-                  <Eye className="w-3.5 h-3.5" />
-                ) : (
-                  <EyeOff className="w-3.5 h-3.5" />
-                )}
-              </button>
-              <button
-                onClick={() => onEdit(blog)}
-                className="p-1.5 rounded-lg bg-amber-50 text-amber-600 hover:bg-amber-100 transition"
-              >
-                <Edit2 className="w-3.5 h-3.5" />
-              </button>
-              <button
-                onClick={() => onDelete(blog._id)}
-                className="p-1.5 rounded-lg bg-red-50 text-red-500 hover:bg-red-100 transition"
-              >
-                <Trash2 className="w-3.5 h-3.5" />
-              </button>
-            </div>
+            {/* Admin controls — only shown when canEdit is true (set by server) */}
+            {blog.canEdit && (
+              <div className="flex items-center gap-1 shrink-0">
+                <button
+                  onClick={() => onTogglePublic(blog._id)}
+                  title={blog.isPublic ? "Make Private" : "Make Public"}
+                  className={`p-1.5 rounded-lg transition ${blog.isPublic ? "bg-green-50 text-green-600 hover:bg-green-100" : "bg-gray-100 text-gray-400 hover:bg-gray-200"}`}
+                >
+                  {blog.isPublic ? (
+                    <Eye className="w-3.5 h-3.5" />
+                  ) : (
+                    <EyeOff className="w-3.5 h-3.5" />
+                  )}
+                </button>
+                <button
+                  onClick={() => onEdit(blog)}
+                  className="p-1.5 rounded-lg bg-amber-50 text-amber-600 hover:bg-amber-100 transition"
+                >
+                  <Edit2 className="w-3.5 h-3.5" />
+                </button>
+                <button
+                  onClick={() => onDelete(blog._id)}
+                  className="p-1.5 rounded-lg bg-red-50 text-red-500 hover:bg-red-100 transition"
+                >
+                  <Trash2 className="w-3.5 h-3.5" />
+                </button>
+              </div>
+            )}
           </div>
 
-          {/* Content */}
           <p className="text-sm text-gray-600 leading-relaxed">
             {expanded || !isLong ? blog.content : blog.content.slice(0, 120)}
             {isLong && (
@@ -285,20 +313,20 @@ function BlogCard({ blog, onEdit, onDelete, onTogglePublic, onLike }) {
             )}
           </p>
 
-          {/* Like / Share bar */}
           <div className="flex items-center gap-4 mt-3 pt-3 border-t border-gray-50">
+            {/* Like — full toggle for all roles */}
             <button
               onClick={handleLike}
-              className={`flex items-center gap-1.5 text-sm font-medium transition-colors ${
-                liked ? "text-red-500" : "text-gray-400 hover:text-red-400"
-              }`}
+              disabled={likeLoading}
+              className={`flex items-center gap-1.5 text-sm font-medium transition-all active:scale-95 select-none
+                ${liked ? "text-red-500" : "text-gray-400 hover:text-red-400"}`}
             >
               <Heart
-                className={`w-4 h-4 transition-transform active:scale-125 ${
-                  liked ? "fill-red-500 stroke-red-500" : ""
-                }`}
+                className={`w-4 h-4 transition-all duration-200 ${liked ? "fill-red-500 stroke-red-500 scale-110" : "scale-100"}`}
               />
-              <span>{likesCount > 0 ? likesCount : ""} Like</span>
+              <span>
+                {likesCount > 0 ? likesCount : ""} {liked ? "Liked" : "Like"}
+              </span>
             </button>
 
             <button
@@ -309,9 +337,8 @@ function BlogCard({ blog, onEdit, onDelete, onTogglePublic, onLike }) {
               <span>Share</span>
             </button>
 
-            {/* Private badge */}
-            {!blog.isPublic && (
-              <span className="ml-auto flex items-center gap-1 text-xs text-gray-400 bg-gray-50 px-2 py-0.5 rounded-full">
+            {blog.canEdit && !blog.isPublic && (
+              <span className="ml-auto flex items-center gap-1 text-xs bg-red-200 px-2 py-0.5 rounded-full">
                 <EyeOff className="w-3 h-3" /> Private
               </span>
             )}
@@ -326,7 +353,7 @@ function BlogCard({ blog, onEdit, onDelete, onTogglePublic, onLike }) {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// BLOG FORM MODAL  (create + edit)
+// BLOG FORM MODAL
 // ─────────────────────────────────────────────────────────────────────────────
 const CATEGORIES = [
   "General",
@@ -337,7 +364,7 @@ const CATEGORIES = [
   "Event",
 ];
 
-function BlogFormModal({ blog, onClose, onSave }) {
+function BlogFormModal({ blog, isStudent, onClose, onSave }) {
   const [form, setForm] = useState({
     title: blog?.title || "",
     content: blog?.content || "",
@@ -376,16 +403,15 @@ function BlogFormModal({ blog, onClose, onSave }) {
       fd.append("category", form.category);
       fd.append("isPublic", form.isPublic);
       files.forEach((f) => fd.append("images", f));
-
       if (blog?._id) {
         await axios.put(`${API}/${blog._id}`, fd, { withCredentials: true });
+      } else if (isStudent) {
+        await axios.post(`${API}/submit`, fd, { withCredentials: true });
       } else {
-        console.log("Submitting new blog with data:", form);
         await axios.post(API, fd, { withCredentials: true });
       }
       onSave();
     } catch (err) {
-      console.log(err);
       setError(err.response?.data?.message || "Something went wrong");
     } finally {
       setLoading(false);
@@ -395,7 +421,6 @@ function BlogFormModal({ blog, onClose, onSave }) {
   return (
     <div className="fixed inset-0 bg-black/50 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4">
       <div className="bg-white rounded-t-2xl sm:rounded-2xl w-full sm:max-w-lg max-h-[92vh] overflow-y-auto">
-        {/* Modal header */}
         <div className="flex items-center justify-between p-5 border-b sticky top-0 bg-white z-10">
           <h2 className="text-lg font-bold text-gray-800">
             {blog ? "Edit Blog" : "New Blog"}
@@ -407,9 +432,7 @@ function BlogFormModal({ blog, onClose, onSave }) {
             <X className="w-5 h-5 text-gray-500" />
           </button>
         </div>
-
         <div className="p-5 space-y-4">
-          {/* Title */}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">
               Title <span className="text-red-400">*</span>
@@ -421,8 +444,6 @@ function BlogFormModal({ blog, onClose, onSave }) {
               className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-300 transition"
             />
           </div>
-
-          {/* Category */}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">
               Category
@@ -437,8 +458,6 @@ function BlogFormModal({ blog, onClose, onSave }) {
               ))}
             </select>
           </div>
-
-          {/* Content */}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">
               Content <span className="text-red-400">*</span>
@@ -451,8 +470,6 @@ function BlogFormModal({ blog, onClose, onSave }) {
               className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-300 resize-none transition"
             />
           </div>
-
-          {/* Image upload */}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">
               Images
@@ -470,8 +487,6 @@ function BlogFormModal({ blog, onClose, onSave }) {
                 className="hidden"
               />
             </label>
-
-            {/* Image previews */}
             {previews.length > 0 && (
               <div className="flex gap-2 mt-2 flex-wrap">
                 {previews.map((p, i) => (
@@ -492,8 +507,6 @@ function BlogFormModal({ blog, onClose, onSave }) {
               </div>
             )}
           </div>
-
-          {/* Public toggle */}
           <div className="flex items-center justify-between bg-gray-50 rounded-xl p-3">
             <div>
               <p className="text-sm font-medium text-gray-700">Public Post</p>
@@ -501,26 +514,18 @@ function BlogFormModal({ blog, onClose, onSave }) {
             </div>
             <button
               onClick={() => setForm({ ...form, isPublic: !form.isPublic })}
-              className={`relative w-11 h-6 rounded-full transition-colors duration-200 ${
-                form.isPublic ? "bg-blue-500" : "bg-gray-300"
-              }`}
+              className={`relative w-11 h-6 rounded-full transition-colors duration-200 ${form.isPublic ? "bg-blue-500" : "bg-gray-300"}`}
             >
               <span
-                className={`absolute top-0.5 w-5 h-5 bg-white rounded-full shadow transition-all duration-200 ${
-                  form.isPublic ? "left-5.5" : "left-0.5"
-                }`}
+                className={`absolute top-0.5 w-5 h-5 bg-white rounded-full shadow transition-all duration-200 ${form.isPublic ? "left-5.5" : "left-0.5"}`}
               />
             </button>
           </div>
-
-          {/* Error */}
           {error && (
             <p className="text-sm text-red-500 bg-red-50 px-3 py-2 rounded-lg">
               {error}
             </p>
           )}
-
-          {/* Submit */}
           <button
             onClick={handleSubmit}
             disabled={loading}
@@ -549,8 +554,7 @@ function DeleteModal({ onCancel, onConfirm }) {
           Delete Blog?
         </h3>
         <p className="text-sm text-gray-500 text-center mb-5">
-          This will permanently delete the post and all its images from
-          Cloudinary.
+          This will permanently delete the post and all its images.
         </p>
         <div className="flex gap-3">
           <button
@@ -572,21 +576,275 @@ function DeleteModal({ onCancel, onConfirm }) {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
+// PENDING BLOG CARD (teacher approval view)
+// ─────────────────────────────────────────────────────────────────────────────
+function PendingBlogCard({ blog, onApprove, onReject }) {
+  const [rejectMode, setRejectMode] = useState(false);
+  const [reason, setReason] = useState("");
+  const [expanded, setExpanded] = useState(false);
+  const isLong = blog.content.length > 120;
+  const studentName = blog.studentAuthor
+    ? `${blog.studentAuthor.firstName} ${blog.studentAuthor.lastName}`
+    : "Unknown Student";
+
+  return (
+    <div className="bg-white rounded-xl shadow-sm border border-amber-100 overflow-hidden">
+      {blog.images?.length > 0 && <ImageSlider images={blog.images} />}
+      <div className="p-4">
+        <div className="flex items-start justify-between gap-2 mb-2">
+          <div className="flex-1 min-w-0">
+            <div className="flex items-center gap-2 mb-1">
+              <span className="inline-block text-xs font-semibold text-blue-600 bg-blue-50 px-2 py-0.5 rounded-full">
+                {blog.category}
+              </span>
+              <span className="inline-block text-xs font-semibold text-amber-600 bg-amber-50 px-2 py-0.5 rounded-full">
+                Pending Review
+              </span>
+            </div>
+            <h3 className="text-base font-bold text-gray-800 leading-tight">
+              {blog.title}
+            </h3>
+            <p className="text-xs text-gray-400 mt-0.5">
+              By{" "}
+              <span className="font-medium text-gray-600">{studentName}</span>
+              <span className="mx-1.5">·</span>
+              {new Date(blog.createdAt).toLocaleDateString("en-IN", {
+                day: "numeric",
+                month: "short",
+                year: "numeric",
+              })}
+            </p>
+          </div>
+        </div>
+
+        <p className="text-sm text-gray-600 leading-relaxed mb-3">
+          {expanded || !isLong ? blog.content : blog.content.slice(0, 120)}
+          {isLong && (
+            <button
+              onClick={() => setExpanded(!expanded)}
+              className="text-blue-500 text-xs font-medium ml-1"
+            >
+              {expanded ? " show less" : "...read more"}
+            </button>
+          )}
+        </p>
+
+        {!rejectMode ? (
+          <div className="flex gap-2 pt-3 border-t border-gray-100">
+            <button
+              onClick={() => onApprove(blog._id)}
+              className="flex-1 flex items-center justify-center gap-1.5 bg-green-500 text-white text-sm font-semibold py-2 rounded-lg hover:bg-green-600 transition"
+            >
+              <Check className="w-4 h-4" /> Approve & Publish
+            </button>
+            <button
+              onClick={() => setRejectMode(true)}
+              className="flex-1 flex items-center justify-center gap-1.5 bg-red-50 text-red-500 text-sm font-semibold py-2 rounded-lg hover:bg-red-100 transition"
+            >
+              <X className="w-4 h-4" /> Reject
+            </button>
+          </div>
+        ) : (
+          <div className="pt-3 border-t border-gray-100 space-y-2">
+            <textarea
+              value={reason}
+              onChange={(e) => setReason(e.target.value)}
+              placeholder="Reason for rejection (optional)..."
+              rows={2}
+              className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-red-200 resize-none"
+            />
+            <div className="flex gap-2">
+              <button
+                onClick={() => {
+                  onReject(blog._id, reason);
+                  setRejectMode(false);
+                }}
+                className="flex-1 bg-red-500 text-white text-sm font-semibold py-2 rounded-lg hover:bg-red-600 transition"
+              >
+                Confirm Reject
+              </button>
+              <button
+                onClick={() => {
+                  setRejectMode(false);
+                  setReason("");
+                }}
+                className="flex-1 border border-gray-200 text-gray-600 text-sm font-semibold py-2 rounded-lg hover:bg-gray-50 transition"
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// MY SUBMISSION CARD (student view of their own posts)
+// ─────────────────────────────────────────────────────────────────────────────
+function MySubmissionCard({ blog }) {
+  const [expanded, setExpanded] = useState(false);
+  const isLong = blog.content.length > 120;
+
+  const statusConfig = {
+    pending: { label: "Awaiting Review", color: "text-amber-600 bg-amber-50" },
+    published: { label: "Published", color: "text-green-600 bg-green-50" },
+    rejected: { label: "Rejected", color: "text-red-600 bg-red-50" },
+  };
+  const s = statusConfig[blog.status] ?? statusConfig.pending;
+
+  return (
+    <div
+      className={`bg-white rounded-xl shadow-sm border overflow-hidden ${
+        blog.status === "rejected"
+          ? "border-red-100"
+          : blog.status === "published"
+            ? "border-green-100"
+            : "border-amber-100"
+      }`}
+    >
+      {blog.images?.length > 0 && <ImageSlider images={blog.images} />}
+      <div className="p-4">
+        <div className="flex items-start justify-between gap-2 mb-2">
+          <div className="flex-1 min-w-0">
+            <div className="flex items-center gap-2 mb-1">
+              <span className="inline-block text-xs font-semibold text-blue-600 bg-blue-50 px-2 py-0.5 rounded-full">
+                {blog.category}
+              </span>
+              <span
+                className={`inline-block text-xs font-semibold px-2 py-0.5 rounded-full ${s.color}`}
+              >
+                {s.label}
+              </span>
+            </div>
+            <h3 className="text-base font-bold text-gray-800 leading-tight">
+              {blog.title}
+            </h3>
+            <p className="text-xs text-gray-400 mt-0.5">
+              {new Date(blog.createdAt).toLocaleDateString("en-IN", {
+                day: "numeric",
+                month: "short",
+                year: "numeric",
+              })}
+            </p>
+          </div>
+        </div>
+
+        <p className="text-sm text-gray-600 leading-relaxed">
+          {expanded || !isLong ? blog.content : blog.content.slice(0, 120)}
+          {isLong && (
+            <button
+              onClick={() => setExpanded(!expanded)}
+              className="text-blue-500 text-xs font-medium ml-1"
+            >
+              {expanded ? " show less" : "...read more"}
+            </button>
+          )}
+        </p>
+
+        {/* Show rejection reason if rejected */}
+        {blog.status === "rejected" && blog.rejectionReason && (
+          <div className="mt-3 p-3 bg-red-50 rounded-lg border border-red-100">
+            <p className="text-xs font-semibold text-red-600 mb-0.5">
+              Teacher's feedback
+            </p>
+            <p className="text-xs text-red-500">{blog.rejectionReason}</p>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
 // MAIN PAGE
 // ─────────────────────────────────────────────────────────────────────────────
+const CATEGORIES_FILTER = [
+  "General",
+  "Did You Know",
+  "Story Time",
+  "Announcement",
+  "Achievement",
+  "Event",
+];
+
 export default function Blogs() {
+  const { user } = useAuth();
+  const role = user?.role;
+
+  // school_admin and teacher_admin can create/edit their own posts
+  const canCreate = role === "school_admin" || role === "teacher_admin";
+
   const [blogs, setBlogs] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
   const [editBlog, setEditBlog] = useState(null);
   const [deleteId, setDeleteId] = useState(null);
   const [filter, setFilter] = useState("all"); // all | public | private
+  // At the top of the Blogs() component, add pending count fetch for teachers:
+
+  const [pendingBlogs, setPendingBlogs] = useState([]);
+  const [activeTab, setActiveTab] = useState("feed"); // "feed" | "pending" | "my-submissions"
+
+  const fetchPendingBlogs = async () => {
+    if (role !== "teacher_admin" && role !== "school_admin") return;
+    try {
+      const { data } = await axios.get(`${API}/pending`, {
+        withCredentials: true,
+      });
+      setPendingBlogs(data.data);
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
+  const fetchMySubmissions = async () => {
+    if (role !== "student_admin") return;
+    try {
+      const { data } = await axios.get(`${API}/my-submissions`, {
+        withCredentials: true,
+      });
+      setMySubmissions(data.data);
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
+  const [mySubmissions, setMySubmissions] = useState([]);
+
+  useEffect(() => {
+    fetchBlogs();
+    fetchPendingBlogs();
+    fetchMySubmissions();
+  }, []);
+
+  const handleApprove = async (id) => {
+    try {
+      await axios.patch(`${API}/${id}/approve`, {}, { withCredentials: true });
+      setPendingBlogs((prev) => prev.filter((b) => b._id !== id));
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
+  const handleReject = async (id, reason) => {
+    try {
+      await axios.patch(
+        `${API}/${id}/reject`,
+        { reason },
+        { withCredentials: true },
+      );
+      setPendingBlogs((prev) => prev.filter((b) => b._id !== id));
+    } catch (err) {
+      console.error(err);
+    }
+  };
 
   const fetchBlogs = async () => {
     setLoading(true);
     try {
       const { data } = await axios.get(API, { withCredentials: true });
-      console.log("Fetched blogs:", data);
       setBlogs(data.data);
     } catch (err) {
       console.error(err);
@@ -601,10 +859,7 @@ export default function Blogs() {
 
   const handleDelete = async () => {
     try {
-      const res = await axios.delete(`${API}/${deleteId}`, {
-        withCredentials: true,
-      });
-      console.log("Delete response:", res);
+      await axios.delete(`${API}/${deleteId}`, { withCredentials: true });
       setBlogs((prev) => prev.filter((b) => b._id !== deleteId));
     } catch (err) {
       console.error(err);
@@ -620,25 +875,38 @@ export default function Blogs() {
         {},
         { withCredentials: true },
       );
-      setBlogs((prev) => prev.map((b) => (b._id === id ? data.data : b)));
+      setBlogs((prev) =>
+        prev.map((b) => (b._id === id ? { ...b, ...data.data } : b)),
+      );
     } catch (err) {
       console.error(err);
     }
   };
 
-  const handleLike = async (id) => {
-    try {
-      await axios.patch(`${API}/${id}/like`, {}, { withCredentials: true });
-    } catch (err) {
-      console.error(err);
-    }
+  const handleLikeUpdate = (id, likes, hasLiked) => {
+    setBlogs((prev) =>
+      prev.map((b) => (b._id === id ? { ...b, likes, hasLiked } : b)),
+    );
   };
 
-  const filtered = blogs?.filter((b) => {
+  // students/parents only see public blogs; admins/teachers see all
+  // Blogs.jsx — replace visibleBlogs
+  const visibleBlogs = blogs.filter((b) => {
+    // always exclude pending/rejected from main feed for everyone
+    if (b.status === "pending" || b.status === "rejected") return false;
+
+    if (role === "student_admin") {
+      return b.isPublic; // students: public only
+    }
+
+    // school_admin / teacher_admin: apply public/private filter tab
     if (filter === "public") return b.isPublic;
     if (filter === "private") return !b.isPublic;
     return true;
   });
+
+  // blogs created by this user (school_admin / teacher_admin)
+  const myPosts = blogs.filter((b) => b.canEdit && !b.studentAuthor);
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -646,55 +914,117 @@ export default function Blogs() {
       <div className="bg-white border-b sticky top-0 z-20 shadow-sm">
         <div className="max-w-2xl mx-auto px-4 py-3 flex items-center justify-between">
           <div>
-            <h1 className="text-lg font-bold text-gray-800">School Blogs</h1>
-            <p className="text-xs text-gray-400">{blogs?.length} posts</p>
+            <h1 className="text-lg font-bold text-gray-800">
+              {role === "student_admin" ? "School Blogs" : "Blogs"}
+            </h1>
+            <p className="text-xs text-gray-400">{visibleBlogs.length} posts</p>
           </div>
-          <button
-            onClick={() => {
-              setEditBlog(null);
-              setShowForm(true);
-            }}
-            className="flex items-center gap-1.5 bg-blue-600 text-white text-sm font-semibold px-3 py-2 rounded-lg hover:bg-blue-700 transition active:scale-95"
-          >
-            <Plus className="w-4 h-4" />
-            <span>New Blog</span>
-          </button>
+
+          {/* Create button — only for school_admin and teacher_admin */}
+          {/* Create button */}
+          {canCreate && activeTab !== "pending" && (
+            <button
+              onClick={() => {
+                setEditBlog(null);
+                setShowForm(true);
+              }}
+              className="flex items-center gap-1.5 bg-blue-600 text-white text-sm font-semibold px-3 py-2 rounded-lg hover:bg-blue-700 transition active:scale-95"
+            >
+              <Plus className="w-4 h-4" />
+              <span>New Blog</span>
+            </button>
+          )}
+          {role === "student_admin" && (
+            <button
+              onClick={() => {
+                setEditBlog(null);
+                setShowForm(true);
+              }}
+              className="flex items-center gap-1.5 bg-blue-600 text-white text-sm font-semibold px-3 py-2 rounded-lg hover:bg-blue-700 transition active:scale-95"
+            >
+              <Plus className="w-4 h-4" />
+              <span>Write Post</span>
+            </button>
+          )}
         </div>
 
-        {/* Filter tabs */}
-        <div className="max-w-2xl mx-auto px-4 pb-3 flex gap-2">
-          {[
-            ["all", "All"],
-            ["public", "Public"],
-            ["private", "Private"],
-          ].map(([val, label]) => (
+        {/* Tab bar */}
+        <div className="max-w-2xl mx-auto px-4 pb-3 flex gap-2 overflow-x-auto scrollbar-hide">
+          <button
+            onClick={() => setActiveTab("feed")}
+            className={`text-xs px-3 py-1 rounded-full font-semibold transition shrink-0 ${activeTab === "feed" ? "bg-blue-600 text-white" : "bg-gray-100 text-gray-500 hover:bg-gray-200"}`}
+          >
+            Feed
+          </button>
+
+          {/* school_admin / teacher_admin: their own posts */}
+          {(role === "school_admin" || role === "teacher_admin") && (
             <button
-              key={val}
-              onClick={() => setFilter(val)}
-              className={`text-xs px-3 py-1 rounded-full font-semibold transition ${
-                filter === val
-                  ? "bg-blue-600 text-white"
-                  : "bg-gray-100 text-gray-500 hover:bg-gray-200"
-              }`}
+              onClick={() => setActiveTab("my-posts")}
+              className={`text-xs px-3 py-1 rounded-full font-semibold transition shrink-0 ${activeTab === "my-posts" ? "bg-blue-600 text-white" : "bg-gray-100 text-gray-500 hover:bg-gray-200"}`}
             >
-              {label}
-              {val === "all" && (
-                <span className="ml-1 text-[10px] opacity-70">
-                  {blogs?.length}
-                </span>
-              )}
-              {val === "public" && (
-                <span className="ml-1 text-[10px] opacity-70">
-                  {blogs?.filter((b) => b.isPublic).length}
-                </span>
-              )}
-              {val === "private" && (
-                <span className="ml-1 text-[10px] opacity-70">
-                  {blogs?.filter((b) => !b.isPublic).length}
+              My Posts
+              <span className="ml-1 text-[10px] opacity-70">
+                {blogs.filter((b) => b.canEdit && !b.studentAuthor).length}
+              </span>
+            </button>
+          )}
+
+          {/* Teacher/Admin: pending approvals */}
+          {(role === "teacher_admin" || role === "school_admin") && (
+            <button
+              onClick={() => setActiveTab("pending")}
+              className={`text-xs px-3 py-1 rounded-full font-semibold transition flex items-center gap-1 shrink-0 ${activeTab === "pending" ? "bg-amber-500 text-white" : "bg-gray-100 text-gray-500 hover:bg-gray-200"}`}
+            >
+              Pending
+              {pendingBlogs.length > 0 && (
+                <span
+                  className={`text-[10px] px-1.5 py-0.5 rounded-full font-bold ${activeTab === "pending" ? "bg-white/30" : "bg-amber-500 text-white"}`}
+                >
+                  {pendingBlogs.length}
                 </span>
               )}
             </button>
-          ))}
+          )}
+
+          {/* Student: their own submissions */}
+          {role === "student_admin" && (
+            <button
+              onClick={() => setActiveTab("my-submissions")}
+              className={`text-xs px-3 py-1 rounded-full font-semibold transition shrink-0 ${activeTab === "my-submissions" ? "bg-blue-600 text-white" : "bg-gray-100 text-gray-500 hover:bg-gray-200"}`}
+            >
+              My Posts
+              <span className="ml-1 text-[10px] opacity-70">
+                {mySubmissions.length}
+              </span>
+            </button>
+          )}
+
+          {/* Public/Private filter — only on feed tab for non-students */}
+          {activeTab === "feed" && role !== "student_admin" && (
+            <>
+              {[
+                ["all", "All"],
+                ["public", "Public"],
+                ["private", "Private"],
+              ].map(([val, label]) => (
+                <button
+                  key={val}
+                  onClick={() => setFilter(val)}
+                  className={`text-xs px-3 py-1 rounded-full font-semibold transition shrink-0 ${filter === val ? "bg-blue-600 text-white" : "bg-gray-100 text-gray-500 hover:bg-gray-200"}`}
+                >
+                  {label}
+                  <span className="ml-1 text-[10px] opacity-70">
+                    {val === "all"
+                      ? blogs.length
+                      : val === "public"
+                        ? blogs.filter((b) => b.isPublic).length
+                        : blogs.filter((b) => !b.isPublic).length}
+                  </span>
+                </button>
+              ))}
+            </>
+          )}
         </div>
       </div>
 
@@ -705,18 +1035,74 @@ export default function Blogs() {
             <Loader2 className="w-8 h-8 text-blue-500 animate-spin" />
             <p className="text-sm text-gray-400">Loading blogs...</p>
           </div>
-        ) : filtered?.length === 0 ? (
+        ) : activeTab === "pending" ? (
+          // ── Pending approval queue ──
+          pendingBlogs.length === 0 ? (
+            <div className="text-center py-24">
+              <Check className="w-12 h-12 mx-auto mb-3 text-gray-200" />
+              <p className="font-semibold text-gray-400">All caught up!</p>
+              <p className="text-sm text-gray-300 mt-1">
+                No blogs waiting for approval.
+              </p>
+            </div>
+          ) : (
+            pendingBlogs.map((blog) => (
+              <PendingBlogCard
+                key={blog._id}
+                blog={blog}
+                onApprove={handleApprove}
+                onReject={handleReject}
+              />
+            ))
+          )
+        ) : activeTab === "my-posts" ? (
+          // ── Admin / Teacher: their own posts ──
+          myPosts.length === 0 ? (
+            <div className="text-center py-24">
+              <ImageIcon className="w-12 h-12 mx-auto mb-3 text-gray-200" />
+              <p className="font-semibold text-gray-400">No posts yet</p>
+              <p className="text-sm text-gray-300 mt-1">
+                Create your first blog post!
+              </p>
+            </div>
+          ) : (
+            myPosts.map((blog) => (
+              <BlogCard
+                key={blog._id}
+                blog={blog}
+                onEdit={(b) => {
+                  setEditBlog(b);
+                  setShowForm(true);
+                }}
+                onDelete={(id) => setDeleteId(id)}
+                onTogglePublic={handleTogglePublic}
+                onLikeUpdate={handleLikeUpdate}
+              />
+            ))
+          )
+        ) : activeTab === "my-submissions" ? (
+          // ── Student's own submissions ──
+          mySubmissions.length === 0 ? (
+            <div className="text-center py-24">
+              <ImageIcon className="w-12 h-12 mx-auto mb-3 text-gray-200" />
+              <p className="font-semibold text-gray-400">No submissions yet</p>
+              <p className="text-sm text-gray-300 mt-1">
+                Submit a blog post for your teacher to review.
+              </p>
+            </div>
+          ) : (
+            mySubmissions.map((blog) => (
+              <MySubmissionCard key={blog._id} blog={blog} />
+            ))
+          )
+        ) : // ── Main feed ──
+        visibleBlogs.length === 0 ? (
           <div className="text-center py-24">
             <ImageIcon className="w-12 h-12 mx-auto mb-3 text-gray-200" />
             <p className="font-semibold text-gray-400">No blogs found</p>
-            <p className="text-sm text-gray-300 mt-1">
-              {filter === "all"
-                ? "Create your first blog post!"
-                : `No ${filter} posts yet.`}
-            </p>
           </div>
         ) : (
-          filtered?.map((blog) => (
+          visibleBlogs.map((blog) => (
             <BlogCard
               key={blog._id}
               blog={blog}
@@ -726,16 +1112,16 @@ export default function Blogs() {
               }}
               onDelete={(id) => setDeleteId(id)}
               onTogglePublic={handleTogglePublic}
-              onLike={handleLike}
+              onLikeUpdate={handleLikeUpdate}
             />
           ))
         )}
       </div>
 
-      {/* ── Modals ── */}
       {showForm && (
         <BlogFormModal
           blog={editBlog}
+          isStudent={role === "student_admin"}
           onClose={() => {
             setShowForm(false);
             setEditBlog(null);
@@ -743,7 +1129,9 @@ export default function Blogs() {
           onSave={() => {
             setShowForm(false);
             setEditBlog(null);
-            fetchBlogs();
+            if (role === "student_admin")
+              fetchMySubmissions(); // refresh submissions
+            else fetchBlogs();
           }}
         />
       )}
