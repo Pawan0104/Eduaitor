@@ -121,53 +121,52 @@ const TeacherManagement = () => {
 
   /* FORM CHANGE */
 
-const handleChange = (e) => {
-  const { name, value } = e.target;
+  const handleChange = (e) => {
+    const { name, value } = e.target;
 
-  setForm((prev) => ({
-    ...prev,
-    [name]: value,
-  }));
+    setForm((prev) => ({
+      ...prev,
+      [name]: value,
+    }));
 
-  if (errors[name]) {
-    setErrors((prev) => {
-      const updated = { ...prev };
-      delete updated[name];
-      return updated;
-    });
-  }
-};
+    if (errors[name]) {
+      setErrors((prev) => {
+        const updated = { ...prev };
+        delete updated[name];
+        return updated;
+      });
+    }
+  };
 
-    /* FILE */
+  /* FILE */
 
- const handleFileChange = (e) => {
-  const { name, files } = e.target;
-  const file = files[0];
+  const handleFileChange = (e) => {
+    const { name, files } = e.target;
+    const file = files[0];
 
-  if (!file) return;
+    if (!file) return;
 
-  if (file.size > 2 * 1024 * 1024) {
-    toast.error("File must be less than 2MB");
-    return;
-  }
+    if (file.size > 2 * 1024 * 1024) {
+      toast.error("File must be less than 2MB");
+      return;
+    }
 
-  if (errors[name]) {
-    setErrors((prev) => {
-      const updated = { ...prev };
-      delete updated[name];
-      return updated;
-    });
-  }
+    if (errors[name]) {
+      setErrors((prev) => {
+        const updated = { ...prev };
+        delete updated[name];
+        return updated;
+      });
+    }
 
-  setForm((prev) => ({
-    ...prev,
-    [name]: file,
-  }));
-};
-
+    setForm((prev) => ({
+      ...prev,
+      [name]: file,
+    }));
+  };
 
   /* MULTI SELECT FOR CLASSES */
- const handleClassChange = (e) => {
+  const handleClassChange = (e) => {
     const options = Array.from(e.target.selectedOptions);
     const values = options.map((opt) => opt.value);
 
@@ -189,6 +188,26 @@ const handleChange = (e) => {
     if (step === 1) {
       if (!form.fullName.trim()) errors.push("Full Name required");
       if (!form.phone.trim()) errors.push("Phone required");
+      if (!form.dob) {
+        errors.push("Date of Birth required");
+      } else {
+        const dob = new Date(form.dob);
+        const today = new Date();
+
+        let age = today.getFullYear() - dob.getFullYear();
+        const monthDiff = today.getMonth() - dob.getMonth();
+
+        if (
+          monthDiff < 0 ||
+          (monthDiff === 0 && today.getDate() < dob.getDate())
+        ) {
+          age--;
+        }
+
+        if (age < 18) {
+          errors.push("Teacher must be at least 18 years old");
+        }
+      }
       if (!form.email.trim()) errors.push("Email required");
 
       if (form.phone && !/^\d{10}$/.test(form.phone))
@@ -205,7 +224,41 @@ const handleChange = (e) => {
 
     if (step === 3) {
       if (!form.designation) errors.push("Designation required");
-      if (!form.joiningDate) errors.push("Joining Date required");
+      if (!form.joiningDate) {
+        errors.push("Joining Date required");
+      } else {
+        const joiningDate = new Date(form.joiningDate);
+        const today = new Date();
+
+        today.setHours(0, 0, 0, 0);
+
+        // Future date check
+        if (joiningDate > today) {
+          errors.push("Joining Date cannot be a future date");
+        }
+
+        // Age check on joining date
+        if (form.dob) {
+          const dob = new Date(form.dob);
+
+          let ageAtJoining = joiningDate.getFullYear() - dob.getFullYear();
+
+          const monthDiff = joiningDate.getMonth() - dob.getMonth();
+
+          if (
+            monthDiff < 0 ||
+            (monthDiff === 0 && joiningDate.getDate() < dob.getDate())
+          ) {
+            ageAtJoining--;
+          }
+
+          if (ageAtJoining < 18) {
+            errors.push(
+              "Teacher must be at least 18 years old on the joining date",
+            );
+          }
+        }
+      }
     }
 
     if (step === 4) {
@@ -217,35 +270,48 @@ const handleChange = (e) => {
     return errors;
   };
 
- const next = () => {
-  const stepErrorsArray = validateStep();
+  const next = () => {
+    const stepErrorsArray = validateStep();
 
-  if (stepErrorsArray.length > 0) {
-    const errorMap = {};
+    if (stepErrorsArray.length > 0) {
+      const errorMap = {};
 
-    stepErrorsArray.forEach((err) => {
-      const lowerErr = err.toLowerCase();
+      stepErrorsArray.forEach((err) => {
+        const lowerErr = err.toLowerCase();
 
-      if (lowerErr.includes("full name")) errorMap.fullName = err;
-      if (lowerErr.includes("phone") || lowerErr.includes("invalid phone")) errorMap.phone = err;
-      if (lowerErr.includes("email") || lowerErr.includes("invalid email")) errorMap.email = err;
-      if (lowerErr.includes("qualification")) errorMap.qualification = err;
-      if (lowerErr.includes("subject")) errorMap.subjects = err;
-      if (lowerErr.includes("designation")) errorMap.designation = err;
-      if (lowerErr.includes("joining date")) errorMap.joiningDate = err;
-      if (lowerErr.includes("username")) errorMap.username = err;
-      if (lowerErr.includes("password")) errorMap.password = err;
-      if (lowerErr.includes("role")) errorMap.role = err;
-    });
+        if (lowerErr.includes("full name")) errorMap.fullName = err;
+        if (
+          lowerErr.includes("date of birth") ||
+          lowerErr.includes("18 years old")
+        ) {
+          errorMap.dob = err;
+        }
+        if (lowerErr.includes("phone") || lowerErr.includes("invalid phone"))
+          errorMap.phone = err;
+        if (lowerErr.includes("email") || lowerErr.includes("invalid email"))
+          errorMap.email = err;
+        if (lowerErr.includes("qualification")) errorMap.qualification = err;
+        if (lowerErr.includes("subject")) errorMap.subjects = err;
+        if (lowerErr.includes("designation")) errorMap.designation = err;
+        if (
+          lowerErr.includes("joining date") ||
+          lowerErr.includes("18 years old on the joining date")
+        ) {
+          errorMap.joiningDate = err;
+        }
+        if (lowerErr.includes("username")) errorMap.username = err;
+        if (lowerErr.includes("password")) errorMap.password = err;
+        if (lowerErr.includes("role")) errorMap.role = err;
+      });
 
-    setErrors(errorMap);
-    toast.error("Please fill in the required fields.");
-    return;
-  }
+      setErrors(errorMap);
+      toast.error("Please fill in the required fields.");
+      return;
+    }
 
-  setErrors({});
-  setStep((s) => s + 1);
-};
+    setErrors({});
+    setStep((s) => s + 1);
+  };
 
   const prev = () => {
     if (step > 1) setStep((s) => s - 1);
@@ -253,23 +319,23 @@ const handleChange = (e) => {
 
   /* RESET */
 
-const resetForm = () => {
-  if (!isDirty()) {
-    setForm(emptyForm);
-    setStep(1);
-    return;
-  }
+  const resetForm = () => {
+    if (!isDirty()) {
+      setForm(emptyForm);
+      setStep(1);
+      return;
+    }
 
-  setConfirmMessage("Are you sure you want to reset the form?");
+    setConfirmMessage("Are you sure you want to reset the form?");
 
-  setConfirmAction(() => () => {
-    setForm(emptyForm);
-    setStep(1);
-    setErrors({});
-  });
+    setConfirmAction(() => () => {
+      setForm(emptyForm);
+      setStep(1);
+      setErrors({});
+    });
 
-  setConfirmOpen(true);
-};
+    setConfirmOpen(true);
+  };
 
   /* SUBMIT */
 
@@ -498,6 +564,8 @@ const resetForm = () => {
                   name="dob"
                   value={form.dob}
                   onChange={handleChange}
+                  error={errors.dob}
+                  max={new Date().toISOString().split("T")[0]}
                 />
                 <Select
                   label="Gender"
@@ -595,7 +663,7 @@ const resetForm = () => {
                   value={form.designation}
                   onChange={handleChange}
                   placeholder="e.g., Senior Teacher, HOD"
-                   error={errors.designation}
+                  error={errors.designation}
                 />
                 <Input
                   type="date"
@@ -604,6 +672,7 @@ const resetForm = () => {
                   value={form.joiningDate}
                   onChange={handleChange}
                   error={errors.joiningDate}
+                  max={new Date().toISOString().split("T")[0]}
                 />
                 <Select
                   label="Employment Type"
@@ -670,12 +739,13 @@ const resetForm = () => {
                     isEdit
                       ? "Password (leave blank to keep current)"
                       : "Password *"
-                  } 
+                  }
                   defaultValue="123456"
                   name="password"
                   value={form.password}
                   onChange={handleChange}
                   placeholder="Create password"
+                  error = {errors.password}
                 />
               </div>
             )}
@@ -763,9 +833,11 @@ const resetForm = () => {
 
 export default TeacherManagement;
 
-const Input = ({ label, className = "" ,error, ...props }) => (
+const Input = ({ label, className = "", error, ...props }) => (
   <div className={className}>
-    <label className="block text-sm mb-1 text-[rgb(var(--text))]">{label}</label>
+    <label className="block text-sm mb-1 text-[rgb(var(--text))]">
+      {label}
+    </label>
     <input
       {...props}
       className="w-full border px-3 py-2 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none"
@@ -799,7 +871,9 @@ const Select = ({
 
   return (
     <div>
-      <label className="block text-sm mb-1 text-[rgb(var(--text))]">{label}</label>
+      <label className="block text-sm mb-1 text-[rgb(var(--text))]">
+        {label}
+      </label>
 
       <select
         {...props}
@@ -828,14 +902,18 @@ const Select = ({
           Hold Ctrl/Cmd to select multiple
         </p>
       )}
-       {error && <span className="text-xs text-red-500 font-medium">{error}</span>}
+      {error && (
+        <span className="text-xs text-red-500 font-medium">{error}</span>
+      )}
     </div>
   );
 };
 
-const File = ({ label, name, onChange,error}) => (
+const File = ({ label, name, onChange, error }) => (
   <div>
-    <label className="block text-sm mb-1 text-[rgb(var(--text))]">{label}</label>
+    <label className="block text-sm mb-1 text-[rgb(var(--text))]">
+      {label}
+    </label>
     <input
       type="file"
       name={name}
@@ -843,7 +921,7 @@ const File = ({ label, name, onChange,error}) => (
       accept="image/*"
       className="w-full border px-3 py-2 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none"
     />
-     {error && <span className="text-xs text-red-500 font-medium">{error}</span>}
+    {error && <span className="text-xs text-red-500 font-medium">{error}</span>}
     <p className="text-xs text-[rgb(var(--text))] mt-1">Max size: 2MB</p>
   </div>
 );

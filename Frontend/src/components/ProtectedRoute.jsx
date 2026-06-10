@@ -3,7 +3,7 @@ import { useAuth } from "../context/AuthContext.jsx";
 import { toast } from "react-toastify";
 import { useEffect, useRef } from "react";
 
-const ProtectedRoute = ({ children, allowedRoles }) => {
+const ProtectedRoute = ({ children, allowedRoles, requiredLoginAs }) => {
   const { user, loading } = useAuth();
   const location = useLocation();
   const hasShownToast = useRef(false);
@@ -42,11 +42,21 @@ const ProtectedRoute = ({ children, allowedRoles }) => {
       return <Navigate to="/teacher/dashboard" replace />;
     }
     if (user.role === "student_admin") {
-      return <Navigate to="/parent/dashboard" replace />;
+      const dest =
+        user.loginAs === "student" ? "/student/dashboard" : "/parent/dashboard";
+      return <Navigate to={dest} replace />;
     }
-    if (user.role === "staff_admin")   return <Navigate to="/staff/dashboard"   replace />;
+    if (user.role === "staff_admin")
+      return <Navigate to="/staff/dashboard" replace />;
   }
 
+  // ── loginAs guard — prevent parent accessing /student/* and vice versa
+  if (requiredLoginAs && user.loginAs !== requiredLoginAs) {
+    const dest =
+      user.loginAs === "student" ? "/student/dashboard" : "/parent/dashboard";
+    return <Navigate to={dest} replace />;
+  }
+  
   return children;
 };
 

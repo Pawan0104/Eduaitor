@@ -5,6 +5,7 @@ import connectDB from "./config/db.js";
 import cookieParser from "cookie-parser";
 import School from "./models/school.js";
 import Staff from "./models/staff.js";
+import Student from "./models/student.js";
 dotenv.config();
 
 const app = express();
@@ -82,10 +83,12 @@ import notificationRoute from "./routes/notificationRoute.js";
 import blogRoute from "./routes/blogRoute.js";
 import classAttendanceRoute from "./routes/classAttendanceRoute.js";
 import staffRoute from "./routes/staffRoute.js";
+import gatepassRoute from "./routes/gatepassRoute.js";
 
 import { authMiddleware } from "./auth/auth.js";
 
-app.get("/api/auth/me", authMiddleware, async (req, res) => {  // async added
+app.get("/api/auth/me", authMiddleware, async (req, res) => {
+  // async added
   try {
     /* ---------- SUPER ADMIN ---------- */
     if (req.user.role === "super_admin") {
@@ -101,9 +104,9 @@ app.get("/api/auth/me", authMiddleware, async (req, res) => {  // async added
 
     /* ---------- FETCH SCHOOL MODULES (for all school-bound roles) ---------- */
     // school_id is in JWT for all 3 roles below
-    const school = await School
-      .findById(req.user.school_id)
-      .select("name school_logo subscribed_modules");
+    const school = await School.findById(req.user.school_id).select(
+      "name school_logo subscribed_modules",
+    );
 
     const subscribed_modules = school?.subscribed_modules || [];
 
@@ -143,55 +146,89 @@ app.get("/api/auth/me", authMiddleware, async (req, res) => {  // async added
     }
 
     /* ---------- STAFF ADMIN ---------- */
-// ADDED: staff block
-if (req.user.role === "staff_admin") {
+    // ADDED: staff block
+    if (req.user.role === "staff_admin") {
+      // fetch fresh permissions from DB — not from JWT
+      // so if school admin updates permissions, takes effect on next refresh
+      const staffMember = await Staff.findById(req.user.staff_id).select(
+        "permissions status staffRole staffRoleCustom firstTimeLogin",
+      );
 
-  // fetch fresh permissions from DB — not from JWT
-  // so if school admin updates permissions, takes effect on next refresh
-  const staffMember = await Staff
-    .findById(req.user.staff_id)
-    .select("permissions status staffRole staffRoleCustom firstTimeLogin");
+      // staff deleted or deactivated
+      if (!staffMember || staffMember.status === "Inactive") {
+        return res.status(403).json({
+          success: false,
+          message: "Account inactive or not found.",
+        });
+      }
 
-  // staff deleted or deactivated
-  if (!staffMember || staffMember.status === "Inactive") {
-    return res.status(403).json({
-      success: false,
-      message: "Account inactive or not found.",
-    });
-  }
-
-  return res.json({
-    success: true,
-    user: {
-      role:            "staff_admin",
-      staff_id:        req.user.staff_id,
-      school_id:       req.user.school_id,
-      name:            req.user.name,
-      email:           req.user.email,
-      _id:             req.user._id,
-      staffRole:       staffMember.staffRole,
-      staffRoleCustom: staffMember.staffRoleCustom,
-      firstTimeLogin:  staffMember.firstTimeLogin,
-      permissions:     staffMember.permissions,      // ← always fresh from DB
-      subscribed_modules,                             // ← already fetched above
-      school_name:     school?.school_name,
-      school_logo:     school?.school_logo,
-    },
-  });
-}
+      return res.json({
+        success: true,
+        user: {
+          role: "staff_admin",
+          staff_id: req.user.staff_id,
+          school_id: req.user.school_id,
+          name: req.user.name,
+          email: req.user.email,
+          _id: req.user._id,
+          staffRole: staffMember.staffRole,
+          staffRoleCustom: staffMember.staffRoleCustom,
+          firstTimeLogin: staffMember.firstTimeLogin,
+          permissions: staffMember.permissions, // ← always fresh from DB
+          subscribed_modules, // ← already fetched above
+          school_name: school?.school_name,
+          school_logo: school?.school_logo,
+        },
+      });
+    }
 
     /* ---------- STUDENT ADMIN ---------- */
     if (req.user.role === "student_admin") {
+      const loginAs = req.user.loginAs; // "student" or "parent"
+
+      // Guard: if loginAs missing from old JWT, clear and force re-login
+      if (!loginAs) {
+        return res.status(401).json({
+          success: false,
+          message: "Session expired, please login again.",
+        });
+      }
+
+      // Guard: if student_id missing
+      if (!req.user.student_id) {
+        return res
+          .status(401)
+          .json({ success: false, message: "Invalid session." });
+      }
+
+      const studentDoc = await Student.findById(req.user.student_id).select(
+        "studentCredentials parentCredentials schoolId firstName lastName",
+      );
+
+      if (!studentDoc) {
+        return res
+          .status(404)
+          .json({ success: false, message: "Student not found." });
+      }
+
+      const creds =
+        loginAs === "student"
+          ? studentDoc.studentCredentials
+          : studentDoc.parentCredentials;
+
+      // school is already fetched above (from req.user.school_id)
       return res.json({
         success: true,
         user: {
           username: req.user.username,
           role: req.user.role,
+          loginAs,
           school_id: req.user.school_id,
           student_id: req.user.student_id,
           name: req.user.name,
           _id: req.user._id,
-          subscribed_modules, // ← added
+          firstTimeLogin: creds?.firstTimeLogin ?? false,
+          subscribed_modules,
           school_name: school?.name,
           school_logo: school?.school_logo,
         },
@@ -199,8 +236,8 @@ if (req.user.role === "staff_admin") {
     }
 
     return res.status(401).json({ success: false, message: "Unauthorized" });
-
   } catch (error) {
+    console.error("❌ /auth/me error:", error.message, error.stack); // ← ADD THIS
     return res.status(500).json({ success: false, message: "Server error" });
   }
 });
@@ -248,10 +285,11 @@ app.use("/api/calendar", calendarRoute);
 app.use("/api/diary", diaryRoute);
 app.use("/api/messages", messageRoute);
 app.use("/api/groups", groupRoute);
-app.use("/api/notifications", notificationRoute)
+app.use("/api/notifications", notificationRoute);
 app.use("/api/blogs", blogRoute);
- app.use("/api/class-attendance", classAttendanceRoute);
+app.use("/api/class-attendance", classAttendanceRoute);
 app.use("/api/staff", staffRoute);
+app.use("/api/gatepass", gatepassRoute);
 // Server
 const PORT = process.env.PORT || 5000;
 app.listen(PORT, () => console.log(`Server running on port ${PORT}`));

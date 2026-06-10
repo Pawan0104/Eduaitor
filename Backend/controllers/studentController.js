@@ -31,7 +31,9 @@ const normalizeStudentFeeFields = (safeBody) => {
   safeBody.busFeeFrequency =
     safeBody.busFeeFrequency === "quarterly" ? "quarterly" : "annually";
   safeBody.busFeeQuarter =
-    safeBody.busFeeFrequency === "quarterly" ? safeBody.busFeeQuarter || "" : "";
+    safeBody.busFeeFrequency === "quarterly"
+      ? safeBody.busFeeQuarter || ""
+      : "";
 };
 
 /* ================= GENERATE STUDENT ID ================= */
@@ -93,23 +95,45 @@ export const createStudent = async (req, res) => {
     await uploadFile("studentAadhar", "documents");
     await uploadFile("fatherAadhar", "documents");
     await uploadFile("motherAadhar", "documents");
-    const existingUser = await Student.findOne({
-  schoolId,
-  username: safeBody.username,
-});
-if (existingUser) {
-  return res.status(400).json({
-    success: false,
-    message: "Username already exists",
-  });
-}
+
+    const studentUsernameExists = await Student.findOne({
+      schoolId,
+      "studentCredentials.username": safeBody.username, // username field from form
+    });
+    if (studentUsernameExists) {
+      return res
+        .status(400)
+        .json({ success: false, message: "Student username already exists" });
+    }
 
     const studentId = await generateStudentId(schoolId);
 
-    if (safeBody.password && safeBody.password.trim() !== "") {
-      safeBody.temp_password = safeBody.password;
-      safeBody.password = await bcrypt.hash(safeBody.password, 10);
-    }
+    // ── HASH PASSWORD (same password used for both, set at creation) ──
+    const rawPassword = safeBody.password?.trim();
+    const hashedPassword = rawPassword
+      ? await bcrypt.hash(rawPassword, 10)
+      : undefined;
+
+    // ── BUILD CREDENTIAL OBJECTS ──
+    const studentCredentials = {
+      username: studentId, // STU0001 — auto generated
+      password: hashedPassword,
+      temp_password: rawPassword || undefined,
+      firstTimeLogin: true,
+    };
+
+    const parentCredentials = {
+      username: safeBody.fatherMobile || "", // father mobile as username
+      password: hashedPassword, // same initial password
+      temp_password: rawPassword || undefined,
+      firstTimeLogin: true,
+    };
+
+    // ── STRIP OLD TOP-LEVEL CREDENTIAL FIELDS ──
+    delete safeBody.username;
+    delete safeBody.password;
+    delete safeBody.temp_password;
+    delete safeBody.firstTimeLogin;
 
     const student = await Student.create({
       ...safeBody,
@@ -118,6 +142,8 @@ if (existingUser) {
       totalDue,
       totalPaid: 0,
       documents,
+      studentCredentials,
+      parentCredentials,
     });
 
     // AUTO ADD TO GROUPS
@@ -234,14 +260,14 @@ export const updateStudent = async (req, res) => {
       schoolId,
     });
 
-    const oldStudent = student.toObject(); // Reference for group sync
-
     if (!student) {
       return res.status(404).json({
         success: false,
         message: "Student not found",
       });
     }
+
+    const oldStudent = student.toObject(); // Reference for group sync
 
     const files = req.files || {};
     const documents = student.documents || {};
@@ -277,13 +303,35 @@ export const updateStudent = async (req, res) => {
     await updateFile("fatherAadhar", "documents");
     await updateFile("motherAadhar", "documents");
 
+    // ── STRIP OLD TOP-LEVEL CREDENTIAL FIELDS ──
+    delete safeBody.username;
+    delete safeBody.firstTimeLogin;
+
+    // ── BUILD SEPARATE $set FOR NESTED CREDENTIAL FIELDS ──
+    const credentialUpdate = {};
+
     if (safeBody.password && safeBody.password.trim() !== "") {
-      safeBody.temp_password = safeBody.password;
-      safeBody.password = await bcrypt.hash(safeBody.password, 10);
-    } else {
-      delete safeBody.password;
-      delete safeBody.temp_password;
+      const rawPassword = safeBody.password.trim();
+      const hashedPassword = await bcrypt.hash(rawPassword, 10);
+
+      credentialUpdate["studentCredentials.password"] = hashedPassword;
+      credentialUpdate["studentCredentials.temp_password"] = rawPassword;
+      credentialUpdate["parentCredentials.password"] = hashedPassword;
+      credentialUpdate["parentCredentials.temp_password"] = rawPassword;
     }
+
+    // Sync parent username if fatherMobile changed
+    if (safeBody.fatherMobile) {
+      credentialUpdate["parentCredentials.username"] = safeBody.fatherMobile;
+    }
+
+    // ── STRIP password from safeBody so it doesn't conflict ──
+    delete safeBody.password;
+    delete safeBody.temp_password;
+
+    // ── ALSO STRIP any nested credential objects if accidentally in safeBody ──
+    delete safeBody.studentCredentials;
+    delete safeBody.parentCredentials;
 
     const totalPaid = Number(student.totalPaid) || 0;
     const finalFee = Number(safeBody.finalFee);
@@ -298,6 +346,7 @@ export const updateStudent = async (req, res) => {
             }
           : {}),
         documents,
+        ...credentialUpdate,
       },
       { new: true },
     )

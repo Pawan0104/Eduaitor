@@ -59,6 +59,7 @@ import TeacherAssignmentResult from "./pages/TeacherAssignmentResult";
 import ReadTimetable from "./pages/ReadTimetable";
 import TeacherExam from "./pages/TeacherExam";
 
+import StudentMenu from "./pages/StudentMenu";
 import ParentMenu from "./pages/ParentMenu";
 import ParentDashboard from "./pages/ParentDashboard";
 import ParentAssignment from "./pages/ParentAssignment";
@@ -71,6 +72,7 @@ import AttendanceParent from "./pages/AttendanceParent";
 import MyChild from "./pages/MyChild";
 import ParentLibrary from "./pages/ParentLibrary";
 import ParentTransport from "./pages/ParentTransport";
+
 import ChangePassword from "./components/ChangePassword";
 import NotificationPage from "./pages/NotificationPage";
 import Blogs from "./pages/Blogs";
@@ -79,6 +81,8 @@ import AttendanceWithTabs from "./pages/AttendanceWithTabs";
 import StudentAttendanceDetail from "./pages/StudentAttendanceDetail";
 import StaffManagement from "./pages/StaffManagement";
 import StaffDashboard from "./pages/StaffDashboard";
+import ParentGatepass from "./pages/ParentGatepass";
+import TeacherGatepass from "./pages/TeacherGatepass";
 
 const App = () => {
   return (
@@ -93,9 +97,8 @@ const App = () => {
         <Route
           path="/change-password"
           element={
-            <ProtectedRoute allowedRoles={["student_admin"]}>
-              {" "}
-              <ChangePassword />{" "}
+            <ProtectedRoute allowedRoles={["student_admin", "staff_admin"]}>
+              <ChangePassword />
             </ProtectedRoute>
           }
         />
@@ -149,7 +152,10 @@ const App = () => {
           <Route path="subject" element={<Subject />} />
           <Route path="syllabus" element={<Syllabus />} />
           <Route path="attendance" element={<AttendanceReportPrincipal />} />
-          <Route path="attendance/student/:studentId" element={<StudentAttendanceDetail />} />
+          <Route
+            path="attendance/student/:studentId"
+            element={<StudentAttendanceDetail />}
+          />
           <Route path="timetable" element={<TimeTable />} />
           <Route path="fee-structure" element={<FeeStructure />} />
           <Route path="fee-collection" element={<FeeCollection />} />
@@ -196,7 +202,10 @@ const App = () => {
           />
           <Route path="exam" element={<TeacherExam />} />
           <Route path="attendance/mark" element={<AttendanceWithTabs />} />
-          <Route path="attendance/student/:studentId" element={<StudentAttendanceDetail />} />
+          <Route
+            path="attendance/student/:studentId"
+            element={<StudentAttendanceDetail />}
+          />
           <Route
             path="attendance/report"
             element={<AttendanceReportTeacher />}
@@ -210,14 +219,19 @@ const App = () => {
           <Route path="group" element={<Group />} />
           <Route path="timetable" element={<ReadTimetable />} />
           <Route path="blogs" element={<Blogs />} />
+           <Route path="gatepass" element={<TeacherGatepass />} />
 
           <Route path="*" element={<Navigate to="/teacher/dashboard" />} />
         </Route>
 
+        {/* ── PARENT ROUTES (loginAs === "parent") ── */}
         <Route
           path="/parent"
           element={
-            <ProtectedRoute allowedRoles={["student_admin"]}>
+            <ProtectedRoute
+              allowedRoles={["student_admin"]}
+              requiredLoginAs="parent"
+            >
               <AdminLayout />
             </ProtectedRoute>
           }
@@ -225,25 +239,15 @@ const App = () => {
           <Route path="menu" element={<ParentMenu />} />
           <Route path="dashboard" element={<ParentDashboard />} />
           <Route path="notification" element={<NotificationPage />} />
-          <Route path="student" element={<MyChild />} />
-          <Route path="assignment" element={<ParentAssignment />} />
-          <Route
-            path="assignment/result"
-            element={<ParentAssignmentResult />}
-          />
-          <Route path="timetable" element={<ReadTimetable />} />
-          <Route path="exam-result" element={<ParentResultView />} />
-          <Route path="diary" element={<DiaryParent />} />
+          <Route path="student" element={<MyChild />} /> {/* child profile */}
+          <Route path="fees" element={<ParentFee />} />
+          <Route path="transport" element={<ParentTransport />} />
+          <Route path="notice" element={<Notice />} />
           <Route path="event" element={<Event />} />
           <Route path="event/:id" element={<EventView />} />
-          <Route path="notice" element={<Notice />} />
-          <Route path="group" element={<Group />} />
           <Route path="calendar" element={<TeacherCalendar />} />
-          <Route path="attendance" element={<AttendanceParent />} />
-          <Route path="fees" element={<ParentFee />} />
-          <Route path="library" element={<ParentLibrary />} />
-          <Route path="transport" element={<ParentTransport />} />
           <Route path="blogs" element={<Blogs />} />
+           <Route path="gatepass" element={<ParentGatepass />} />
           {/* <Route
           path="timetable"
           element={
@@ -254,43 +258,78 @@ const App = () => {
             />
           }
         /> */}
-
           <Route path="*" element={<Navigate to="/parent/dashboard" />} />
         </Route>
 
+        {/* ── STUDENT ROUTES (loginAs === "student") ── */}
         <Route
-  path="/staff"
-  element={
-    <ProtectedRoute allowedRoles={["staff_admin"]}>
-      <AdminLayout />
-    </ProtectedRoute>
-  }
->
-  {/* always accessible */}
-  {/* <Route path="menu"         element={<StaffMenu />} /> */}
-  <Route path="dashboard"    element={<StaffDashboard />} />
-  <Route path="notification" element={<NotificationPage />} />
-  <Route path="notice"       element={<Notice />} />
-  <Route path="event"        element={<Event />} />
-  <Route path="event/:id"    element={<EventView />} />
-  <Route path="calendar"     element={<TeacherCalendar />} />
+          path="/student"
+          element={
+            <ProtectedRoute
+              allowedRoles={["student_admin"]}
+              requiredLoginAs="student"
+            >
+              <AdminLayout />
+            </ProtectedRoute>
+          }
+        >
+          <Route path="menu" element={<StudentMenu />} />
+          {/* reuse or make StudentMenu */}
+          <Route path="dashboard" element={<ParentDashboard />} />
+          {/* reuse or make StudentDashboard */}
+          <Route path="notification" element={<NotificationPage />} />
+          <Route path="attendance" element={<AttendanceParent />} />
+          <Route path="timetable" element={<ReadTimetable />} />
+          <Route path="assignment" element={<ParentAssignment />} />
+          <Route
+            path="assignment/result"
+            element={<ParentAssignmentResult />}
+          />
+          <Route path="exam-result" element={<ParentResultView />} />
+          <Route path="diary" element={<DiaryParent />} />
+          <Route path="library" element={<ParentLibrary />} />
+          <Route path="group" element={<Group />} />
+          <Route path="notice" element={<Notice />} />
+          <Route path="event" element={<Event />} />
+          <Route path="event/:id" element={<EventView />} />
+          <Route path="calendar" element={<TeacherCalendar />} />
+          <Route path="blogs" element={<Blogs />} />
+          <Route path="*" element={<Navigate to="/student/dashboard" />} />
+        </Route>
 
-  {/* module gated pages — reuse existing components where possible */}
-  <Route path="students"    element={<Students />} />
-  <Route path="attendance"  element={<AttendanceReportPrincipal />} />
-  <Route path="fees"        element={<FeeCollection />} />
-  <Route path="library"     element={<LibraryManagement />} />
-  <Route path="transport"   element={<Transport />} />
-  <Route path="timetable"   element={<ReadTimetable />} />
-  <Route path="syllabus"    element={<Syllabus />} />
-  <Route path="diary"       element={<DiaryPrincipal />} />
-  <Route path="exams"       element={<ExamCreate />} />
-  <Route path="assignments" element={<Assignment />} />
-  <Route path="group"       element={<Group />} />
-  <Route path="staff"       element={<StaffManagement />} />
+        <Route
+          path="/staff"
+          element={
+            <ProtectedRoute allowedRoles={["staff_admin"]}>
+              <AdminLayout />
+            </ProtectedRoute>
+          }
+        >
+          {/* always accessible */}
+          {/* <Route path="menu"         element={<StaffMenu />} /> */}
+          <Route path="dashboard" element={<StaffDashboard />} />
+          <Route path="notification" element={<NotificationPage />} />
+          <Route path="notice" element={<Notice />} />
+          <Route path="event" element={<Event />} />
+          <Route path="event/:id" element={<EventView />} />
+          <Route path="calendar" element={<TeacherCalendar />} />
 
-  <Route path="*" element={<Navigate to="/staff/dashboard" />} />
-</Route>
+          {/* module gated pages — reuse existing components where possible */}
+          <Route path="students" element={<Students />} />
+          <Route path="attendance" element={<AttendanceReportPrincipal />} />
+          <Route path="fees" element={<FeeCollection />} />
+          <Route path="library" element={<LibraryManagement />} />
+          <Route path="transport" element={<Transport />} />
+          <Route path="timetable" element={<ReadTimetable />} />
+          <Route path="syllabus" element={<Syllabus />} />
+          <Route path="diary" element={<DiaryPrincipal />} />
+          <Route path="exams" element={<ExamCreate />} />
+          <Route path="assignments" element={<Assignment />} />
+          <Route path="group" element={<Group />} />
+          <Route path="staff" element={<StaffManagement />} />
+
+          <Route path="*" element={<Navigate to="/staff/dashboard" />} />
+        </Route>
 
         {/* Default redirect */}
         <Route path="*" element={<Navigate to="/admin/login" />} />

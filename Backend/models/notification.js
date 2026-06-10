@@ -41,10 +41,10 @@ import mongoose from 'mongoose';
 const targetSchema = new mongoose.Schema({
   type: {
     type: String,
-    enum: ['all', 'role', 'class', 'exam', 'student', 'teacher', 'diary','assignment',"attendance"],
+    enum: ['all', 'role', 'class', 'exam', 'student', 'teacher', 'diary','assignment',"attendance",'gatepass'],
     default: 'all',
   },
-  roles:     [{ type: String, enum: ['teacher_admin', 'student_admin', 'school_admin'] }],
+  roles:     [{ type: String, enum: ['teacher_admin', 'student_admin', 'school_admin','staff_admin'] }],
   classId:   { type: mongoose.Schema.Types.ObjectId, ref: 'Class'   },
   examId:    { type: mongoose.Schema.Types.ObjectId, ref: 'Exam'    },
   schoolId:  { type: mongoose.Schema.Types.ObjectId, ref: 'School'  },
@@ -62,7 +62,7 @@ const notificationSchema = new mongoose.Schema({
 
   notificationType: {
     type: String,
-    enum: ['general', 'exam', 'result', 'attendance', 'fee', 'diary', 'assignment'],
+    enum: ['general', 'exam', 'result', 'attendance', 'fee', 'diary', 'assignment','gatepass'],
     default: 'general',
   },
 

@@ -53,11 +53,19 @@ export default function Login() {
         withCredentials: true,
       });
 
-      // 🔥 important: fetch user after login
-      await fetchUser();
-
       const role = res.data.data.role;
+      const loginAs = res.data.data.loginAs; // "student" or "parent"
       const isFirstTime = res.data.data.firstTimeLogin;
+
+      if (role === "student_admin" && isFirstTime) {
+        await fetchUser(); // need user in context for /change-password ProtectedRoute
+        toast.info("Please change your default password to continue.");
+        navigate("/change-password", { replace: true });
+        return;
+      }
+
+      // For all other roles, fetchUser then navigate
+      await fetchUser();
 
       if (role === "super_admin") {
         if (isMobile) {
@@ -83,26 +91,29 @@ export default function Login() {
           navigate("/teacher/dashboard"); // desktop page
         }
         toast.success("Login successful! Welcome back.");
-      }
-       else if (role === "student_admin") {
+      } else if (role === "student_admin") {
         if (isFirstTime) {
+          await fetchUser();
           toast.info("Please change your default password to continue.");
-          navigate("/change-password");
-          return; // ✅ stop here, don't fall through
+          navigate("/change-password", { replace: true });
+          return;
         }
 
-        
-        if (isMobile) {
-          navigate(from, { replace: true });
-          navigate("/parent/menu");
+        await fetchUser();
+
+        if (loginAs === "student") {
+          navigate(isMobile ? "/student/menu" : "/student/dashboard", {
+            replace: true,
+          });
         } else {
-          navigate("/parent/dashboard");
+          navigate(isMobile ? "/parent/menu" : "/parent/dashboard", {
+            replace: true,
+          });
         }
         toast.success("Login successful! Welcome back.");
+      } else if (role === "staff_admin") {
+        navigate("/staff/dashboard");
       }
-      else if(role=== "staff_admin"){
-          navigate("/staff/dashboard");
-        }
     } catch {
       setError("Invalid credentials");
       toast.error("Login failed. Please check your credentials.");
@@ -132,7 +143,7 @@ export default function Login() {
           <div className="text-center mb-8">
             <FaUserShield className="mx-auto text-4xl text-indigo-500 mb-3" />
 
-            <h2 className="text-3xl font-bold text-gray-700">Admin Login</h2>
+            <h2 className="text-3xl font-bold text-gray-700 mb-2">Login</h2>
 
             <p className="text-gray-500 text-sm">EduAitor Control Panel</p>
           </div>
@@ -200,7 +211,6 @@ export default function Login() {
                 "Login to Admin Panel"
               )}
             </button>
-
           </form>
         </div>
       </div>

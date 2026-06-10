@@ -42,9 +42,9 @@ export const loginUser = async (req, res) => {
     });
 
     if (teacher && (await bcrypt.compare(password, teacher.password))) {
-       const school = await School
-        .findById(teacher.schoolId)
-        .select("subscribed_modules");
+      const school = await School.findById(teacher.schoolId).select(
+        "subscribed_modules",
+      );
 
       const subscribed_modules = school?.subscribed_modules || [];
 
@@ -67,97 +67,156 @@ export const loginUser = async (req, res) => {
           name: teacher.fullName,
           email: teacher.email,
           school_id: teacher.schoolId,
-           subscribed_modules,
-        },
-      });
-    }
-
-    /* ---------- STUDENT / PARENT ADMIN ---------- */
-    const student = await Student.findOne({ username: email });
-
-    if (student && (await bcrypt.compare(password, student.password))) {
-      const school = await School
-        .findById(student.schoolId)
-        .select("subscribed_modules");
-
-      const subscribed_modules = school?.subscribed_modules || [];
-
-      const token = generateToken({
-        role: "student_admin",
-        username: student.username,
-        school_id: student.schoolId,
-        student_id: student._id,
-        name: `${student.firstName} ${student.lastName}`,
-        _id: student._id,
-      });
-      res.cookie("token", token, cookieOptions);
-      return res.json({
-        success: true,
-        token,
-        message: "Parent login successful",
-        data: {
-          role: "student_admin",
-          student_id: student._id,
-          name: `${student.firstName} ${student.lastName}`,
-          username: student.username,
-          school_id: student.schoolId,
-          firstTimeLogin: student.firstTimeLogin,
           subscribed_modules,
         },
       });
     }
 
-
-/* ------------------------ staff admin login ------------------- */
-const staff = await Staff.findOne({
-  $or: [{ email }, { username: email }],
-});
-
-if (staff && (await bcrypt.compare(password, staff.password))) {
-
-  // check staff is active
-  if (staff.status === "Inactive") {
-    return res.status(403).json({
-      success: false,
-      message: "Your account is inactive. Contact your school administrator.",
+    /* ---------- STUDENT / PARENT ADMIN ---------- */
+    const studentByStudentCreds = await Student.findOne({
+      "studentCredentials.username": email,
     });
-  }
 
-  // fetch school modules — for sidebar disable logic
-  const staffSchool = await School
-    .findById(staff.schoolId)
-    .select("subscribed_modules");
+    const studentByParentCreds = await Student.findOne({
+      "parentCredentials.username": email,
+    });
 
-  const subscribed_modules = staffSchool?.subscribed_modules || [];
+    // ── STUDENT LOGIN ──
+    if (studentByStudentCreds) {
+      const passwordMatch = await bcrypt.compare(
+        password,
+        studentByStudentCreds.studentCredentials.password,
+      );
 
-  const token = generateToken({
-    role:      "staff_admin",
-    email:     staff.email,
-    school_id: staff.schoolId,
-    staff_id:  staff._id,
-    name:      staff.fullName,
-    _id:       staff._id,
-  });
+      if (passwordMatch) {
+        const school = await School.findById(
+          studentByStudentCreds.schoolId,
+        ).select("subscribed_modules");
+        const subscribed_modules = school?.subscribed_modules || [];
 
-  res.cookie("token", token, cookieOptions);
-  return res.json({
-    success: true,
-    token,
-    message: "Staff login successful",
-    data: {
-      role:             "staff_admin",
-      staff_id:         staff._id,
-      name:             staff.fullName,
-      email:            staff.email,
-      school_id:        staff.schoolId,
-      staffRole:        staff.staffRole,
-      staffRoleCustom:  staff.staffRoleCustom,
-      firstTimeLogin:   staff.firstTimeLogin,
-      permissions:      staff.permissions,      // ← staff personal module access
-      subscribed_modules,                        // ← school level modules for sidebar
-    },
-  });
-}
+        const token = generateToken({
+          role: "student_admin",
+          loginAs: "student",
+          username: studentByStudentCreds.studentCredentials.username,
+          school_id: studentByStudentCreds.schoolId,
+          student_id: studentByStudentCreds._id,
+          name: `${studentByStudentCreds.firstName} ${studentByStudentCreds.lastName}`,
+          _id: studentByStudentCreds._id,
+        });
+
+        res.cookie("token", token, cookieOptions);
+        return res.json({
+          success: true,
+          token,
+          message: "Student login successful",
+          data: {
+            role: "student_admin",
+            loginAs: "student",
+            student_id: studentByStudentCreds._id,
+            name: `${studentByStudentCreds.firstName} ${studentByStudentCreds.lastName}`,
+            username: studentByStudentCreds.studentCredentials.username,
+            school_id: studentByStudentCreds.schoolId,
+            firstTimeLogin:
+              studentByStudentCreds.studentCredentials.firstTimeLogin,
+            subscribed_modules,
+          },
+        });
+      }
+    }
+
+    // ── PARENT LOGIN ──
+    if (studentByParentCreds) {
+      const passwordMatch = await bcrypt.compare(
+        password,
+        studentByParentCreds.parentCredentials.password,
+      );
+
+      if (passwordMatch) {
+        const school = await School.findById(
+          studentByParentCreds.schoolId,
+        ).select("subscribed_modules");
+        const subscribed_modules = school?.subscribed_modules || [];
+
+        const token = generateToken({
+          role: "student_admin",
+          loginAs: "parent",
+          username: studentByParentCreds.parentCredentials.username,
+          school_id: studentByParentCreds.schoolId,
+          student_id: studentByParentCreds._id,
+          name: `${studentByParentCreds.firstName} ${studentByParentCreds.lastName}`,
+          _id: studentByParentCreds._id,
+        });
+
+        res.cookie("token", token, cookieOptions);
+        return res.json({
+          success: true,
+          token,
+          message: "Parent login successful",
+          data: {
+            role: "student_admin",
+            loginAs: "parent",
+            student_id: studentByParentCreds._id,
+            name: `${studentByParentCreds.firstName} ${studentByParentCreds.lastName}`,
+            username: studentByParentCreds.parentCredentials.username,
+            school_id: studentByParentCreds.schoolId,
+            firstTimeLogin:
+              studentByParentCreds.parentCredentials.firstTimeLogin,
+            subscribed_modules,
+          },
+        });
+      }
+    }
+
+    /* ------------------------ staff admin login ------------------- */
+    const staff = await Staff.findOne({
+      $or: [{ email }, { username: email }],
+    });
+
+    if (staff && (await bcrypt.compare(password, staff.password))) {
+      // check staff is active
+      if (staff.status === "Inactive") {
+        return res.status(403).json({
+          success: false,
+          message:
+            "Your account is inactive. Contact your school administrator.",
+        });
+      }
+
+      // fetch school modules — for sidebar disable logic
+      const staffSchool = await School.findById(staff.schoolId).select(
+        "subscribed_modules",
+      );
+
+      const subscribed_modules = staffSchool?.subscribed_modules || [];
+
+      const token = generateToken({
+        role: "staff_admin",
+        email: staff.email,
+        school_id: staff.schoolId,
+        staff_id: staff._id,
+        name: staff.fullName,
+        _id: staff._id,
+      });
+
+      res.cookie("token", token, cookieOptions);
+      return res.json({
+        success: true,
+        token,
+        message: "Staff login successful",
+        data: {
+          role: "staff_admin",
+          staff_id: staff._id,
+          name: staff.fullName,
+          email: staff.email,
+          school_id: staff.schoolId,
+          staffRole: staff.staffRole,
+          staffRoleCustom: staff.staffRoleCustom,
+          firstTimeLogin: staff.firstTimeLogin,
+          permissions: staff.permissions, // ← staff personal module access
+          subscribed_modules, // ← school level modules for sidebar
+        },
+      });
+    }
 
     /* ---------- SCHOOL ADMIN ---------- */
     const school = await School.findOne({ admin_email: email });
@@ -198,10 +257,27 @@ export const changePassWord = async (req, res) => {
   const { newPassword } = req.body;
   const hashed = await bcrypt.hash(newPassword, 10);
 
-  const okkreport = await Student.findByIdAndUpdate(req.user._id, {
-    password: hashed,
-   firstTimeLogin: false,   
-  });
+  const loginAs = req.user.loginAs; // "student" or "parent" from JWT
+
+  if (loginAs === "student") {
+    await Student.findByIdAndUpdate(req.user._id, {
+      "studentCredentials.password": hashed,
+      "studentCredentials.temp_password": newPassword,
+      "studentCredentials.firstTimeLogin": false,
+    });
+  } else if (loginAs === "parent") {
+    await Student.findByIdAndUpdate(req.user._id, {
+      "parentCredentials.password": hashed,
+      "parentCredentials.temp_password": newPassword,
+      "parentCredentials.firstTimeLogin": false,
+    });
+  } else {
+    // staff or other roles — keep existing logic
+    await Student.findByIdAndUpdate(req.user._id, {
+      password: hashed,
+      firstTimeLogin: false,
+    });
+  }
 
   res.json({ message: "Password updated successfully" });
 };

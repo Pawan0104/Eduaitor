@@ -32,11 +32,6 @@ const studentSchema = new mongoose.Schema(
     guardianMobile: String,
     guardianRelation: String,
 
-    firstTimeLogin: {
-      type: Boolean,
-      default: true
-    },
-
     address: String,
 
     classId: {
@@ -94,16 +89,30 @@ const studentSchema = new mongoose.Schema(
       ref: "School", // or whatever your school model is named
     },
 
-    username: String,
-    password: String,
-    temp_password: {
-      type: String,
+    studentCredentials: {
+      username: { type: String }, // STU0001
+      password: { type: String },
+      temp_password: { type: String },
+      firstTimeLogin: { type: Boolean, default: true },
     },
-
+    parentCredentials: {
+      username: { type: String }, // fatherMobile
+      password: { type: String },
+      temp_password: { type: String },
+      firstTimeLogin: { type: Boolean, default: true },
+    },
   },
   { timestamps: true },
 );
 
 // Unique index set for schools
 studentSchema.index({ schoolId: 1, studentId: 1 }, { unique: true });
+studentSchema.index(
+  { schoolId: 1, "studentCredentials.username": 1 },
+  { unique: true, sparse: true },
+);
+studentSchema.index(
+  { schoolId: 1, "parentCredentials.username": 1 },
+  { unique: true, sparse: true },
+);
 export default mongoose.model("Student", studentSchema);
