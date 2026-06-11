@@ -393,30 +393,31 @@ export default function Notice() {
         </p>
       </div>
 
-      {/* ── Stat Cards ── */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
-        {statCards.map((s, i) => (
-          <div
-            key={i}
-            className="bg-[rgb(var(--surface))] rounded-xl border border-[rgb(var(--border))] shadow-sm px-5 py-4 flex items-center gap-4"
-          >
-            <div
-              className={`w-11 h-11 rounded-xl flex items-center justify-center text-xl shrink-0 ${s.iconBg}`}
-            >
-              {s.icon}
-            </div>
-            <div>
-              <p className="text-xs text-[rgb(var(--text))] font-medium tracking-wide">
-                {s.label}
-              </p>
-              <p className="text-2xl font-bold text-[rgb(var(--text))] leading-tight">
-                {s.value}
-              </p>
-            </div>
-          </div>
-        ))}
+{/* ── Stat Cards ── */}
+<div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
+  {statCards.map((s, i) => (
+    <div
+      key={i}
+      className="bg-[rgb(var(--surface))] rounded-xl border border-[rgb(var(--border))] shadow-sm px-3 py-4 sm:px-5 flex items-center gap-2 sm:gap-4 min-w-0"
+    >
+      <div
+        className={`w-11 h-11 rounded-xl flex items-center justify-center text-xl shrink-0 ${s.iconBg}`}
+      >
+        {s.icon}
       </div>
-
+      
+      {/* min-w-0 forces the flex child to respect its boundaries instead of pushing outward */}
+      <div className="min-w-0 flex-1">
+        <p className="text-xs text-[rgb(var(--text))] font-medium tracking-wide truncate">
+          {s.label}
+        </p>
+        <p className="text-xl sm:text-2xl font-bold text-[rgb(var(--text))] leading-tight truncate">
+          {s.value}
+        </p>
+      </div>
+    </div>
+  ))}
+</div>
       {/* ── Toolbar ── */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-5">
         {!isStudent && (
@@ -447,125 +448,124 @@ export default function Notice() {
       </div>
 
       {/* ── Notice Cards ── */}
-      {loading ? (
-        <div className="flex items-center justify-center py-20">
-          <div className="w-8 h-8 border-4 border-indigo-400 border-t-transparent rounded-full animate-spin" />
-        </div>
-      ) : filtered.length === 0 ? (
-        <div className="text-center py-20 text-gray-400 text-sm">
-          No notices found.
-        </div>
-      ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-5">
-          {filtered.map((n) => {
-            const catCls =
-              CATEGORY_STYLES[n.category] || CATEGORY_STYLES.General;
-            const prioCls =
-              PRIORITY_STYLES[n.priority] || PRIORITY_STYLES.Normal;
-            const audCls = AUDIENCE_STYLES[n.audience] || AUDIENCE_STYLES.All;
-            const isExpired =
-              n.expiryDate && new Date(n.expiryDate) < new Date();
+    {loading ? (
+  <div className="flex items-center justify-center py-20">
+    <div className="w-8 h-8 border-4 border-indigo-400 border-t-transparent rounded-full animate-spin" />
+  </div>
+) : filtered.length === 0 ? (
+  <div className="text-center py-20 text-gray-400 text-sm">
+    No notices found.
+  </div>
+) : (
+  <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-5">
+    {filtered.map((n) => {
+      const catCls = CATEGORY_STYLES[n.category] || CATEGORY_STYLES.General;
+      const prioCls = PRIORITY_STYLES[n.priority] || PRIORITY_STYLES.Normal;
+      const audCls = AUDIENCE_STYLES[n.audience] || AUDIENCE_STYLES.All;
+      const isExpired = n.expiryDate && new Date(n.expiryDate) < new Date();
 
-            return (
-              <div
-                key={n._id}
-                className={`bg-[rgb(var(--surface))] rounded-xl border shadow-sm p-5 flex flex-col hover:shadow-md transition ${
-                  !n.isActive || isExpired
-                    ? "opacity-60 border-gray-100"
-                    : "border-gray-100"
-                }`}
+      // Check if the user has admin privileges
+      const isAdmin = user?.role === "admin" || user?.role === "administrator" || user?.role === "school_admin";
+
+      return (
+        <div
+          key={n._id}
+          onClick={() => !isAdmin && setViewNotice(n)}
+          className={`bg-[rgb(var(--surface))] rounded-xl border shadow-sm p-5 flex flex-col hover:shadow-md transition ${
+            !n.isActive || isExpired ? "opacity-60 border-gray-100" : "border-gray-100"
+          } ${!isAdmin ? "cursor-pointer" : ""}`}
+        >
+          {/* top row */}
+          <div className="flex items-start justify-between gap-2 mb-3 text-[rgb(var(--text))]">
+            <h3 className="text-sm font-bold leading-snug flex-1">
+              {n.title}
+            </h3>
+            {(!n.isActive || isExpired) && (
+              <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-gray-100 text-[rgb(var(--primary))] shrink-0">
+                Inactive
+              </span>
+            )}
+          </div>
+
+          {/* badges */}
+          <div className="flex flex-wrap gap-1.5 mb-3">
+            <span className={`text-[10px] font-bold px-2.5 py-0.5 rounded-full ${catCls.bg} ${catCls.text}`}>
+              {n.category?.toUpperCase()}
+            </span>
+            <span className={`flex items-center gap-1 text-[10px] font-bold px-2.5 py-0.5 rounded-full ${prioCls.bg} ${prioCls.text}`}>
+              {prioCls.icon} {n.priority}
+            </span>
+            <span className={`text-[10px] font-bold px-2.5 py-0.5 rounded-full ${audCls.bg} ${audCls.text}`}>
+              {n.audience === "Class" && n.assignedClass ? `Class: ${n.assignedClass}` : n.audience}
+            </span>
+          </div>
+
+          {/* preview */}
+          <p className="text-xs leading-relaxed line-clamp-2 flex-1 mb-3">
+            {n.content}
+          </p>
+
+          {/* dates */}
+          <div className="flex items-center gap-3 text-[11px] mb-4">
+            <span className="flex items-center gap-1">
+              <FiCalendar size={11} /> {n.publishDate?.slice(0, 10)}
+            </span>
+            {n.expiryDate && (
+              <>
+                <span>→</span>
+                <span className={isExpired ? "text-red-400" : ""}>
+                  {n.expiryDate?.slice(0, 10)}
+                </span>
+              </>
+            )}
+          </div>
+
+          {/* author */}
+          {/* Cleans up the bottom border separator dynamically if there are no action buttons below it */}
+          <div className={`flex items-center gap-2 pb-4 ${isAdmin ? "border-b border-gray-100 mb-3" : ""}`}>
+            <div className="w-6 h-6 rounded-full text-[rgb(var(--text))] bg-[rgb(var(--primary))] flex items-center justify-center text-[10px] font-bold shrink-0">
+              {n.createdBy?.charAt(0)?.toUpperCase()}
+            </div>
+            <span className="text-xs">{n.createdBy}</span>
+          </div>
+
+          {/* actions (Only visible to admins) */}
+          {isAdmin && (
+            <div className="flex items-center gap-2">
+              <button
+                onClick={(e) => {
+                  e.stopPropagation(); // Prevents card-click triggers
+                  setViewNotice(n);
+                }}
+                className="flex items-center gap-1.5 text-xs font-medium text-indigo-500 hover:bg-indigo-50 px-3 py-1.5 rounded-lg transition"
               >
-                {/* top row */}
-                <div className="flex items-start justify-between gap-2 mb-3 text-[rgb(var(--text))]">
-                  <h3 className="text-sm font-bold leading-snug flex-1">
-                    {n.title}
-                  </h3>
-                  {(!n.isActive || isExpired) && (
-                    <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-gray-100 text-[rgb(var(--primary))] shrink-0">
-                      Inactive
-                    </span>
-                  )}
-                </div>
-
-                {/* badges */}
-                <div className="flex flex-wrap gap-1.5 mb-3">
-                  <span
-                    className={`text-[10px] font-bold px-2.5 py-0.5 rounded-full ${catCls.bg} ${catCls.text}`}
-                  >
-                    {n.category?.toUpperCase()}
-                  </span>
-                  <span
-                    className={`flex items-center gap-1 text-[10px] font-bold px-2.5 py-0.5 rounded-full ${prioCls.bg} ${prioCls.text}`}
-                  >
-                    {prioCls.icon} {n.priority}
-                  </span>
-                  <span
-                    className={`text-[10px] font-bold px-2.5 py-0.5 rounded-full ${audCls.bg} ${audCls.text}`}
-                  >
-                    {n.audience === "Class" && n.assignedClass
-                      ? `Class: ${n.assignedClass}`
-                      : n.audience}
-                  </span>
-                </div>
-
-                {/* preview */}
-                <p className="text-xs  leading-relaxed line-clamp-2 flex-1 mb-3">
-                  {n.content}
-                </p>
-
-                {/* dates */}
-                <div className="flex items-center gap-3 text-[11px]  mb-4">
-                  <span className="flex items-center gap-1">
-                    <FiCalendar size={11} /> {n.publishDate?.slice(0, 10)}
-                  </span>
-                  {n.expiryDate && (
-                    <>
-                      <span>→</span>
-                      <span className={isExpired ? "text-red-400" : ""}>
-                        {n.expiryDate?.slice(0, 10)}
-                      </span>
-                    </>
-                  )}
-                </div>
-
-                {/* author */}
-                <div className="flex items-center gap-2 pb-4 border-b border-gray-100 mb-3">
-                  <div className="w-6 h-6 rounded-full text-[rgb(var(--text))] bg-[rgb(var(--primary))] flex items-center justify-center text-[10px] font-bold shrink-0">
-                    {n.createdBy?.charAt(0)?.toUpperCase()}
-                  </div>
-                  <span className="text-xs ">{n.createdBy}</span>
-                </div>
-
-                {/* actions */}
-                <div className="flex items-center gap-2">
-                  <button
-                    onClick={() => setViewNotice(n)}
-                    className="flex items-center gap-1.5 text-xs font-medium text-indigo-500 hover:bg-indigo-50 px-3 py-1.5 rounded-lg transition"
-                  >
-                    <FiEye size={13} /> View
-                  </button>
-                  {user?.role === "school_admin" && (
-                    <>
-                      <button
-                        onClick={() => openEdit(n)}
-                        className="flex items-center gap-1.5 text-xs font-medium text-amber-500 hover:bg-amber-50 px-3 py-1.5 rounded-lg transition"
-                      >
-                        <FiEdit2 size={13} /> Edit
-                      </button>
-                      <button
-                        onClick={() => setDeleteId(n._id)}
-                        className="flex items-center gap-1.5 text-xs font-medium text-red-400 hover:bg-red-50 px-3 py-1.5 rounded-lg transition ml-auto"
-                      >
-                        <FiTrash2 size={13} /> Delete
-                      </button>
-                    </>
-                  )}
-                </div>
-              </div>
-            );
-          })}
+                <FiEye size={13} /> View
+              </button>
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  openEdit(n);
+                }}
+                className="flex items-center gap-1.5 text-xs font-medium text-amber-500 hover:bg-amber-50 px-3 py-1.5 rounded-lg transition"
+              >
+                <FiEdit2 size={13} /> Edit
+              </button>
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setDeleteId(n._id);
+                }}
+                className="flex items-center gap-1.5 text-xs font-medium text-red-400 hover:bg-red-50 px-3 py-1.5 rounded-lg transition ml-auto"
+              >
+                <FiTrash2 size={13} /> Delete
+              </button>
+            </div>
+          )}
         </div>
-      )}
+      );
+    })}
+  </div>
+)}
 
       {/* ════════ View Modal ════════ */}
       {viewNotice && (

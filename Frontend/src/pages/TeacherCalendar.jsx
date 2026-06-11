@@ -163,7 +163,7 @@ export default function TeacherCalendar({ schoolId }) {
           <h1 className="text-xl md:text-2xl font-bold text-[rgb(var(--text))] tracking-tight">
             Academic Calendar
           </h1>
-          <p className="text-sm text-[rgb(var(--text))]">Teacher View • Read Only</p>
+          {/* <p className="text-sm text-[rgb(var(--text))]">Teacher View • Read Only</p> */}
         </div>
         <button
           onClick={loadAll}
@@ -179,23 +179,51 @@ export default function TeacherCalendar({ schoolId }) {
           {/* Controls & Filters */}
           <div className="bg-[rgb(var(--surface))] rounded-2xl shadow-sm border border-gray-100 p-4 mb-4">
             <div className="flex flex-col md:flex-row justify-between items-center gap-4">
-              <div className="flex items-center gap-2">
-                <button
-                  onClick={() => setMonth((m) => (m === 0 ? 11 : m - 1))}
-                  className="p-2 rounded-xl cursor-pointer"
-                >
-                  <FiChevronLeft />
-                </button>
-                <h2 className="text-lg font-bold text-[rgb(var(--text))] w-36 text-center">
-                  {MONTHS[month]} {year}
-                </h2>
-                <button
-                  onClick={() => setMonth((m) => (m === 11 ? 0 : m + 1))}
-                  className="p-2 rounded-xl cursor-pointer"
-                >
-                  <FiChevronRight />
-                </button>
-              </div>
+             <div className="flex items-center gap-2 flex-wrap">
+  <button
+    onClick={() => {
+      if (month === 0) { setMonth(11); setYear((y) => y - 1); }
+      else setMonth((m) => m - 1);
+    }}
+    className="p-2 rounded-xl cursor-pointer"
+  >
+    <FiChevronLeft />
+  </button>
+
+  <select
+    value={month}
+    onChange={(e) => setMonth(Number(e.target.value))}
+    className="text-sm font-semibold border border-gray-200 rounded-lg px-2 py-1.5
+               text-[rgb(var(--text))] bg-[rgb(var(--surface))]
+               focus:outline-none focus:ring-2 focus:ring-indigo-300"
+  >
+    {MONTHS.map((m, i) => (
+      <option key={i} value={i}>{m}</option>
+    ))}
+  </select>
+
+  <select
+    value={year}
+    onChange={(e) => setYear(Number(e.target.value))}
+    className="text-sm font-semibold border border-gray-200 rounded-lg px-2 py-1.5
+               text-[rgb(var(--text))] bg-[rgb(var(--surface))]
+               focus:outline-none focus:ring-2 focus:ring-indigo-300"
+  >
+    {Array.from({ length: 11 }, (_, i) => 2020 + i).map((y) => (
+      <option key={y}>{y}</option>
+    ))}
+  </select>
+
+  <button
+    onClick={() => {
+      if (month === 11) { setMonth(0); setYear((y) => y + 1); }
+      else setMonth((m) => m + 1);
+    }}
+    className="p-2 rounded-xl cursor-pointer"
+  >
+    <FiChevronRight />
+  </button>
+</div>
               <div className="flex flex-wrap justify-center gap-2">
                 <button
                   onClick={() => setActiveFilter("All")}

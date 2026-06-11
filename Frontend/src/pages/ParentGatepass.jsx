@@ -562,30 +562,30 @@ const ParentGatepass = () => {
 
               {/* ── EXIT DETAILS ── */}
               <div>
-                <p className="text-sm font-semibold mb-3">Exit Details</p>
+                <p className="text-sm font-semibold mb-3">Pickup Details</p>
                 <div className="grid grid-cols-2 gap-3">
                   <FInput
-                    label="Exit Date"
+                    label="Pickup Date"
                     type="date"
                     value={exitDate}
                     onChange={(e) => setExitDate(e.target.value)}
                     required
                   />
                   <FInput
-                    label="Exit Time"
+                    label="Pickup Time"
                     type="time"
                     value={exitTime}
                     onChange={(e) => setExitTime(e.target.value)}
                     required
                   />
-                  <div className="col-span-2">
+                  {/* <div className="col-span-2">
                     <FInput
                       label="Expected Return Time (optional)"
                       type="time"
                       value={expectedReturn}
                       onChange={(e) => setExpectedReturn(e.target.value)}
                     />
-                  </div>
+                  </div> */}
                 </div>
               </div>
 
@@ -599,7 +599,7 @@ const ParentGatepass = () => {
                   value={reason}
                   onChange={(e) => setReason(e.target.value)}
                   rows={3}
-                  placeholder="Reason for early leaving..."
+                  placeholder="Reason for early pickup..."
                   className="w-full border border-[rgb(var(--border))]
                     rounded-lg px-3 py-2 text-sm
                     bg-[rgb(var(--bg))] text-[rgb(var(--text))]
