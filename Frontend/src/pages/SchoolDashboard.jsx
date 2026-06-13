@@ -436,10 +436,10 @@ const SchoolDashboard = () => {
                 Monitor reports, fee health, attendance, notices, events, and
                 daily action points from one control center.
               </p>
-              <UpcomingNotifications />
             </div>
             <div className="flex flex-col gap-3 sm:flex-row">
               {/* Settings — secondary style */}
+              <UpcomingNotifications />
               <button
                 onClick={() => setSettingsOpen((value) => !value)}
                 className="inline-flex items-center justify-center gap-2 rounded-2xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))] px-4 py-3 text-sm font-bold text-[rgb(var(--text))] transition hover:border-[rgb(var(--border-strong))]"
