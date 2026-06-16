@@ -10,11 +10,25 @@ import {
   getAllStudents,
   getStudentsByTeacher,
 } from "../controllers/studentController.js";
+import uploadSpreadsheet from "../middlewares/uploadSpreadsheet.js";
+import {
+  bulkUploadStudents,
+  downloadStudentTemplate,
+} from "../controllers/studentBulkController.js";
 
 const router = express.Router();
 
 /* SUPER ADMIN ROUTES */
 router.get("/all/admin", authMiddleware, getAllStudents);
+
+/* BULK UPLOAD ROUTES */
+router.get("/bulk-upload/template", authMiddleware, downloadStudentTemplate);
+router.post(
+  "/bulk-upload",
+  authMiddleware,
+  uploadSpreadsheet.single("file"),
+  bulkUploadStudents,
+);
 
 /* STUDENT ROUTES */
 router.post(
@@ -36,6 +50,10 @@ router.post(
   createStudent,
 );
 
+router.get("/", authMiddleware, getStudents);
+
+router.get("/teacher/my-students", authMiddleware, getStudentsByTeacher);
+
 router.put(
   "/:id",
   authMiddleware,
@@ -55,10 +73,6 @@ router.put(
 
   updateStudent,
 );
-
-router.get("/", authMiddleware, getStudents);
-
-router.get("/teacher/my-students", authMiddleware, getStudentsByTeacher);
 
 router.get("/:id", authMiddleware, getStudent);
 
