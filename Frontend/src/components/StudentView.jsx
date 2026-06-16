@@ -52,6 +52,8 @@ const StudentView = () => {
   if (!student) return <Empty />;
 
   const docs = student.documents || {};
+  const studentCreds = student.studentCredentials || {};
+  const parentCreds = student.parentCredentials || {};
 
   return (
     <div className=" min-h-screen">
@@ -264,36 +266,19 @@ const StudentView = () => {
           )}
         </div>
 
-        {/* PARENT LOGIN — full width */}
+        {/* LOGIN CREDENTIALS — dev-visible, full width */}
         {user?.role === "school_admin" && (
-          <div className="bg-[rgb(var(--surface))] rounded-2xl border border-gray-100 shadow-sm p-5">
-            <div className="flex items-center gap-2 mb-4">
-              <span className="text-base">🔐</span>
-              <h3 className="text-base font-semibold text-[rgb(var(--text))]">
-                Parent Login
-              </h3>
-              <span className="ml-auto text-xs text-[rgb(var(--text-muted))] bg-[rgb(var(--surface))] px-2 py-0.5 rounded-full">
-                Dev visible
-              </span>
-            </div>
-            <div className="flex flex-col sm:flex-row gap-3">
-              <div className="flex-1 bg-[rgb(var(--primary))] border border-indigo-100 rounded-xl p-4">
-                <p className="text-xs text-[rgb(var(--text))] uppercase tracking-wide mb-1">
-                  Username
-                </p>
-                <p className="text-base font-semibold text-[rgb(var(--text))]">
-                  {student.username || "—"}
-                </p>
-              </div>
-              <div className="flex-1 bg-[rgb(var(--primary))] border border-purple-100 rounded-xl p-4">
-                <p className="text-xs text-[rgb(var(--text))] uppercase tracking-wide mb-1">
-                  Password (temp)
-                </p>
-                <p className="text-base font-semibold text-[rgb(var(--text))] tracking-widest">
-                  {student.temp_password || "—"}
-                </p>
-              </div>
-            </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <CredentialsCard
+              title="Student Login"
+              icon="🎓"
+              creds={studentCreds}
+            />
+            <CredentialsCard
+              title="Parent Login"
+              icon="🔐"
+              creds={parentCreds}
+            />
           </div>
         )}
       </div>
@@ -309,7 +294,9 @@ const Section = ({ title, icon, children }) => (
   <div className="bg-[rgb(var(--surface))] rounded-2xl border border-[rgb(var(--border))] shadow-sm p-5">
     <div className="flex items-center gap-2 mb-4">
       <span className="text-base">{icon}</span>
-      <h3 className="text-base font-semibold text-[rgb(var(--text))]">{title}</h3>
+      <h3 className="text-base font-semibold text-[rgb(var(--text))]">
+        {title}
+      </h3>
     </div>
     <div className="space-y-2.5 text-sm">{children}</div>
   </div>
@@ -318,7 +305,9 @@ const Section = ({ title, icon, children }) => (
 const Row = ({ label, value }) => (
   <div className="flex justify-between gap-3 py-0.5">
     <span className="text-[rgb(var(--text-muted))] shrink-0">{label}</span>
-    <span className="font-medium text-[rgb(var(--text))] text-right">{value || "—"}</span>
+    <span className="font-medium text-[rgb(var(--text))] text-right">
+      {value || "—"}
+    </span>
   </div>
 );
 
@@ -344,6 +333,51 @@ const StatCard = ({ label, value, color }) => (
   <div className={`rounded-xl p-4 ${color}`}>
     <p className="text-xs uppercase tracking-wide opacity-70 mb-1">{label}</p>
     <p className="text-lg font-semibold">{value}</p>
+  </div>
+);
+
+// Dev-only credentials panel. Shows username, temp (plaintext) password, and
+// first-login status for either the student or parent credential set.
+// NOTE: this surfaces the temp_password field on purpose for local/dev use —
+// pull this card (or gate it behind an env flag) before shipping to production,
+// since it exposes a readable password straight from the API response.
+const CredentialsCard = ({ title, icon, creds }) => (
+  <div className="bg-[rgb(var(--surface))] rounded-2xl border border-gray-100 shadow-sm p-5">
+    <div className="flex items-center gap-2 mb-4">
+      <span className="text-base">{icon}</span>
+      <h3 className="text-base font-semibold text-[rgb(var(--text))]">
+        {title}
+      </h3>
+      <span className="ml-auto text-xs text-[rgb(var(--text-muted))] bg-[rgb(var(--surface))] border border-[rgb(var(--border))] px-2 py-0.5 rounded-full">
+        Dev visible
+      </span>
+    </div>
+
+    <div className="flex flex-col sm:flex-row gap-3">
+      <div className="flex-1 bg-[rgb(var(--primary))] border border-indigo-100 rounded-xl p-4">
+        <p className="text-xs text-[rgb(var(--text))] uppercase tracking-wide mb-1">
+          Username
+        </p>
+        <p className="text-base font-semibold text-[rgb(var(--text))]">
+          {creds.username || "—"}
+        </p>
+      </div>
+      <div className="flex-1 bg-[rgb(var(--primary))] border border-purple-100 rounded-xl p-4">
+        <p className="text-xs text-[rgb(var(--text))] uppercase tracking-wide mb-1">
+          Password (temp)
+        </p>
+        <p className="text-base font-semibold text-[rgb(var(--text))] tracking-widest">
+          {creds.temp_password || "—"}
+        </p>
+      </div>
+    </div>
+
+    <div className="flex justify-between gap-3 mt-3 pt-3 border-t border-[rgb(var(--border))] text-sm">
+      <span className="text-[rgb(var(--text-muted))]">First-time login</span>
+      <span className="font-medium text-[rgb(var(--text))]">
+        {creds.firstTimeLogin === false ? "No — password changed" : "Yes"}
+      </span>
+    </div>
   </div>
 );
 

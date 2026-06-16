@@ -86,6 +86,7 @@ import TeacherGatepass from "./pages/TeacherGatepass";
 import MessagesPage from "./pages/messagesingal/MessagePage";
 import NewMessagePage from "./pages/messagesingal/NewMessagePage";
 import ChatPage from "./pages/messagesingal/ChatPage";
+import BulkStudentUpload from "./pages/BulkStudentUpload";
 
 // message files -
 
@@ -148,6 +149,7 @@ const App = () => {
           <Route path="student-manage" element={<StudentManagement />} />
           <Route path="student-manage/:id" element={<StudentManagement />} />
           <Route path="student-view/:id" element={<StudentView />} />
+          <Route path="students/bulk-upload" element={<BulkStudentUpload />} />
           <Route path="teachers" element={<Teachers />} />
           <Route path="teacher-manage" element={<TeacherManagement />} />
           <Route path="teacher-manage/:id" element={<TeacherManagement />} />
@@ -185,7 +187,7 @@ const App = () => {
           <Route path="messages" element={<MessagesPage />} />
           <Route path="messages/new" element={<NewMessagePage />} />
           <Route path="messages/:threadId" element={<ChatPage />} />
-
+          <Route path="/school/gatepass" element={<TeacherGatepass />}  />
           <Route path="*" element={<Navigate to="/school/dashboard" />} />
         </Route>
 

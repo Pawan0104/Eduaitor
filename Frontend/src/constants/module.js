@@ -17,6 +17,7 @@ export const MODULES = [
   { key: "blogs",      label: "Blogs",                 default: false },
   { key: "staff",      label: "Staff",                 default: false },
   { key: "gatepass",   label: "Gate Passes",           default: false },
+  { key: "message",   label: "Messages",           default: false },
 ];
 
 export const MODULE_KEYS = MODULES.map((m) => m.key);

@@ -378,6 +378,7 @@ export default function SchoolMenu() {
       children: [
         { name: "All Students", path: "/school/students" },
         { name: "Add Student", path: "/school/student-manage" },
+        { name: "Bulk Upload", path: "/school/students/bulk-upload" },
       ],
     },
     {
@@ -386,6 +387,7 @@ export default function SchoolMenu() {
       children: [
         { name: "All Teachers", path: "/school/teachers" },
         { name: "Add Teacher", path: "/school/teacher-manage" },
+        
       ],
     },
     {

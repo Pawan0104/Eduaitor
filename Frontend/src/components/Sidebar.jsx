@@ -161,6 +161,7 @@ const Sidebar = ({ closeSidebar }) => {
       children: [
         { name: "All Students", path: "/school/students" },
         { name: "Add Student", path: "/school/student-manage" },
+        { name: "Bulk Upload", path: "/school/students/bulk-upload" },
       ],
     },
     {
@@ -265,14 +266,15 @@ const Sidebar = ({ closeSidebar }) => {
       name: "Gate Pass",
       icon: <FaIdCard />,
       path: "/school/gatepass",
-      module: "gatepass", // ← must match key in modules.js
+      // module: "gatepass", // ← must match key in modules.js
     },
      {
       name:"Messages",
       icon:<FaBell/>,
       path:"/school/messages",
       // module:"messages"
-    }
+    },
+    
   ];
 
   /* ── TEACHER ADMIN MENU ── UPDATED: module keys added */
@@ -578,7 +580,12 @@ const Sidebar = ({ closeSidebar }) => {
   else if (role === "teacher_admin") menu = teacherAdminMenu;
   else if (role === "student_admin") {
     menu = user?.loginAs === "student" ? studentMenu : parentMenu;
-  } else if (role === "staff_admin") menu = staffAdminMenu;
+  } 
+  else if (role === "staff_admin") {
+  menu = staffAdminMenu.filter(item => 
+    !item.module || user?.permissions?.includes(item.module)
+  );
+}
 
   const toggleMenu = (name) => {
     setOpenMenu(openMenu === name ? null : name);
