@@ -12,9 +12,6 @@ import {
 
 const API = import.meta.env.VITE_API_URL;
 
-// ─────────────────────────────────────────────────────────────
-// HELPER — format time for message bubble e.g. "10:30 AM"
-// ─────────────────────────────────────────────────────────────
 const formatTime = (date) => {
   if (!date) return "";
   return new Date(date).toLocaleTimeString([], {
@@ -23,9 +20,6 @@ const formatTime = (date) => {
   });
 };
 
-// ─────────────────────────────────────────────────────────────
-// HELPER — date separator label
-// ─────────────────────────────────────────────────────────────
 const formatDateSeparator = (date) => {
   if (!date) return "";
   const d = new Date(date);
@@ -41,9 +35,6 @@ const formatDateSeparator = (date) => {
   });
 };
 
-// ─────────────────────────────────────────────────────────────
-// HELPER — Avatar with initials fallback
-// ─────────────────────────────────────────────────────────────
 const Avatar = ({ photo, name, size = 38 }) => {
   const initials = name
     ? name.split(" ").map((n) => n[0]).join("").toUpperCase().slice(0, 2)
@@ -76,9 +67,6 @@ const Avatar = ({ photo, name, size = 38 }) => {
   );
 };
 
-// ─────────────────────────────────────────────────────────────
-// COMPONENT — single message bubble
-// ─────────────────────────────────────────────────────────────
 const MessageBubble = ({ message, isMe }) => {
   const hasText = message.text?.trim();
   const hasAttachment = message.attachment?.url;
@@ -103,7 +91,6 @@ const MessageBubble = ({ message, isMe }) => {
               }
         }
       >
-        {/* Image attachment */}
         {hasAttachment && isImage && (
           <img
             src={message.attachment.url}
@@ -113,7 +100,6 @@ const MessageBubble = ({ message, isMe }) => {
           />
         )}
 
-        {/* PDF / file attachment */}
         {hasAttachment && !isImage && (
           <a
             href={message.attachment.url}
@@ -129,15 +115,15 @@ const MessageBubble = ({ message, isMe }) => {
           </a>
         )}
 
-        {/* Text */}
         {hasText && (
           <p className="text-sm leading-relaxed break-words">{message.text}</p>
         )}
 
-        {/* Time + seen */}
         <p
           className="text-[10px] mt-1 text-right"
-          style={{ color: isMe ? "rgba(255,255,255,0.7)" : "rgb(var(--text-muted))" }}
+          style={{
+            color: isMe ? "rgba(255,255,255,0.7)" : "rgb(var(--text-muted))",
+          }}
         >
           {formatTime(message.createdAt)}
           {isMe && (
@@ -149,44 +135,39 @@ const MessageBubble = ({ message, isMe }) => {
   );
 };
 
-// ─────────────────────────────────────────────────────────────
-// COMPONENT — date separator
-// ─────────────────────────────────────────────────────────────
 const DateSeparator = ({ date }) => (
   <div className="flex items-center gap-2 my-4">
-    <div
-      className="flex-1 h-px"
-      style={{ backgroundColor: "rgb(var(--border))" }}
-    />
+    <div className="flex-1 h-px" style={{ backgroundColor: "rgb(var(--border))" }} />
     <span
       className="text-xs shrink-0 px-2"
       style={{ color: "rgb(var(--text-muted))" }}
     >
       {formatDateSeparator(date)}
     </span>
-    <div
-      className="flex-1 h-px"
-      style={{ backgroundColor: "rgb(var(--border))" }}
-    />
+    <div className="flex-1 h-px" style={{ backgroundColor: "rgb(var(--border))" }} />
   </div>
 );
 
 // ─────────────────────────────────────────────────────────────
-// HELPER — get my ID from auth context
+// HELPER — get my ID + subType from auth context
+// subType needed for correct isMe check with student/parent
 // ─────────────────────────────────────────────────────────────
-const getMyId = (user) => {
-  if (!user) return null;
-  if (user.role === "teacher_admin") return user.teacher_id;
-  if (user.role === "student_admin") return user.student_id;
-  if (user.role === "staff_admin") return user.staff_id;
-  if (user.role === "school_admin") return user.school_id;
-  return null;
+const getMyInfo = (user) => {
+  if (!user) return { id: null, subType: "default" };
+  if (user.role === "teacher_admin")
+    return { id: user.teacher_id, subType: "default" };
+  if (user.role === "student_admin")
+    return {
+      id: user.student_id,
+      subType: user.loginAs === "parent" ? "parent" : "student",
+    };
+  if (user.role === "staff_admin")
+    return { id: user.staff_id, subType: "default" };
+  if (user.role === "school_admin")
+    return { id: user.school_id, subType: "default" };
+  return { id: null, subType: "default" };
 };
 
-// ─────────────────────────────────────────────────────────────
-// MAIN — ChatPage
-// Layout: fixed header + scrollable messages + fixed input bar
-// ─────────────────────────────────────────────────────────────
 export default function ChatPage() {
   const { threadId } = useParams();
   const { user } = useAuth();
@@ -205,9 +186,9 @@ export default function ChatPage() {
   const fileInputRef = useRef(null);
   const textareaRef = useRef(null);
 
-  const myId = getMyId(user);
+  const { id: myId, subType: mySubType } = getMyInfo(user);
 
-  // ── Role based back path ───────────────────────────────────
+  // ── Role based path ────────────────────────────────────────
   let path = "";
   if (user?.role === "school_admin") path = "/school";
   else if (user?.role === "teacher_admin") path = "/teacher";
@@ -215,7 +196,6 @@ export default function ChatPage() {
     path = user.loginAs === "student" ? "/student" : "/parent";
   else if (user?.role === "staff_admin") path = "/staff";
 
-  // ── Fetch messages ─────────────────────────────────────────
   const fetchMessages = useCallback(async () => {
     try {
       setLoading(true);
@@ -233,7 +213,6 @@ export default function ChatPage() {
     }
   }, [threadId]);
 
-  // ── Fetch other user info from threads list ────────────────
   const fetchOtherUser = useCallback(async () => {
     try {
       const res = await axios.get(`${API}/message-signal/threads`, {
@@ -246,7 +225,6 @@ export default function ChatPage() {
     }
   }, [threadId]);
 
-  // ── Mark as read on open ───────────────────────────────────
   const markAsRead = useCallback(async () => {
     try {
       await axios.put(
@@ -265,12 +243,10 @@ export default function ChatPage() {
     markAsRead();
   }, [fetchMessages, fetchOtherUser, markAsRead]);
 
-  // ── Scroll to bottom on new messages ──────────────────────
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
 
-  // ── Auto resize textarea as user types ────────────────────
   useEffect(() => {
     const el = textareaRef.current;
     if (!el) return;
@@ -278,7 +254,6 @@ export default function ChatPage() {
     el.style.height = `${Math.min(el.scrollHeight, 120)}px`;
   }, [text]);
 
-  // ── File selection ─────────────────────────────────────────
   const handleFileChange = (e) => {
     const selected = e.target.files[0];
     if (!selected) return;
@@ -294,14 +269,12 @@ export default function ChatPage() {
     );
   };
 
-  // ── Remove file ────────────────────────────────────────────
   const removeFile = () => {
     setFile(null);
     setFilePreview(null);
     if (fileInputRef.current) fileInputRef.current.value = "";
   };
 
-  // ── Send message ───────────────────────────────────────────
   const handleSend = async () => {
     if (!text.trim() && !file) return;
     try {
@@ -330,7 +303,6 @@ export default function ChatPage() {
     }
   };
 
-  // ── Enter to send, Shift+Enter for new line ────────────────
   const handleKeyDown = (e) => {
     if (e.key === "Enter" && !e.shiftKey) {
       e.preventDefault();
@@ -338,7 +310,6 @@ export default function ChatPage() {
     }
   };
 
-  // ── Group messages by date ─────────────────────────────────
   const groupedMessages = messages.reduce((acc, msg) => {
     const key = new Date(msg.createdAt).toDateString();
     if (!acc[key]) acc[key] = [];
@@ -346,17 +317,37 @@ export default function ChatPage() {
     return acc;
   }, {});
 
-  // ─────────────────────────────────────────────────────────
-  // RENDER
-  // ─────────────────────────────────────────────────────────
+  // ── isMe — checks both senderId AND senderSubType ─────────
+  // Critical for student/parent — same _id but different subType
+  const isMyMessage = (msg) => {
+    const sameId = msg.senderId?.toString() === myId?.toString();
+    const sameSubType =
+      (msg.senderSubType || "default") === mySubType;
+    return sameId && sameSubType;
+  };
+
+  // ── Chat header subtitle ───────────────────────────────────
+  // Shows child name for parent threads
+  const headerSubtitle = () => {
+    if (otherUser?.subType === "parent" && otherUser?.childName) {
+      return `Parent • Child: ${otherUser.childName}`;
+    }
+    if (otherUser?.subType === "student" && otherUser?.className) {
+      return `Student • Class ${otherUser.className}${
+        otherUser.sectionName ? ` ${otherUser.sectionName}` : ""
+      }`;
+    }
+    return otherUser?.role || "";
+  };
+
   return (
     <div
-  className="flex flex-col w-full max-w-2xl mx-auto"
-  style={{
-    backgroundColor: "rgb(var(--bg))",
-    height: "calc(100vh - 57px)", // 57px = your Topbar height
-  }}
->
+      className="flex flex-col w-full max-w-2xl mx-auto"
+      style={{
+        backgroundColor: "rgb(var(--bg))",
+        height: "calc(100vh - 57px)",
+      }}
+    >
       {/* ── FIXED HEADER ── */}
       <div
         className="shrink-0 flex items-center gap-3 px-4 py-3 border-b"
@@ -365,7 +356,6 @@ export default function ChatPage() {
           borderColor: "rgb(var(--border))",
         }}
       >
-        {/* Back button */}
         <button
           onClick={() => navigate(`${path}/messages`)}
           className="p-1 rounded-lg transition shrink-0"
@@ -380,10 +370,8 @@ export default function ChatPage() {
           <FiArrowLeft size={22} />
         </button>
 
-        {/* Avatar */}
         <Avatar photo={otherUser?.photo} name={otherUser?.name} size={38} />
 
-        {/* Name + role */}
         <div className="flex-1 min-w-0">
           <p
             className="font-semibold text-sm truncate"
@@ -391,11 +379,12 @@ export default function ChatPage() {
           >
             {otherUser?.name || "Loading..."}
           </p>
+          {/* Subtitle — role or parent/child info */}
           <p
-            className="text-xs capitalize"
+            className="text-xs capitalize truncate"
             style={{ color: "rgb(var(--text-muted))" }}
           >
-            {otherUser?.role || ""}
+            {headerSubtitle()}
           </p>
         </div>
       </div>
@@ -403,7 +392,6 @@ export default function ChatPage() {
       {/* ── SCROLLABLE MESSAGES AREA ── */}
       <div className="flex-1 overflow-y-auto px-4 py-3">
 
-        {/* Loading */}
         {loading && (
           <div className="flex justify-center py-10">
             <div
@@ -417,7 +405,6 @@ export default function ChatPage() {
           </div>
         )}
 
-        {/* Error */}
         {!loading && error && (
           <div className="text-center py-10">
             <p className="text-red-400 text-sm">{error}</p>
@@ -431,20 +418,15 @@ export default function ChatPage() {
           </div>
         )}
 
-        {/* Empty */}
         {!loading && !error && messages.length === 0 && (
           <div className="flex flex-col items-center justify-center
                           h-full gap-2 py-10">
-            <p
-              className="text-sm"
-              style={{ color: "rgb(var(--text-muted))" }}
-            >
+            <p className="text-sm" style={{ color: "rgb(var(--text-muted))" }}>
               No messages yet. Say hello! 👋
             </p>
           </div>
         )}
 
-        {/* Messages grouped by date */}
         {!loading &&
           !error &&
           messages.length > 0 &&
@@ -455,17 +437,16 @@ export default function ChatPage() {
                 <MessageBubble
                   key={msg._id}
                   message={msg}
-                  isMe={msg.senderId?.toString() === myId?.toString()}
+                  isMe={isMyMessage(msg)}
                 />
               ))}
             </div>
           ))}
 
-        {/* Scroll anchor */}
         <div ref={bottomRef} />
       </div>
 
-      {/* ── FILE PREVIEW BAR — shown above input when file selected ── */}
+      {/* ── FILE PREVIEW BAR ── */}
       {file && (
         <div
           className="shrink-0 px-4 py-2 border-t flex items-center gap-3"
@@ -489,14 +470,12 @@ export default function ChatPage() {
               <FiFile size={20} style={{ color: "rgb(var(--primary))" }} />
             </div>
           )}
-
           <p
             className="text-sm truncate flex-1"
             style={{ color: "rgb(var(--text))" }}
           >
             {file.name}
           </p>
-
           <button
             onClick={removeFile}
             className="shrink-0 transition"
@@ -519,7 +498,6 @@ export default function ChatPage() {
           borderColor: "rgb(var(--border))",
         }}
       >
-        {/* Hidden file input */}
         <input
           type="file"
           ref={fileInputRef}
@@ -528,7 +506,6 @@ export default function ChatPage() {
           className="hidden"
         />
 
-        {/* Attach button */}
         <button
           onClick={() => fileInputRef.current?.click()}
           className="mb-1 shrink-0 transition"
@@ -544,7 +521,6 @@ export default function ChatPage() {
           <FiPaperclip size={20} />
         </button>
 
-        {/* Textarea — auto grows up to 120px */}
         <textarea
           ref={textareaRef}
           value={text}
@@ -563,7 +539,6 @@ export default function ChatPage() {
           }}
         />
 
-        {/* Send button */}
         <button
           onClick={handleSend}
           disabled={sending || (!text.trim() && !file)}
@@ -583,9 +558,12 @@ export default function ChatPage() {
         >
           {sending ? (
             <div
-              className="w-4 h-4 border-2 border-t-transparent rounded-full animate-spin"
-              style={{ borderColor: "rgb(var(--text-muted))",
-                       borderTopColor: "transparent" }}
+              className="w-4 h-4 border-2 border-t-transparent
+                         rounded-full animate-spin"
+              style={{
+                borderColor: "rgb(var(--text-muted))",
+                borderTopColor: "transparent",
+              }}
             />
           ) : (
             <FiSend size={16} />

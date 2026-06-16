@@ -3,7 +3,7 @@ import { useNavigate } from "react-router-dom";
 import axios from "axios";
 import { useAuth } from "../../context/AuthContext";
 import { FiPlus, FiSearch, FiMessageSquare } from "react-icons/fi";
-import {FaArrowLeft} from "react-icons/fa"
+import { FaArrowLeft } from "react-icons/fa";
 
 const API = import.meta.env.VITE_API_URL;
 
@@ -14,7 +14,6 @@ const timeAgo = (date) => {
   if (!date) return "";
   const now = new Date();
   const diff = Math.floor((now - new Date(date)) / 1000);
-
   if (diff < 60) return "just now";
   if (diff < 3600) return `${Math.floor(diff / 60)} min ago`;
   if (diff < 86400) return `${Math.floor(diff / 3600)} hours ago`;
@@ -41,9 +40,9 @@ const Avatar = ({ photo, name, size = 48 }) => {
     );
   }
 
+  // ── Fixed: removed duplicate style prop ───────────────────
   return (
     <div
-      style={{ width: size, height: size }}
       className="rounded-full shrink-0 flex items-center justify-center
                  text-sm font-semibold"
       style={{
@@ -60,18 +59,30 @@ const Avatar = ({ photo, name, size = 48 }) => {
 
 // ─────────────────────────────────────────────────────────────
 // COMPONENT — single thread row
+// Shows parent child info if otherUser is a parent
 // ─────────────────────────────────────────────────────────────
 const ThreadItem = ({ thread, onClick }) => {
   const { otherUser, lastMessage, lastMessageAt, unreadCount } = thread;
+
+  // Build subtitle — show child name for parent threads
+  const subtitle = () => {
+    if (otherUser?.subType === "parent" && otherUser?.childName) {
+      return `Parent • Child: ${otherUser.childName}`;
+    }
+    if (otherUser?.subType === "student" && otherUser?.className) {
+      return `Student • Class ${otherUser.className}${
+        otherUser.sectionName ? ` • ${otherUser.sectionName}` : ""
+      }`;
+    }
+    return otherUser?.role || "";
+  };
 
   return (
     <div
       onClick={onClick}
       className="flex items-center gap-3 px-4 py-3 cursor-pointer
                  transition-colors border-b"
-      style={{
-        borderColor: "rgb(var(--border))",
-      }}
+      style={{ borderColor: "rgb(var(--border))" }}
       onMouseEnter={(e) =>
         (e.currentTarget.style.backgroundColor = "rgb(var(--surface))")
       }
@@ -85,15 +96,12 @@ const ThreadItem = ({ thread, onClick }) => {
       {/* Info */}
       <div className="flex-1 min-w-0">
         <div className="flex items-center justify-between gap-2">
-          {/* Name */}
           <p
             className="font-semibold text-sm truncate"
             style={{ color: "rgb(var(--text))" }}
           >
             {otherUser?.name || "Unknown"}
           </p>
-
-          {/* Time */}
           <span
             className="text-xs shrink-0"
             style={{ color: "rgb(var(--text-muted))" }}
@@ -102,12 +110,12 @@ const ThreadItem = ({ thread, onClick }) => {
           </span>
         </div>
 
-        {/* Role */}
+        {/* Subtitle — role or parent info */}
         <p
-          className="text-xs capitalize mb-0.5"
+          className="text-xs capitalize mb-0.5 truncate"
           style={{ color: "rgb(var(--text-muted))" }}
         >
-          {otherUser?.role || ""}
+          {subtitle()}
         </p>
 
         {/* Last message + unread badge */}
@@ -118,8 +126,6 @@ const ThreadItem = ({ thread, onClick }) => {
           >
             {lastMessage || "No messages yet"}
           </p>
-
-          {/* Unread badge */}
           {unreadCount > 0 && (
             <span
               className="text-xs rounded-full px-2 py-0.5 shrink-0
@@ -145,7 +151,6 @@ const ThreadItem = ({ thread, onClick }) => {
 
 // ─────────────────────────────────────────────────────────────
 // MAIN — MessagesPage
-// Layout: fixed header + fixed search + scrollable list
 // ─────────────────────────────────────────────────────────────
 export default function MessagesPage() {
   const { user } = useAuth();
@@ -156,8 +161,15 @@ export default function MessagesPage() {
   const [search, setSearch] = useState("");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
-  const isMobile = window.innerWidth <= 768;
 
+  // ── isMobile — use state to avoid SSR issues ───────────────
+  const [isMobile, setIsMobile] = useState(window.innerWidth <= 768);
+
+  useEffect(() => {
+    const handleResize = () => setIsMobile(window.innerWidth <= 768);
+    window.addEventListener("resize", handleResize);
+    return () => window.removeEventListener("resize", handleResize);
+  }, []);
 
   // ── Role based path ────────────────────────────────────────
   let path = "";
@@ -201,6 +213,7 @@ export default function MessagesPage() {
         (t) =>
           t.otherUser?.name?.toLowerCase().includes(q) ||
           t.otherUser?.role?.toLowerCase().includes(q) ||
+          t.otherUser?.childName?.toLowerCase().includes(q) ||
           t.lastMessage?.toLowerCase().includes(q)
       )
     );
@@ -208,46 +221,60 @@ export default function MessagesPage() {
 
   // ─────────────────────────────────────────────────────────
   // RENDER
-  // Full height, fixed header + search, scrollable list only
   // ─────────────────────────────────────────────────────────
   return (
     <div
-  className="flex flex-col w-full max-w-2xl mx-auto"
-  style={{
-    backgroundColor: "rgb(var(--bg))",
-    height: "calc(100vh - 57px)", // 57px = your Topbar height
-  }}
->
-         {isMobile && (
-              <div className="px-4 pt-4">
-                <button
-                  onClick={() => navigate(-1)}
-                  className="flex items-center gap-2 px-3 py-1.5 rounded-xl
-                       bg-[rgb(var(--primary))] shadow-sm border border-slate-100
-                       text-sm font-bold 0 active:scale-95 transition-transform mb-2.5"
-                >
-                  <FaArrowLeft size={16} />
-                  Back
-                </button>
-              </div>
-            )}
-
-            
+      className="flex flex-col w-full max-w-2xl mx-auto"
+      style={{
+        backgroundColor: "rgb(var(--bg))",
+        height: "calc(100vh - 57px)",
+      }}
+    >
+      {/* ── MOBILE BACK BUTTON ── */}
+      {isMobile && (
+        <div className="px-4 pt-4 shrink-0">
+          <button
+            onClick={() => navigate(-1)}
+            className="flex items-center gap-2 px-3 py-1.5 rounded-xl
+                       shadow-sm text-sm font-bold active:scale-95
+                       transition-transform mb-1"
+            style={{
+              backgroundColor: "rgb(var(--primary))",
+              color: "#fff",
+            }}
+          >
+            <FaArrowLeft size={14} />
+            Back
+          </button>
+        </div>
+      )}
 
       {/* ── FIXED HEADER ── */}
       <div
         className="shrink-0 flex items-center justify-between
-                   px-4 pt-5 pb-3 border-b"
+                   px-4 pt-4 pb-3 border-b"
         style={{
           backgroundColor: "rgb(var(--bg))",
           borderColor: "rgb(var(--border))",
         }}
       >
-{!isMobile && (
-  <button 
-              onClick={() => navigate(`${path}/dashboard`)}> 
-            <FaArrowLeft /> </button>
-)}
+        {/* Desktop back arrow → dashboard */}
+        {!isMobile && (
+          <button
+            onClick={() => navigate(`${path}/dashboard`)}
+            className="p-1 rounded-lg transition shrink-0"
+            style={{ color: "rgb(var(--primary))" }}
+            onMouseEnter={(e) =>
+              (e.currentTarget.style.backgroundColor = "rgb(var(--surface))")
+            }
+            onMouseLeave={(e) =>
+              (e.currentTarget.style.backgroundColor = "transparent")
+            }
+          >
+            <FaArrowLeft size={18} />
+          </button>
+        )}
+
         <h1
           className="text-xl font-bold"
           style={{ color: "rgb(var(--primary))" }}
@@ -255,7 +282,7 @@ export default function MessagesPage() {
           Messages
         </h1>
 
-        {/* + button */}
+        {/* + New message button */}
         <button
           onClick={() => navigate(`${path}/messages/new`)}
           className="p-2 rounded-xl transition"
@@ -290,15 +317,12 @@ export default function MessagesPage() {
           />
           <input
             type="text"
-            placeholder="Search"
+            placeholder="Search messages..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             className="bg-transparent outline-none text-sm w-full"
-            style={{
-              color: "rgb(var(--text))",
-            }}
+            style={{ color: "rgb(var(--text))" }}
           />
-          {/* Clear search */}
           {search && (
             <button
               onClick={() => setSearch("")}
@@ -321,13 +345,12 @@ export default function MessagesPage() {
             <div
               className="w-8 h-8 border-4 border-t-transparent
                          rounded-full animate-spin"
-              style={{ borderColor: "rgb(var(--primary))" ,
-                       borderTopColor: "transparent" }}
+              style={{
+                borderColor: "rgb(var(--primary))",
+                borderTopColor: "transparent",
+              }}
             />
-            <p
-              className="text-sm"
-              style={{ color: "rgb(var(--text-muted))" }}
-            >
+            <p className="text-sm" style={{ color: "rgb(var(--text-muted))" }}>
               Loading messages...
             </p>
           </div>
@@ -359,23 +382,22 @@ export default function MessagesPage() {
               className="text-sm text-center"
               style={{ color: "rgb(var(--text-muted))" }}
             >
-              {search
-                ? "No results found."
-                : "No messages yet. Tap + to start."}
+              {search ? "No results found." : "No messages yet. Tap + to start."}
             </p>
           </div>
         )}
 
         {/* Thread list */}
-        {!loading && !error && filtered.length > 0 &&
+        {!loading &&
+          !error &&
+          filtered.length > 0 &&
           filtered.map((thread) => (
             <ThreadItem
               key={thread._id}
               thread={thread}
               onClick={() => navigate(`${path}/messages/${thread._id}`)}
             />
-          ))
-        }
+          ))}
       </div>
     </div>
   );

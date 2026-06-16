@@ -79,6 +79,52 @@ export const COLOR_MAP = {
 };
 const DEFAULT_COLOR = { bg: "#F3F4F6", icon: "#6B7280", dot: "#E5E7EB" };
 
+/* ─── Greeting header ───────────────────────────────────────── */
+function GreetingHeader({ name, role, loginAs }) {
+  const [dateStr, setDateStr] = useState("");
+
+  useEffect(() => {
+    const update = () => {
+      const now = new Date();
+      setDateStr(
+        now.toLocaleDateString("en-IN", {
+          weekday: "long",
+          day: "2-digit",
+          month: "short",
+        }),
+      );
+    };
+    update();
+  }, []);
+
+  const displayRole = (loginAs ? loginAs : role || "").replace("_", " ");
+
+  return (
+    <div
+      className="rounded-[20px] px-5 py-5 mb-1 relative overflow-hidden"
+      style={{
+        background:
+          "linear-gradient(135deg, rgb(var(--sidebar)) 0%, rgb(var(--primary)) 100%)",
+      }}
+    >
+      {/* Decorative dot */}
+      <div
+        className="absolute -top-6 -right-6 w-24 h-24 rounded-full opacity-10 pointer-events-none"
+        style={{ background: "#fff" }}
+      />
+      {displayRole && (
+        <p className="text-white/80 text-[11px] font-bold uppercase tracking-wide mb-1">
+          {displayRole}
+        </p>
+      )}
+      <h1 className="text-white text-xl font-extrabold mb-1 capitalize">
+        Welcome, {name}
+      </h1>
+      <p className="text-white/80 text-[12.5px] font-semibold">{dateStr}</p>
+    </div>
+  );
+}
+
 /* ─── Exit Popup ────────────────────────────────────────────── */
 function ExitPopup({ onConfirm, onCancel }) {
   return (
@@ -315,6 +361,11 @@ export default function SchoolMenu() {
     navigate("/admin/login", { replace: true });
   };
 
+  // ── Greeting info (same pattern as Topbar) ──────────────────
+  const greetingName = user?.name || user?.school_name || "User";
+  const greetingRole = user?.role || "User";
+  const greetingLoginAs = user?.loginAs;
+
   const menu = [
     {
       name: "Dashboard",
@@ -457,11 +508,18 @@ export default function SchoolMenu() {
       style={{ background: "rgb(var(--bg))" }}
     >
       <div className="p-4 flex flex-col gap-3">
+        {/* Greeting */}
+        <GreetingHeader
+          name={greetingName}
+          role={greetingRole}
+          loginAs={greetingLoginAs}
+        />
+
         {rows.map((row, rowIdx) => {
           const openInRow = row.find(
             (item) => item.name === openItem && item.children,
           );
-          
+
           return (
             <div key={rowIdx} className="flex flex-col">
               <UpComingNotifications />

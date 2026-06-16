@@ -18,6 +18,11 @@ const messageSchema = new mongoose.Schema(
       required: true,
       enum: ["Teacher", "Student", "Staff", "School"],
     },
+    senderSubType: {
+  type: String,
+  enum: ["default", "student", "parent"],
+  default: "default",
+},
 
     text: {
       type: String,

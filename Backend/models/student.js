@@ -96,6 +96,7 @@ const studentSchema = new mongoose.Schema(
       firstTimeLogin: { type: Boolean, default: true },
     },
     parentCredentials: {
+      
       username: { type: String }, // fatherMobile
       password: { type: String },
       temp_password: { type: String },

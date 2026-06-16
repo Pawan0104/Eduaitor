@@ -69,7 +69,6 @@ const UpComingNotifications = () => {
     <div className="w-full rounded-xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))] px-3 py-2.5 flex flex-col gap-2">
       {todayItems.length > 0 && (
         <div
-          onClick={() => navigate("/notifications", { state: { selectedId: todayItems[0]._id } })}
           className="flex items-center gap-2 cursor-pointer group min-h-[28px]"
         >
           <span className="shrink-0 text-[10px] font-bold uppercase tracking-wide
@@ -89,7 +88,6 @@ const UpComingNotifications = () => {
 
       {tomorrowItems.length > 0 && (
         <div
-          onClick={() => navigate("/notifications", { state: { selectedId: tomorrowItems[0]._id } })}
           className="flex items-center gap-2 cursor-pointer group min-h-[28px]"
         >
           <span className="shrink-0 text-[10px] font-bold uppercase tracking-wide

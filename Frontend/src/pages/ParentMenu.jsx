@@ -36,7 +36,6 @@ import { useAuth } from "../context/AuthContext";
 import axios from "axios";
 import BlogFeed from "../components/BlogFeed";
 
-
 /* ─── Color map ─────────────────────────────────────────────── */
 const COLOR_MAP = {
   Dashboard: { bg: "#FFF7ED", icon: "#F97316", dot: "#FED7AA" },
@@ -60,6 +59,52 @@ const COLOR_MAP = {
 };
 const DEFAULT_COLOR = { bg: "#F3F4F6", icon: "#6B7280", dot: "#E5E7EB" };
 
+/* ─── Greeting header ───────────────────────────────────────── */
+function GreetingHeader({ name, role, loginAs }) {
+  const [dateStr, setDateStr] = useState("");
+
+  useEffect(() => {
+    const update = () => {
+      const now = new Date();
+      setDateStr(
+        now.toLocaleDateString("en-IN", {
+          weekday: "long",
+          day: "2-digit",
+          month: "short",
+        }),
+      );
+    };
+    update();
+  }, []);
+
+  const displayRole = (loginAs ? loginAs : role || "").replace("_", " ");
+
+  return (
+    <div
+      className="rounded-[20px] px-5 py-5 mb-1 relative overflow-hidden"
+      style={{
+        background:
+          "linear-gradient(135deg, rgb(var(--sidebar)) 0%, rgb(var(--primary)) 100%)",
+      }}
+    >
+      {/* Decorative dot */}
+      <div
+        className="absolute -top-6 -right-6 w-24 h-24 rounded-full opacity-10 pointer-events-none"
+        style={{ background: "#fff" }}
+      />
+      {displayRole && (
+        <p className="text-white/80 text-[11px] font-bold uppercase tracking-wide mb-1">
+          {displayRole}
+        </p>
+      )}
+      <h1 className="text-white text-xl font-extrabold mb-1 capitalize">
+        Welcome, {name}
+      </h1>
+      <p className="text-white/80 text-[12.5px] font-semibold">{dateStr}</p>
+    </div>
+  );
+}
+
 /* ─── Exit Popup ────────────────────────────────────────────── */
 function ExitPopup({ onConfirm, onCancel }) {
   return (
@@ -67,17 +112,32 @@ function ExitPopup({ onConfirm, onCancel }) {
       className="fixed inset-0 z-50 flex items-end justify-center animate-fade-in"
       style={{ background: "rgba(0,0,0,0.45)" }}
     >
-      <div className="w-full max-w-lg bg-white rounded-t-3xl px-6 pt-3 pb-10 animate-slide-up">
-        <div className="w-10 h-1 rounded-full bg-slate-200 mx-auto mb-6" />
+      <div
+        className="w-full max-w-lg rounded-t-3xl px-6 pt-3 pb-10 animate-slide-up"
+        style={{ background: "rgb(var(--bg))" }}
+      >
+        <div
+          className="w-10 h-1 rounded-full mx-auto mb-6"
+          style={{ background: "rgb(var(--border))" }}
+        />
 
         <div className="flex flex-col items-center mb-7">
-          <div className="w-14 h-14 rounded-full bg-red-50 flex items-center justify-center text-2xl mb-4">
+          <div
+            className="w-14 h-14 rounded-full flex items-center justify-center text-2xl mb-4"
+            style={{ background: "rgb(var(--surface))" }}
+          >
             🚪
           </div>
-          <h2 className="text-lg font-extrabold text-slate-800 mb-1">
+          <h2
+            className="text-lg font-extrabold mb-1"
+            style={{ color: "rgb(var(--text))" }}
+          >
             Exit App?
           </h2>
-          <p className="text-sm text-slate-500 text-center leading-relaxed">
+          <p
+            className="text-sm text-center leading-relaxed"
+            style={{ color: "rgb(var(--text-muted))" }}
+          >
             Are you sure you want to logout and exit?
           </p>
         </div>
@@ -85,17 +145,21 @@ function ExitPopup({ onConfirm, onCancel }) {
         <div className="flex gap-3">
           <button
             onClick={onCancel}
-            className="flex-1 py-3.5 rounded-2xl border border-slate-200 bg-slate-50
-                       text-sm font-extrabold text-slate-600 active:scale-95 transition-transform"
+            className="flex-1 py-3.5 rounded-2xl text-sm font-extrabold active:scale-95 transition-transform border"
+            style={{
+              borderColor: "rgb(var(--border))",
+              background: "rgb(var(--surface))",
+              color: "rgb(var(--text))",
+            }}
           >
             Stay
           </button>
           <button
             onClick={onConfirm}
-            className="flex-1 py-3.5 rounded-2xl text-sm font-extrabold text-white
-                       active:scale-95 transition-transform"
+            className="flex-1 py-3.5 rounded-2xl text-sm font-extrabold text-white active:scale-95 transition-transform"
             style={{
-              background: "linear-gradient(135deg,#1E3A5F 0%,#2563EB 100%)",
+              background:
+                "linear-gradient(135deg, rgb(var(--sidebar)) 0%, rgb(var(--primary)) 100%)",
             }}
           >
             Logout &amp; Exit
@@ -136,27 +200,33 @@ function AccordionPanel({ isOpen, children }) {
 }
 
 /* ─── Card tile ─────────────────────────────────────────────── */
-function MenuCard({ item, color, globalIdx, isOpen, onToggle }) {
+function MenuCard({ item, color, globalIdx, isOpen, onToggle, isDark }) {
   const navigate = useNavigate();
   const hasChildren = Boolean(item.children);
+
+  const iconBg = isDark ? "rgb(var(--surface))" : color.bg;
+  const dotColor = isDark ? "rgb(var(--border))" : color.dot;
 
   return (
     <div
       onClick={() => (hasChildren ? onToggle() : navigate(item.path))}
       className={[
-        "relative overflow-hidden flex flex-col items-center bg-white cursor-pointer select-none",
+        "relative overflow-hidden flex flex-col items-center cursor-pointer select-none",
         "px-3.5 pt-5 pb-4 transition-all duration-150 active:scale-95 animate-fade-slide-up",
         isOpen ? "rounded-t-[18px] shadow-md" : "rounded-[18px] shadow-sm",
       ].join(" ")}
       style={{
+        background: "rgb(var(--bg))",
+        border: isOpen
+          ? `2px solid ${color.icon}40`
+          : "1px solid rgb(var(--border))",
         animationDelay: `${globalIdx * 45}ms`,
-        ...(isOpen ? { outline: `2px solid ${color.icon}25` } : {}),
       }}
     >
       {/* Decorative dot */}
       <div
         className="absolute -top-3 -right-3 w-12 h-12 rounded-full opacity-50 pointer-events-none"
-        style={{ background: color.dot }}
+        style={{ background: dotColor }}
       />
 
       {/* Icon bubble */}
@@ -165,7 +235,7 @@ function MenuCard({ item, color, globalIdx, isOpen, onToggle }) {
         style={{
           width: 52,
           height: 52,
-          background: color.bg,
+          background: iconBg,
           color: color.icon,
         }}
       >
@@ -173,7 +243,10 @@ function MenuCard({ item, color, globalIdx, isOpen, onToggle }) {
       </div>
 
       {/* Name */}
-      <p className="m-0 text-[12.5px] font-extrabold text-slate-800 text-center leading-snug">
+      <p
+        className="m-0 text-[12.5px] font-extrabold text-center leading-snug"
+        style={{ color: "rgb(var(--text))" }}
+      >
         {item.name}
       </p>
 
@@ -181,7 +254,7 @@ function MenuCard({ item, color, globalIdx, isOpen, onToggle }) {
       {hasChildren && (
         <div
           className="mt-2 px-2.5 py-0.5 rounded-full flex items-center gap-1"
-          style={{ background: color.bg }}
+          style={{ background: iconBg }}
         >
           <span className="text-[10px] font-bold" style={{ color: color.icon }}>
             {item.children.length} items
@@ -201,23 +274,26 @@ function MenuCard({ item, color, globalIdx, isOpen, onToggle }) {
 }
 
 /* ─── Children list ─────────────────────────────────────────── */
-function ChildList({ children, color }) {
+function ChildList({ children, color, isDark }) {
   const navigate = useNavigate();
+  const listBg = isDark ? "rgb(var(--surface))" : color.bg;
+
   return (
     <div
       className="rounded-b-[18px] overflow-hidden"
-      style={{ background: color.bg }}
+      style={{ background: listBg }}
     >
       <div className="flex flex-col gap-2 p-3 pt-2">
         {children.map((child, idx) => (
           <div
             key={child.name}
             onClick={() => navigate(child.path)}
-            className="flex items-center gap-3 bg-white rounded-2xl px-4 py-3
+            className="flex items-center gap-3 rounded-2xl px-4 py-3
                        cursor-pointer active:scale-[0.97] transition-transform
                        shadow-sm animate-fade-slide-right"
             style={{
-              border: `1.5px solid ${color.dot}`,
+              background: "rgb(var(--bg))",
+              border: "1.5px solid rgb(var(--border))",
               animationDelay: `${idx * 50}ms`,
             }}
           >
@@ -225,12 +301,15 @@ function ChildList({ children, color }) {
               className="w-2 h-2 rounded-full shrink-0"
               style={{ background: color.icon }}
             />
-            <span className="flex-1 text-[13.5px] font-bold text-slate-800">
+            <span
+              className="flex-1 text-[13.5px] font-bold"
+              style={{ color: "rgb(var(--text))" }}
+            >
               {child.name}
             </span>
             <div
               className="w-7 h-7 rounded-lg flex items-center justify-center text-sm font-bold"
-              style={{ background: color.bg, color: color.icon }}
+              style={{ background: listBg, color: color.icon }}
             >
               ›
             </div>
@@ -246,8 +325,24 @@ export default function ParentMenu() {
   const navigate = useNavigate();
   const [openItem, setOpenItem] = useState(null);
   const [showExit, setShowExit] = useState(false);
+  const [isDark, setIsDark] = useState(false);
   const { user, loading, setUser } = useAuth();
   const API = import.meta.env.VITE_API_URL;
+
+  // ── Read + apply saved theme on mount ───────────────────────
+  useEffect(() => {
+    const saved = localStorage.getItem("theme") || "theme-light";
+    document.documentElement.className = saved;
+    setIsDark(saved === "theme-dark");
+
+    const onStorage = () => {
+      const t = localStorage.getItem("theme") || "theme-light";
+      document.documentElement.className = t;
+      setIsDark(t === "theme-dark");
+    };
+    window.addEventListener("storage", onStorage);
+    return () => window.removeEventListener("storage", onStorage);
+  }, []);
 
   const logout = async () => {
     try {
@@ -268,6 +363,11 @@ export default function ParentMenu() {
     sessionStorage.clear();
     navigate("/admin/login", { replace: true });
   };
+
+  // ── Greeting info (same pattern as Topbar) ──────────────────
+  const greetingName = user?.name || user?.school_name || "User";
+  const greetingRole = user?.role || "User";
+  const greetingLoginAs = user?.loginAs;
 
   const menu = [
     { name: "Dashboard", icon: <FaTachometerAlt />, path: "/parent/dashboard" },
@@ -338,9 +438,19 @@ export default function ParentMenu() {
   };
 
   return (
-    <div className="min-h-screen bg-slate-100 font-nunito">
+    <div
+      className="min-h-screen font-nunito"
+      style={{ background: "rgb(var(--bg))" }}
+    >
       {/* Grid — row-based so accordion never breaks column count */}
       <div className="p-4 flex flex-col gap-3">
+        {/* Greeting */}
+        <GreetingHeader
+          name={greetingName}
+          role={greetingRole}
+          loginAs={greetingLoginAs}
+        />
+
         {rows.map((row, rowIdx) => {
           /* Find the open item in this row (there can be at most one open globally) */
           const openInRow = row.find(
@@ -363,6 +473,7 @@ export default function ParentMenu() {
                       color={color}
                       globalIdx={globalIdx}
                       isOpen={isOpen}
+                      isDark={isDark}
                       onToggle={() => setOpenItem(isOpen ? null : item.name)}
                     />
                   );
@@ -379,7 +490,11 @@ export default function ParentMenu() {
                   const color = COLOR_MAP[childItem.name] ?? DEFAULT_COLOR;
                   return (
                     <AccordionPanel isOpen={Boolean(openInRow)}>
-                      <ChildList children={childItem.children} color={color} />
+                      <ChildList
+                        children={childItem.children}
+                        color={color}
+                        isDark={isDark}
+                      />
                     </AccordionPanel>
                   );
                 })()}

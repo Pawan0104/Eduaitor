@@ -181,7 +181,7 @@ export const getGroupMessages = async (req, res) => {
  */
 export const updateMessage = async (req, res) => {
   try {
-    const { userId } = normalizeUser(req.user);
+    const { userId, userType, schoolId } = normalizeUser(req.user);
     const { text } = req.body;
 
     const message = await Message.findById(req.params.id);
@@ -191,6 +191,17 @@ export const updateMessage = async (req, res) => {
         success: false,
         message: "Message not found",
       });
+    }
+
+    const { error, status } = await verifyGroupAccess(
+      message.groupId,
+      schoolId,
+      userId,
+      userType,
+    );
+
+    if (error) {
+      return res.status(status).json({ success: false, message: error });
     }
 
     if (message.file) {
@@ -207,10 +218,10 @@ export const updateMessage = async (req, res) => {
       });
     }
 
-    if (message.sender.userId.toString() !== userId.toString()) {
+    if (userType !== "admin" && message.sender.userId.toString() !== userId.toString()) {
       return res.status(403).json({
         success: false,
-        message: "Not your message",
+        message: "Insufficient permissions",
       });
     }
 
@@ -228,7 +239,7 @@ export const updateMessage = async (req, res) => {
  */
 export const deleteMessage = async (req, res) => {
   try {
-    const { userId, userType } = normalizeUser(req.user);
+    const { userId, userType, schoolId } = normalizeUser(req.user);
     const { id } = req.params;
 
     if (!mongoose.Types.ObjectId.isValid(id)) {
@@ -245,6 +256,17 @@ export const deleteMessage = async (req, res) => {
         success: false,
         message: "Message not found",
       });
+    }
+
+    const { error, status } = await verifyGroupAccess(
+      message.groupId,
+      schoolId,
+      userId,
+      userType,
+    );
+
+    if (error) {
+      return res.status(status).json({ success: false, message: error });
     }
 
     const isOwner = message.sender.userId.toString() === userId.toString();

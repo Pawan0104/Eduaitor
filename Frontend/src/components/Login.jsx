@@ -10,6 +10,7 @@ import {
 } from "react-icons/fa";
 import axios from "axios";
 import { toast } from "react-toastify";
+import logo from "../../public/eduaitor.png"; 
 
 const API = import.meta.env.VITE_API_URL;
 
@@ -129,25 +130,20 @@ export default function Login() {
   return (
     <div className="min-h-screen grid md:grid-cols-2">
       {/* LEFT PANEL */}
-      <div className="hidden md:flex flex-col justify-center items-center bg-linear-to-br from-indigo-600 via-purple-600 to-indigo-700 text-white p-12">
-        <h1 className="text-5xl font-bold mb-4">EduAitor</h1>
-
-        <p className="text-lg opacity-90 text-center max-w-md">
-          Manage schools, students, teachers, fees and analytics in one powerful
-          platform.
-        </p>
+      <div className="hidden md:flex flex-col justify-center items-center bg-linear-to-br from-[#e6edf8] via-[#d7e2f5] to-[#eef1fb]  text-white p-12">
+       <img className="h-44" src={logo} alt="" />
       </div>
 
       {/* RIGHT PANEL */}
-      <div className="flex items-center justify-center bg-linear-to-br from-[#e6edf8] via-[#d7e2f5] to-[#eef1fb] p-6">
-        <div className="w-full max-w-md bg-white/80 backdrop-blur-xl shadow-xl rounded-2xl p-8 border border-white/40">
+      <div className="flex items-center justify-center bg-linear-to-br from-indigo-600 via-purple-600 to-indigo-700 p-6">
+        <div className="w-full max-w-md bg-white backdrop-blur-xl shadow-xl rounded-2xl p-8 border border-white/40">
           {/* HEADER */}
           <div className="text-center mb-8">
             <FaUserShield className="mx-auto text-4xl text-indigo-500 mb-3" />
 
             <h2 className="text-3xl font-bold text-gray-700 mb-2">Login</h2>
 
-            <p className="text-gray-500 text-sm">EduAitor Control Panel</p>
+            <p className="text-gray-500 text-sm">Manage your account</p>
           </div>
 
           {/* ERROR */}

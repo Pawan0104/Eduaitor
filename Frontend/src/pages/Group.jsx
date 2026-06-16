@@ -21,6 +21,7 @@ import {
   FiLock,
   FiChevronDown,
   FiCheck,
+  FiEdit,
 } from "react-icons/fi";
 import {
   MdOutlineGroups,
@@ -666,9 +667,7 @@ function MembersPanel({ group, isAdmin, onRemove, onAdd, userLookup }) {
               <Avatar name={name} size="w-9 h-9" fs="text-xs" url={photo} />
               <div className="flex-1 min-w-0 text-[rgb(var(--text))] bg-[rgb(var(--surface))]">
                 <div className="flex items-center gap-1.5 ">
-                  <p className="text-xs font-semibold  truncate">
-                    {name}
-                  </p>
+                  <p className="text-xs font-semibold  truncate">{name}</p>
                   {m.role === "admin" && (
                     <MdAdminPanelSettings
                       size={12}
@@ -892,7 +891,7 @@ function getMemberName(m, userLookup) {
 }
 
 // ─── MESSAGE BUBBLE ───────────────────────────────────────────────────────────
-function Bubble({ msg, isOwn, isAdmin, onDelete, onPin, userLookup }) {
+function Bubble({ msg, isOwn, isAdmin, onDelete, onPin, onEdit, userLookup }) {
   const [menu, setMenu] = useState(false);
   const menuRef = useRef(null);
 
@@ -1022,6 +1021,17 @@ function Bubble({ msg, isOwn, isAdmin, onDelete, onPin, userLookup }) {
                       {msg.isPinned ? "Unpin" : "Pin"}
                     </button>
                   )}
+                  {msg.text && !msg.file && (
+                    <button
+                      onClick={() => {
+                        onEdit?.(msg._id, msg.text);
+                        setMenu(false);
+                      }}
+                      className="w-full flex items-center gap-2.5 px-3.5 py-2 text-xs font-medium text-gray-700 hover:bg-gray-50"
+                    >
+                      <FiEdit size={12} /> Edit
+                    </button>
+                  )}
                   <button
                     onClick={() => {
                       onDelete(msg._id);
@@ -1070,7 +1080,6 @@ function PinnedBanner({ msg, userLookup }) {
     </div>
   );
 }
-
 // ─── CHAT WINDOW ──────────────────────────────────────────────────────────────
 function ChatWindow({
   group,
@@ -1089,6 +1098,7 @@ function ChatWindow({
   const [showMembers, setShowMembers] = useState(false);
   const [showAddMember, setShowAddMember] = useState(false);
   const [showMenu, setShowMenu] = useState(false);
+  const [editing, setEditing] = useState(null);
   const fileRef = useRef(null);
   const bottomRef = useRef(null);
   const menuRef = useRef(null);
@@ -1164,27 +1174,62 @@ function ChatWindow({
     if (!text.trim() && !file) return;
     setSending(true);
     try {
-      const fd = new FormData();
-      fd.append("groupId", group._id);
-      if (text.trim()) fd.append("text", text.trim());
-      if (file) fd.append("file", file);
-      const { data } = await api.post("/messages", fd, {
-        headers: { "Content-Type": "multipart/form-data" },
-      });
-      if (data.success) {
-        setMessages((prev) => [...prev, data.data]);
-        setText("");
-        setFile(null);
-        if (textareaRef.current) textareaRef.current.style.height = "42px";
-        setTimeout(
-          () => bottomRef.current?.scrollIntoView({ behavior: "smooth" }),
-          60,
-        );
+      if (editing) {
+        const { data } = await api.put(`/messages/${editing}`, {
+          text: text.trim(),
+        });
+        if (data.success) {
+          setMessages((prev) =>
+            prev.map((m) => (m._id === editing ? data.data : m)),
+          );
+          setText("");
+          setEditing(null);
+          if (textareaRef.current) textareaRef.current.style.height = "42px";
+          toast.success("Message updated");
+        }
+      } else {
+        const fd = new FormData();
+        fd.append("groupId", group._id);
+        if (text.trim()) fd.append("text", text.trim());
+        if (file) fd.append("file", file);
+        const { data } = await api.post("/messages", fd, {
+          headers: { "Content-Type": "multipart/form-data" },
+        });
+        if (data.success) {
+          setMessages((prev) => [...prev, data.data]);
+          setText("");
+          setFile(null);
+          if (textareaRef.current) textareaRef.current.style.height = "42px";
+          setTimeout(
+            () => bottomRef.current?.scrollIntoView({ behavior: "smooth" }),
+            60,
+          );
+        }
       }
     } catch (e) {
       toast.error(e.response?.data?.message || "Failed to send");
     } finally {
       setSending(false);
+    }
+  };
+
+  const cancelEdit = () => {
+    setEditing(null);
+    setText("");
+    if (textareaRef.current) textareaRef.current.style.height = "42px";
+  };
+
+  const startEdit = (id, originalText) => {
+    setEditing(id);
+    setText(originalText || "");
+    setFile(null);
+    if (textareaRef.current) {
+      textareaRef.current.style.height = "auto";
+      textareaRef.current.style.height = `${Math.min(
+        textareaRef.current.scrollHeight,
+        120,
+      )}px`;
+      textareaRef.current.focus();
     }
   };
 
@@ -1272,9 +1317,7 @@ function ChatWindow({
             className="flex-1 min-w-0 cursor-pointer"
             onClick={() => setShowMembers((v) => !v)}
           >
-            <p className="text-sm font-bold  truncate">
-              {group.name}
-            </p>
+            <p className="text-sm font-bold  truncate">{group.name}</p>
             <p className="text-xstruncate flex items-center gap-1.5">
               <span>{group.members?.length || 0} members</span>
               {group.type === "announcement" && (
@@ -1323,10 +1366,7 @@ function ChatWindow({
         {pinnedMsg && <PinnedBanner msg={pinnedMsg} userLookup={userLookup} />}
 
         {/* ── Messages ── */}
-        <div
-          className="flex-1 overflow-y-auto px-3 sm:px-4 py-2 bg-[rgb(var(--surface))]"
-          
-        >
+        <div className="flex-1 overflow-y-auto px-3 sm:px-4 py-2 bg-[rgb(var(--surface))]">
           {page < totalPages && (
             <div className="text-center py-2 mb-1">
               <button
@@ -1373,9 +1413,7 @@ function ChatWindow({
               >
                 <Icon size={30} className="text-[rgb(var(--primary))]" />
               </div>
-              <p className="text-sm font-semibold ">
-                No messages yet
-              </p>
+              <p className="text-sm font-semibold ">No messages yet</p>
               <p className="text-xs  mt-1">
                 {canSend
                   ? "Send the first message!"
@@ -1399,6 +1437,7 @@ function ChatWindow({
                     }
                     isAdmin={isAdmin}
                     onDelete={deleteMsg}
+                    onEdit={startEdit}
                     onPin={pinMsg}
                     userLookup={userLookup}
                   />
@@ -1412,7 +1451,18 @@ function ChatWindow({
         {/* ── Input bar ── */}
         {canSend ? (
           <div className="shrink-0  border-t border-gray-100 px-3 py-2.5">
-            {file && (
+            {editing && (
+              <div className="flex items-center justify-between gap-2 mb-2 px-3 py-2 bg-indigo-50 text-indigo-700 text-xs font-medium rounded-2xl">
+                <span>Editing message</span>
+                <button
+                  onClick={cancelEdit}
+                  className="text-indigo-600 hover:text-indigo-800"
+                >
+                  Cancel
+                </button>
+              </div>
+            )}
+            {!editing && file && (
               <div className="flex items-center gap-1.5 mb-2 bg-indigo-50 text-indigo-700 text-xs font-medium px-3 py-1.5 rounded-full w-fit max-w-65">
                 {fileIcon}
                 <span className="truncate flex-1">{file.name}</span>
@@ -1428,20 +1478,24 @@ function ChatWindow({
               </div>
             )}
             <div className="flex items-end gap-2">
-              <button
-                onClick={() => fileRef.current?.click()}
-                title="Attach file (image / video / PDF / doc — max 10 MB)"
-                className="p-2.5 text-gray-400 hover:text-indigo-500 hover:bg-indigo-50 rounded-xl transition-colors shrink-0 mb-0.5"
-              >
-                <FiPaperclip size={17} />
-              </button>
-              <input
-                ref={fileRef}
-                type="file"
-                className="hidden"
-                accept="image/*,video/*,.pdf,.doc,.docx"
-                onChange={handleFile}
-              />
+              {!editing && (
+                <>
+                  <button
+                    onClick={() => fileRef.current?.click()}
+                    title="Attach file (image / video / PDF / doc — max 10 MB)"
+                    className="p-2.5 text-gray-400 hover:text-indigo-500 hover:bg-indigo-50 rounded-xl transition-colors shrink-0 mb-0.5"
+                  >
+                    <FiPaperclip size={17} />
+                  </button>
+                  <input
+                    ref={fileRef}
+                    type="file"
+                    className="hidden"
+                    accept="image/*,video/*,.pdf,.doc,.docx"
+                    onChange={handleFile}
+                  />
+                </>
+              )}
 
               <textarea
                 ref={textareaRef}
@@ -1466,11 +1520,17 @@ function ChatWindow({
 
               <button
                 onClick={send}
-                disabled={sending || (!text.trim() && !file)}
+                disabled={
+                  sending || (editing ? !text.trim() : !text.trim() && !file)
+                }
                 className="p-2.5  bg-[rgb(var(--primary))] hover:bg-[rgb(var(--primary-light))] disabled:bg-[rgb(var(--surface))] disabled:cursor-not-allowed rounded-xl transition-colors shrink-0 mb-0.5 shadow-sm"
               >
                 {sending ? (
                   <FiLoader size={16} className="animate-spin" />
+                ) : editing ? (
+                  <span className="text-sm font-semibold text-white">
+                    Update
+                  </span>
                 ) : (
                   <FiSend size={16} />
                 )}
@@ -1608,7 +1668,10 @@ export default function Groups() {
         if (data.success) {
           setCurrentUser({
             ...data.user,
-            id: data.user.teacher_id || data.user.school_id,
+            id:
+              data.user.student_id ||
+              data.user.teacher_id ||
+              data.user.school_id,
           });
         }
       })
@@ -1720,9 +1783,7 @@ export default function Groups() {
                 <div className="w-8 h-8 bg-[rgb(var(--primary))] rounded-xl flex items-center justify-center shadow-sm">
                   <MdOutlineGroups size={17} className="" />
                 </div>
-                <span className="text-base font-bold ">
-                  Groups
-                </span>
+                <span className="text-base font-bold ">Groups</span>
                 <span className="text-xs font-bold text-[rgb(var(--text))] bg-[rgb(var(--primary))] px-2 py-0.5 rounded-full">
                   {groups.length}
                 </span>
