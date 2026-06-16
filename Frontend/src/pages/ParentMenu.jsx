@@ -35,6 +35,7 @@ import { toast } from "react-toastify";
 import { useAuth } from "../context/AuthContext";
 import axios from "axios";
 import BlogFeed from "../components/BlogFeed";
+import UpComingNotifications from "../components/UpComingNotifications";
 
 /* ─── Color map ─────────────────────────────────────────────── */
 const COLOR_MAP = {
@@ -450,7 +451,8 @@ export default function ParentMenu() {
           role={greetingRole}
           loginAs={greetingLoginAs}
         />
-
+        
+        <UpComingNotifications />
         {rows.map((row, rowIdx) => {
           /* Find the open item in this row (there can be at most one open globally) */
           const openInRow = row.find(

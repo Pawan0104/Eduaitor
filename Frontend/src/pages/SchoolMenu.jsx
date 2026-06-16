@@ -516,6 +516,7 @@ export default function SchoolMenu() {
           role={greetingRole}
           loginAs={greetingLoginAs}
         />
+<UpComingNotifications />
 
         {rows.map((row, rowIdx) => {
           const openInRow = row.find(
@@ -524,7 +525,6 @@ export default function SchoolMenu() {
 
           return (
             <div key={rowIdx} className="flex flex-col">
-              <UpComingNotifications />
               <div className="grid grid-cols-2 gap-3">
                 {row.map((item, colIdx) => {
                   const color = COLOR_MAP[item.name] ?? DEFAULT_COLOR;
