@@ -11,7 +11,10 @@ const paymentSchema = new mongoose.Schema({
         type: mongoose.Schema.Types.ObjectId,
         ref: 'School',
         required: true
-    }
+    },
+    razorpayOrderId: { type: String },
+    razorpayPaymentId: { type: String },
+    razorpaySignature: { type: String },
 }, {
     // This tells Mongoose to auto-build indexes properly when the app boots up
     autoIndex: true 

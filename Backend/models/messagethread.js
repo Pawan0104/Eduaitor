@@ -72,7 +72,13 @@
 import mongoose from "mongoose";
 
 // Allowed participant model names
-const PARTICIPANT_MODELS = ["Teacher", "Student", "Staff", "School"];
+const PARTICIPANT_MODELS = [
+  "Teacher",
+  "Student",
+  "Staff",
+  "School",
+  "SuperAdmin",
+];
 
 // subType — differentiates student vs parent (both share same Student _id)
 // For Teacher, Staff, School → subType is always "default"
@@ -106,7 +112,8 @@ const participantSchema = new mongoose.Schema(
     schoolId: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "School",
-      required: true,
+      // Optional for SuperAdmin (cross-school help threads)
+      required: false,
     },
   },
   { _id: false }
@@ -150,6 +157,13 @@ const messageThreadSchema = new mongoose.Schema(
       type: String,
       enum: PARTICIPANT_SUBTYPES,
       default: "default",
+    },
+
+    // Help / support thread with platform Super Admin
+    isHelpThread: {
+      type: Boolean,
+      default: false,
+      index: true,
     },
   },
   { timestamps: true }

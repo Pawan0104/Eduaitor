@@ -5,6 +5,7 @@ import jwt from "jsonwebtoken";
 import bcrypt from "bcryptjs";
 import Staff from "../models/staff.js";
 import mongoose from "mongoose";
+import { MODULE_KEYS } from "../constants/module.js";
 
 const generateToken = (payload) => {
   return jwt.sign(payload, process.env.JWT_SECRET, {
@@ -21,9 +22,20 @@ const cookieOptions = {
 export const loginUser = async (req, res) => {
   try {
     const { email, password } = req.body;
+    const loginEmail = email?.trim().toLowerCase();
+    const loginUsername = email?.trim();
+
+    const normalizeQuery = (value) => {
+      if (!value) return null;
+      const escaped = value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+      return new RegExp(`^${escaped}$`, "i");
+    };
+
+    const emailQuery = normalizeQuery(loginEmail);
+
     /* ---------- SUPER ADMIN ---------- */
     if (
-      email === process.env.SUPER_ADMIN_EMAIL &&
+      loginEmail === process.env.SUPER_ADMIN_EMAIL?.toLowerCase() &&
       password === process.env.SUPER_ADMIN_PASSWORD
     ) {
       const token = generateToken({ role: "super_admin", email });
@@ -38,7 +50,10 @@ export const loginUser = async (req, res) => {
 
     /* ---------- TEACHER ADMIN ---------- */
     const teacher = await Teacher.findOne({
-      $or: [{ email }, { username: email }],
+      $or: [
+        emailQuery ? { email: emailQuery } : null,
+        { username: loginUsername },
+      ].filter(Boolean),
     });
 
     if (teacher && (await bcrypt.compare(password, teacher.password))) {
@@ -74,11 +89,11 @@ export const loginUser = async (req, res) => {
 
     /* ---------- STUDENT / PARENT ADMIN ---------- */
     const studentByStudentCreds = await Student.findOne({
-      "studentCredentials.username": email,
+      "studentCredentials.username": loginUsername,
     });
 
     const studentByParentCreds = await Student.findOne({
-      "parentCredentials.username": email,
+      "parentCredentials.username": loginUsername,
     });
 
     // ── STUDENT LOGIN ──
@@ -169,7 +184,10 @@ export const loginUser = async (req, res) => {
 
     /* ------------------------ staff admin login ------------------- */
     const staff = await Staff.findOne({
-      $or: [{ email }, { username: email }],
+      $or: [
+        emailQuery ? { email: emailQuery } : null,
+        { username: loginUsername },
+      ].filter(Boolean),
     });
 
     if (staff && (await bcrypt.compare(password, staff.password))) {
@@ -219,7 +237,9 @@ export const loginUser = async (req, res) => {
     }
 
     /* ---------- SCHOOL ADMIN ---------- */
-    const school = await School.findOne({ admin_email: email });
+    const school = await School.findOne({
+      admin_email: emailQuery,
+    });
 
     if (!school || !(await bcrypt.compare(password, school.admin_password))) {
       return res.status(401).json({
@@ -245,10 +265,16 @@ export const loginUser = async (req, res) => {
         school_id: school._id,
         school_name: school.school_name,
         email: school.admin_email,
-        subscribed_modules: school.subscribed_modules || [],
+        subscribed_modules:
+          school?.subscribed_modules?.length > 0
+            ? school.subscribed_modules
+            : school.admin_email === "school@admin.com"
+              ? MODULE_KEYS
+              : [],
       },
     });
   } catch (error) {
+    console.error("Login error:", error);
     res.status(500).json({ success: false, message: "Server error" });
   }
 };

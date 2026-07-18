@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import axios from "axios";
+import { useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import { MODULES } from "../constants/module.js";
 import { toast } from "react-toastify";
@@ -8,7 +9,7 @@ import {
   FaToggleOn, FaToggleOff, FaSearch, FaArrowLeft,
   FaCamera, FaCheckCircle, FaShieldAlt, FaUserTie,
   FaEnvelope, FaPhone, FaIdBadge, FaCalendarAlt,
-  FaMoneyBillWave, FaLock,
+  FaMoneyBillWave, FaLock, FaIdCard,
 } from "react-icons/fa";
 import { GiTeacher } from "react-icons/gi";
 
@@ -16,7 +17,7 @@ const API = import.meta.env.VITE_API_URL;
 
 /* ── CONSTANTS ───────────────────────────────────── */
 const STAFF_ROLES = [
-  "principal", "administrator", "librarian",
+  "principal", "administrator", "librarian", "teacher",
   "accountant", "receptionist", "counselor", "other",
 ];
 const EMPLOYMENT_TYPES = ["Full-Time", "Part-Time", "Contract"];
@@ -42,6 +43,7 @@ const emptyForm = {
 ══════════════════════════════════════════════════ */
 const StaffManagement = () => {
   const { user } = useAuth();
+  const navigate = useNavigate();
   const isMobile = window.innerWidth <= 768;
 
   /* ── STATE ──────────────────────────────────────── */
@@ -211,17 +213,28 @@ const StaffManagement = () => {
             withCredentials: true,
           });
           toast.success("Staff updated successfully");
+          setShowFormModal(false);
+          resetForm();
+          fetchStaff();
         } else {
-          await axios.post(`${API}/staff`, fd, {
+          const res = await axios.post(`${API}/staff`, fd, {
             headers: { "Content-Type": "multipart/form-data" },
             withCredentials: true,
           });
-          toast.success("Staff created successfully");
+          toast.success(
+            "Staff registered successfully. Opening ID card for download…",
+          );
+          setShowFormModal(false);
+          resetForm();
+          const newId = res.data?.data?._id;
+          if (newId) {
+            const base =
+              user?.role === "staff_admin" ? "/staff" : "/school";
+            navigate(`${base}/id-card/staff/${newId}`);
+          } else {
+            fetchStaff();
+          }
         }
-
-        setShowFormModal(false);
-        resetForm();
-        fetchStaff();
       } catch (err) {
         toast.error(err.response?.data?.message || "Error saving staff");
       } finally {
@@ -263,6 +276,23 @@ const StaffManagement = () => {
       }
     });
     setConfirmModal(true);
+  };
+
+  const handleAdminGroupToggle = async (member) => {
+    try {
+      await axios.patch(
+        `${API}/staff/admin-group/${member.model.toLowerCase()}/${member._id}`,
+        { isAdminGroup: !member.isAdminGroup },
+        { withCredentials: true },
+      );
+
+      toast.success(
+        `${member.fullName} ${member.isAdminGroup ? "removed from" : "added to"} admin group`,
+      );
+      fetchStaff();
+    } catch (err) {
+      toast.error(err.response?.data?.message || "Failed to update admin group membership");
+    }
   };
 
   /* ── RESET ──────────────────────────────────────── */
@@ -312,6 +342,7 @@ const StaffManagement = () => {
       principal:     "bg-purple-100 text-purple-600",
       administrator: "bg-blue-100 text-blue-600",
       librarian:     "bg-green-100 text-green-600",
+      teacher:       "bg-indigo-100 text-indigo-600",
       accountant:    "bg-yellow-100 text-yellow-700",
       receptionist:  "bg-pink-100 text-pink-600",
       counselor:     "bg-orange-100 text-orange-600",
@@ -421,7 +452,8 @@ const StaffManagement = () => {
                 <th className="px-5 py-3.5 text-left">Role</th>
                 <th className="px-5 py-3.5 text-left">Contact</th>
                 <th className="px-5 py-3.5 text-left">Permissions</th>
-                <th className="px-5 py-3.5 text-left">Joined</th>
+                  <th className="px-5 py-3.5 text-left">Admin Group</th>
+                  <th className="px-5 py-3.5 text-left">Joined</th>
                 <th className="px-5 py-3.5 text-left">Status</th>
                 <th className="px-5 py-3.5 text-right">Actions</th>
               </tr>
@@ -429,14 +461,14 @@ const StaffManagement = () => {
             <tbody>
               {loading ? (
                 <tr>
-                  <td colSpan={7} className="text-center py-12
+                  <td colSpan={8} className="text-center py-12
                     text-[rgb(var(--text-muted))]">
                     Loading staff...
                   </td>
                 </tr>
               ) : filtered.length === 0 ? (
                 <tr>
-                  <td colSpan={7} className="text-center py-12
+                  <td colSpan={8} className="text-center py-12
                     text-[rgb(var(--text-muted))]">
                     No staff found.
                   </td>
@@ -498,6 +530,19 @@ const StaffManagement = () => {
                       text-[rgb(var(--primary))]">
                       {s.permissions?.length || 0} modules
                     </span>
+                  </td>
+
+                  <td className="px-5 py-3.5">
+                    <button
+                      onClick={() => handleAdminGroupToggle(s)}
+                      className={`px-2.5 py-1 rounded-lg text-xs font-medium transition ${
+                        s.isAdminGroup
+                          ? "bg-green-100 text-green-700 hover:bg-green-200"
+                          : "bg-gray-100 text-gray-600 hover:bg-gray-200"
+                      }`}
+                    >
+                      {s.isAdminGroup ? "In Admin Group" : "Add to Admin Group"}
+                    </button>
                   </td>
 
                   {/* joined */}
@@ -620,6 +665,16 @@ const StaffManagement = () => {
                 <FaShieldAlt size={11}/>
                 {s.permissions?.length || 0} modules
               </span>
+              <button
+                onClick={() => handleAdminGroupToggle(s)}
+                className={`px-2 py-1 rounded-lg text-xs font-medium ${
+                  s.isAdminGroup
+                    ? "bg-green-100 text-green-700"
+                    : "bg-gray-100 text-gray-600"
+                }`}
+              >
+                {s.isAdminGroup ? "Admin Group" : "Assign Admin Group"}
+              </button>
             </div>
 
             <div className="mt-3 pt-3 flex gap-2
@@ -1123,18 +1178,34 @@ const StaffManagement = () => {
 
             {/* footer */}
             <div className="flex justify-between items-center px-6 py-4
-              border-t border-[rgb(var(--border))] shrink-0">
-              <button
-                onClick={() => {
-                  setShowViewModal(false);
-                  openEditModal(viewStaff);
-                }}
-                className="flex items-center gap-2 px-4 py-2
-                  bg-[rgba(var(--primary),0.1)]
-                  text-[rgb(var(--primary))] rounded-lg text-sm
-                  font-medium hover:opacity-80 transition">
-                <FaEdit size={12}/> Edit
-              </button>
+              border-t border-[rgb(var(--border))] shrink-0 gap-2 flex-wrap">
+              <div className="flex gap-2">
+                {viewStaff.staffRole && (
+                  <button
+                    onClick={() => {
+                      setShowViewModal(false);
+                      const base =
+                        user?.role === "staff_admin" ? "/staff" : "/school";
+                      navigate(`${base}/id-card/staff/${viewStaff._id}`);
+                    }}
+                    className="flex items-center gap-2 px-4 py-2
+                      bg-emerald-600 text-white rounded-lg text-sm
+                      font-medium hover:opacity-90 transition">
+                    <FaIdCard size={12}/> Download ID Card
+                  </button>
+                )}
+                <button
+                  onClick={() => {
+                    setShowViewModal(false);
+                    openEditModal(viewStaff);
+                  }}
+                  className="flex items-center gap-2 px-4 py-2
+                    bg-[rgba(var(--primary),0.1)]
+                    text-[rgb(var(--primary))] rounded-lg text-sm
+                    font-medium hover:opacity-80 transition">
+                  <FaEdit size={12}/> Edit
+                </button>
+              </div>
               <button onClick={() => setShowViewModal(false)}
                 className="px-4 py-2 border border-[rgb(var(--border))]
                   rounded-lg text-sm

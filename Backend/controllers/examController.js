@@ -3,7 +3,79 @@ import Subject from "../models/subject.js";
 import Teacher from "../models/teacher.js";
 import Student from "../models/student.js";
 import Result from "../models/result.js";
+import Term from "../models/Term.js";
+import ClassAttendance from "../models/classAttendance.js";
+import School from "../models/school.js";
 import { createNotificationHelper } from "./notificationController.js";
+
+const formatExamDate = (d) =>
+  new Date(d).toLocaleDateString("en-IN", {
+    day: "2-digit",
+    month: "short",
+    year: "numeric",
+  });
+
+const canEnterMarks = (req) => {
+  const role = req.user?.role;
+  return (
+    role === "teacher_admin" ||
+    role === "school_admin" ||
+    role === "staff_admin"
+  );
+};
+
+const findExamForMarks = async (examId, schoolId, req) => {
+  const query = { _id: examId, schoolId };
+  if (req.user?.role === "teacher_admin") {
+    query.teacherId = req.user.teacher_id;
+  }
+  return Exam.findOne(query)
+    .populate("className", "name")
+    .populate("subject", "name")
+    .populate("termId", "name academicYear termType startDate endDate")
+    .populate("sectionId", "name")
+    .populate("teacherId", "fullName");
+};
+
+const notifyExamScheduled = async ({
+  subjectName,
+  teacherName,
+  examDate,
+  startTime,
+  endTime,
+  classId,
+  sectionId,
+  teacherId,
+  schoolId,
+  createdBy,
+  updated = false,
+}) => {
+  const dateLabel = formatExamDate(examDate);
+  const timeLabel =
+    startTime && endTime ? ` (${startTime} – ${endTime})` : "";
+  return createNotificationHelper({
+    title: updated
+      ? `${subjectName} exam updated`
+      : `${subjectName} exam scheduled`,
+    message: updated
+      ? `${subjectName} exam has been updated to ${dateLabel}${timeLabel} by ${teacherName}. Parents and students, please note the change.`
+      : `${subjectName} exam is scheduled on ${dateLabel}${timeLabel} (Teacher: ${teacherName}). Parents and students, please prepare accordingly.`,
+    notificationType: "exam",
+    targets: [
+      {
+        type: "class",
+        classId,
+        sectionId: sectionId || null,
+        classes: [{ classId, sectionId: sectionId || null }],
+      },
+      { type: "teacher", teacherId },
+    ],
+    schoolId,
+    createdBy,
+    startingDate: examDate ? new Date(examDate) : null,
+  });
+};
+
 // Create Exam
 export const createExam = async (req, res) => {
   try {
@@ -91,27 +163,22 @@ export const createExam = async (req, res) => {
 
     await newExam.save();
 
-    const subjectName = await Subject.findOne({ _id: subject });
-    const teacherName = await Teacher.findOne({ _id: teacherId });
+    const subjectDoc = await Subject.findOne({ _id: subject });
+    const teacherDoc = await Teacher.findOne({ _id: teacherId });
 
-    console.log(
-      `Created exam for ${subjectName} on ${examDate} assigned to ${teacherName.fullName}`,
-    );
-
-
-  const studentnotification = await  createNotificationHelper({
-      title: `${subjectName.name} exam`,
-      message: `${subjectName.name} exam on ${examDate} by ${teacherName.fullName}`,
-      notificationType: "exam",
-      targets: [
-    { type: 'class',   classId: className },
-    { type: 'teacher', teacherId: teacherId },
-  ],
+    await notifyExamScheduled({
+      subjectName: subjectDoc?.name || "Subject",
+      teacherName: teacherDoc?.fullName || "Teacher",
+      examDate,
+      startTime,
+      endTime,
+      classId: className,
+      sectionId,
+      teacherId,
       schoolId,
       createdBy: req.user._id,
+      updated: false,
     });
-   console.log("Notification created for new exam:", studentnotification);
-   
 
     // Return populated data so the frontend can show the Class Name immediately
     const populatedExam = await Exam.findById(newExam._id).populate(
@@ -171,6 +238,7 @@ export const updateExam = async (req, res) => {
       endTime,
       totalMarks,
       passingMarks,
+      sectionId,
     } = req.body;
 
     const dateObj = new Date(examDate);
@@ -228,19 +296,20 @@ export const updateExam = async (req, res) => {
       return res.status(404).json({ message: "Exam not found" });
     }
 
-      
-  const classTeachernotification = await  createNotificationHelper({
-      title: `${updatedExam.subject.name} exam updated`,
-      message: `${updatedExam.subject.name} exam on ${examDate} by ${updatedExam.teacherId.fullName}`,
-      notificationType: "exam",
-        targets: [
-    { type: 'class',   classId: className },
-    { type: 'teacher', teacherId: updatedExam.teacherId._id },
-  ],
+    await notifyExamScheduled({
+      subjectName: updatedExam.subject?.name || "Subject",
+      teacherName: updatedExam.teacherId?.fullName || "Teacher",
+      examDate: examDate || updatedExam.examDate,
+      startTime: updatedExam.startTime,
+      endTime: updatedExam.endTime,
+      classId: className || updatedExam.className?._id || updatedExam.className,
+      sectionId: updatedExam.sectionId || sectionId,
+      teacherId: updatedExam.teacherId?._id || updatedExam.teacherId,
       schoolId,
       createdBy: req.user._id,
+      updated: true,
     });
-    
+
     res.status(200).json(updatedExam);
   } catch (err) {
     console.error("Update Exam Error:", err);
@@ -271,20 +340,31 @@ export const deleteExam = async (req, res) => {
 
 export const getTeacherExams = async (req, res) => {
   try {
-    const teacherId = req.user?.teacher_id; // logged-in teacher
+    const teacherId = req.user?.teacher_id;
     const schoolId = req.user?.school_id;
+    const role = req.user?.role;
 
-    if (!teacherId) {
-      return res.status(400).json({ message: "Teacher not found" });
+    if (!schoolId) {
+      return res.status(400).json({ message: "School not identified" });
     }
 
-    const exams = await Exam.find({
-      schoolId,
-      teacherId, // ✅ filter by teacher
-    })
+    // Teachers see only their exams; school admin / staff see all school exams
+    const filter = { schoolId };
+    if (role === "teacher_admin") {
+      if (!teacherId) {
+        return res.status(400).json({ message: "Teacher not found" });
+      }
+      filter.teacherId = teacherId;
+    } else if (!["school_admin", "staff_admin"].includes(role)) {
+      return res.status(403).json({ message: "Not authorized" });
+    }
+
+    const exams = await Exam.find(filter)
       .populate("className", "name")
       .populate("subject", "name")
-      .populate("termId", "name academicYear")
+      .populate("termId", "name academicYear termType")
+      .populate("teacherId", "fullName")
+      .populate("sectionId", "name")
       .sort({ examDate: 1, startTime: 1 });
 
     res.status(200).json(exams);
@@ -344,16 +424,14 @@ const isExamPast = (examDate) => {
 export const getExamStudents = async (req, res) => {
   try {
     const { examId } = req.params;
-    const teacherId = req.user?.teacher_id;
     const schoolId = req.user?.school_id;
- 
-    // Verify teacher is assigned to this exam
-    const exam = await Exam.findOne({ _id: examId, schoolId, teacherId })
-      .populate("className", "name")
-      .populate("subject", "name")
-      .populate("termId", "name academicYear")
-      .populate("sectionId", "name");
- 
+
+    if (!canEnterMarks(req)) {
+      return res.status(403).json({ message: "Not authorized for marks entry" });
+    }
+
+    const exam = await findExamForMarks(examId, schoolId, req);
+
     if (!exam) {
       return res.status(403).json({ message: "Not authorized for this exam" });
     }
@@ -408,69 +486,73 @@ export const submitMarks = async (req, res) => {
     const teacherId = req.user?.teacher_id;
     const schoolId = req.user?.school_id;
     const { results } = req.body;
- 
+
+    if (!canEnterMarks(req)) {
+      return res.status(403).json({ message: "Not authorized for marks entry" });
+    }
+
     if (!Array.isArray(results) || results.length === 0) {
       return res.status(400).json({ message: "No results data provided" });
     }
- 
-    // Verify ownership
-    const exam = await Exam.findOne({ _id: examId, schoolId, teacherId }).populate("className", "name").populate("subject", "name");
+
+    const exam = await findExamForMarks(examId, schoolId, req);
     if (!exam) {
       return res.status(403).json({ message: "Not authorized for this exam" });
     }
- 
+
     // Must be on or after exam date
     if (!isExamPast(exam.examDate)) {
       return res
         .status(400)
         .json({ message: "Cannot enter marks before the exam date" });
     }
- 
-    // Must be within edit window
-    if (!isEditAllowed(exam.examDate)) {
+
+    // Teachers have 2-day edit window; school/staff can override
+    const isAdminEntry =
+      req.user?.role === "school_admin" || req.user?.role === "staff_admin";
+    if (!isAdminEntry && !isEditAllowed(exam.examDate)) {
       return res
         .status(400)
         .json({ message: "Edit window has closed. Results are locked." });
     }
- 
+
     const now = new Date();
- 
+    const enteredBy = teacherId || exam.teacherId?._id || exam.teacherId;
+
     const bulkOps = await Promise.all(
       results.map(async (r) => {
         const isPresent = r.attendanceStatus === "Present";
         let percentage = null;
         let grade = null;
         let isPassed = null;
- 
+
         if (
           isPresent &&
           r.marksObtained !== null &&
           r.marksObtained !== undefined
         ) {
           percentage = parseFloat(
-            ((r.marksObtained / exam.totalMarks) * 100).toFixed(2)
+            ((r.marksObtained / exam.totalMarks) * 100).toFixed(2),
           );
           grade = calculateGrade(percentage);
           isPassed = r.marksObtained >= exam.passingMarks;
         }
- 
-        // Get previous result for edit history
+
         const prev = await Result.findOne({
           examId,
           studentId: r.studentId,
           schoolId,
         });
- 
-        const historyEntry =
-          prev
-            ? {
-                editedBy: teacherId,
-                editedAt: now,
-                previousMarks: prev.marksObtained,
-                previousStatus: prev.attendanceStatus,
-              }
-            : null;
- 
+
+        const historyEntry = prev
+          ? {
+              editedBy: enteredBy,
+              editedAt: now,
+              previousMarks: prev.marksObtained,
+              previousStatus: prev.attendanceStatus,
+            }
+          : null;
+
         return {
           updateOne: {
             filter: { examId, studentId: r.studentId, schoolId },
@@ -479,11 +561,11 @@ export const submitMarks = async (req, res) => {
                 schoolId,
                 examId,
                 studentId: r.studentId,
-                classId: exam.className,
-                sectionId: exam.sectionId || null,
-                termId: exam.termId,
-                subjectId: exam.subject,
-                teacherId: exam.teacherId,
+                classId: exam.className?._id || exam.className,
+                sectionId: exam.sectionId?._id || exam.sectionId || null,
+                termId: exam.termId?._id || exam.termId,
+                subjectId: exam.subject?._id || exam.subject,
+                teacherId: exam.teacherId?._id || exam.teacherId,
                 attendanceStatus: r.attendanceStatus || "Present",
                 marksObtained: isPresent ? (r.marksObtained ?? null) : null,
                 totalMarks: exam.totalMarks,
@@ -493,7 +575,7 @@ export const submitMarks = async (req, res) => {
                 isPassed,
                 remarks: r.remarks || "",
                 isLocked: false,
-                enteredBy: teacherId,
+                enteredBy,
                 enteredAt: prev ? prev.enteredAt : now,
                 lastEditedAt: now,
               },
@@ -504,26 +586,31 @@ export const submitMarks = async (req, res) => {
             upsert: true,
           },
         };
-      })
+      }),
     );
 
-    await createNotificationHelper({
-  title: "Results Published 📊",
-  message: `${exam.subject.name} results are now available. Check your performance.`,
-  notificationType: "result",
-  createdBy: req.user._id,
-  schoolId,
-  targets: [
-    {
-      type: "class",
-      classId: exam.className,
-      sectionId: exam.sectionId || null
-    }
-  ]
-});
- 
     await Result.bulkWrite(bulkOps);
- 
+
+    const classId = exam.className?._id || exam.className;
+    const sectionId = exam.sectionId?._id || exam.sectionId || null;
+    const subjectName = exam.subject?.name || "Subject";
+
+    await createNotificationHelper({
+      title: "Exam results published",
+      message: `${subjectName} results are now available. Parents and students can view marks and report card.`,
+      notificationType: "result",
+      createdBy: req.user._id,
+      schoolId,
+      targets: [
+        {
+          type: "class",
+          classId,
+          sectionId,
+          classes: [{ classId, sectionId }],
+        },
+      ],
+    });
+
     res.status(200).json({
       message: "Marks saved successfully",
       saved: results.length,
@@ -648,5 +735,281 @@ export const getClassResults = async (req, res) => {
   } catch (err) {
     console.error("getClassResults Error:", err);
     res.status(500).json({ message: "Failed to fetch class results" });
+  }
+};
+
+/**
+ * GET /exam/report-card/:studentId?termId=xxx
+ *
+ * Term-wise cumulative report card:
+ * - Selecting Term 1 → marks for Term 1 only
+ * - Selecting Term 2 → marks for Term 1 + Term 2
+ * - Selecting Term N → marks for Term 1 … Term N (same academic year)
+ * Attendance is always "till date" (from academic year / earliest term start → today).
+ * Parents can generate after any exam once marks exist.
+ */
+export const getReportCard = async (req, res) => {
+  try {
+    const { studentId } = req.params;
+    const schoolId = req.user?.school_id;
+    const role = req.user?.role;
+    const { termId, academicYear } = req.query;
+
+    if (!schoolId) {
+      return res.status(400).json({ message: "School not identified" });
+    }
+
+    if (
+      role === "student_admin" &&
+      String(req.user.student_id) !== String(studentId)
+    ) {
+      return res.status(403).json({ message: "Not authorized" });
+    }
+
+    if (!termId) {
+      return res.status(400).json({
+        message: "termId is required. Select a term to generate the report card.",
+      });
+    }
+
+    const student = await Student.findOne({ _id: studentId, schoolId })
+      .select("firstName lastName studentId rollNo gender dob classId sectionId")
+      .populate("classId", "name")
+      .populate("sectionId", "name")
+      .lean();
+
+    if (!student) {
+      return res.status(404).json({ message: "Student not found" });
+    }
+
+    const selectedTerm = await Term.findOne({ _id: termId, schoolId }).lean();
+    if (!selectedTerm) {
+      return res.status(404).json({ message: "Term not found" });
+    }
+
+    const yearLabel = selectedTerm.academicYear || academicYear || null;
+
+    // All terms in same academic year, ordered
+    const yearTerms = await Term.find({
+      schoolId,
+      academicYear: selectedTerm.academicYear,
+    })
+      .sort({ order: 1, createdAt: 1 })
+      .lean();
+
+    const selectedOrder =
+      selectedTerm.order ??
+      yearTerms.findIndex((t) => String(t._id) === String(selectedTerm._id));
+
+    // Cumulative: this term + all earlier terms in the year
+    const includedTerms = yearTerms.filter((t, idx) => {
+      const ord = t.order ?? idx;
+      return ord <= selectedOrder;
+    });
+
+    // Fallback if order missing / mismatch — include selected + anything created before it
+    const terms =
+      includedTerms.length > 0
+        ? includedTerms
+        : yearTerms.filter(
+            (t) =>
+              String(t._id) === String(selectedTerm._id) ||
+              new Date(t.createdAt) <= new Date(selectedTerm.createdAt),
+          );
+
+    const termIds = terms.map((t) => t._id);
+
+    const results = await Result.find({
+      schoolId,
+      studentId,
+      termId: { $in: termIds },
+    })
+      .populate("subjectId", "name")
+      .populate("termId", "name termType academicYear order")
+      .populate("examId", "examDate totalMarks passingMarks")
+      .sort({ createdAt: 1 })
+      .lean();
+
+    // Per-exam rows (full detail) + subject totals across included terms
+    const examRows = results.map((r) => ({
+      resultId: r._id,
+      termId: r.termId?._id || r.termId,
+      termName: r.termId?.name || "—",
+      subjectId: r.subjectId?._id || r.subjectId,
+      subjectName: r.subjectId?.name || "—",
+      examDate: r.examId?.examDate || null,
+      marksObtained:
+        r.attendanceStatus === "Present" ? r.marksObtained : null,
+      totalMarks: r.totalMarks,
+      percentage: r.percentage,
+      grade: r.grade,
+      isPassed: r.isPassed,
+      attendanceStatus: r.attendanceStatus,
+    }));
+
+    const subjectMap = {};
+    for (const r of results) {
+      const key = String(r.subjectId?._id || r.subjectId);
+      if (!subjectMap[key]) {
+        subjectMap[key] = {
+          subjectId: key,
+          subjectName: r.subjectId?.name || "—",
+          marksObtained: 0,
+          totalMarks: 0,
+          exams: 0,
+          isPassed: true,
+          attendanceStatus: r.attendanceStatus,
+          byTerm: {},
+        };
+      }
+      const row = subjectMap[key];
+      const tKey = String(r.termId?._id || r.termId);
+      const tName = r.termId?.name || "Term";
+      if (!row.byTerm[tKey]) {
+        row.byTerm[tKey] = {
+          termId: tKey,
+          termName: tName,
+          marksObtained: 0,
+          totalMarks: 0,
+        };
+      }
+      if (r.attendanceStatus === "Present" && r.marksObtained != null) {
+        row.marksObtained += r.marksObtained;
+        row.totalMarks += r.totalMarks || 0;
+        row.exams += 1;
+        row.byTerm[tKey].marksObtained += r.marksObtained;
+        row.byTerm[tKey].totalMarks += r.totalMarks || 0;
+        if (r.isPassed === false) row.isPassed = false;
+      } else if (r.attendanceStatus !== "Present") {
+        row.attendanceStatus = r.attendanceStatus;
+      }
+    }
+
+    const subjects = Object.values(subjectMap).map((s) => {
+      const percentage =
+        s.totalMarks > 0
+          ? parseFloat(((s.marksObtained / s.totalMarks) * 100).toFixed(2))
+          : null;
+      return {
+        ...s,
+        byTerm: Object.values(s.byTerm),
+        percentage,
+        grade: percentage != null ? calculateGrade(percentage) : "—",
+      };
+    });
+
+    const scored = subjects.filter((s) => s.totalMarks > 0);
+    const totalObtained = scored.reduce((a, s) => a + s.marksObtained, 0);
+    const totalMax = scored.reduce((a, s) => a + s.totalMarks, 0);
+    const overallPercentage =
+      totalMax > 0
+        ? parseFloat(((totalObtained / totalMax) * 100).toFixed(2))
+        : null;
+
+    // Attendance till date (year start → today)
+    let startDate = terms
+      .map((t) => t.startDate)
+      .filter(Boolean)
+      .sort((a, b) => new Date(a) - new Date(b))[0];
+
+    if (!startDate && yearLabel) {
+      const y = parseInt(String(yearLabel).slice(0, 4), 10);
+      if (!Number.isNaN(y)) startDate = new Date(y, 3, 1); // 1 Apr
+    }
+
+    const endDate = new Date(); // till date
+    endDate.setHours(23, 59, 59, 999);
+
+    const attFilter = { studentId, schoolId, date: { $lte: endDate } };
+    if (startDate) attFilter.date.$gte = new Date(startDate);
+
+    const attRecords = await ClassAttendance.find(attFilter).lean();
+    const present = attRecords.filter((r) => r.status === "Present").length;
+    const late = attRecords.filter((r) => r.status === "Late").length;
+    const absent = attRecords.filter((r) => r.status === "Absent").length;
+    const totalDays = attRecords.length;
+    const attendancePercentage = totalDays
+      ? Math.round(((present + late) / totalDays) * 100)
+      : 0;
+
+    const school = await School.findById(schoolId)
+      .select("school_name school_logo address")
+      .lean();
+
+    // Group exam rows by term for UI sections
+    const termSections = terms.map((t) => ({
+      termId: t._id,
+      termName: t.name,
+      order: t.order,
+      exams: examRows.filter(
+        (e) => String(e.termId) === String(t._id),
+      ),
+    }));
+
+    return res.status(200).json({
+      success: true,
+      cumulative: true,
+      selectedTerm: {
+        _id: selectedTerm._id,
+        name: selectedTerm.name,
+        termType: selectedTerm.termType,
+        academicYear: selectedTerm.academicYear,
+        order: selectedTerm.order,
+      },
+      academicYear: yearLabel,
+      terms: terms.map((t) => ({
+        _id: t._id,
+        name: t.name,
+        termType: t.termType,
+        academicYear: t.academicYear,
+        order: t.order,
+        startDate: t.startDate,
+        endDate: t.endDate,
+      })),
+      school: {
+        name: school?.school_name || "",
+        logo: school?.school_logo || "",
+        address: school?.address || "",
+      },
+      student: {
+        _id: student._id,
+        name: `${student.firstName} ${student.lastName || ""}`.trim(),
+        studentId: student.studentId,
+        rollNo: student.rollNo,
+        gender: student.gender,
+        dob: student.dob,
+        className: student.classId?.name || "—",
+        sectionName: student.sectionId?.name || "—",
+      },
+      termSections,
+      examRows,
+      subjects,
+      summary: {
+        totalObtained,
+        totalMax,
+        overallPercentage,
+        overallGrade:
+          overallPercentage != null ? calculateGrade(overallPercentage) : "—",
+        subjectsCount: subjects.length,
+        examsCount: examRows.length,
+        passedCount: subjects.filter(
+          (s) => s.isPassed !== false && s.totalMarks > 0,
+        ).length,
+      },
+      attendance: {
+        present,
+        late,
+        absent,
+        totalDays,
+        percentage: attendancePercentage,
+        from: startDate || null,
+        to: endDate,
+        tillDate: true,
+      },
+      generatedAt: new Date(),
+    });
+  } catch (err) {
+    console.error("getReportCard Error:", err);
+    res.status(500).json({ message: "Failed to generate report card" });
   }
 };

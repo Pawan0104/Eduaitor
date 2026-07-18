@@ -6,6 +6,17 @@ const fileSchema = new mongoose.Schema({
   type: String,
 });
 
+const extraDocumentSchema = new mongoose.Schema(
+  {
+    fieldName: String,
+    label: String,
+    url: String,
+    public_id: String,
+    type: String,
+  },
+  { _id: false },
+);
+
 const studentSchema = new mongoose.Schema(
   {
     firstName: { type: String, required: true },
@@ -34,6 +45,10 @@ const studentSchema = new mongoose.Schema(
 
     address: String,
 
+    previousSchoolName: String,
+    previousSchoolClass: String,
+    previousSchoolResult: String,
+
     classId: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "Class",
@@ -48,6 +63,18 @@ const studentSchema = new mongoose.Schema(
     transport: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "TransportRoute",
+      default: null,
+    },
+
+    houseId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "House",
+      default: null,
+    },
+
+    /** Set when student is admitted — ID card becomes available for download */
+    idCardIssuedAt: {
+      type: Date,
       default: null,
     },
     selectedOptionalFees: {
@@ -84,6 +111,10 @@ const studentSchema = new mongoose.Schema(
       fatherAadhar: fileSchema,
       motherAadhar: fileSchema,
     },
+    extraDocuments: {
+      type: [extraDocumentSchema],
+      default: [],
+    },
     schoolId: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "School", // or whatever your school model is named
@@ -108,6 +139,7 @@ const studentSchema = new mongoose.Schema(
 
 // Unique index set for schools
 studentSchema.index({ schoolId: 1, studentId: 1 }, { unique: true });
+studentSchema.index({ schoolId: 1, houseId: 1 });
 studentSchema.index(
   { schoolId: 1, "studentCredentials.username": 1 },
   { unique: true, sparse: true },

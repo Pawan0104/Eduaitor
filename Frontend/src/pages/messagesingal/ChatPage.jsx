@@ -152,8 +152,12 @@ const DateSeparator = ({ date }) => (
 // HELPER — get my ID + subType from auth context
 // subType needed for correct isMe check with student/parent
 // ─────────────────────────────────────────────────────────────
+const SUPER_ADMIN_PARTICIPANT_ID = "000000000000000000000001";
+
 const getMyInfo = (user) => {
   if (!user) return { id: null, subType: "default" };
+  if (user.role === "super_admin")
+    return { id: SUPER_ADMIN_PARTICIPANT_ID, subType: "default" };
   if (user.role === "teacher_admin")
     return { id: user.teacher_id, subType: "default" };
   if (user.role === "student_admin")
@@ -190,26 +194,39 @@ export default function ChatPage() {
 
   // ── Role based path ────────────────────────────────────────
   let path = "";
-  if (user?.role === "school_admin") path = "/school";
+  if (user?.role === "super_admin") path = "/admin";
+  else if (user?.role === "school_admin") path = "/school";
   else if (user?.role === "teacher_admin") path = "/teacher";
   else if (user?.role === "student_admin")
     path = user.loginAs === "student" ? "/student" : "/parent";
   else if (user?.role === "staff_admin") path = "/staff";
 
-  const fetchMessages = useCallback(async () => {
+  const fetchMessages = useCallback(async ({ silent = false } = {}) => {
     try {
-      setLoading(true);
-      setError("");
+      if (!silent) {
+        setLoading(true);
+        setError("");
+      }
       const res = await axios.get(
         `${API}/message-signal/thread/${threadId}`,
         { withCredentials: true }
       );
-      setMessages(res.data.messages || []);
+      const next = res.data.messages || [];
+      setMessages((prev) => {
+        // Avoid re-render flash when nothing changed
+        if (
+          prev.length === next.length &&
+          prev[prev.length - 1]?._id === next[next.length - 1]?._id
+        ) {
+          return prev;
+        }
+        return next;
+      });
     } catch (err) {
       console.error("❌ fetchMessages error:", err.message);
-      setError("Failed to load messages.");
+      if (!silent) setError("Failed to load messages.");
     } finally {
-      setLoading(false);
+      if (!silent) setLoading(false);
     }
   }, [threadId]);
 
@@ -238,10 +255,31 @@ export default function ChatPage() {
   }, [threadId]);
 
   useEffect(() => {
-    fetchMessages();
+    fetchMessages({ silent: false });
     fetchOtherUser();
     markAsRead();
   }, [fetchMessages, fetchOtherUser, markAsRead]);
+
+  // Live refresh — poll while chat is open (no socket server yet)
+  useEffect(() => {
+    if (!threadId) return undefined;
+
+    const tick = () => {
+      if (document.hidden) return;
+      fetchMessages({ silent: true });
+    };
+
+    const id = setInterval(tick, 2500);
+    const onFocus = () => fetchMessages({ silent: true });
+    window.addEventListener("focus", onFocus);
+    document.addEventListener("visibilitychange", onFocus);
+
+    return () => {
+      clearInterval(id);
+      window.removeEventListener("focus", onFocus);
+      document.removeEventListener("visibilitychange", onFocus);
+    };
+  }, [threadId, fetchMessages]);
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });

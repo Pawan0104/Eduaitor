@@ -10,6 +10,12 @@ function FeeCollection() {
   const [inputValue, setInputValue] = useState("");
   const [filteredStudents, setFilteredStudents] = useState([]);
   const [selectedClass, setSelectedClass] = useState("");
+  const [razorpayKeyId, setRazorpayKeyId] = useState("");
+  const [razorpayKeySecret, setRazorpayKeySecret] = useState("");
+  const [hasRazorpaySecret, setHasRazorpaySecret] = useState(false);
+  const [savingRazorpay, setSavingRazorpay] = useState(false);
+  const [testingRazorpay, setTestingRazorpay] = useState(false);
+  const [razorpayStatus, setRazorpayStatus] = useState(""); // idle | ready | error
 
   const API = import.meta.env.VITE_API_URL;
   const navigate = useNavigate();
@@ -38,9 +44,98 @@ function FeeCollection() {
       toast.error("Failed to load students");
     }
   };
+
+  const fetchRazorpaySettings = async () => {
+    try {
+      const { data } = await axios.get(`${API}/schools/me/razorpay`, {
+        withCredentials: true,
+      });
+      if (data?.success) {
+        const keyId = data.data.razorpayKeyId || "";
+        setRazorpayKeyId(keyId);
+        setHasRazorpaySecret(Boolean(data.data.hasSecret));
+        if (
+          keyId &&
+          data.data.hasSecret &&
+          !keyId.includes("local") &&
+          !keyId.includes("eduaitor")
+        ) {
+          setRazorpayStatus("saved");
+        } else if (keyId.includes("local") || keyId.includes("eduaitor")) {
+          setRazorpayStatus("error");
+        } else {
+          setRazorpayStatus("");
+        }
+      }
+    } catch {
+      // optional settings panel; ignore if unavailable
+    }
+  };
+
+  const saveRazorpaySettings = async () => {
+    const keyId = razorpayKeyId.trim();
+    if (!keyId) {
+      toast.error("Enter Razorpay Key ID");
+      return;
+    }
+    if (!hasRazorpaySecret && !razorpayKeySecret.trim()) {
+      toast.error("Enter Razorpay Key Secret");
+      return;
+    }
+
+    try {
+      setSavingRazorpay(true);
+      const payload = { razorpayKeyId: keyId };
+      if (razorpayKeySecret.trim()) {
+        payload.razorpayKeySecret = razorpayKeySecret.trim();
+      }
+      const { data } = await axios.put(`${API}/schools/me/razorpay`, payload, {
+        withCredentials: true,
+      });
+      if (data?.success) {
+        toast.success("Razorpay keys saved");
+        setHasRazorpaySecret(Boolean(data.data.hasSecret));
+        setRazorpayKeySecret("");
+        setRazorpayStatus("saved");
+      } else {
+        toast.error(data?.message || "Failed to save Razorpay settings");
+        setRazorpayStatus("error");
+      }
+    } catch (err) {
+      toast.error(err?.response?.data?.message || "Failed to save Razorpay settings");
+      setRazorpayStatus("error");
+    } finally {
+      setSavingRazorpay(false);
+    }
+  };
+
+  const testRazorpaySettings = async () => {
+    try {
+      setTestingRazorpay(true);
+      const { data } = await axios.post(
+        `${API}/schools/me/razorpay/test`,
+        {},
+        { withCredentials: true },
+      );
+      if (data?.success) {
+        toast.success(data.message || "Razorpay keys verified");
+        setRazorpayStatus("ready");
+      } else {
+        toast.error(data?.message || "Razorpay test failed");
+        setRazorpayStatus("error");
+      }
+    } catch (err) {
+      toast.error(err?.response?.data?.message || "Razorpay test failed");
+      setRazorpayStatus("error");
+    } finally {
+      setTestingRazorpay(false);
+    }
+  };
+
   useEffect(() => {
     fetchClasses();
     fetchStudents();
+    fetchRazorpaySettings();
   }, []);
 
   const handleClassChange = (e) => {
@@ -202,6 +297,100 @@ function FeeCollection() {
         </div>
       )}
       <h1 className="text-2xl font-bold mb-4">Fee Collection</h1>
+
+      <div className="mb-6 rounded-xl border border-indigo-200 bg-[rgb(var(--surface))] p-5 max-w-2xl shadow-sm">
+        <div className="flex items-start justify-between gap-3 mb-3">
+          <div>
+            <h2 className="text-base font-semibold">Razorpay key setup</h2>
+            <p className="text-xs text-[rgb(var(--text))] mt-1">
+              Optional for now. Without keys, parents use a development checkout
+              (OK button → payment success). Add real keys later for live Razorpay.
+            </p>
+          </div>
+          {razorpayStatus === "ready" && (
+            <span className="text-xs font-semibold px-2.5 py-1 rounded-full bg-emerald-50 text-emerald-700">
+              Verified
+            </span>
+          )}
+          {razorpayStatus === "saved" && (
+            <span className="text-xs font-semibold px-2.5 py-1 rounded-full bg-amber-50 text-amber-700">
+              Saved — test next
+            </span>
+          )}
+          {razorpayStatus === "error" && (
+            <span className="text-xs font-semibold px-2.5 py-1 rounded-full bg-red-50 text-red-600">
+              Needs real keys
+            </span>
+          )}
+        </div>
+
+        <ol className="text-xs text-[rgb(var(--text))] space-y-1.5 mb-4 list-decimal list-inside">
+          <li>
+            Open{" "}
+            <a
+              href="https://dashboard.razorpay.com/app/keys"
+              target="_blank"
+              rel="noreferrer"
+              className="text-indigo-600 font-medium underline"
+            >
+              Razorpay Dashboard → API Keys
+            </a>
+          </li>
+          <li>Switch to <strong>Test Mode</strong> (toggle in left sidebar)</li>
+          <li>Copy <strong>Key ID</strong> and generate/copy <strong>Key Secret</strong></li>
+          <li>Paste below → Save → Test connection</li>
+        </ol>
+
+        <div className="grid gap-3 sm:grid-cols-2">
+          <div>
+            <label className="block text-xs font-medium mb-1">Key ID</label>
+            <input
+              type="text"
+              value={razorpayKeyId}
+              onChange={(e) => {
+                setRazorpayKeyId(e.target.value);
+                setRazorpayStatus("");
+              }}
+              placeholder="rzp_test_xxxxxxxxxxxx"
+              className="w-full border rounded-lg px-3 py-2 text-sm bg-[rgb(var(--surface))]"
+            />
+          </div>
+          <div>
+            <label className="block text-xs font-medium mb-1">
+              Key Secret {hasRazorpaySecret ? "(leave blank to keep)" : ""}
+            </label>
+            <input
+              type="password"
+              value={razorpayKeySecret}
+              onChange={(e) => {
+                setRazorpayKeySecret(e.target.value);
+                setRazorpayStatus("");
+              }}
+              placeholder={hasRazorpaySecret ? "••••••••" : "Enter secret"}
+              className="w-full border rounded-lg px-3 py-2 text-sm bg-[rgb(var(--surface))]"
+            />
+          </div>
+        </div>
+        <div className="mt-3 flex flex-wrap gap-2">
+          <button
+            type="button"
+            onClick={saveRazorpaySettings}
+            disabled={savingRazorpay}
+            className="px-4 py-2 rounded-lg bg-indigo-600 text-white text-sm font-medium disabled:opacity-60"
+          >
+            {savingRazorpay ? "Saving…" : "1. Save keys"}
+          </button>
+          <button
+            type="button"
+            onClick={testRazorpaySettings}
+            disabled={testingRazorpay || !hasRazorpaySecret}
+            className="px-4 py-2 rounded-lg border border-indigo-200 text-indigo-700 text-sm font-medium disabled:opacity-60"
+          >
+            {testingRazorpay ? "Testing…" : "2. Test connection"}
+          </button>
+        </div>
+      </div>
+
       <div className="fc-container">
         <div className="fc-search">
           <input

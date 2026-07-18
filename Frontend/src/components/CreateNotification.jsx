@@ -392,6 +392,7 @@ const NOTIF_TYPES = [
   { value: "result",     label: "🏆 Result"     },
   { value: "attendance", label: "📋 Attendance" },
   { value: "fee",        label: "💰 Fee"        },
+  { value: "transport",  label: "🚌 Transport"  },
 ];
 
 const inputCls = [

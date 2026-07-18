@@ -5,7 +5,9 @@ import Student from "../models/student.js";
 import Staff from "../models/staff.js";
 import School from "../models/school.js";
 import Class from "../models/class.js";
-import Section from "../models/section.js"
+import Section from "../models/section.js";
+import { ensureSuperAdminParticipant } from "../models/superAdmin.js";
+import { SUPER_ADMIN_PARTICIPANT_ID } from "../constants/superAdminParticipant.js";
 import { uploadToCloudinary } from "../utils/uploadToCloudinary.js";
 
 // ─────────────────────────────────────────────────────────────
@@ -142,8 +144,34 @@ export const getCallerInfo = (req) => {
     };
   }
 
-  // super_admin not supported in messaging
+  if (role === "super_admin") {
+    return {
+      participantId: SUPER_ADMIN_PARTICIPANT_ID,
+      participantModel: "SuperAdmin",
+      subType: "default",
+      schoolId: null,
+      isSuperAdmin: true,
+    };
+  }
+
   return null;
+};
+
+/** Build thread access query — Super Admin is not school-scoped */
+const threadParticipantQuery = (threadId, caller) => {
+  const query = {
+    _id: threadId,
+    participants: {
+      $elemMatch: {
+        participantId: caller.participantId,
+        subType: caller.subType,
+      },
+    },
+  };
+  if (caller.schoolId) {
+    query.schoolId = caller.schoolId;
+  }
+  return query;
 };
 
 // ─────────────────────────────────────────────────────────────
@@ -154,6 +182,21 @@ export const formatParticipant = (participant) => {
   const doc = participant.participantId; // populated document
   const model = participant.participantModel;
   const subType = participant.subType || "default";
+
+  if (model === "SuperAdmin") {
+    const id =
+      doc?._id ||
+      participant.participantId ||
+      SUPER_ADMIN_PARTICIPANT_ID;
+    return {
+      _id: id,
+      name: doc?.name || "Platform Support",
+      photo: null,
+      role: "Super Admin",
+      model: "SuperAdmin",
+      subType: "default",
+    };
+  }
 
   if (!doc) return null;
 
@@ -569,6 +612,123 @@ export const startOrGetThread = async (req, res) => {
 };
 
 // ─────────────────────────────────────────────────────────────
+// @route   POST /api/message-signal/help/start
+// @desc    Start or return help thread with platform Super Admin
+// @access  Private (school / teacher / student / parent)
+// ─────────────────────────────────────────────────────────────
+export const startHelpThread = async (req, res) => {
+  try {
+    const caller = getCallerInfo(req);
+
+    if (!caller || caller.isSuperAdmin) {
+      return res.status(403).json({
+        success: false,
+        message: "Help chat is available for school, teacher, student and parent accounts.",
+      });
+    }
+
+    const allowedModels = ["School", "Teacher", "Student"];
+    if (!allowedModels.includes(caller.participantModel)) {
+      return res.status(403).json({
+        success: false,
+        message: "Help chat is not available for your role.",
+      });
+    }
+
+    if (!caller.schoolId) {
+      return res.status(403).json({
+        success: false,
+        message: "School not identified.",
+      });
+    }
+
+    await ensureSuperAdminParticipant();
+
+    const schoolObjectId = caller.schoolId;
+    const callerObjectId = caller.participantId;
+
+    // One help thread per user (school + participant + subType).
+    // Match only the requester side — more reliable than $all with SuperAdmin.
+    let existingThread = await MessageThread.findOne({
+      isHelpThread: true,
+      schoolId: schoolObjectId,
+      participants: {
+        $elemMatch: {
+          participantId: callerObjectId,
+          participantModel: caller.participantModel,
+          subType: caller.subType,
+        },
+      },
+    }).sort({ lastMessageAt: -1, createdAt: -1 });
+
+    if (existingThread) {
+      return res.status(200).json({
+        success: true,
+        message: "Help thread already exists.",
+        threadId: existingThread._id,
+        isHelpThread: true,
+      });
+    }
+
+    try {
+      const newThread = await MessageThread.create({
+        schoolId: schoolObjectId,
+        isHelpThread: true,
+        participants: [
+          {
+            participantId: callerObjectId,
+            participantModel: caller.participantModel,
+            subType: caller.subType,
+            schoolId: schoolObjectId,
+          },
+          {
+            participantId: SUPER_ADMIN_PARTICIPANT_ID,
+            participantModel: "SuperAdmin",
+            subType: "default",
+            schoolId: schoolObjectId,
+          },
+        ],
+        lastMessage: "",
+        lastMessageAt: null,
+      });
+
+      return res.status(201).json({
+        success: true,
+        message: "Help thread created.",
+        threadId: newThread._id,
+        isHelpThread: true,
+      });
+    } catch (createErr) {
+      // Race: parallel Help clicks — return the thread that won
+      existingThread = await MessageThread.findOne({
+        isHelpThread: true,
+        schoolId: schoolObjectId,
+        participants: {
+          $elemMatch: {
+            participantId: callerObjectId,
+            participantModel: caller.participantModel,
+            subType: caller.subType,
+          },
+        },
+      }).sort({ createdAt: -1 });
+
+      if (existingThread) {
+        return res.status(200).json({
+          success: true,
+          message: "Help thread already exists.",
+          threadId: existingThread._id,
+          isHelpThread: true,
+        });
+      }
+      throw createErr;
+    }
+  } catch (error) {
+    console.error("❌ startHelpThread error:", error.message);
+    return res.status(500).json({ success: false, message: "Server error." });
+  }
+};
+
+// ─────────────────────────────────────────────────────────────
 // @route   GET /api/message-signal/threads
 // @desc    Get all threads (inbox) for logged-in user
 //          Uses subType to separate student vs parent inbox
@@ -585,28 +745,40 @@ export const getMyThreads = async (req, res) => {
       });
     }
 
-    // ── Fetch threads for this exact participant + subType ───
-    // $elemMatch ensures BOTH participantId AND subType match
-    // This is critical — without subType check, student and parent
-    // would see each other's threads
-    const threads = await MessageThread.find({
-      schoolId: caller.schoolId,
-      participants: {
-        $elemMatch: {
-          participantId: caller.participantId,
-          subType: caller.subType,
-        },
-      },
-    })
+    await ensureSuperAdminParticipant();
+
+    // Super Admin: all help threads across schools
+    // Others: school-scoped inbox for their participant + subType
+    const findQuery = caller.isSuperAdmin
+      ? {
+          isHelpThread: true,
+          participants: {
+            $elemMatch: {
+              participantId: SUPER_ADMIN_PARTICIPANT_ID,
+              participantModel: "SuperAdmin",
+            },
+          },
+        }
+      : {
+          schoolId: caller.schoolId,
+          participants: {
+            $elemMatch: {
+              participantId: caller.participantId,
+              subType: caller.subType,
+            },
+          },
+        };
+
+    const threads = await MessageThread.find(findQuery)
       .sort({ lastMessageAt: -1 })
       .populate({
         path: "participants.participantId",
         select:
           "fullName photo school_name school_logo firstName lastName " +
-          "documents staffRole staffRoleCustom designation " +
+          "documents staffRole staffRoleCustom designation name email " +
           "fatherName motherName classId sectionId",
-        // Note: classId and sectionId will be populated separately below
-      });
+      })
+      .populate({ path: "schoolId", select: "school_name school_logo" });
 
     // ── For each thread format the OTHER participant ─────────
     const formattedThreads = await Promise.all(
@@ -614,9 +786,10 @@ export const getMyThreads = async (req, res) => {
         // Find the other participant — match by participantId AND subType
         // so we correctly identify student vs parent side
         const otherParticipant = thread.participants.find((p) => {
-          const idMatch =
-            p.participantId?._id?.toString() !==
-            caller.participantId.toString();
+          const pid =
+            p.participantId?._id?.toString() ||
+            p.participantId?.toString();
+          const idMatch = pid !== caller.participantId.toString();
           // Edge case — same _id but different subType (student vs parent)
           const subTypeMatch = p.subType !== caller.subType;
           return idMatch || subTypeMatch;
@@ -626,26 +799,41 @@ export const getMyThreads = async (req, res) => {
         // so formatParticipant can show class + section name
         if (
           otherParticipant?.participantModel === "Student" &&
-          otherParticipant?.participantId
+          otherParticipant?.participantId &&
+          typeof otherParticipant.participantId === "object"
         ) {
           const studentDoc = otherParticipant.participantId;
-          if (studentDoc.classId) {
+          if (studentDoc.classId && !studentDoc.classId?.name) {
             const classDoc = await Class.findById(studentDoc.classId).select(
               "name"
             );
             studentDoc.classId = classDoc;
           }
-          if (studentDoc.sectionId) {
-  const sectionDoc = await Section.findById(
-    studentDoc.sectionId
-  ).select("name");
-  studentDoc.sectionId = sectionDoc;
-}
+          if (studentDoc.sectionId && !studentDoc.sectionId?.name) {
+            const sectionDoc = await Section.findById(
+              studentDoc.sectionId
+            ).select("name");
+            studentDoc.sectionId = sectionDoc;
+          }
         }
 
         const otherUser = otherParticipant
           ? formatParticipant(otherParticipant)
           : null;
+
+        if (otherUser && thread.isHelpThread) {
+          const schoolName =
+            thread.schoolId?.school_name ||
+            (typeof thread.schoolId === "object"
+              ? thread.schoolId?.school_name
+              : null);
+          if (schoolName) otherUser.schoolName = schoolName;
+          if (caller.isSuperAdmin && otherUser.model !== "School") {
+            otherUser.roleLabel = `${otherUser.role}${
+              schoolName ? ` · ${schoolName}` : ""
+            }`;
+          }
+        }
 
         // ── Unread count ─────────────────────────────────────
         // Count messages not sent by me and not seen
@@ -669,6 +857,11 @@ export const getMyThreads = async (req, res) => {
           lastMessage: thread.lastMessage || "",
           lastMessageAt: thread.lastMessageAt,
           unreadCount,
+          isHelpThread: !!thread.isHelpThread,
+          schoolName:
+            thread.schoolId?.school_name ||
+            otherUser?.schoolName ||
+            null,
         };
       })
     );
@@ -676,6 +869,8 @@ export const getMyThreads = async (req, res) => {
     return res.status(200).json({
       success: true,
       threads: formattedThreads,
+      myParticipantId: caller.participantId,
+      isHelpInbox: !!caller.isSuperAdmin,
     });
   } catch (error) {
     console.error("❌ getMyThreads error:", error.message);
@@ -930,16 +1125,9 @@ export const getThreadMessages = async (req, res) => {
     // Verify thread exists and caller is a participant
     // Use $elemMatch to check both participantId AND subType
     // Critical — prevents student from accessing parent's thread
-    const thread = await MessageThread.findOne({
-      _id: threadId,
-      schoolId: caller.schoolId,
-      participants: {
-        $elemMatch: {
-          participantId: caller.participantId,
-          subType: caller.subType,
-        },
-      },
-    });
+    const thread = await MessageThread.findOne(
+      threadParticipantQuery(threadId, caller),
+    );
 
     if (!thread) {
       return res.status(404).json({
@@ -955,6 +1143,8 @@ export const getThreadMessages = async (req, res) => {
     return res.status(200).json({
       success: true,
       messages,
+      myParticipantId: caller.participantId,
+      isHelpThread: !!thread.isHelpThread,
     });
   } catch (error) {
     console.error("❌ getThreadMessages error:", error.message);
@@ -1001,16 +1191,9 @@ export const sendMessage = async (req, res) => {
 
     // Verify thread exists and caller is a participant
     // $elemMatch checks both participantId AND subType
-    const thread = await MessageThread.findOne({
-      _id: threadId,
-      schoolId: caller.schoolId,
-      participants: {
-        $elemMatch: {
-          participantId: caller.participantId,
-          subType: caller.subType,
-        },
-      },
-    });
+    const thread = await MessageThread.findOne(
+      threadParticipantQuery(threadId, caller),
+    );
 
     if (!thread) {
       return res.status(404).json({
@@ -1100,16 +1283,9 @@ export const markThreadAsRead = async (req, res) => {
     }
 
     // Verify thread exists and caller is a participant
-    const thread = await MessageThread.findOne({
-      _id: threadId,
-      schoolId: caller.schoolId,
-      participants: {
-        $elemMatch: {
-          participantId: caller.participantId,
-          subType: caller.subType,
-        },
-      },
-    });
+    const thread = await MessageThread.findOne(
+      threadParticipantQuery(threadId, caller),
+    );
 
     if (!thread) {
       return res.status(404).json({

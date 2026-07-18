@@ -32,6 +32,17 @@ const topicSchema = new mongoose.Schema(
       type: String,
       default: "",
     },
+    /** Module page range within the chapter PDF (1-based) */
+    pageFrom: {
+      type: Number,
+      default: null,
+      min: 1,
+    },
+    pageTo: {
+      type: Number,
+      default: null,
+      min: 1,
+    },
     order: {
       type: Number,
       default: 0,

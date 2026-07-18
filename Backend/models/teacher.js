@@ -51,6 +51,11 @@ const teacherSchema = new mongoose.Schema(
       },
     ],
 
+    isAdminGroup: {
+      type: Boolean,
+      default: false,
+    },
+
     role: {
       type: String,
       default: "teacher_admin",

@@ -8,6 +8,7 @@ import {
   FaBell,
   FaBusAlt,
   FaBookDead,
+  FaClipboardList,
   FaCalendar,
   FaBookOpen,
   FaChevronDown,
@@ -15,6 +16,10 @@ import {
   FaClipboardCheck,
   FaBook,
   FaBlog,
+  FaHotel,
+  FaHome,
+  FaStore,
+  FaHeadset,
 } from "react-icons/fa";
 import { FaBookJournalWhills } from "react-icons/fa6";
 import { FiUsers } from "react-icons/fi";
@@ -22,9 +27,12 @@ import { GiOpenBook, GiTeacher } from "react-icons/gi";
 import { HiAcademicCap } from "react-icons/hi2";
 import { toast } from "react-toastify";
 import { useAuth } from "../context/AuthContext";
+import { useLanguage } from "../context/LanguageContext";
 import axios from "axios";
 import BlogFeed from "../components/BlogFeed";
 import UpComingNotifications from "../components/UpComingNotifications";
+import { ModuleGrid, useMenuExitGuard } from "../components/RoleMenuShell";
+import { clearSessionKeepPrefs } from "../utils/clearSessionKeepPrefs";
 
 /* ─── Color map ─────────────────────────────────────────────── */
 export const COLOR_MAP = {
@@ -38,6 +46,7 @@ export const COLOR_MAP = {
 
   // Student / Principal
   Students: { bg: "#EFF6FF", icon: "#3B82F6", dot: "#BFDBFE" },
+  "Lead Management": { bg: "#FFF7ED", icon: "#EA580C", dot: "#FED7AA" },
   Teachers: { bg: "#F0FDF4", icon: "#22C55E", dot: "#BBF7D0" },
   Classes: { bg: "#FAF5FF", icon: "#A855F7", dot: "#E9D5FF" },
   "My Classes": { bg: "#FAF5FF", icon: "#A855F7", dot: "#E9D5FF" },
@@ -58,6 +67,8 @@ export const COLOR_MAP = {
 
   Diary: { bg: "#FDF4FF", icon: "#C026D3", dot: "#F5D0FE" },
 
+  Homework: { bg: "#FFFBEB", icon: "#D97706", dot: "#FDE68A" },
+
   Events: { bg: "#FFF1F2", icon: "#E11D48", dot: "#FECDD3" },
 
   Notices: { bg: "#FFF7ED", icon: "#EA580C", dot: "#FED7AA" },
@@ -66,8 +77,12 @@ export const COLOR_MAP = {
 
   Library: { bg: "#F0FDFA", icon: "#0D9488", dot: "#99F6E4" },
 
+  "Hostel Management": { bg: "#EEF2FF", icon: "#4F46E5", dot: "#C7D2FE" },
+  "School Commerce Suite": { bg: "#ECFDF5", icon: "#059669", dot: "#A7F3D0" },
+
   Blog: { bg: "#F0FDFA", icon: "#0D9488", dot: "#99F6E4" },
   Blogs: { bg: "#F0FDFA", icon: "#0D9488", dot: "#99F6E4" },
+  "Help / Support": { bg: "#FFFBEB", icon: "#D97706", dot: "#FDE68A" },
 
   Group: { bg: "#F0FDF4", icon: "#22C55E", dot: "#BBF7D0" },
 
@@ -233,6 +248,7 @@ function AccordionPanel({ isOpen, children }) {
    tile rather than just an accent dot. */
 function MenuCard({ item, color, globalIdx, isOpen, onToggle, isDark }) {
   const navigate = useNavigate();
+  const { tn } = useLanguage();
   const hasChildren = Boolean(item.children);
 
   const cardBg = isDark ? "rgb(var(--surface))" : color.bg;
@@ -272,7 +288,7 @@ function MenuCard({ item, color, globalIdx, isOpen, onToggle, isDark }) {
         className="relative m-0 text-[12.5px] font-extrabold text-center leading-snug"
         style={{ color: "rgb(var(--text))" }}
       >
-        {item.name}
+        {tn(item.name)}
       </p>
 
       {/* Badge */}
@@ -301,6 +317,7 @@ function MenuCard({ item, color, globalIdx, isOpen, onToggle, isDark }) {
 /* ─── Children list ─────────────────────────────────────────── */
 function ChildList({ children, color, isDark }) {
   const navigate = useNavigate();
+  const { tn } = useLanguage();
   const listBg = isDark ? "rgb(var(--surface))" : color.bg;
 
   return (
@@ -328,7 +345,7 @@ function ChildList({ children, color, isDark }) {
               className="flex-1 text-[13.5px] font-bold"
               style={{ color: "rgb(var(--text))" }}
             >
-              {child.name}
+              {tn(child.name)}
             </span>
             <div
               className="w-7 h-7 rounded-lg flex items-center justify-center text-sm font-bold"
@@ -350,6 +367,7 @@ export default function SchoolMenu() {
   const [showExit, setShowExit] = useState(false);
   const [isDark, setIsDark] = useState(false);
   const { user, setUser } = useAuth();
+  const { t } = useLanguage();
   const API = import.meta.env.VITE_API_URL;
 
   // ── Read + apply saved theme on mount ───────────────────────
@@ -359,9 +377,9 @@ export default function SchoolMenu() {
     setIsDark(saved === "theme-dark");
 
     const onStorage = () => {
-      const t = localStorage.getItem("theme") || "theme-light";
-      document.documentElement.className = t;
-      setIsDark(t === "theme-dark");
+      const themeName = localStorage.getItem("theme") || "theme-light";
+      document.documentElement.className = themeName;
+      setIsDark(themeName === "theme-dark");
     };
     window.addEventListener("storage", onStorage);
     return () => window.removeEventListener("storage", onStorage);
@@ -370,13 +388,12 @@ export default function SchoolMenu() {
   const logout = async () => {
     try {
       await axios.post(`${API}/auth/logout`, {}, { withCredentials: true });
-      toast.info("You have been logged out successfully.");
+      toast.info(t("topbar.logoutSuccess"));
     } catch (err) {
-      toast.error("Logout failed. Please try again.");
+      toast.error(t("topbar.logoutFailed"));
     }
     setUser(null);
-    localStorage.clear();
-    sessionStorage.clear();
+    clearSessionKeepPrefs();
     navigate("/admin/login", { replace: true });
   };
 
@@ -399,6 +416,11 @@ export default function SchoolMenu() {
         { name: "Add Student", path: "/school/student-manage" },
         { name: "Bulk Upload", path: "/school/students/bulk-upload" },
       ],
+    },
+    {
+      name: "Lead Management",
+      icon: <FaClipboardList />,
+      path: "/school/leads",
     },
     {
       name: "Teachers",
@@ -425,7 +447,12 @@ export default function SchoolMenu() {
     {
       name: "Exam Management",
       icon: <GiOpenBook />,
-      children: [{ name: "Exam Structure", path: "/school/exam-structure" }],
+      children: [
+        { name: "Exam Structure", path: "/school/exam-structure" },
+        { name: "Marks Entry", path: "/school/exam-marks-entry" },
+        { name: "Exam Marks", path: "/school/exam-marks" },
+        { name: "Report Card", path: "/school/report-card" },
+      ],
     },
     {
       name: "Syllabus",
@@ -444,6 +471,7 @@ export default function SchoolMenu() {
         { name: "Fee Structure", path: "/school/fee-structure" },
         { name: "Fee Collection", path: "/school/fee-collection" },
         { name: "Fee History", path: "/school/fee-history" },
+        { name: "Financial Report", path: "/school/financial-report" },
         { name: "Defaulters", path: "/school/defaulters" },
       ],
     },
@@ -451,6 +479,11 @@ export default function SchoolMenu() {
       name: "Diary",
       icon: <FaBookOpen />,
       path: "/school/diary",
+    },
+    {
+      name: "Homework",
+      icon: <FaClipboardList />,
+      path: "/school/homework",
     },
     {
       name: "Events",
@@ -475,6 +508,7 @@ export default function SchoolMenu() {
         { name: "Route Manage", path: "/school/transport-route" },
         { name: "Bus Manage", path: "/school/transport-bus" },
         { name: "Driver Manage", path: "/school/transport-driver" },
+        { name: "GPS Tracking", path: "/school/transport-gps" },
       ],
     },
     {
@@ -483,102 +517,53 @@ export default function SchoolMenu() {
       path: "/school/library",
     },
     {
+      name: "Hostel Management",
+      icon: <FaHotel />,
+      path: "/school/hostel",
+    },
+    {
+      name: "House Allocation",
+      icon: <FaHome />,
+      path: "/school/house",
+    },
+    {
+      name: "School Commerce Suite",
+      icon: <FaStore />,
+      path: "/school/commerce",
+    },
+    {
       name: "Blog",
       icon: <FaBlog />,
       path: "/school/blogs",
     },
+    {
+      name: "Help / Support",
+      icon: <FaHeadset />,
+      path: "/school/help",
+    },
   ];
 
-  const rows = [];
-  for (let i = 0; i < menu.length; i += 2) rows.push(menu.slice(i, i + 2));
-
-  // ── Mobile back-button → exit popup ─────────────────────────
-  useEffect(() => {
-    const isMobile =
-      /Mobi|Android|iPhone|iPad/i.test(navigator.userAgent) ||
-      window.innerWidth <= 768;
-    if (!isMobile) return;
-
-    let isActive = true;
-    const push = () => {
-      if (window.history.state !== "menu-lock")
-        window.history.pushState("menu-lock", "");
-    };
-    push();
-
-    const onPopState = () => {
-      if (!isActive) return;
-      push();
-      setShowExit(true);
-    };
-    const onFocus = () => push();
-
-    window.addEventListener("popstate", onPopState);
-    window.addEventListener("focus", onFocus);
-    return () => {
-      isActive = false;
-      window.removeEventListener("popstate", onPopState);
-      window.removeEventListener("focus", onFocus);
-    };
-  }, []);
+  useMenuExitGuard(setShowExit);
 
   return (
     <div
       className="min-h-screen font-nunito"
       style={{ background: "rgb(var(--bg))" }}
     >
-      <div className="p-4 flex flex-col gap-3">
-        {/* Greeting */}
+      <div className="flex flex-col gap-3">
         <GreetingHeader
           name={greetingName}
           role={greetingRole}
           loginAs={greetingLoginAs}
         />
         <UpComingNotifications />
-
-        {rows.map((row, rowIdx) => {
-          const openInRow = row.find(
-            (item) => item.name === openItem && item.children,
-          );
-
-          return (
-            <div key={rowIdx} className="flex flex-col">
-              <div className="grid grid-cols-2 gap-3">
-                {row.map((item, colIdx) => {
-                  const color = COLOR_MAP[item.name] ?? DEFAULT_COLOR;
-                  const isOpen = openItem === item.name;
-                  const globalIdx = rowIdx * 2 + colIdx;
-
-                  return (
-                    <MenuCard
-                      key={item.name}
-                      item={item}
-                      color={color}
-                      globalIdx={globalIdx}
-                      isOpen={isOpen}
-                      isDark={isDark}
-                      onToggle={() => setOpenItem(isOpen ? null : item.name)}
-                    />
-                  );
-                })}
-              </div>
-              {row.some((item) => item.children) &&
-                (() => {
-                  const childItem = openInRow ?? row.find((i) => i.children);
-                  const color = COLOR_MAP[childItem.name] ?? DEFAULT_COLOR;
-                  return (
-                    <AccordionPanel isOpen={Boolean(openInRow)}>
-                      <ChildList
-                        children={childItem.children}
-                        color={color}
-                        isDark={isDark}
-                      />
-                    </AccordionPanel>
-                  );
-                })()}
-            </div>
-          );
-        })}
+        <ModuleGrid
+          menu={menu}
+          colorMap={COLOR_MAP}
+          openItem={openItem}
+          setOpenItem={setOpenItem}
+          isDark={isDark}
+        />
       </div>
 
       <BlogFeed />

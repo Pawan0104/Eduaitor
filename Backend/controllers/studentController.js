@@ -3,12 +3,15 @@ import Student from "../models/student.js";
 import Group from "../models/group.js";
 import Teacher from "../models/teacher.js";
 import Class from "../models/class.js";
+import School from "../models/school.js";
+import House from "../models/house.js";
 import { uploadToCloudinary } from "../utils/uploadToCloudinary.js";
 import { deleteFromCloudinary } from "../utils/deleteFromCloudinary.js";
 import {
   syncStudentGroups,
   removeStudentFromOldGroups,
 } from "../utils/groupSync.js";
+import { ensureDefaultHouses } from "../utils/ensureDefaultHouses.js";
 import bcrypt from "bcryptjs";
 
 const normalizeStudentFeeFields = (safeBody) => {
@@ -63,7 +66,16 @@ export const createStudent = async (req, res) => {
       });
     }
 
-    const files = req.files || {};
+    const rawFiles = req.files || [];
+    const files = Array.isArray(rawFiles)
+      ? rawFiles.reduce((acc, file) => {
+          const field = file.fieldname;
+          acc[field] = acc[field] || [];
+          acc[field].push(file);
+          return acc;
+        }, {})
+      : rawFiles;
+
     const documents = {};
 
     const uploadFile = async (field, folder) => {
@@ -82,6 +94,19 @@ export const createStudent = async (req, res) => {
       }
     };
 
+    const parseExtraDocumentsMeta = () => {
+      if (!safeBody.extraDocumentsMeta) return [];
+
+      try {
+        return JSON.parse(safeBody.extraDocumentsMeta).map((doc) => ({
+          fieldName: doc.fieldName,
+          label: doc.label || "",
+        }));
+      } catch {
+        return [];
+      }
+    };
+
     // Upload images
     await uploadFile("studentPhoto", "students");
     await uploadFile("fatherPhoto", "students");
@@ -95,6 +120,28 @@ export const createStudent = async (req, res) => {
     await uploadFile("studentAadhar", "documents");
     await uploadFile("fatherAadhar", "documents");
     await uploadFile("motherAadhar", "documents");
+
+    const extraDocumentsMeta = parseExtraDocumentsMeta();
+    delete safeBody.extraDocumentsMeta;
+    const extraDocuments = [];
+
+    for (const docMeta of extraDocumentsMeta) {
+      const field = docMeta.fieldName;
+      if (!files[field] || !files[field][0]) continue;
+
+      try {
+        const uploaded = await uploadToCloudinary(files[field][0], "documents");
+        extraDocuments.push({
+          fieldName: field,
+          label: docMeta.label || "",
+          url: uploaded.url,
+          public_id: uploaded.public_id,
+          type: uploaded.type,
+        });
+      } catch (err) {
+        console.error(`Upload failed for extra document ${field}`, err);
+      }
+    }
 
     const studentUsernameExists = await Student.findOne({
       schoolId,
@@ -135,6 +182,28 @@ export const createStudent = async (req, res) => {
     delete safeBody.temp_password;
     delete safeBody.firstTimeLogin;
 
+    // Auto-assign a random active house when school uses House Allocation
+    let houseId = safeBody.houseId || null;
+    if (!houseId) {
+      try {
+        const school = await School.findById(schoolId)
+          .select("subscribed_modules")
+          .lean();
+        if (school?.subscribed_modules?.includes("house")) {
+          await ensureDefaultHouses(schoolId);
+          const houses = await House.find({
+            schoolId,
+            status: "Active",
+          }).select("_id");
+          if (houses.length > 0) {
+            houseId = houses[Math.floor(Math.random() * houses.length)]._id;
+          }
+        }
+      } catch {
+        /* non-blocking */
+      }
+    }
+
     const student = await Student.create({
       ...safeBody,
       schoolId,
@@ -142,8 +211,11 @@ export const createStudent = async (req, res) => {
       totalDue,
       totalPaid: 0,
       documents,
+      extraDocuments,
       studentCredentials,
       parentCredentials,
+      houseId,
+      idCardIssuedAt: new Date(),
     });
 
     // AUTO ADD TO GROUPS
@@ -151,8 +223,9 @@ export const createStudent = async (req, res) => {
 
     res.status(201).json({
       success: true,
-      message: "Student created successfully",
+      message: "Student created successfully. ID card is ready to download.",
       data: student,
+      idCardReady: true,
     });
   } catch (error) {
     console.error("Create student error:", error);
@@ -181,6 +254,7 @@ export const getStudents = async (req, res) => {
       .populate("classId", "name className")
       .populate("sectionId", "name sectionName")
       .populate("transport", "name routeId")
+      .populate("houseId", "name code color")
       .sort({ createdAt: -1 });
 
     res.json({
@@ -269,8 +343,18 @@ export const updateStudent = async (req, res) => {
 
     const oldStudent = student.toObject(); // Reference for group sync
 
-    const files = req.files || {};
+    const rawFiles = req.files || [];
+    const files = Array.isArray(rawFiles)
+      ? rawFiles.reduce((acc, file) => {
+          const field = file.fieldname;
+          acc[field] = acc[field] || [];
+          acc[field].push(file);
+          return acc;
+        }, {})
+      : rawFiles;
+
     const documents = student.documents || {};
+    const extraDocuments = student.extraDocuments || [];
 
     const updateFile = async (field, folder) => {
       if (files[field] && files[field][0]) {
@@ -289,6 +373,19 @@ export const updateStudent = async (req, res) => {
       }
     };
 
+    const parseExtraDocumentsMeta = () => {
+      if (!safeBody.extraDocumentsMeta) return [];
+
+      try {
+        return JSON.parse(safeBody.extraDocumentsMeta).map((doc) => ({
+          fieldName: doc.fieldName,
+          label: doc.label || "",
+        }));
+      } catch {
+        return [];
+      }
+    };
+
     // Update images
     await updateFile("studentPhoto", "students");
     await updateFile("fatherPhoto", "students");
@@ -302,6 +399,28 @@ export const updateStudent = async (req, res) => {
     await updateFile("studentAadhar", "documents");
     await updateFile("fatherAadhar", "documents");
     await updateFile("motherAadhar", "documents");
+
+    const extraDocumentsMeta = parseExtraDocumentsMeta();
+    delete safeBody.extraDocumentsMeta;
+    const newExtraDocuments = [];
+
+    for (const docMeta of extraDocumentsMeta) {
+      const field = docMeta.fieldName;
+      if (!files[field] || !files[field][0]) continue;
+
+      try {
+        const uploaded = await uploadToCloudinary(files[field][0], "documents");
+        newExtraDocuments.push({
+          fieldName: field,
+          label: docMeta.label || "",
+          url: uploaded.url,
+          public_id: uploaded.public_id,
+          type: uploaded.type,
+        });
+      } catch (err) {
+        console.error(`Upload failed for extra document ${field}`, err);
+      }
+    }
 
     // ── STRIP OLD TOP-LEVEL CREDENTIAL FIELDS ──
     delete safeBody.username;
@@ -346,6 +465,7 @@ export const updateStudent = async (req, res) => {
             }
           : {}),
         documents,
+        extraDocuments: [...extraDocuments, ...newExtraDocuments],
         ...credentialUpdate,
       },
       { new: true },
@@ -468,6 +588,7 @@ export const getAllStudents = async (req, res) => {
       .populate("classId", "name className")
       .populate("sectionId", "name sectionName")
       .populate("transport", "name routeId")
+      .populate("houseId", "name code color")
       .sort({ createdAt: -1 });
 
     res.json({

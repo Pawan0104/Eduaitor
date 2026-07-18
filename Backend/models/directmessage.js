@@ -16,7 +16,7 @@ const messageSchema = new mongoose.Schema(
     senderModel: {
       type: String,
       required: true,
-      enum: ["Teacher", "Student", "Staff", "School"],
+      enum: ["Teacher", "Student", "Staff", "School", "SuperAdmin"],
     },
     senderSubType: {
   type: String,

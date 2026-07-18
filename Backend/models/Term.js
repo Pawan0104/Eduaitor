@@ -12,8 +12,14 @@ const termSchema = new mongoose.Schema(
       required: true,
     },
     name: {
-      type: String, // "Half Yearly", "Final"
+      type: String, // "Half Yearly", "Yearly"
       required: true,
+    },
+    /** Report-card type: half_yearly | yearly | other */
+    termType: {
+      type: String,
+      enum: ["half_yearly", "yearly", "other"],
+      default: "other",
     },
     order: Number,
     startDate: Date,

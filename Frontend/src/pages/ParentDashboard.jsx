@@ -20,10 +20,13 @@ import {
   FaBus,
   FaClipboardList,
   FaBookOpen,
+  FaMapMarkerAlt,
 } from "react-icons/fa";
 import { useNavigate } from "react-router-dom";
 import { toast } from "react-toastify";
 import UpComingNotifications from "../components/UpComingNotifications";
+import { useTx } from "../components/DashboardI18n";
+import { useLanguage } from "../context/LanguageContext";
 
 const API = import.meta.env.VITE_API_URL;
 
@@ -67,6 +70,7 @@ const iconTones = {
 
 const ParentDashboard = () => {
   const navigate = useNavigate();
+  const { t } = useLanguage();
   const isMobile = window.innerWidth <= 768;
 
   const [loading, setLoading] = useState(true);
@@ -269,17 +273,17 @@ const ParentDashboard = () => {
       tone: "emerald",
     },
     {
-      label: "Fee Details",
-      helper: "Payment history & dues",
+      label: "Pay Fee",
+      helper: "Pay dues online now",
       icon: <FiFileText />,
       to: "/parent/fees",
       tone: "amber",
     },
     {
-      label: "My Books",
-      helper: "Issued library books",
+      label: "Syllabus Books",
+      helper: "View books, chapters and content",
       icon: <FaBookOpen />,
-      to: "/parent/library",
+      to: "/parent/syllabus-books",
       tone: "violet",
     },
   ];
@@ -431,43 +435,46 @@ const ParentDashboard = () => {
             </div>
           </div>
 
-          <div className="rounded-3xl border border-slate-200 bg-[rgb(var(--surface))] p-5 shadow-sm">
+          <div
+            className="rounded-3xl border border-slate-200 bg-[rgb(var(--surface))] p-5 shadow-sm"
+            data-no-i18n=""
+          >
             <div className="mb-4 flex items-center gap-3">
               <div className="rounded-2xl bg-[rgb(var(--surface))] p-3 text-amber-600">
                 <FiAlertCircle />
               </div>
               <div>
                 <h2 className="text-lg font-black text-[rgb(var(--text))]">
-                  Attention Needed
+                  {t("dashboard.attentionNeeded")}
                 </h2>
                 <p className="text-sm text-[rgb(var(--text))]">
-                  Items requiring your action
+                  {t("dashboard.attentionSubtitle")}
                 </p>
               </div>
             </div>
             <div className="space-y-3">
               <AlertRow
-                label="Fee Due"
+                label={t("dashboard.feeDue")}
                 value={`₹${metrics.totalDue.toLocaleString()}`}
-                helper="Pending fee payment"
+                helper={t("dashboard.pendingFeePayment")}
                 tone={metrics.totalDue > 0 ? "red" : "emerald"}
               />
               <AlertRow
-                label="Overdue Assignments"
+                label={t("dashboard.overdueAssignments")}
                 value={metrics.overdueAssignments}
-                helper="Past submission deadline"
+                helper={t("dashboard.pastSubmissionDeadline")}
                 tone={metrics.overdueAssignments > 0 ? "red" : "emerald"}
               />
               <AlertRow
-                label="Overdue Books"
+                label={t("dashboard.overdueBooks")}
                 value={metrics.overdueBooks}
-                helper="Library books past due date"
+                helper={t("dashboard.libraryBooksPastDue")}
                 tone={metrics.overdueBooks > 0 ? "amber" : "emerald"}
               />
               <AlertRow
-                label="Active Notices"
+                label={t("dashboard.activeNotices")}
                 value={data.notices.filter((n) => n.isActive).length}
-                helper="School-wide announcements"
+                helper={t("dashboard.schoolWideAnnouncements")}
                 tone="blue"
               />
             </div>
@@ -481,7 +488,7 @@ const ParentDashboard = () => {
               <div>
                 <h2 className="text-lg font-black text-[rgb(var(--text))]">Transport</h2>
                 <p className="mt-1 text-sm text-[rgb(var(--text))]">
-                  Bus route and driver details for your child
+                  Bus route, driver details, and live GPS for your child
                 </p>
               </div>
               <button
@@ -494,29 +501,77 @@ const ParentDashboard = () => {
             {!data.transport?.assigned ? (
               <EmptyState message="No transport route assigned yet." />
             ) : (
-              <div className="grid gap-4 sm:grid-cols-3">
-                <TransportCard
-                  label="Route"
-                  value={data.transport?.data?.route?.name || "—"}
-                  sub={`Stops: ${data.transport?.data?.route?.stops ?? "—"}`}
-                  icon={<FiTruck />}
-                  tone="sky"
-                />
-                <TransportCard
-                  label="Bus"
-                  value={data.transport?.data?.bus?.busId || "—"}
-                  sub={`Reg: ${data.transport?.data?.bus?.regNo || "—"}`}
-                  icon={<FaBus />}
-                  tone="blue"
-                />
-                <TransportCard
-                  label="Driver"
-                  value={data.transport?.data?.driver?.name || "—"}
-                  sub={data.transport?.data?.driver?.phone || "—"}
-                  icon={<FaUserGraduate />}
-                  tone="emerald"
-                />
-              </div>
+              <>
+                <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+                  <TransportCard
+                    label="Route"
+                    value={data.transport?.data?.route?.name || "—"}
+                    sub={`Stops: ${data.transport?.data?.route?.stops ?? "—"}`}
+                    icon={<FiTruck />}
+                    tone="sky"
+                  />
+                  <TransportCard
+                    label="Bus"
+                    value={data.transport?.data?.bus?.busId || "—"}
+                    sub={`Reg: ${data.transport?.data?.bus?.regNo || "—"}`}
+                    icon={<FaBus />}
+                    tone="blue"
+                  />
+                  <TransportCard
+                    label="Driver"
+                    value={data.transport?.data?.driver?.name || "—"}
+                    sub={data.transport?.data?.driver?.phone || "—"}
+                    icon={<FaUserGraduate />}
+                    tone="emerald"
+                  />
+                  <TransportCard
+                    label="GPS Tracking"
+                    value={
+                      data.transport?.data?.bus?.gps?.enabled
+                        ? data.transport?.data?.bus?.gps?.hasLiveFix
+                          ? "Live"
+                          : "Enabled"
+                        : "Off"
+                    }
+                    sub={
+                      data.transport?.data?.bus?.gps?.hasLiveFix
+                        ? data.transport?.data?.bus?.gps?.lastUpdated
+                          ? `Updated ${new Date(
+                              data.transport.data.bus.gps.lastUpdated,
+                            ).toLocaleTimeString()}`
+                          : "Location available"
+                        : data.transport?.data?.bus?.gps?.enabled
+                          ? "Waiting for fix"
+                          : "Not enabled on bus"
+                    }
+                    icon={<FaMapMarkerAlt />}
+                    tone={
+                      data.transport?.data?.bus?.gps?.hasLiveFix
+                        ? "emerald"
+                        : "sky"
+                    }
+                  />
+                </div>
+                {data.transport?.data?.bus?.gps?.hasLiveFix && (
+                  <div className="mt-4 flex flex-wrap gap-2">
+                    <a
+                      href={`https://www.google.com/maps?q=${data.transport.data.bus.gps.latitude},${data.transport.data.bus.gps.longitude}`}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="inline-flex items-center gap-2 rounded-xl bg-sky-600 px-4 py-2 text-sm font-bold text-white"
+                    >
+                      Track bus on map
+                    </a>
+                    <button
+                      type="button"
+                      onClick={() => navigate("/parent/transport")}
+                      className="inline-flex items-center gap-2 rounded-xl border border-slate-200 px-4 py-2 text-sm font-bold text-[rgb(var(--text))]"
+                    >
+                      Open transport & GPS
+                    </button>
+                  </div>
+                )}
+              </>
             )}
           </section>
         )}
@@ -627,7 +682,7 @@ const ParentDashboard = () => {
             <SectionCard
               title="Fee Summary"
               subtitle="Payment status and dues breakdown"
-              action={{ label: "Pay / View Details", to: "/parent/fees" }}
+              action={{ label: "Pay Fee", to: "/parent/fees" }}
               onAction={() => navigate("/parent/fees")}
             >
               <div className="space-y-4">
@@ -662,7 +717,7 @@ const ParentDashboard = () => {
                       Paid: ₹{(data.fees?.totalPaid ?? 0).toLocaleString()}
                     </span>
                     <span>
-                      Due: ₹{(data.fees?.totalDue ?? 0).toLocaleString()}
+                      Due: ₹{(data.fees?.totalDue ?? data.fees?.balanceDue ?? 0).toLocaleString()}
                     </span>
                   </div>
                 </div>
@@ -674,10 +729,19 @@ const ParentDashboard = () => {
                   />
                   <MiniMetric
                     label="Due"
-                    value={`₹${(data.fees?.totalDue ?? 0).toLocaleString()}`}
+                    value={`₹${(data.fees?.totalDue ?? data.fees?.balanceDue ?? 0).toLocaleString()}`}
                     tone={metrics.totalDue > 0 ? "red" : "emerald"}
                   />
                 </div>
+                <button
+                  type="button"
+                  onClick={() => navigate("/parent/fees")}
+                  className="w-full rounded-xl bg-indigo-600 px-4 py-3 text-sm font-semibold text-white hover:bg-indigo-700"
+                >
+                  {(data.fees?.totalDue ?? data.fees?.balanceDue ?? 0) > 0
+                    ? "Pay Fee Now"
+                    : "Open Fee Details"}
+                </button>
               </div>
             </SectionCard>
           )}
@@ -881,27 +945,31 @@ const DashboardSettingsControl = ({ visibility, onToggle, onReset }) => {
   );
 };
 
-const SectionCard = ({ title, subtitle, children, action, onAction }) => (
+const SectionCard = ({ title, subtitle, children, action, onAction }) => {
+  const tx = useTx();
+  return (
   <section className="rounded-3xl border border-slate-200 bg-[rgb(var(--surface))] p-5 shadow-sm">
     <div className="mb-4 flex items-start justify-between gap-3">
       <div>
-        <h2 className="text-lg font-black text-[rgb(var(--text))]">{title}</h2>
-        <p className="mt-1 text-sm text-[rgb(var(--text))]">{subtitle}</p>
+        <h2 className="text-lg font-black text-[rgb(var(--text))]">{tx(title)}</h2>
+        <p className="mt-1 text-sm text-[rgb(var(--text))]">{tx(subtitle)}</p>
       </div>
       {action && (
         <button
           onClick={onAction}
           className="shrink-0 text-sm font-bold text-[rgb(var(--text))] transition hover:text-[rgb(var(--text))] cursor-pointer"
         >
-          {action.label}
+          {tx(action.label)}
         </button>
       )}
     </div>
     {children}
   </section>
-);
+  );
+};
 
 const StatCard = ({ title, value, note, icon, tone }) => {
+  const tx = useTx();
   const tones = {
     blue: "bg-blue-50 text-blue-600",
     emerald: "bg-emerald-50 text-emerald-600",
@@ -915,10 +983,10 @@ const StatCard = ({ title, value, note, icon, tone }) => {
       <div className="flex items-start justify-between gap-4">
         <div>
           <p className="text-xs font-black uppercase tracking-[0.2em] text-[rgb(var(--text))]">
-            {title}
+            {tx(title)}
           </p>
           <p className="mt-3 text-2xl font-black text-[rgb(var(--text))]">{value}</p>
-          <p className="mt-2 text-sm text-[rgb(var(--text))]">{note}</p>
+          <p className="mt-2 text-sm text-[rgb(var(--text))]">{tx(note)}</p>
         </div>
         <div className={`rounded-2xl p-3 text-xl ${tones[tone]}`}>{icon}</div>
       </div>
@@ -926,15 +994,18 @@ const StatCard = ({ title, value, note, icon, tone }) => {
   );
 };
 
-const HighlightCard = ({ label, value, subtext }) => (
+const HighlightCard = ({ label, value, subtext }) => {
+  const tx = useTx();
+  return (
   <div className="rounded-2xl bg-[rgb(var(--surface))]/10 p-4 backdrop-blur-sm border">
     <p className="text-xs font-bold uppercase tracking-[0.2em] text-[rgb(var(--text))]">
-      {label}
+      {tx(label)}
     </p>
     <p className="mt-2 text-2xl font-black text-[rgb(var(--text))]">{value}</p>
-    <p className="mt-2 text-sm text-[rgb(var(--text))]">{subtext}</p>
+    <p className="mt-2 text-sm text-[rgb(var(--text))]">{tx(subtext)}</p>
   </div>
-);
+  );
+};
 
 const AlertRow = ({ label, value, helper, tone }) => {
   const tones = {
@@ -958,20 +1029,23 @@ const AlertRow = ({ label, value, helper, tone }) => {
   );
 };
 
-const TransportCard = ({ label, value, sub, icon, tone }) => (
+const TransportCard = ({ label, value, sub, icon, tone }) => {
+  const tx = useTx();
+  return (
   <div
     className={`rounded-2xl border border-slate-100  p-4 flex items-center gap-4`}
   >
     <div className={`rounded-2xl p-3 text-xl ${iconTones[tone]}`}>{icon}</div>
     <div>
       <p className="text-xs font-black uppercase tracking-[0.18em] text-[rgb(var(--text))]">
-        {label}
+        {tx(label)}
       </p>
       <p className="mt-1 text-base font-black text-[rgb(var(--text))]">{value}</p>
       <p className="text-xs text-[rgb(var(--text))]">{sub}</p>
     </div>
   </div>
-);
+  );
+};
 
 const LibraryRow = ({ issue }) => {
   const statusColors = {
@@ -1104,10 +1178,13 @@ const TimelineRow = ({ title, meta, date }) => (
   </div>
 );
 
-const EmptyState = ({ message }) => (
+const EmptyState = ({ message }) => {
+  const tx = useTx();
+  return (
   <div className="rounded-2xl border border-dashed border-slate-300 bg-[rgb(var(--surface))] p-8 text-center text-sm font-medium text-[rgb(var(--text))]">
-    {message}
+    {tx(message)}
   </div>
-);
+  );
+};
 
 export default ParentDashboard;

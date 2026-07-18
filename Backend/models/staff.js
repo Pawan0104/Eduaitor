@@ -50,6 +50,7 @@ const staffSchema = new mongoose.Schema(
         "principal",
         "administrator",
         "librarian",
+        "teacher",
         "accountant",
         "receptionist",
         "counselor",
@@ -90,6 +91,11 @@ const staffSchema = new mongoose.Schema(
       default: [],
     },
 
+    isAdminGroup: {
+      type: Boolean,
+      default: false,
+    },
+
     // ── AUTH ──────────────────────────────────────
     username: {
       type: String,
@@ -120,6 +126,12 @@ const staffSchema = new mongoose.Schema(
       type: String,
       enum: ["Active", "Inactive"],
       default: "Active",
+    },
+
+    /** Set when staff is registered — ID card becomes available for download */
+    idCardIssuedAt: {
+      type: Date,
+      default: null,
     },
   },
   { timestamps: true },

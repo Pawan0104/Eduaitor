@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import axios from "axios";
-import { FaPlus, FaTrash, FaEdit, FaBus } from "react-icons/fa";
+import { FaPlus, FaTrash, FaEdit, FaBus, FaMapMarkerAlt } from "react-icons/fa";
 import { toast } from "react-toastify";
 import { FaArrowLeft } from "react-icons/fa";
 import { useNavigate } from "react-router-dom";
@@ -17,6 +17,10 @@ const EMPTY_FORM = {
   route: "",
   nextService: "",
   status: "Active",
+  gpsEnabled: false,
+  gpsDeviceId: "",
+  lastLatitude: "",
+  lastLongitude: "",
 };
 
 const BusManagement = () => {
@@ -101,6 +105,16 @@ const BusManagement = () => {
           ? new Date(bus.nextService).toISOString().slice(0, 10)
           : "",
       status: bus.status || "Active",
+      gpsEnabled: Boolean(bus.gpsEnabled),
+      gpsDeviceId: bus.gpsDeviceId || "",
+      lastLatitude:
+        bus.lastLatitude != null && bus.lastLatitude !== ""
+          ? String(bus.lastLatitude)
+          : "",
+      lastLongitude:
+        bus.lastLongitude != null && bus.lastLongitude !== ""
+          ? String(bus.lastLongitude)
+          : "",
     });
     setFormModal(true);
   };
@@ -126,6 +140,10 @@ const BusManagement = () => {
         route: form.route || null,
         nextService: form.nextService || null,
         status: form.status,
+        gpsEnabled: Boolean(form.gpsEnabled),
+        gpsDeviceId: form.gpsDeviceId?.trim() || "",
+        lastLatitude: form.lastLatitude !== "" ? form.lastLatitude : null,
+        lastLongitude: form.lastLongitude !== "" ? form.lastLongitude : null,
       };
       if (isEdit) {
         await axios.put(`${API}/transport/buses/${editId}`, payload, {
@@ -223,10 +241,10 @@ const BusManagement = () => {
       <div className="mb-6 flex flex-col md:flex-row md:justify-between md:items-center gap-3">
         <div>
           <h1 className="text-2xl sm:text-3xl font-bold ">
-            Bus Management (WORKING)
+            Bus Management
           </h1>
           <p className=" text-sm sm:text-base">
-            Manage school fleet & maintenance
+            Manage school fleet, maintenance & GPS tracking
           </p>
         </div>
         <button
@@ -282,6 +300,7 @@ const BusManagement = () => {
                 <th className="p-4 text-left">Capacity</th>
                 <th className="p-4 text-left">Next Service</th>
                 <th className="p-4 text-left">Status</th>
+                <th className="p-4 text-left">GPS</th>
                 <th className="p-4 text-center">Actions</th>
               </tr>
             </thead>
@@ -349,6 +368,35 @@ const BusManagement = () => {
                     </span>
                   </td>
 
+                  {/* GPS */}
+                  <td className="p-4">
+                    {bus.gpsEnabled ? (
+                      <div>
+                        <span className="px-2 py-1 text-xs font-medium rounded-full bg-emerald-100 text-emerald-700">
+                          Enabled
+                        </span>
+                        {bus.lastLatitude != null && bus.lastLongitude != null ? (
+                          <a
+                            href={`https://www.google.com/maps?q=${bus.lastLatitude},${bus.lastLongitude}`}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="mt-1 flex items-center gap-1 text-xs text-blue-600 hover:underline"
+                          >
+                            <FaMapMarkerAlt /> Track
+                          </a>
+                        ) : (
+                          <p className="text-xs text-[rgb(var(--text-light))] mt-1">
+                            No fix yet
+                          </p>
+                        )}
+                      </div>
+                    ) : (
+                      <span className="px-2 py-1 text-xs font-medium rounded-full bg-gray-100 text-gray-500">
+                        Off
+                      </span>
+                    )}
+                  </td>
+
                   {/* ACTIONS */}
                   <td className="p-4">
                     <div className="flex items-center justify-center gap-2 flex-wrap">
@@ -373,7 +421,7 @@ const BusManagement = () => {
 
               {filtered.length === 0 && (
                 <tr>
-                  <td colSpan="8" className="text-center py-10 text-[rgb(var(--text))] bg-[rgb(var(--surface))]">
+                  <td colSpan="9" className="text-center py-10 text-[rgb(var(--text))] bg-[rgb(var(--surface))]">
                     No buses found. Click "Add Bus" to register one.
                   </td>
                 </tr>
@@ -611,6 +659,77 @@ const BusFormModal = ({
               <option value="Inactive">Inactive</option>
             </select>
           </div>
+        </div>
+
+        {/* GPS TRACKING */}
+        <div className="mt-5 pt-4 border-t">
+          <div className="flex items-center justify-between mb-3">
+            <div>
+              <p className="text-sm font-semibold">Bus GPS Tracking</p>
+              <p className="text-xs text-[rgb(var(--text-light))]">
+                Enable device tracking for this vehicle
+              </p>
+            </div>
+            <label className="flex items-center gap-2 text-sm cursor-pointer">
+              <input
+                type="checkbox"
+                checked={Boolean(form.gpsEnabled)}
+                onChange={(e) =>
+                  setForm((p) => ({ ...p, gpsEnabled: e.target.checked }))
+                }
+                className="w-4 h-4"
+              />
+              Enabled
+            </label>
+          </div>
+          {form.gpsEnabled && (
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div className="sm:col-span-2">
+                <label className="block text-xs font-semibold text-[rgb(var(--text-light))] mb-1">
+                  GPS Device ID
+                </label>
+                <input
+                  type="text"
+                  placeholder="e.g. GPS-DEVICE-001"
+                  value={form.gpsDeviceId}
+                  onChange={(e) =>
+                    setForm((p) => ({ ...p, gpsDeviceId: e.target.value }))
+                  }
+                  className="w-full border rounded-lg px-3 py-2 text-sm"
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-semibold text-[rgb(var(--text-light))] mb-1">
+                  Last Latitude
+                </label>
+                <input
+                  type="number"
+                  step="any"
+                  placeholder="e.g. 26.9124"
+                  value={form.lastLatitude}
+                  onChange={(e) =>
+                    setForm((p) => ({ ...p, lastLatitude: e.target.value }))
+                  }
+                  className="w-full border rounded-lg px-3 py-2 text-sm"
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-semibold text-[rgb(var(--text-light))] mb-1">
+                  Last Longitude
+                </label>
+                <input
+                  type="number"
+                  step="any"
+                  placeholder="e.g. 75.7873"
+                  value={form.lastLongitude}
+                  onChange={(e) =>
+                    setForm((p) => ({ ...p, lastLongitude: e.target.value }))
+                  }
+                  className="w-full border rounded-lg px-3 py-2 text-sm"
+                />
+              </div>
+            </div>
+          )}
         </div>
 
         {/* Footer */}

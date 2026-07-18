@@ -72,6 +72,11 @@ const checkModuleAccess = (moduleKey) => {
           });
         }
 
+        // staff_admin should always be able to manage staff records
+        if (moduleKey === "staff") {
+          return next();
+        }
+
         if (!staffMember.permissions.includes(moduleKey)) {
           return res.status(403).json({
             success: false,

@@ -1,10 +1,14 @@
-import { FaBell, FaBars } from "react-icons/fa";
+import { FaBell, FaThLarge, FaChevronLeft } from "react-icons/fa";
 import { AiOutlineLogout } from "react-icons/ai";
 import { useEffect, useState } from "react";
 import { useAuth } from "../context/AuthContext";
-import { useNavigate } from "react-router-dom";
+import { useLanguage } from "../context/LanguageContext";
+import { useNavigate, useLocation } from "react-router-dom";
 import axios from "axios";
 import { toast } from "react-toastify";
+import LanguageSwitcher from "./LanguageSwitcher";
+import { MenuStylePicker } from "./RoleMenuShell";
+import { clearSessionKeepPrefs } from "../utils/clearSessionKeepPrefs";
 
 const TYPE_COLORS = {
   general: { bg: "bg-slate-100", text: "text-slate-600", dot: "bg-slate-400" },
@@ -43,7 +47,7 @@ const getInitials = (name) => {
     .slice(0, 2);
 };
 
-const Topbar = ({ toggleSidebar }) => {
+const Topbar = ({ menuPath = "/" }) => {
   const [time, setTime] = useState({});
   const [openDropdown, setOpenDropdown] = useState(false);
   const [notifications, setNotifications] = useState([]);
@@ -51,17 +55,25 @@ const Topbar = ({ toggleSidebar }) => {
   const [theme, setTheme] = useState("");
 
   const { user } = useAuth();
+  const { t, locale } = useLanguage();
   const navigate = useNavigate();
+  const location = useLocation();
   const API = import.meta.env.VITE_API_URL;
 
   const name = user?.name || user?.school_name || "User";
   const role = user?.role || "User";
   const userId = user?._id || null;
   const loginAs = user?.loginAs;
+  const onMenuHub = Boolean(menuPath && location.pathname === menuPath);
+  const canGoBack = !onMenuHub && window.history.length > 1;
 
   let basePath = "/parent";
   if (role === "school_admin") basePath = "/school";
   else if (role === "teacher_admin") basePath = "/teacher";
+  else if (role === "staff_admin") basePath = "/staff";
+  else if (role === "super_admin") basePath = "/admin";
+  else if (role === "student_admin")
+    basePath = loginAs === "parent" ? "/parent" : "/student";
 
   const fetchNotifications = async () => {
     try {
@@ -114,7 +126,7 @@ const Topbar = ({ toggleSidebar }) => {
         })),
       );
     } catch {
-      toast.error("Failed to mark all as read");
+      toast.error(t("topbar.markAllFailed"));
     }
   };
 
@@ -128,9 +140,9 @@ const Topbar = ({ toggleSidebar }) => {
       );
       setNotifications([]);
       setOpenNotif(false);
-      toast.success("Notifications cleared from topbar");
+      toast.success(t("topbar.clearSuccess"));
     } catch {
-      toast.error("Failed to clear notifications");
+      toast.error(t("topbar.clearFailed"));
     }
   };
 
@@ -141,12 +153,11 @@ const Topbar = ({ toggleSidebar }) => {
   const logout = async () => {
     try {
       await axios.post(`${API}/auth/logout`, {}, { withCredentials: true });
-      toast.info("Logged out successfully");
+      toast.info(t("topbar.logoutSuccess"));
     } catch {
-      toast.error("Logout failed");
+      toast.error(t("topbar.logoutFailed"));
     }
-    localStorage.clear();
-    sessionStorage.clear();
+    clearSessionKeepPrefs();
     navigate("/admin/login", { replace: true });
   };
 
@@ -162,11 +173,11 @@ const Topbar = ({ toggleSidebar }) => {
     const updateTime = () => {
       const now = new Date();
       setTime({
-        t: now.toLocaleTimeString("en-IN", {
+        t: now.toLocaleTimeString(locale, {
           hour: "2-digit",
           minute: "2-digit",
         }),
-        d: now.toLocaleDateString("en-IN", {
+        d: now.toLocaleDateString(locale, {
           weekday: "short",
           day: "2-digit",
           month: "short",
@@ -183,7 +194,7 @@ const Topbar = ({ toggleSidebar }) => {
       clearInterval(clock);
       clearInterval(poll);
     };
-  }, []);
+  }, [locale]);
 
   useEffect(() => {
     const close = () => {
@@ -195,33 +206,56 @@ const Topbar = ({ toggleSidebar }) => {
   }, [openDropdown, openNotif]);
 
   return (
-    <header className="h-16 bg-[rgb(var(--sidebar))] backdrop-blur border-b border-[rgb(var(--border-strong))] flex items-center justify-between px-5 sticky top-0 z-30 shadow-md">
+    <header className="h-14 lg:h-16 bg-[rgb(var(--sidebar))] backdrop-blur border-b border-[rgb(var(--border-strong))] flex items-center justify-between px-3 sm:px-5 sticky top-0 z-30 shadow-md">
       {/* LEFT */}
-      <div className="flex items-center gap-3">
-        <button
-          onClick={toggleSidebar}
-          className="lg:hidden text-[rgb(var(--text))]"
-        >
-          <FaBars size={18} />
-        </button>
-        <div className="flex items-center gap-2.5 pl-2">
+      <div className="flex items-center gap-2 sm:gap-3 min-w-0">
+        {/* Mobile: back (when nested) + Menu hub — desktop uses permanent sidebar */}
+        {canGoBack && (
+          <button
+            type="button"
+            onClick={() => navigate(-1)}
+            className="lg:hidden shrink-0 w-9 h-9 flex items-center justify-center rounded-xl
+              bg-[rgb(var(--surface))] border border-[rgb(var(--border))]
+              text-[rgb(var(--text))] active:scale-95 transition"
+            aria-label="Back"
+          >
+            <FaChevronLeft size={14} />
+          </button>
+        )}
+        {menuPath && (
+          <button
+            type="button"
+            onClick={() => navigate(menuPath)}
+            className={`lg:hidden shrink-0 w-9 h-9 flex items-center justify-center rounded-xl
+              border active:scale-95 transition
+              ${
+                onMenuHub
+                  ? "bg-[rgb(var(--primary))] text-white border-transparent"
+                  : "bg-[rgb(var(--surface))] border-[rgb(var(--border))] text-[rgb(var(--primary))]"
+              }`}
+            aria-label="All modules"
+          >
+            <FaThLarge size={14} />
+          </button>
+        )}
+        <div className="flex items-center gap-2 sm:gap-2.5 min-w-0 pl-0.5 sm:pl-2">
           {user?.school_logo ? (
             <img
               src={user.school_logo}
               alt="School Logo"
-              className="h-10 w-auto max-w-35 rounded-lg object-contain"
+              className="h-8 lg:h-10 w-auto max-w-28 lg:max-w-35 rounded-lg object-contain"
             />
           ) : (
             <>
-              <div className="w-10 h-10 rounded-xl bg-[rgb(var(--primary))] flex items-center justify-center text-lg shadow">
+              <div className="w-8 h-8 lg:w-10 lg:h-10 rounded-xl bg-[rgb(var(--primary))] flex items-center justify-center text-base lg:text-lg shadow shrink-0">
                 🎓
               </div>
-              <div className="hidden sm:block">
-                <h1 className="text-base font-bold text-[rgb(var(--text))]">
+              <div className="min-w-0">
+                <h1 className="text-sm lg:text-base font-bold text-[rgb(var(--text))] truncate">
                   EduAltor
                 </h1>
-                <p className="text-[11px] opacity-50 text-[rgb(var(--text))]">
-                  Track. Assess. Improve.
+                <p className="hidden lg:block text-[11px] opacity-50 text-[rgb(var(--text))]">
+                  {t("brand.tagline")}
                 </p>
               </div>
             </>
@@ -230,8 +264,11 @@ const Topbar = ({ toggleSidebar }) => {
       </div>
 
       {/* RIGHT */}
-      <div className="flex items-center gap-4">
-        <div className="hidden md:block text-right">
+      <div className="flex items-center gap-1.5 sm:gap-3 shrink-0">
+        <MenuStylePicker />
+        <LanguageSwitcher />
+
+        <div className="hidden lg:block text-right">
           <p className="text-sm font-semibold text-[rgb(var(--text))]">
             {time.t}
           </p>
@@ -245,12 +282,12 @@ const Topbar = ({ toggleSidebar }) => {
               e.stopPropagation();
               setOpenNotif((v) => !v);
             }}
-            className="relative w-10 h-10 flex items-center justify-center
+            className="relative w-9 h-9 lg:w-10 lg:h-10 flex items-center justify-center
             rounded-xl bg-[rgb(var(--surface))]
             hover:bg-[rgba(var(--primary),0.08)] transition
-            border border-[rgb(var(--border))]"
+            border border-[rgb(var(--border))] active:scale-95"
           >
-            <FaBell className="text-[rgb(var(--text))]" size={15} />
+            <FaBell className="text-[rgb(var(--text))]" size={14} />
             {unreadCount > 0 && (
               <span className="absolute -top-1.5 -right-1.5 min-w-4.5 h-4.5 bg-rose-500 text-white text-[9px] font-bold flex items-center justify-center rounded-full px-1 shadow">
                 {unreadCount > 99 ? "99+" : unreadCount}
@@ -267,11 +304,11 @@ const Topbar = ({ toggleSidebar }) => {
               <div className="px-4 py-3 border-b border-[rgb(var(--border))] flex items-center justify-between">
                 <div className="flex items-center gap-2">
                   <span className="font-semibold text-xs sm:text-sm text-[rgb(var(--text))]">
-                    Notifications
+                    {t("topbar.notifications")}
                   </span>
                   {unreadCount > 0 && (
                     <span className="text-[10px] bg-rose-500 text-white px-1.5 py-0.5 rounded-full font-bold">
-                      {unreadCount} new
+                      {unreadCount} {t("topbar.new")}
                     </span>
                   )}
                 </div>
@@ -281,7 +318,7 @@ const Topbar = ({ toggleSidebar }) => {
                       onClick={handleMarkAllRead}
                       className="text-[10px] text-[rgb(var(--primary))] hover:underline font-medium"
                     >
-                      Mark all read
+                      {t("topbar.markAllRead")}
                     </button>
                   )}
                   {notifications.length > 0 && (
@@ -290,7 +327,7 @@ const Topbar = ({ toggleSidebar }) => {
                       className="text-[10px] text-rose-400 hover:text-rose-600 font-medium transition"
                       title="Dismiss from topbar — still visible on Notification Page"
                     >
-                      Clear
+                      {t("topbar.clear")}
                     </button>
                   )}
                 </div>
@@ -302,7 +339,7 @@ const Topbar = ({ toggleSidebar }) => {
                   <div className="py-12 flex flex-col items-center gap-2">
                     <span className="text-3xl">🔔</span>
                     <p className="text-sm text-[rgb(var(--text-muted))]">
-                      You're all caught up!
+                      {t("topbar.caughtUp")}
                     </p>
                     <button
                       onClick={() => {
@@ -311,7 +348,7 @@ const Topbar = ({ toggleSidebar }) => {
                       }}
                       className="mt-1 text-xs text-[rgb(var(--primary))] hover:underline"
                     >
-                      View all past notifications →
+                      {t("topbar.viewAllPast")}
                     </button>
                   </div>
                 ) : (
@@ -373,7 +410,7 @@ const Topbar = ({ toggleSidebar }) => {
                     }}
                     className="w-full py-2.5 text-xs font-medium text-[rgb(var(--primary))] hover:bg-[rgba(var(--primary),0.05)] transition"
                   >
-                    View all notifications →
+                    {t("topbar.viewAll")}
                   </button>
                 </div>
               )}
@@ -398,7 +435,7 @@ const Topbar = ({ toggleSidebar }) => {
                 {loginAs ? loginAs : role.replace("_", " ")}
               </p>
             </div>
-            <div className="w-10 h-10 rounded-full bg-[rgb(var(--primary))] text-white flex items-center justify-center text-sm font-bold shadow">
+            <div className="w-9 h-9 lg:w-10 lg:h-10 rounded-full bg-[rgb(var(--primary))] text-white flex items-center justify-center text-xs lg:text-sm font-bold shadow">
               {getInitials(name)}
             </div>
           </div>
@@ -423,7 +460,7 @@ const Topbar = ({ toggleSidebar }) => {
               <div className="px-5 py-4">
                 <div className="flex justify-between items-center mb-3">
                   <span className="text-[11px] font-bold text-[rgb(var(--text))] opacity-40 uppercase">
-                    Appearance
+                    {t("common.appearance")}
                   </span>
                   <span className="text-[10px] px-2 py-0.5 rounded-full bg-orange-500/10 text-orange-500 font-bold capitalize">
                     {theme.replace("theme-", "")}
@@ -451,25 +488,25 @@ const Topbar = ({ toggleSidebar }) => {
                       color: "bg-emerald-500",
                       border: "border-emerald-400",
                     },
-                  ].map((t) => (
+                  ].map((opt) => (
                     <button
-                      key={t.id}
+                      key={opt.id}
                       onClick={() => {
-                        setTheme(t.id);
-                        document.documentElement.className = t.id;
-                        localStorage.setItem("theme", t.id);
+                        setTheme(opt.id);
+                        document.documentElement.className = opt.id;
+                        localStorage.setItem("theme", opt.id);
                       }}
                       className="relative group w-8 h-8 flex items-center justify-center"
                     >
-                      {theme === t.id && (
+                      {theme === opt.id && (
                         <span className="absolute inset-0 rounded-full bg-orange-500/20 animate-pulse scale-125" />
                       )}
                       <div
                         className={`
-                        w-6 h-6 rounded-full ${t.color} ${t.border} border shadow-sm
+                        w-6 h-6 rounded-full ${opt.color} ${opt.border} border shadow-sm
                         transition-all transform group-hover:scale-110 group-active:scale-90
                         ${
-                          theme === t.id
+                          theme === opt.id
                             ? "ring-2 ring-orange-500 ring-offset-2 ring-offset-[rgb(var(--bg))]"
                             : "opacity-80 hover:opacity-100"
                         }`}
@@ -485,7 +522,7 @@ const Topbar = ({ toggleSidebar }) => {
                   className="group w-full flex items-center justify-center gap-2 px-4 py-2.5 text-sm font-medium text-[rgb(var(--text))] hover:bg-red-500 hover:text-white rounded-xl transition-all"
                 >
                   <AiOutlineLogout />
-                  Logout
+                  {t("common.logout")}
                 </button>
               </div>
             </div>

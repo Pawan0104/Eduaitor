@@ -33,6 +33,20 @@ const schoolSchema = new mongoose.Schema(
       type: String,
     },
 
+    // School campus GPS — used for bus arrive/depart geofence alerts
+    latitude: {
+      type: Number,
+      default: null,
+    },
+    longitude: {
+      type: Number,
+      default: null,
+    },
+    geofenceRadiusM: {
+      type: Number,
+      default: 250,
+    },
+
     contact_email: {
       type: String,
     },
@@ -75,6 +89,16 @@ const schoolSchema = new mongoose.Schema(
       type: [String],
       enum: MODULE_KEYS,  
       default: [],
+    },
+
+    razorpayKeyId: {
+      type: String,
+      default: "",
+    },
+
+    razorpayKeySecret: {
+      type: String,
+      default: "",
     },
   },
   { timestamps: true },

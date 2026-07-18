@@ -34,19 +34,7 @@ router.post(
 router.post(
   "/",
   authMiddleware,
-  upload.fields([
-    { name: "studentPhoto", maxCount: 1 },
-    { name: "fatherPhoto", maxCount: 1 },
-    { name: "motherPhoto", maxCount: 1 },
-    { name: "guardianPhoto", maxCount: 1 },
-
-    { name: "birthCertificate", maxCount: 1 },
-    { name: "transferCertificate", maxCount: 1 },
-
-    { name: "studentAadhar", maxCount: 1 },
-    { name: "fatherAadhar", maxCount: 1 },
-    { name: "motherAadhar", maxCount: 1 },
-  ]),
+  upload.any(),
   createStudent,
 );
 
@@ -57,20 +45,7 @@ router.get("/teacher/my-students", authMiddleware, getStudentsByTeacher);
 router.put(
   "/:id",
   authMiddleware,
-  upload.fields([
-    { name: "studentPhoto", maxCount: 1 },
-    { name: "fatherPhoto", maxCount: 1 },
-    { name: "motherPhoto", maxCount: 1 },
-    { name: "guardianPhoto", maxCount: 1 },
-
-    { name: "birthCertificate", maxCount: 1 },
-    { name: "transferCertificate", maxCount: 1 },
-
-    { name: "studentAadhar", maxCount: 1 },
-    { name: "fatherAadhar", maxCount: 1 },
-    { name: "motherAadhar", maxCount: 1 },
-  ]),
-
+  upload.any(),
   updateStudent,
 );
 

@@ -17,6 +17,8 @@ import { useNavigate } from "react-router-dom";
 import { toast } from "react-toastify";
 import { FaArrowLeft, FaBookReader } from "react-icons/fa";
 import UpComingNotifications from "../components/UpComingNotifications";
+import { useTx } from "../components/DashboardI18n";
+import { useLanguage } from "../context/LanguageContext";
 
 const API = import.meta.env.VITE_API_URL;
 
@@ -68,6 +70,7 @@ const iconTones = {
 
 const TeacherDashboard = () => {
   const navigate = useNavigate();
+  const { t } = useLanguage();
   const isMobile = window.innerWidth <= 768;
 
   const [loading, setLoading] = useState(true);
@@ -434,43 +437,46 @@ const TeacherDashboard = () => {
             </div>
           </div>
 
-          <div className="rounded-3xl border border-slate-200 bg-[rgb(var(--surface))] p-5 shadow-sm">
+          <div
+            className="rounded-3xl border border-slate-200 bg-[rgb(var(--surface))] p-5 shadow-sm"
+            data-no-i18n=""
+          >
             <div className="mb-4 flex items-center gap-3">
               <div className="rounded-2xl bg-amber-50 p-3 text-amber-600">
                 <FiClock />
               </div>
               <div>
                 <h2 className="text-lg font-black text-[rgb(var(--text))]">
-                  Attention Needed
+                  {t("dashboard.attentionNeeded")}
                 </h2>
                 <p className="text-sm text-[rgb(var(--text))]">
-                  Items requiring your action
+                  {t("dashboard.attentionSubtitle")}
                 </p>
               </div>
             </div>
             <div className="space-y-3">
               <AlertRow
-                label="Overdue Assignments"
+                label={t("dashboard.overdueAssignments")}
                 value={metrics.overdue}
-                helper="Published past due date"
+                helper={t("dashboard.publishedPastDue")}
                 tone="red"
               />
               <AlertRow
-                label="Draft Assignments"
+                label={t("dashboard.draftAssignments")}
                 value={metrics.drafts}
-                helper="Not yet published to students"
+                helper={t("dashboard.notYetPublished")}
                 tone="amber"
               />
               <AlertRow
-                label="Homework Diaries"
+                label={t("dashboard.homeworkDiaries")}
                 value={metrics.homeworkDiaries}
-                helper="Total logged entries"
+                helper={t("dashboard.totalLoggedEntries")}
                 tone="blue"
               />
               <AlertRow
-                label="Active Notices"
+                label={t("dashboard.activeNotices")}
                 value={data.notices.filter((n) => n.isActive).length}
-                helper="School-wide announcements"
+                helper={t("dashboard.schoolWideAnnouncements")}
                 tone="emerald"
               />
             </div>
@@ -836,25 +842,28 @@ const DashboardSettingsControl = ({ visibility, onToggle, onReset }) => {
   );
 };
 
-const SectionCard = ({ title, subtitle, children, action, onAction }) => (
+const SectionCard = ({ title, subtitle, children, action, onAction }) => {
+  const tx = useTx();
+  return (
   <section className="rounded-3xl border border-slate-200 bg-[rgb(var(--surface))] p-5 shadow-sm">
     <div className="mb-4 flex items-start justify-between gap-3">
       <div>
-        <h2 className="text-lg font-black text-[rgb(var(--text))]">{title}</h2>
-        <p className="mt-1 text-sm text-[rgb(var(--text))]">{subtitle}</p>
+        <h2 className="text-lg font-black text-[rgb(var(--text))]">{tx(title)}</h2>
+        <p className="mt-1 text-sm text-[rgb(var(--text))]">{tx(subtitle)}</p>
       </div>
       {action && (
         <button
           onClick={onAction}
           className="shrink-0 text-sm font-bold text-[rgb(var(--text))] transition hover:text-[rgb(var(--text-muted))]  cursor-pointer"
         >
-          {action.label}
+          {tx(action.label)}
         </button>
       )}
     </div>
     {children}
   </section>
-);
+  );
+};
 
 const StatCard = ({ title, value, note, icon, tone }) => {
   const tones = {
@@ -879,15 +888,18 @@ const StatCard = ({ title, value, note, icon, tone }) => {
   );
 };
 
-const HighlightCard = ({ label, value, subtext }) => (
+const HighlightCard = ({ label, value, subtext }) => {
+  const tx = useTx();
+  return (
   <div className="rounded-2xl bg-[rgb(var(--surface))] border p-4 backdrop-blur-sm">
     <p className="text-xs font-bold uppercase tracking-[0.2em] text-[rgb(var(--text))]">
-      {label}
+      {tx(label)}
     </p>
     <p className="mt-2 text-2xl font-black text-[rgb(var(--text))]">{value}</p>
-    <p className="mt-2 text-sm text-[rgb(var(--text))]">{subtext}</p>
+    <p className="mt-2 text-sm text-[rgb(var(--text))]">{tx(subtext)}</p>
   </div>
-);
+  );
+};
 
 const AlertRow = ({ label, value, helper, tone }) => {
   const tones = {
@@ -1035,10 +1047,13 @@ const TimelineRow = ({ title, meta, date }) => (
   </div>
 );
 
-const EmptyState = ({ message }) => (
+const EmptyState = ({ message }) => {
+  const tx = useTx();
+  return (
   <div className="rounded-2xl border border-dashed border-slate-300 bg-slate-50 p-8 text-center text-sm font-medium text-[rgb(var(--text))]">
-    {message}
+    {tx(message)}
   </div>
-);
+  );
+};
 
 export default TeacherDashboard;

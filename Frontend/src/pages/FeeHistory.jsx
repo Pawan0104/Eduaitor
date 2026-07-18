@@ -454,6 +454,7 @@ function FeeHistory() {
                   "Amount",
                   "Mode",
                   "Date & Remarks",
+                  "Action",
                 ].map((h) => (
                   <th
                     key={h}
@@ -470,7 +471,7 @@ function FeeHistory() {
               ) : records.length === 0 ? (
                 <tr>
                   <td
-                    colSpan={6}
+                    colSpan={7}
                     className="text-center py-16  font-sans text-sm"
                   >
                     No records found
@@ -514,6 +515,23 @@ function FeeHistory() {
                             {item.remarks}
                           </p>
                         )}
+                      </td>
+                      <td className="px-4 py-3">
+                        <button
+                          type="button"
+                          onClick={() =>
+                            navigate(
+                              `${
+                                window.location.pathname.startsWith("/staff")
+                                  ? "/staff"
+                                  : "/school"
+                              }/fees/receipt/${item._id}`,
+                            )
+                          }
+                          className="text-xs font-bold text-emerald-700 hover:underline"
+                        >
+                          Receipt
+                        </button>
                       </td>
                     </tr>
                   );
@@ -570,6 +588,21 @@ function FeeHistory() {
                     </span>
                     <Badge mode={item.paymentMode} />
                     <span>{formatDate(item.paidDate)}</span>
+                    <button
+                      type="button"
+                      onClick={() =>
+                        navigate(
+                          `${
+                            window.location.pathname.startsWith("/staff")
+                              ? "/staff"
+                              : "/school"
+                          }/fees/receipt/${item._id}`,
+                        )
+                      }
+                      className="ml-auto text-emerald-700 font-bold"
+                    >
+                      Receipt
+                    </button>
                   </div>
                   {item.remarks && (
                     <p className="mt-2 text-xs text-stone-400 font-sans border-t border-stone-100 pt-2">

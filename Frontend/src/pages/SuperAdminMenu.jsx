@@ -6,12 +6,20 @@ import {
   FaUserShield,
   FaSchool,
   FaChartLine,
+  FaHeadset,
+  FaBookDead,
 } from "react-icons/fa";
 import { FaSchoolFlag } from "react-icons/fa6";
 import { toast } from "react-toastify";
 import { useAuth } from "../context/AuthContext";
 import axios from "axios";
 import UpComingNotifications from "../components/UpComingNotifications";
+import {
+  GreetingHeader,
+  ModuleGrid,
+  useMenuExitGuard,
+} from "../components/RoleMenuShell";
+import { clearSessionKeepPrefs } from "../utils/clearSessionKeepPrefs";
 
 /* ─── Color map ─────────────────────────────────────────────── */
 const COLOR_MAP = {
@@ -20,6 +28,8 @@ const COLOR_MAP = {
   "Access Control": { bg: "#FDF4FF", icon: "#A855F7", dot: "#E9D5FF" },
   School: { bg: "#EFF6FF", icon: "#3B82F6", dot: "#BFDBFE" },
   "School Detail": { bg: "#F0FDF4", icon: "#22C55E", dot: "#BBF7D0" },
+  "Help Requests": { bg: "#FFFBEB", icon: "#D97706", dot: "#FDE68A" },
+  "Syllabus Catalog": { bg: "#F0FDF4", icon: "#10B981", dot: "#A7F3D0" },
 };
 const DEFAULT_COLOR = { bg: "#F3F4F6", icon: "#6B7280", dot: "#E5E7EB" };
 
@@ -266,8 +276,7 @@ export default function SuperAdminMenu() {
       toast.error("Logout failed. Please try again.");
     }
     setUser(null);
-    localStorage.clear();
-    sessionStorage.clear();
+    clearSessionKeepPrefs();
     navigate("/admin/login", { replace: true });
   };
 
@@ -301,92 +310,39 @@ export default function SuperAdminMenu() {
       icon: <FaSchoolFlag />,
       path: "/admin/school-detail",
     },
+    {
+      name: "Syllabus Catalog",
+      icon: <FaBookDead />,
+      path: "/admin/syllabus-catalog",
+    },
+    {
+      name: "Help Requests",
+      icon: <FaHeadset />,
+      path: "/admin/messages",
+    },
   ];
 
-  const rows = [];
-  for (let i = 0; i < menu.length; i += 2) rows.push(menu.slice(i, i + 2));
-
-  // ── Mobile back-button → exit popup ─────────────────────────
-  useEffect(() => {
-    const isMobile =
-      /Mobi|Android|iPhone|iPad/i.test(navigator.userAgent) ||
-      window.innerWidth <= 768;
-    if (!isMobile) return;
-
-    let isActive = true;
-    const push = () => {
-      if (window.history.state !== "menu-lock")
-        window.history.pushState("menu-lock", "");
-    };
-    push();
-
-    const onPopState = () => {
-      if (!isActive) return;
-      push();
-      setShowExit(true);
-    };
-    const onFocus = () => push();
-
-    window.addEventListener("popstate", onPopState);
-    window.addEventListener("focus", onFocus);
-    return () => {
-      isActive = false;
-      window.removeEventListener("popstate", onPopState);
-      window.removeEventListener("focus", onFocus);
-    };
-  }, []);
+  useMenuExitGuard(setShowExit);
 
   return (
     <div
       className="min-h-screen font-nunito"
-      style={{ background: "rgb(var(--bg))" }} // ← uses CSS variable
+      style={{ background: "rgb(var(--bg))" }}
     >
-      <div className="p-4 flex flex-col gap-3">
-        {rows.map((row, rowIdx) => {
-          const openInRow = row.find(
-            (item) => item.name === openItem && item.children,
-          );
-
-          return (
-            <div key={rowIdx} className="flex flex-col">
-              <UpComingNotifications />
-              <div className="grid grid-cols-2 gap-3">
-                {row.map((item, colIdx) => {
-                  const color = COLOR_MAP[item.name] ?? DEFAULT_COLOR;
-                  const isOpen = openItem === item.name;
-                  const globalIdx = rowIdx * 2 + colIdx;
-
-                  return (
-                    <MenuCard
-                      key={item.name}
-                      item={item}
-                      color={color}
-                      globalIdx={globalIdx}
-                      isOpen={isOpen}
-                      isDark={isDark}
-                      onToggle={() => setOpenItem(isOpen ? null : item.name)}
-                    />
-                  );
-                })}
-              </div>
-
-              {row.some((item) => item.children) &&
-                (() => {
-                  const childItem = openInRow ?? row.find((i) => i.children);
-                  const color = COLOR_MAP[childItem.name] ?? DEFAULT_COLOR;
-                  return (
-                    <AccordionPanel isOpen={Boolean(openInRow)}>
-                      <ChildList
-                        children={childItem.children}
-                        color={color}
-                        isDark={isDark}
-                      />
-                    </AccordionPanel>
-                  );
-                })()}
-            </div>
-          );
-        })}
+      <div className="flex flex-col gap-3">
+        <GreetingHeader
+          name={user?.name || user?.school_name || "User"}
+          role={user?.role || "User"}
+          loginAs={user?.loginAs}
+        />
+        <UpComingNotifications />
+        <ModuleGrid
+          menu={menu}
+          colorMap={COLOR_MAP}
+          openItem={openItem}
+          setOpenItem={setOpenItem}
+          isDark={isDark}
+        />
       </div>
 
       {showExit && (

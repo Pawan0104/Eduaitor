@@ -29,7 +29,11 @@ const modules = [
   "finance",
   "calendar",
   "transport",
+  "gpsTracking",
   "library",
+  "hostel",
+  "house",
+  "commerce",
   "inventory",
   "documents",
   "contact",
@@ -39,6 +43,17 @@ const modules = [
 ];
 
 const actions = ["view", "create", "edit", "delete"];
+
+const moduleLabels = {
+  dashboardSettings: "Dashboard Settings",
+  gpsTracking: "Bus GPS Tracking",
+  transport: "Transport Management",
+  house: "House Allocation",
+};
+
+const formatModuleLabel = (key) =>
+  moduleLabels[key] ||
+  key.replace(/([A-Z])/g, " $1").replace(/^./, (c) => c.toUpperCase());
 
 const AccessControl = () => {
   const emptyForm = { role: "" };
@@ -350,7 +365,9 @@ const AccessControl = () => {
                   <tbody>
                     {modules.map((module) => (
                       <tr key={module} className="border-t">
-                        <td className="p-3 capitalize font-medium">{module}</td>
+                        <td className="p-3 font-medium">
+                          {formatModuleLabel(module)}
+                        </td>
 
                         {actions.map((action) => (
                           <td key={action} className="text-center">

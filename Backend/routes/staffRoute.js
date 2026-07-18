@@ -7,6 +7,7 @@ import {
   getStaff,
   getSingleStaff,
   updateStaff,
+  toggleAdminGroupMembership,
   toggleStaffStatus,
   deleteStaff,
 } from "../controllers/staffController.js";
@@ -44,6 +45,13 @@ router.put(
   checkModuleAccess("staff"),
   upload.single("photo"),
   updateStaff
+);
+
+router.patch(
+  "/admin-group/:model/:id",
+  authMiddleware,
+  checkModuleAccess("staff"),
+  toggleAdminGroupMembership
 );
 
 router.patch(

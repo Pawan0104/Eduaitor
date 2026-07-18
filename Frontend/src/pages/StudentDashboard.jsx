@@ -12,10 +12,18 @@ import {
   FiAlertCircle,
   FiAward,
 } from "react-icons/fi";
-import { FaArrowLeft, FaUserGraduate, FaClipboardList, FaBookOpen } from "react-icons/fa";
+import {
+  FaArrowLeft,
+  FaUserGraduate,
+  FaClipboardList,
+  FaBookOpen,
+  FaIdCard,
+} from "react-icons/fa";
 import { useNavigate } from "react-router-dom";
 import { toast } from "react-toastify";
 import UpComingNotifications from "../components/UpComingNotifications";
+import { useTx } from "../components/DashboardI18n";
+import { useLanguage } from "../context/LanguageContext";
 
 const API = import.meta.env.VITE_API_URL;
 
@@ -56,6 +64,7 @@ const iconTones = {
 
 const StudentDashboard = () => {
   const navigate = useNavigate();
+  const { t } = useLanguage();
   const isMobile = window.innerWidth <= 768;
 
   const [loading, setLoading] = useState(true);
@@ -237,11 +246,18 @@ const StudentDashboard = () => {
       tone: "emerald",
     },
     {
-      label: "My Books",
+      label: "Syllabus Books",
+      helper: "View books, chapters and content",
+      icon: <FaBookOpen />,
+      to: "/student/syllabus-books",
+      tone: "violet",
+    },
+    {
+      label: "Library",
       helper: "Issued library books",
       icon: <FaBookOpen />,
       to: "/student/library",
-      tone: "violet",
+      tone: "blue",
     },
     {
       label: "Exam Results",
@@ -249,6 +265,13 @@ const StudentDashboard = () => {
       icon: <FiAward />,
       to: "/student/exam-result",
       tone: "amber",
+    },
+    {
+      label: "My ID Card",
+      helper: "View and print your school ID",
+      icon: <FaIdCard />,
+      to: "/student/id-card",
+      tone: "blue",
     },
   ];
 
@@ -395,43 +418,46 @@ const StudentDashboard = () => {
             </div>
           </div>
 
-          <div className="rounded-3xl border border-slate-200 bg-[rgb(var(--surface))] p-5 shadow-sm">
+          <div
+            className="rounded-3xl border border-slate-200 bg-[rgb(var(--surface))] p-5 shadow-sm"
+            data-no-i18n=""
+          >
             <div className="mb-4 flex items-center gap-3">
               <div className="rounded-2xl bg-[rgb(var(--surface))] p-3 text-amber-600">
                 <FiAlertCircle />
               </div>
               <div>
                 <h2 className="text-lg font-black text-[rgb(var(--text))]">
-                  Attention Needed
+                  {t("dashboard.attentionNeeded")}
                 </h2>
                 <p className="text-sm text-[rgb(var(--text))]">
-                  Items requiring your action
+                  {t("dashboard.attentionSubtitle")}
                 </p>
               </div>
             </div>
             <div className="space-y-3">
               <AlertRow
-                label="Overdue Assignments"
+                label={t("dashboard.overdueAssignments")}
                 value={metrics.overdueAssignments}
-                helper="Past submission deadline"
+                helper={t("dashboard.pastSubmissionDeadline")}
                 tone={metrics.overdueAssignments > 0 ? "red" : "emerald"}
               />
               <AlertRow
-                label="Pending Assignments"
+                label={t("dashboard.pendingAssignments")}
                 value={metrics.pendingAssignments}
-                helper="Not yet submitted"
+                helper={t("dashboard.notYetSubmitted")}
                 tone={metrics.pendingAssignments > 0 ? "amber" : "emerald"}
               />
               <AlertRow
-                label="Overdue Books"
+                label={t("dashboard.overdueBooks")}
                 value={metrics.overdueBooks}
-                helper="Library books past due date"
+                helper={t("dashboard.libraryBooksPastDue")}
                 tone={metrics.overdueBooks > 0 ? "amber" : "emerald"}
               />
               <AlertRow
-                label="Active Notices"
+                label={t("dashboard.activeNotices")}
                 value={data.notices.filter((n) => n.isActive).length}
-                helper="School-wide announcements"
+                helper={t("dashboard.schoolWideAnnouncements")}
                 tone="blue"
               />
             </div>
@@ -762,25 +788,28 @@ const DashboardSettingsControl = ({ visibility, onToggle, onReset }) => {
   );
 };
 
-const SectionCard = ({ title, subtitle, children, action, onAction }) => (
+const SectionCard = ({ title, subtitle, children, action, onAction }) => {
+  const tx = useTx();
+  return (
   <section className="rounded-3xl border border-slate-200 bg-[rgb(var(--surface))] p-5 shadow-sm">
     <div className="mb-4 flex items-start justify-between gap-3">
       <div>
-        <h2 className="text-lg font-black text-[rgb(var(--text))]">{title}</h2>
-        <p className="mt-1 text-sm text-[rgb(var(--text))]">{subtitle}</p>
+        <h2 className="text-lg font-black text-[rgb(var(--text))]">{tx(title)}</h2>
+        <p className="mt-1 text-sm text-[rgb(var(--text))]">{tx(subtitle)}</p>
       </div>
       {action && (
         <button
           onClick={onAction}
           className="shrink-0 text-sm font-bold text-[rgb(var(--text))] transition hover:text-[rgb(var(--text))] cursor-pointer"
         >
-          {action.label}
+          {tx(action.label)}
         </button>
       )}
     </div>
     {children}
   </section>
-);
+  );
+};
 
 const StatCard = ({ title, value, note, icon, tone }) => {
   const tones = {
@@ -807,15 +836,18 @@ const StatCard = ({ title, value, note, icon, tone }) => {
   );
 };
 
-const HighlightCard = ({ label, value, subtext }) => (
+const HighlightCard = ({ label, value, subtext }) => {
+  const tx = useTx();
+  return (
   <div className="rounded-2xl bg-[rgb(var(--surface))]/10 p-4 backdrop-blur-sm border">
     <p className="text-xs font-bold uppercase tracking-[0.2em] text-[rgb(var(--text))]">
-      {label}
+      {tx(label)}
     </p>
     <p className="mt-2 text-2xl font-black text-[rgb(var(--text))]">{value}</p>
-    <p className="mt-2 text-sm text-[rgb(var(--text))]">{subtext}</p>
+    <p className="mt-2 text-sm text-[rgb(var(--text))]">{tx(subtext)}</p>
   </div>
-);
+  );
+};
 
 const AlertRow = ({ label, value, helper, tone }) => {
   const tones = {
@@ -970,10 +1002,13 @@ const TimelineRow = ({ title, meta, date }) => (
   </div>
 );
 
-const EmptyState = ({ message }) => (
+const EmptyState = ({ message }) => {
+  const tx = useTx();
+  return (
   <div className="rounded-2xl border border-dashed border-slate-300 bg-[rgb(var(--surface))] p-8 text-center text-sm font-medium text-[rgb(var(--text))]">
-    {message}
+    {tx(message)}
   </div>
-);
+  );
+};
 
 export default StudentDashboard;

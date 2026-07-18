@@ -1,6 +1,8 @@
 import mongoose from "mongoose";
-import Student from "../models/student.js"
+import Student from "../models/student.js";
+import School from "../models/school.js";
 import { Driver, Bus, TransportRoute, Activity } from "../models/transport.js";
+import { createNotificationHelper } from "./notificationController.js";
 
 // ── HELPERS ───────────────────────────────────────────────────────────────────
 
@@ -20,6 +22,275 @@ const missingSchoolId = (res) =>
 // Safe ObjectId resolver — returns ObjectId if valid string, else null
 const resolveId = (val) =>
   val && mongoose.isValidObjectId(val) ? toId(val) : null;
+
+const TRIP_EVENTS = [
+  "pickup",
+  "arrive_school",
+  "depart_school",
+  "arrive_home",
+];
+
+const TRIP_EVENT_META = {
+  pickup: {
+    field: "pickup",
+    title: "Bus Pickup 🚌",
+    message: (busLabel, routeName) =>
+      `Your child's school bus (${busLabel}) has started pickup${
+        routeName ? ` on route ${routeName}` : ""
+      }. Please have your child ready at the stop.`,
+  },
+  arrive_school: {
+    field: "arriveSchool",
+    title: "Arrived at School 🏫",
+    message: (busLabel, routeName) =>
+      `Your child's school bus (${busLabel}) has arrived at school${
+        routeName ? ` (${routeName})` : ""
+      }.`,
+  },
+  depart_school: {
+    field: "departSchool",
+    title: "Departed from School 🚌",
+    message: (busLabel, routeName) =>
+      `Your child's school bus (${busLabel}) has left school for drop-off${
+        routeName ? ` on route ${routeName}` : ""
+      }.`,
+  },
+  arrive_home: {
+    field: "arriveHome",
+    title: "Arrived Home 🏠",
+    message: (busLabel, routeName) =>
+      `Your child's school bus (${busLabel}) has completed drop-off / arrived near home${
+        routeName ? ` (${routeName})` : ""
+      }.`,
+  },
+};
+
+const todayKey = () => {
+  const d = new Date();
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${y}-${m}-${day}`;
+};
+
+const haversineMeters = (lat1, lon1, lat2, lon2) => {
+  const toRad = (v) => (v * Math.PI) / 180;
+  const R = 6371000;
+  const dLat = toRad(lat2 - lat1);
+  const dLon = toRad(lon2 - lon1);
+  const a =
+    Math.sin(dLat / 2) ** 2 +
+    Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLon / 2) ** 2;
+  return 2 * R * Math.asin(Math.sqrt(a));
+};
+
+const ensureTripDay = (bus) => {
+  const key = todayKey();
+  if (bus.tripDate !== key) {
+    bus.tripDate = key;
+    bus.tripEvents = {
+      pickup: { at: null, notified: false },
+      arriveSchool: { at: null, notified: false },
+      departSchool: { at: null, notified: false },
+      arriveHome: { at: null, notified: false },
+    };
+    bus.insideSchoolGeofence = false;
+  }
+  if (!bus.tripEvents) {
+    bus.tripEvents = {
+      pickup: { at: null, notified: false },
+      arriveSchool: { at: null, notified: false },
+      departSchool: { at: null, notified: false },
+      arriveHome: { at: null, notified: false },
+    };
+  }
+};
+
+const tripEventSnapshot = (bus) => {
+  ensureTripDay(bus);
+  const e = bus.tripEvents || {};
+  return {
+    tripDate: bus.tripDate,
+    pickup: !!e.pickup?.notified,
+    arriveSchool: !!e.arriveSchool?.notified,
+    departSchool: !!e.departSchool?.notified,
+    arriveHome: !!e.arriveHome?.notified,
+    pickupAt: e.pickup?.at || null,
+    arriveSchoolAt: e.arriveSchool?.at || null,
+    departSchoolAt: e.departSchool?.at || null,
+    arriveHomeAt: e.arriveHome?.at || null,
+  };
+};
+
+/**
+ * Record a trip event and notify parents of students on this bus's route.
+ * Returns { sent, skipped, reason?, notifiedCount }
+ */
+const fireTripEvent = async ({
+  bus,
+  event,
+  schoolId,
+  createdBy = null,
+  source = "manual",
+}) => {
+  if (!TRIP_EVENTS.includes(event)) {
+    return { sent: false, reason: "Invalid trip event" };
+  }
+
+  ensureTripDay(bus);
+  const meta = TRIP_EVENT_META[event];
+  const field = meta.field;
+
+  if (bus.tripEvents[field]?.notified) {
+    return {
+      sent: false,
+      skipped: true,
+      reason: "Already notified for this event today",
+      trip: tripEventSnapshot(bus),
+    };
+  }
+
+  // Soft order: pickup → arrive school → depart school → arrive home
+  const order = ["pickup", "arriveSchool", "departSchool", "arriveHome"];
+  const idx = order.indexOf(field);
+  for (let i = 0; i < idx; i++) {
+    if (!bus.tripEvents[order[i]]?.notified) {
+      return {
+        sent: false,
+        reason: `Complete "${order[i]}" before "${field}"`,
+        trip: tripEventSnapshot(bus),
+      };
+    }
+  }
+
+  let routeId = bus.route?._id || bus.route;
+  let routeName = bus.route?.name || "";
+  if (routeId && !routeName) {
+    const route = await TransportRoute.findById(routeId).select("name").lean();
+    routeName = route?.name || "";
+  }
+
+  if (!routeId) {
+    return {
+      sent: false,
+      reason: "Bus has no route assigned",
+      trip: tripEventSnapshot(bus),
+    };
+  }
+
+  const students = await Student.find({
+    schoolId: toId(schoolId),
+    transport: toId(routeId),
+  })
+    .select("_id classId sectionId firstName lastName")
+    .lean();
+
+  const busLabel = bus.busId || bus.regNo || "School Bus";
+  const targets = students.map((s) => ({
+    type: "student",
+    studentId: s._id,
+    classId: s.classId || undefined,
+    sectionId: s.sectionId || undefined,
+  }));
+
+  if (targets.length > 0) {
+    await createNotificationHelper({
+      title: meta.title,
+      message: meta.message(busLabel, routeName),
+      notificationType: "transport",
+      createdBy,
+      schoolId,
+      targets,
+    });
+  }
+
+  bus.tripEvents[field] = { at: new Date(), notified: true };
+  bus.markModified("tripEvents");
+  await bus.save();
+
+  await Activity.create({
+    schoolId: toId(schoolId),
+    bus: bus._id,
+    route: routeId,
+    driver: bus.driver || null,
+    status: `Trip:${event}:${source}`,
+    time: new Date().toLocaleTimeString("en-IN"),
+    date: new Date(),
+  });
+
+  return {
+    sent: true,
+    skipped: false,
+    notifiedCount: targets.length,
+    trip: tripEventSnapshot(bus),
+  };
+};
+
+const maybeAutoSchoolGeofence = async (bus, schoolId, createdBy) => {
+  const school = await School.findById(schoolId)
+    .select("latitude longitude geofenceRadiusM")
+    .lean();
+  if (
+    school?.latitude == null ||
+    school?.longitude == null ||
+    bus.lastLatitude == null ||
+    bus.lastLongitude == null
+  ) {
+    return null;
+  }
+
+  const radius = Number(school.geofenceRadiusM) || 250;
+  const dist = haversineMeters(
+    bus.lastLatitude,
+    bus.lastLongitude,
+    school.latitude,
+    school.longitude,
+  );
+  const inside = dist <= radius;
+  const wasInside = !!bus.insideSchoolGeofence;
+
+  ensureTripDay(bus);
+  bus.insideSchoolGeofence = inside;
+
+  // Enter school → arrival (only after pickup was notified today)
+  if (inside && !wasInside) {
+    if (
+      bus.tripEvents?.pickup?.notified &&
+      !bus.tripEvents?.arriveSchool?.notified
+    ) {
+      return fireTripEvent({
+        bus,
+        event: "arrive_school",
+        schoolId,
+        createdBy,
+        source: "gps",
+      });
+    }
+    await bus.save();
+    return null;
+  }
+
+  // Leave school → departure (only after school arrival was notified)
+  if (!inside && wasInside) {
+    if (
+      bus.tripEvents?.arriveSchool?.notified &&
+      !bus.tripEvents?.departSchool?.notified
+    ) {
+      return fireTripEvent({
+        bus,
+        event: "depart_school",
+        schoolId,
+        createdBy,
+        source: "gps",
+      });
+    }
+    await bus.save();
+    return null;
+  }
+
+  await bus.save();
+  return null;
+};
 
 // ════════════════════════════════════════════════════════════════════════════
 // DASHBOARD SUMMARY
@@ -448,11 +719,22 @@ export const getBuses = async (req, res) => {
 };
 
 // POST /transport/buses
-// body: { school_id, id (busId), regNo, model, capacity, driver, route }
+// body: { school_id, id (busId), regNo, model, capacity, driver, route, gpsEnabled, gpsDeviceId }
 export const createBus = async (req, res) => {
   try {
     const school_id = req.user?.school_id;
-    const { id: busId, regNo, model, capacity, driver, route } = req.body;
+    const {
+      id: busId,
+      regNo,
+      model,
+      capacity,
+      driver,
+      route,
+      gpsEnabled,
+      gpsDeviceId,
+      lastLatitude,
+      lastLongitude,
+    } = req.body;
 
     if (!school_id) return missingSchoolId(res);
 
@@ -464,6 +746,23 @@ export const createBus = async (req, res) => {
       capacity,
       driver: resolveId(driver),
       route: resolveId(route),
+      gpsEnabled: Boolean(gpsEnabled),
+      gpsDeviceId: gpsDeviceId ? String(gpsDeviceId).trim() : "",
+      lastLatitude:
+        lastLatitude !== undefined && lastLatitude !== ""
+          ? Number(lastLatitude)
+          : null,
+      lastLongitude:
+        lastLongitude !== undefined && lastLongitude !== ""
+          ? Number(lastLongitude)
+          : null,
+      lastGpsAt:
+        lastLatitude !== undefined &&
+        lastLatitude !== "" &&
+        lastLongitude !== undefined &&
+        lastLongitude !== ""
+          ? new Date()
+          : null,
     });
 
     // 🔥 FIX: update driver ALSO
@@ -504,6 +803,11 @@ export const updateBus = async (req, res) => {
       status,
       id: busId,
       nextService,
+      gpsEnabled,
+      gpsDeviceId,
+      lastLatitude,
+      lastLongitude,
+      gpsSpeedKmh,
     } = req.body;
 
     if (!school_id) return missingSchoolId(res);
@@ -584,9 +888,25 @@ export const updateBus = async (req, res) => {
       bus.status = status;
     }
 
-    /* ── MANUAL STATUS (OPTIONAL OVERRIDE) ── */
-    if (status !== undefined) {
-      bus.status = status;
+    /* ── GPS TRACKING ── */
+    if (gpsEnabled !== undefined) bus.gpsEnabled = Boolean(gpsEnabled);
+    if (gpsDeviceId !== undefined) {
+      bus.gpsDeviceId = String(gpsDeviceId || "").trim();
+    }
+    if (lastLatitude !== undefined && lastLatitude !== "") {
+      bus.lastLatitude = Number(lastLatitude);
+    }
+    if (lastLongitude !== undefined && lastLongitude !== "") {
+      bus.lastLongitude = Number(lastLongitude);
+    }
+    if (
+      (lastLatitude !== undefined && lastLatitude !== "") ||
+      (lastLongitude !== undefined && lastLongitude !== "")
+    ) {
+      bus.lastGpsAt = new Date();
+    }
+    if (gpsSpeedKmh !== undefined && gpsSpeedKmh !== "") {
+      bus.gpsSpeedKmh = Number(gpsSpeedKmh);
     }
 
     const prevDriver = bus.driver;
@@ -664,6 +984,263 @@ export const updateBusStatus = async (req, res) => {
     if (!bus) return notFound(res, "Bus");
 
     res.json({ success: true, message: `Bus marked as ${status}`, data: bus });
+  } catch (err) {
+    serverError(res, err);
+  }
+};
+
+/** GET /transport/buses/gps — fleet GPS overview */
+export const getBusesGps = async (req, res) => {
+  try {
+    const school_id = req.user?.school_id;
+    if (!school_id) return missingSchoolId(res);
+
+    const buses = await Bus.find({ schoolId: toId(school_id) })
+      .populate("driver", "name phone")
+      .populate("route", "name")
+      .select(
+        "busId regNo model status gpsEnabled gpsDeviceId lastLatitude lastLongitude lastGpsAt gpsSpeedKmh driver route tripDate tripEvents insideSchoolGeofence",
+      )
+      .sort({ busId: 1 })
+      .lean();
+
+    const school = await School.findById(school_id)
+      .select("latitude longitude geofenceRadiusM school_name")
+      .lean();
+
+    const data = buses.map((b) => {
+      // Reset display if tripDate is not today
+      const key = todayKey();
+      const fresh =
+        b.tripDate === key
+          ? b
+          : {
+              ...b,
+              tripDate: key,
+              tripEvents: {
+                pickup: { at: null, notified: false },
+                arriveSchool: { at: null, notified: false },
+                departSchool: { at: null, notified: false },
+                arriveHome: { at: null, notified: false },
+              },
+            };
+      return {
+        ...fresh,
+        trip: tripEventSnapshot(fresh),
+      };
+    });
+
+    return res.json({
+      success: true,
+      data,
+      schoolLocation: {
+        latitude: school?.latitude ?? null,
+        longitude: school?.longitude ?? null,
+        geofenceRadiusM: school?.geofenceRadiusM ?? 250,
+        name: school?.school_name || "",
+      },
+      summary: {
+        total: buses.length,
+        gpsEnabled: buses.filter((b) => b.gpsEnabled).length,
+        live: buses.filter(
+          (b) =>
+            b.gpsEnabled &&
+            b.lastLatitude != null &&
+            b.lastLongitude != null,
+        ).length,
+      },
+    });
+  } catch (err) {
+    serverError(res, err);
+  }
+};
+
+/** PATCH /transport/buses/:id/gps — update live location / toggle GPS */
+export const updateBusGps = async (req, res) => {
+  try {
+    const school_id = req.user?.school_id;
+    const { id } = req.params;
+    const {
+      gpsEnabled,
+      gpsDeviceId,
+      latitude,
+      longitude,
+      lastLatitude,
+      lastLongitude,
+      gpsSpeedKmh,
+    } = req.body;
+
+    if (!school_id) return missingSchoolId(res);
+
+    const bus = await Bus.findOne({
+      _id: id,
+      schoolId: toId(school_id),
+    });
+    if (!bus) return notFound(res, "Bus");
+
+    if (gpsEnabled !== undefined) bus.gpsEnabled = Boolean(gpsEnabled);
+    if (gpsDeviceId !== undefined) {
+      bus.gpsDeviceId = String(gpsDeviceId || "").trim();
+    }
+
+    const lat = latitude ?? lastLatitude;
+    const lng = longitude ?? lastLongitude;
+    if (lat !== undefined && lat !== "" && lng !== undefined && lng !== "") {
+      bus.lastLatitude = Number(lat);
+      bus.lastLongitude = Number(lng);
+      bus.lastGpsAt = new Date();
+    }
+    if (gpsSpeedKmh !== undefined && gpsSpeedKmh !== "") {
+      bus.gpsSpeedKmh = Number(gpsSpeedKmh);
+    }
+
+    await bus.save();
+
+    // Auto notify parents on school arrive / depart when campus GPS is set
+    let autoTrip = null;
+    if (lat !== undefined && lat !== "" && lng !== undefined && lng !== "") {
+      try {
+        autoTrip = await maybeAutoSchoolGeofence(
+          bus,
+          school_id,
+          req.user?._id || null,
+        );
+      } catch (e) {
+        console.error("maybeAutoSchoolGeofence:", e.message);
+      }
+    }
+
+    return res.json({
+      success: true,
+      message: "Bus GPS updated successfully",
+      data: bus,
+      trip: tripEventSnapshot(bus),
+      autoTrip,
+    });
+  } catch (err) {
+    serverError(res, err);
+  }
+};
+
+/**
+ * POST /transport/buses/:id/trip-event
+ * body: { event: pickup | arrive_school | depart_school | arrive_home }
+ * Sends parent notification for that trip stage (once per day).
+ */
+export const recordBusTripEvent = async (req, res) => {
+  try {
+    const school_id = req.user?.school_id;
+    const { id } = req.params;
+    const event = String(req.body?.event || "")
+      .trim()
+      .toLowerCase();
+
+    if (!school_id) return missingSchoolId(res);
+    if (!TRIP_EVENTS.includes(event)) {
+      return res.status(400).json({
+        success: false,
+        message:
+          "event must be one of: pickup, arrive_school, depart_school, arrive_home",
+      });
+    }
+
+    const bus = await Bus.findOne({
+      _id: id,
+      schoolId: toId(school_id),
+    }).populate("route", "name");
+
+    if (!bus) return notFound(res, "Bus");
+
+    const result = await fireTripEvent({
+      bus,
+      event,
+      schoolId: school_id,
+      createdBy: req.user?._id || null,
+      source: "manual",
+    });
+
+    if (!result.sent) {
+      return res.status(result.skipped ? 200 : 400).json({
+        success: result.skipped,
+        message: result.reason || "Could not send trip notification",
+        trip: result.trip,
+        notifiedCount: 0,
+      });
+    }
+
+    return res.json({
+      success: true,
+      message: `Parents notified: ${TRIP_EVENT_META[event].title}`,
+      notifiedCount: result.notifiedCount,
+      trip: result.trip,
+    });
+  } catch (err) {
+    serverError(res, err);
+  }
+};
+
+/** GET /transport/school-location — campus GPS for geofence */
+export const getSchoolTransportLocation = async (req, res) => {
+  try {
+    const school_id = req.user?.school_id;
+    if (!school_id) return missingSchoolId(res);
+    const school = await School.findById(school_id)
+      .select("school_name latitude longitude geofenceRadiusM address")
+      .lean();
+    if (!school) return notFound(res, "School");
+    return res.json({
+      success: true,
+      data: {
+        name: school.school_name,
+        address: school.address || "",
+        latitude: school.latitude ?? null,
+        longitude: school.longitude ?? null,
+        geofenceRadiusM: school.geofenceRadiusM ?? 250,
+      },
+    });
+  } catch (err) {
+    serverError(res, err);
+  }
+};
+
+/** PUT /transport/school-location — set campus GPS used for arrive/depart alerts */
+export const updateSchoolTransportLocation = async (req, res) => {
+  try {
+    const school_id = req.user?.school_id;
+    if (!school_id) return missingSchoolId(res);
+
+    const { latitude, longitude, geofenceRadiusM } = req.body;
+    const update = {};
+    if (latitude !== undefined && latitude !== "") {
+      update.latitude = Number(latitude);
+    }
+    if (longitude !== undefined && longitude !== "") {
+      update.longitude = Number(longitude);
+    }
+    if (geofenceRadiusM !== undefined && geofenceRadiusM !== "") {
+      update.geofenceRadiusM = Math.max(50, Number(geofenceRadiusM) || 250);
+    }
+
+    if (!Object.keys(update).length) {
+      return res.status(400).json({
+        success: false,
+        message: "Provide latitude, longitude, and/or geofenceRadiusM",
+      });
+    }
+
+    const school = await School.findByIdAndUpdate(
+      school_id,
+      { $set: update },
+      { new: true },
+    ).select("school_name latitude longitude geofenceRadiusM address");
+
+    if (!school) return notFound(res, "School");
+
+    return res.json({
+      success: true,
+      message: "School location saved for bus geofence alerts",
+      data: school,
+    });
   } catch (err) {
     serverError(res, err);
   }
@@ -1107,12 +1684,15 @@ export const getParentTransport = async (req, res) => {
       });
     }
  
-    // 3. Fetch the route with full population
+    // 3. Fetch the route with full population (include bus GPS for parents)
     const route = await TransportRoute.findOne({
       _id: student.transport,
       schoolId: new mongoose.Types.ObjectId(schoolId),
     })
-      .populate("bus",    "busId regNo model capacity status nextService")
+      .populate(
+        "bus",
+        "busId regNo model capacity status nextService gpsEnabled lastLatitude lastLongitude lastGpsAt gpsSpeedKmh",
+      )
       .populate("driver", "name phone license licenseExpiry experience status photo")
       .lean();
  
@@ -1123,6 +1703,35 @@ export const getParentTransport = async (req, res) => {
         data: null,
       });
     }
+
+    const bus = route.bus
+      ? {
+          busId: route.bus.busId,
+          regNo: route.bus.regNo,
+          model: route.bus.model,
+          capacity: route.bus.capacity,
+          status: route.bus.status,
+          nextService: route.bus.nextService,
+          gps: {
+            enabled: Boolean(route.bus.gpsEnabled),
+            latitude: route.bus.gpsEnabled ? route.bus.lastLatitude ?? null : null,
+            longitude: route.bus.gpsEnabled
+              ? route.bus.lastLongitude ?? null
+              : null,
+            lastUpdated: route.bus.gpsEnabled
+              ? route.bus.lastGpsAt ?? null
+              : null,
+            speedKmh: route.bus.gpsEnabled
+              ? route.bus.gpsSpeedKmh ?? null
+              : null,
+            hasLiveFix: Boolean(
+              route.bus.gpsEnabled &&
+                route.bus.lastLatitude != null &&
+                route.bus.lastLongitude != null,
+            ),
+          },
+        }
+      : null;
  
     return res.json({
       success: true,
@@ -1139,7 +1748,7 @@ export const getParentTransport = async (req, res) => {
           endTime:    route.endTime,
           stopsList:  route.stopsList || [],
         },
-        bus: route.bus || null,
+        bus,
         driver: route.driver || null,
         busFeeFrequency: student.busFeeFrequency,
         busFeeQuarter:   student.busFeeQuarter,

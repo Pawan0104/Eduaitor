@@ -14,6 +14,8 @@ import SchoolSubscription from "./pages/SchoolSubscription";
 import SchoolView from "./components/SchoolView";
 import SchoolDetail from "./pages/SchoolDetail";
 import AddSchool from "./pages/AddSchool";
+import FeeReceipt from "./pages/FeeReceipt";
+import FinancialReport from "./pages/FinancialReport";
 
 import SchoolMenu from "./pages/SchoolMenu";
 import SchoolDashboard from "./pages/SchoolDashboard";
@@ -38,15 +40,36 @@ import Defaulters from "./pages/Defaulters";
 import Transport from "./pages/Transport";
 import DriverManagement from "./pages/DriverManagement";
 import BusManagement from "./pages/BusManagement";
+import BusGpsTracking from "./pages/BusGpsTracking";
 import RouteManagement from "./pages/RouteManagement";
 import ExamCreate from "./pages/ExamCreate";
 import LibraryManagement from "./pages/LibraryManagement";
+import HostelManagement from "./pages/HostelManagement";
+import HostelBuildings from "./pages/HostelBuildings";
+import HostelRooms from "./pages/HostelRooms";
+import HostelResidents from "./pages/HostelResidents";
+import HostelVisitors from "./pages/HostelVisitors";
+import HouseAllocation from "./pages/HouseAllocation";
+import CommerceSuite from "./pages/CommerceSuite";
+import CommerceInventory from "./pages/CommerceInventory";
+import CommerceStore from "./pages/CommerceStore";
+import CommerceOrders from "./pages/CommerceOrders";
 import Syllabus from "./pages/Syllabus";
+import SyllabusCatalogAdmin from "./pages/SyllabusCatalogAdmin";
+import SyllabusBooksViewer from "./pages/SyllabusBooksViewer";
 import AttendanceReportPrincipal from "./pages/AttendanceReportPrincipal";
 import Calendar from "./pages/Calendar";
 import Group from "./pages/Group";
 import DiaryPrincipal from "./pages/DiaryPrincipal";
+import HomeworkSchool from "./pages/HomeworkSchool";
+import HomeworkTeacher from "./pages/HomeworkTeacher";
+import HomeworkParent from "./pages/HomeworkParent";
+import TeacherPageProgress from "./pages/TeacherPageProgress";
+import ParentLearningToday from "./pages/ParentLearningToday";
+import DailyLearningHub from "./pages/DailyLearningHub";
 import PrincipalResultView from "./pages/PrincipalResultView";
+import StaffAttendance from "./pages/StaffAttendance";
+import StaffMenu from "./pages/StaffMenu";
 
 import TeacherMenu from "./pages/TeacherMenu";
 import TeacherDashboard from "./pages/TeacherDashboard";
@@ -66,8 +89,11 @@ import ParentAssignment from "./pages/ParentAssignment";
 import ParentAssignmentResult from "./pages/ParentAssignmentResult";
 import TeacherCalendar from "./pages/TeacherCalendar";
 import ParentResultView from "./pages/ParentResultView";
+import ReportCard from "./pages/ReportCard";
+import IdCard from "./pages/IdCard";
 import DiaryParent from "./pages/DiaryParent";
 import ParentFee from "./pages/ParentFee";
+import ParentStore from "./pages/ParentStore";
 import AttendanceParent from "./pages/AttendanceParent";
 import MyChild from "./pages/MyChild";
 import ParentLibrary from "./pages/ParentLibrary";
@@ -86,8 +112,10 @@ import TeacherGatepass from "./pages/TeacherGatepass";
 import MessagesPage from "./pages/messagesingal/MessagePage";
 import NewMessagePage from "./pages/messagesingal/NewMessagePage";
 import ChatPage from "./pages/messagesingal/ChatPage";
+import HelpSupport from "./pages/HelpSupport";
 import BulkStudentUpload from "./pages/BulkStudentUpload";
 import StudentDashboard from "./pages/StudentDashboard";
+import LeadManagement from "./pages/LeadManagement";
 
 // message files -
 
@@ -131,6 +159,9 @@ const App = () => {
           <Route path="school-detail" element={<SchoolDetail />} />
           <Route path="subscription-plan" element={<SchoolSubscription />} />
           <Route path="/admin/school-view/:id" element={<SchoolDetail />} />
+          <Route path="syllabus-catalog" element={<SyllabusCatalogAdmin />} />
+          <Route path="messages" element={<MessagesPage />} />
+          <Route path="messages/:threadId" element={<ChatPage />} />
 
           <Route path="*" element={<Navigate to="/admin/dashboard" />} />
         </Route>
@@ -147,9 +178,12 @@ const App = () => {
           <Route path="dashboard" element={<SchoolDashboard />} />
           <Route path="notification" element={<NotificationPage />} />
           <Route path="students" element={<Students />} />
+          <Route path="leads" element={<LeadManagement />} />
           <Route path="student-manage" element={<StudentManagement />} />
           <Route path="student-manage/:id" element={<StudentManagement />} />
           <Route path="student-view/:id" element={<StudentView />} />
+          <Route path="id-card/student/:id" element={<IdCard />} />
+          <Route path="id-card/staff/:id" element={<IdCard />} />
           <Route path="students/bulk-upload" element={<BulkStudentUpload />} />
           <Route path="teachers" element={<Teachers />} />
           <Route path="teacher-manage" element={<TeacherManagement />} />
@@ -165,13 +199,17 @@ const App = () => {
             path="attendance/student/:studentId"
             element={<StudentAttendanceDetail />}
           />
+          <Route path="staff-attendance" element={<StaffAttendance />} />
           <Route path="timetable" element={<TimeTable />} />
           <Route path="fee-structure" element={<FeeStructure />} />
           <Route path="fee-collection" element={<FeeCollection />} />
           <Route path="fee-history" element={<FeeHistory />} />
+          <Route path="financial-report" element={<FinancialReport />} />
+          <Route path="fees/receipt/:paymentId" element={<FeeReceipt />} />
           <Route path="defaulters" element={<Defaulters />} />
           <Route path="group" element={<Group />} />
           <Route path="diary" element={<DiaryPrincipal />} />
+          <Route path="homework" element={<HomeworkSchool />} />
           <Route path="event" element={<Event />} />
           <Route path="event/:id" element={<EventView />} />
           <Route path="notice" element={<Notice />} />
@@ -179,15 +217,29 @@ const App = () => {
           <Route path="transport" element={<Transport />} />
           <Route path="transport-driver" element={<DriverManagement />} />
           <Route path="transport-bus" element={<BusManagement />} />
+          <Route path="transport-gps" element={<BusGpsTracking />} />
           <Route path="transport-route" element={<RouteManagement />} />
           <Route path="exam-structure" element={<ExamCreate />} />
+          <Route path="exam-marks-entry" element={<TeacherExam />} />
           <Route path="exam-marks" element={<PrincipalResultView />} />
+          <Route path="report-card" element={<ReportCard />} />
           <Route path="library" element={<LibraryManagement />} />
+          <Route path="hostel" element={<HostelManagement />} />
+          <Route path="hostel/buildings" element={<HostelBuildings />} />
+          <Route path="hostel/rooms" element={<HostelRooms />} />
+          <Route path="hostel/residents" element={<HostelResidents />} />
+          <Route path="hostel/visitors" element={<HostelVisitors />} />
+          <Route path="house" element={<HouseAllocation />} />
+          <Route path="commerce" element={<CommerceSuite />} />
+          <Route path="commerce/store" element={<CommerceStore />} />
+          <Route path="commerce/orders" element={<CommerceOrders />} />
+          <Route path="commerce/:section" element={<CommerceInventory />} />
           <Route path="blogs" element={<Blogs />} />
           <Route path="staff" element={<StaffManagement />} />
           <Route path="messages" element={<MessagesPage />} />
           <Route path="messages/new" element={<NewMessagePage />} />
           <Route path="messages/:threadId" element={<ChatPage />} />
+          <Route path="help" element={<HelpSupport />} />
           <Route path="/school/gatepass" element={<TeacherGatepass />}  />
           <Route path="*" element={<Navigate to="/school/dashboard" />} />
         </Route>
@@ -205,6 +257,7 @@ const App = () => {
           <Route path="notification" element={<NotificationPage />} />
           <Route path="students" element={<TeacherStudents />} />
           <Route path="student-view/:id" element={<StudentView />} />
+          <Route path="id-card/student/:id" element={<IdCard />} />
           <Route path="class" element={<Class />} />
           <Route path="class-view/:id" element={<ClassView />} />
           <Route path="assignment" element={<Assignment />} />
@@ -213,6 +266,7 @@ const App = () => {
             element={<TeacherAssignmentResult />}
           />
           <Route path="exam" element={<TeacherExam />} />
+          <Route path="report-card" element={<ReportCard />} />
           <Route path="attendance/mark" element={<AttendanceWithTabs />} />
           <Route
             path="attendance/student/:studentId"
@@ -224,6 +278,9 @@ const App = () => {
           />
           <Route path="syllabus" element={<Syllabus />} />
           <Route path="diary" element={<DiaryTeacher />} />
+          <Route path="homework" element={<HomeworkTeacher />} />
+          <Route path="page-progress" element={<TeacherPageProgress />} />
+          <Route path="daily-learning" element={<DailyLearningHub />} />
           <Route path="event" element={<Event />} />
           <Route path="event/:id" element={<EventView />} />
           <Route path="notice" element={<Notice />} />
@@ -235,6 +292,7 @@ const App = () => {
            <Route path="messages" element={<MessagesPage />} />
           <Route path="messages/new" element={<NewMessagePage />} />
           <Route path="messages/:threadId" element={<ChatPage />} />
+          <Route path="help" element={<HelpSupport />} />
 
           <Route path="*" element={<Navigate to="/teacher/dashboard" />} />
         </Route>
@@ -256,26 +314,26 @@ const App = () => {
           <Route path="notification" element={<NotificationPage />} />
           <Route path="student" element={<MyChild />} /> {/* child profile */}
           <Route path="fees" element={<ParentFee />} />
+          <Route path="fees/receipt/:paymentId" element={<FeeReceipt />} />
+          <Route path="store" element={<ParentStore />} />
           <Route path="transport" element={<ParentTransport />} />
+          <Route path="exam-result" element={<ParentResultView />} />
+          <Route path="report-card" element={<ReportCard />} />
+          <Route path="id-card" element={<IdCard />} />
           <Route path="notice" element={<Notice />} />
           <Route path="event" element={<Event />} />
           <Route path="event/:id" element={<EventView />} />
           <Route path="calendar" element={<TeacherCalendar />} />
           <Route path="blogs" element={<Blogs />} />
            <Route path="gatepass" element={<ParentGatepass />} />
+           <Route path="homework" element={<HomeworkParent />} />
+           <Route path="learning-today" element={<ParentLearningToday />} />
+           <Route path="daily-learning" element={<DailyLearningHub />} />
+           <Route path="syllabus-books" element={<SyllabusBooksViewer />} />
            <Route path="messages" element={<MessagesPage />} />
           <Route path="messages/new" element={<NewMessagePage />} />
           <Route path="messages/:threadId" element={<ChatPage />} />
-          {/* <Route
-          path="timetable"
-          element={
-            <ReadTimetable
-              preselectedClassId={student.classId}
-              preselectedDetailId={student.detailId}
-              showClassSelector={false}
-            />
-          }
-        /> */}
+          <Route path="help" element={<HelpSupport />} />
           <Route path="*" element={<Navigate to="/parent/dashboard" />} />
         </Route>
 
@@ -304,7 +362,12 @@ const App = () => {
             element={<ParentAssignmentResult />}
           />
           <Route path="exam-result" element={<ParentResultView />} />
+          <Route path="report-card" element={<ReportCard />} />
+          <Route path="id-card" element={<IdCard />} />
           <Route path="diary" element={<DiaryParent />} />
+          <Route path="homework" element={<HomeworkParent />} />
+          <Route path="daily-learning" element={<DailyLearningHub />} />
+          <Route path="syllabus-books" element={<SyllabusBooksViewer />} />
           <Route path="library" element={<ParentLibrary />} />
           <Route path="group" element={<Group />} />
           <Route path="notice" element={<Notice />} />
@@ -315,6 +378,7 @@ const App = () => {
           <Route path="messages" element={<MessagesPage />} />
           <Route path="messages/new" element={<NewMessagePage />} />
           <Route path="messages/:threadId" element={<ChatPage />} />
+          <Route path="help" element={<HelpSupport />} />
           <Route path="*" element={<Navigate to="/student/dashboard" />} />
         </Route>
 
@@ -327,25 +391,37 @@ const App = () => {
           }
         >
           {/* always accessible */}
-          {/* <Route path="menu"         element={<StaffMenu />} /> */}
+          <Route path="menu" element={<StaffMenu />} />
           <Route path="dashboard" element={<StaffDashboard />} />
           <Route path="notification" element={<NotificationPage />} />
           <Route path="notice" element={<Notice />} />
           <Route path="event" element={<Event />} />
           <Route path="event/:id" element={<EventView />} />
           <Route path="calendar" element={<TeacherCalendar />} />
+          <Route path="id-card" element={<IdCard />} />
+          <Route path="id-card/student/:id" element={<IdCard />} />
+          <Route path="id-card/staff/:id" element={<IdCard />} />
 
           {/* module gated pages — reuse existing components where possible */}
           <Route path="students" element={<Students />} />
-          <Route path="attendance" element={<AttendanceReportPrincipal />} />
+          <Route path="attendance" element={<StaffAttendance />} />
           <Route path="fees" element={<FeeCollection />} />
+          <Route path="fee-history" element={<FeeHistory />} />
+          <Route path="financial-report" element={<FinancialReport />} />
+          <Route path="fees/receipt/:paymentId" element={<FeeReceipt />} />
+          <Route path="defaulters" element={<Defaulters />} />
           <Route path="library" element={<LibraryManagement />} />
+          <Route path="house" element={<HouseAllocation />} />
           <Route path="transport" element={<Transport />} />
           <Route path="timetable" element={<ReadTimetable />} />
           <Route path="syllabus" element={<Syllabus />} />
           <Route path="diary" element={<DiaryPrincipal />} />
+          <Route path="homework" element={<HomeworkSchool />} />
           <Route path="exams" element={<ExamCreate />} />
+          <Route path="exam-marks" element={<TeacherExam />} />
+          <Route path="report-card" element={<ReportCard />} />
           <Route path="assignments" element={<Assignment />} />
+          <Route path="leads" element={<LeadManagement />} />
           <Route path="group" element={<Group />} />
           <Route path="staff" element={<StaffManagement />} />
           <Route path="messages" element={<MessagesPage />} />

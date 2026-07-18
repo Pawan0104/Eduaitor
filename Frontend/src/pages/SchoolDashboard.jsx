@@ -26,6 +26,7 @@ import { toast } from "react-toastify";
 import { FaArrowLeft } from "react-icons/fa";
 import CreateNotification from "../components/CreateNotification";
 import UpcomingNotifications from "../components/UpComingNotifications";
+import { Tx, useTx } from "../components/DashboardI18n";
 
 const API = import.meta.env.VITE_API_URL;
 const settingsKey = "schoolDashboardVisibility";
@@ -834,15 +835,18 @@ const DashboardSettingsControl = ({ visibility, onToggle, onReset }) => {
   );
 };
 
-const SectionCard = ({ title, subtitle, children }) => (
+const SectionCard = ({ title, subtitle, children }) => {
+  const tx = useTx();
+  return (
   <section className="rounded-3xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))] p-5 shadow-sm">
     <div className="mb-4">
-      <h2 className="text-lg font-black text-[rgb(var(--text))]">{title}</h2>
-      <p className="mt-1 text-sm text-[rgb(var(--text-muted))]">{subtitle}</p>
+      <h2 className="text-lg font-black text-[rgb(var(--text))]">{tx(title)}</h2>
+      <p className="mt-1 text-sm text-[rgb(var(--text-muted))]">{tx(subtitle)}</p>
     </div>
     {children}
   </section>
-);
+  );
+};
 
 const StatCard = ({ title, value, note, icon, tone ,path}) => {
   const navigate = useNavigate();
@@ -868,17 +872,21 @@ const StatCard = ({ title, value, note, icon, tone ,path}) => {
   );
 };
 
-const HighlightCard = ({ label, value, subtext }) => (
+const HighlightCard = ({ label, value, subtext }) => {
+  const tx = useTx();
+  return (
   <div className="rounded-2xl border border-[rgb(var(--border))] bg-[rgb(var(--bg))] p-4">
     <p className="text-xs font-bold uppercase tracking-[0.2em] text-[rgb(var(--text-muted))]">
-      {label}
+      {tx(label)}
     </p>
     <p className="mt-2 text-2xl font-black text-[rgb(var(--text))]">{value} </p>
-    <p className="mt-2 text-sm text-[rgb(var(--text-muted))]">{subtext}</p>
+    <p className="mt-2 text-sm text-[rgb(var(--text-muted))]">{tx(subtext)}</p>
   </div>
-);
+  );
+};
 
 const AlertRow = ({ label, value, helper, tone }) => {
+  const tx = useTx();
   const tones = {
     red:    "bg-red-50 text-red-700",
     amber:  "bg-amber-50 text-amber-700",
@@ -888,8 +896,8 @@ const AlertRow = ({ label, value, helper, tone }) => {
   return (
     <div className="flex items-center justify-between gap-3 rounded-2xl border border-[rgb(var(--border))] bg-[rgb(var(--bg))] p-3">
       <div>
-        <p className="text-sm font-bold text-[rgb(var(--text))]">{label}</p>
-        <p className="text-xs text-[rgb(var(--text-muted))]">{helper}</p>
+        <p className="text-sm font-bold text-[rgb(var(--text))]">{tx(label)}</p>
+        <p className="text-xs text-[rgb(var(--text-muted))]">{tx(helper)}</p>
       </div>
       <span className={`rounded-full px-3 py-1 text-xs font-bold ${tones[tone]}`}>
         {value}

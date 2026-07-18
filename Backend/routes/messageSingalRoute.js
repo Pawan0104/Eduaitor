@@ -3,6 +3,7 @@ import { authMiddleware } from "../auth/auth.js";
 import upload from "../middlewares/upload.js";
 import {
   startOrGetThread,
+  startHelpThread,
   getMyThreads,
   getThreadMessages,
   sendMessage,
@@ -19,6 +20,10 @@ router.use(authMiddleware);
 // POST /api/messages/thread/start
 // Start or fetch existing thread with another user
 router.post("/thread/start", startOrGetThread);
+
+// POST /api/message-signal/help/start
+// Open help chat with platform Super Admin
+router.post("/help/start", startHelpThread);
 
 // GET /api/messages/threads
 // Get all threads for logged-in user (inbox)

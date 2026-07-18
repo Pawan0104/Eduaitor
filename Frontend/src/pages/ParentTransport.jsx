@@ -204,30 +204,33 @@ const ParentTransport = () => {
   const [data, setData] = useState(null);
   const [assigned, setAssigned] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [refreshingGps, setRefreshingGps] = useState(false);
   const [showAllStops, setShowAllStops] = useState(false);
 
-  useEffect(() => {
-    const fetchTransport = async () => {
-      try {
-        setLoading(true);
-        const res = await axios.get(`${API}/transport/parent/my-route`, {
-          withCredentials: true,
-        });
-        if (res.data.success) {
-          setAssigned(res.data.assigned);
-          setData(res.data.data || null);
-          console.log(res.data.data || null);
-        } else {
-          toast.error("Failed to load transport details");
-        }
-      } catch (err) {
-        toast.error(
-          err?.response?.data?.message || "Error loading transport info",
-        );
-      } finally {
-        setLoading(false);
+  const fetchTransport = async ({ silent = false } = {}) => {
+    try {
+      if (silent) setRefreshingGps(true);
+      else setLoading(true);
+      const res = await axios.get(`${API}/transport/parent/my-route`, {
+        withCredentials: true,
+      });
+      if (res.data.success) {
+        setAssigned(res.data.assigned);
+        setData(res.data.data || null);
+      } else {
+        toast.error("Failed to load transport details");
       }
-    };
+    } catch (err) {
+      toast.error(
+        err?.response?.data?.message || "Error loading transport info",
+      );
+    } finally {
+      setLoading(false);
+      setRefreshingGps(false);
+    }
+  };
+
+  useEffect(() => {
     fetchTransport();
   }, []);
 
@@ -235,6 +238,7 @@ const ParentTransport = () => {
   if (!assigned || !data) return <NoTransport />;
 
   const { route, bus, driver, busFeeFrequency, busFeeQuarter } = data;
+  const gps = bus?.gps;
   const stops = route.stopsList || [];
   const PREVIEW = 4;
   const hasMore = stops.length > PREVIEW;
@@ -461,6 +465,98 @@ const ParentTransport = () => {
             <p className="px-5 py-4 text-sm text-[rgb(var(--text))] italic">
               No bus assigned to this route.
             </p>
+          )}
+        </Card>
+
+        {/* ── GPS TRACKING CARD ── */}
+        <Card>
+          <CardHeader icon="🛰️" title="Live GPS tracking" accent="#0ea5e9" />
+          {gps?.enabled ? (
+            <div className="px-5 py-4 space-y-4">
+              <div className="flex items-center justify-between gap-3">
+                <div>
+                  <p className="text-sm font-bold text-[rgb(var(--text))]">
+                    {gps.hasLiveFix ? "Live location available" : "Waiting for GPS fix"}
+                  </p>
+                  <p className="text-xs text-[rgb(var(--text-light))] mt-0.5">
+                    {gps.lastUpdated
+                      ? `Updated ${new Date(gps.lastUpdated).toLocaleString()}`
+                      : "No location update yet"}
+                  </p>
+                </div>
+                <span
+                  className={`px-2.5 py-1 text-[11px] font-bold rounded-full ${
+                    gps.hasLiveFix
+                      ? "bg-emerald-50 text-emerald-700"
+                      : "bg-amber-50 text-amber-700"
+                  }`}
+                >
+                  {gps.hasLiveFix ? "Live" : "Pending"}
+                </span>
+              </div>
+
+              <div className="grid grid-cols-2 gap-5">
+                <InfoCell
+                  label="Latitude"
+                  value={
+                    gps.latitude != null ? Number(gps.latitude).toFixed(5) : null
+                  }
+                  mono
+                />
+                <InfoCell
+                  label="Longitude"
+                  value={
+                    gps.longitude != null
+                      ? Number(gps.longitude).toFixed(5)
+                      : null
+                  }
+                  mono
+                />
+                <InfoCell
+                  label="Speed"
+                  value={
+                    gps.speedKmh != null ? `${gps.speedKmh} km/h` : null
+                  }
+                />
+                <InfoCell label="Bus" value={bus?.busId} mono />
+              </div>
+
+              <div className="flex flex-col sm:flex-row gap-2">
+                {gps.hasLiveFix && (
+                  <a
+                    href={`https://www.google.com/maps?q=${gps.latitude},${gps.longitude}`}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="flex-1 flex items-center justify-center gap-2 py-3 rounded-xl bg-sky-600 text-white font-bold text-sm active:scale-[.98] transition-all"
+                  >
+                    Open in Maps
+                  </a>
+                )}
+                <button
+                  type="button"
+                  onClick={() => fetchTransport({ silent: true })}
+                  disabled={refreshingGps}
+                  className="flex-1 flex items-center justify-center gap-2 py-3 rounded-xl border border-slate-200 bg-[rgb(var(--surface))] font-bold text-sm text-[rgb(var(--text))] active:scale-[.98] transition-all disabled:opacity-60"
+                >
+                  {refreshingGps ? "Refreshing..." : "Refresh location"}
+                </button>
+              </div>
+            </div>
+          ) : (
+            <div className="px-5 py-4">
+              <AlertBanner
+                color="amber"
+                icon={
+                  <>
+                    <circle cx="12" cy="12" r="10" />
+                    <line x1="12" y1="8" x2="12" y2="12" />
+                    <line x1="12" y1="16" x2="12.01" y2="16" />
+                  </>
+                }
+                title="GPS not enabled for this bus"
+                desc="School admin can enable GPS tracking on your child's bus from Bus Management."
+              />
+            </div>
           )}
         </Card>
 

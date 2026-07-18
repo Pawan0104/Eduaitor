@@ -6,6 +6,18 @@ import Payment from "../models/payment.js";
 import Counter from "../models/receiptCounter.js";
 import School from "../models/school.js";
 import { createNotificationHelper } from "./notificationController.js";
+import Razorpay from "razorpay";
+
+/** Real Razorpay keys from dashboard. Missing/mock keys → development checkout. */
+const hasRealRazorpayKeys = (school) => {
+  const keyId = String(school?.razorpayKeyId || "").trim();
+  const secret = String(school?.razorpayKeySecret || "").trim();
+  if (!keyId || !secret) return false;
+  if (keyId === "rzp_test_local" || keyId.startsWith("rzp_test_eduaitor")) {
+    return false;
+  }
+  return /^rzp_(test|live)_[A-Za-z0-9]+$/.test(keyId);
+};
 
 //  Get fee structure for a class
 export const getFeeStructures = async (req, res) => {
@@ -142,7 +154,186 @@ export const deleteFeeComponent = async (req, res) => {
 };
 
 // collect fee function
-export const collectStudentFee = async (req, res) => {
+export const initiateRazorpayOrder = async (req, res) => {
+  try {
+    const schoolId = req.user?.school_id;
+    const studentId =
+      req.user?.loginAs === "parent" || req.user?.loginAs === "student"
+        ? req.user.student_id
+        : req.body.studentId;
+    const amount = Number(req.body.amount);
+
+    if (!studentId || !amount || amount <= 0 || !schoolId) {
+      return res.status(400).json({
+        success: false,
+        message: "Student ID, a valid amount, and School ID are required",
+      });
+    }
+
+    const school = await School.findById(schoolId).lean();
+    if (!school) {
+      return res.status(400).json({
+        success: false,
+        message: "School not found",
+      });
+    }
+
+    const student = await Student.findOne({ _id: studentId, schoolId }).lean();
+    if (!student) {
+      return res.status(404).json({
+        success: false,
+        message: "Student not found",
+      });
+    }
+
+    // Development: no real Razorpay keys yet → mock checkout order
+    if (!hasRealRazorpayKeys(school)) {
+      const orderId = `order_local_${Date.now()}`;
+      return res.status(200).json({
+        success: true,
+        message: "Development payment gateway order created",
+        mock: true,
+        orderId,
+        amount: Math.round(amount * 100),
+        currency: "INR",
+        key_id: "rzp_test_dev",
+        studentId,
+        amountRupees: amount,
+      });
+    }
+
+    const razorpay = new Razorpay({
+      key_id: school.razorpayKeyId,
+      key_secret: school.razorpayKeySecret,
+    });
+
+    const options = {
+      amount: Math.round(amount * 100), // paise
+      currency: "INR",
+      receipt: `receipt_${studentId}_${Date.now()}`.slice(0, 40),
+      payment_capture: 1,
+      notes: {
+        studentId: String(studentId),
+        schoolId: String(schoolId),
+      },
+    };
+
+    const order = await razorpay.orders.create(options);
+
+    return res.status(200).json({
+      success: true,
+      message: "Razorpay order initiated successfully",
+      mock: false,
+      orderId: order.id,
+      amount: order.amount,
+      currency: order.currency,
+      key_id: school.razorpayKeyId,
+      studentId,
+      amountRupees: amount,
+    });
+  } catch (error) {
+    console.error("Razorpay Order Initiation Error:", error);
+    return res.status(500).json({
+      success: false,
+      message:
+        error?.error?.description ||
+        error?.message ||
+        "Server error during Razorpay order initiation",
+      error: error.message,
+    });
+  }
+};
+
+export const verifyRazorpayPayment = async (req, res) => {
+  try {
+    const schoolId = req.user?.school_id;
+    const studentId =
+      req.user?.loginAs === "parent" || req.user?.loginAs === "student"
+        ? req.user.student_id
+        : req.body.studentId;
+    const { orderId, paymentId, signature, amountPaid } = req.body;
+
+    if (
+      !orderId ||
+      !paymentId ||
+      !signature ||
+      !studentId ||
+      amountPaid === undefined ||
+      !schoolId
+    ) {
+      return res.status(400).json({
+        success: false,
+        message:
+          "Order ID, Payment ID, Signature, Student ID, Amount Paid, and School ID are required",
+      });
+    }
+
+    const school = await School.findById(schoolId).lean();
+    if (!school) {
+      return res.status(400).json({
+        success: false,
+        message: "School not found",
+      });
+    }
+
+    const isDevOrder = String(orderId).startsWith("order_local_");
+
+    if (isDevOrder) {
+      if (signature !== "local_test_signature") {
+        return res.status(400).json({
+          success: false,
+          message: "Payment verification failed. Signature mismatch.",
+        });
+      }
+    } else {
+      if (!hasRealRazorpayKeys(school)) {
+        return res.status(400).json({
+          success: false,
+          message: "Razorpay API keys not configured for this school.",
+        });
+      }
+
+      const { validatePaymentVerification } = await import(
+        "razorpay/dist/utils/razorpay-utils.js"
+      );
+
+      const isAuthentic = validatePaymentVerification(
+        { order_id: orderId, payment_id: paymentId },
+        signature,
+        school.razorpayKeySecret,
+      );
+
+      if (!isAuthentic) {
+        return res.status(400).json({
+          success: false,
+          message: "Payment verification failed. Signature mismatch.",
+        });
+      }
+    }
+
+    req.body.studentId = studentId;
+    req.body.paymentMode = "Online";
+    req.body.remarks = isDevOrder
+      ? `Dev Gateway Payment - Order ID: ${orderId}, Payment ID: ${paymentId}`
+      : `Razorpay Payment - Order ID: ${orderId}, Payment ID: ${paymentId}`;
+    req.body.amountPaid = amountPaid;
+    req.body.orderId = orderId;
+    req.body.paymentId = paymentId;
+    req.body.signature = signature;
+
+    return collectStudentFeeInternal(req, res);
+  } catch (error) {
+    console.error("Razorpay Payment Verification Error:", error);
+    return res.status(500).json({
+      success: false,
+      message: "Server error during Razorpay payment verification",
+      error: error.message,
+    });
+  }
+};
+
+// Renamed collectStudentFee to collectStudentFeeInternal for internal use
+const collectStudentFeeInternal = async (req, res) => {
   try {
     const { studentId, amountPaid, paymentMode, remarks } = req.body;
     const schoolId = req.user?.school_id;
@@ -191,6 +382,9 @@ export const collectStudentFee = async (req, res) => {
       remarks: remarks || "",
       receiptNo: receiptId,
       paidDate: new Date(),
+      razorpayOrderId: req.body.orderId || null,
+      razorpayPaymentId: req.body.paymentId || null,
+      razorpaySignature: req.body.signature || null,
     });
 
     // 6. Update student totals
@@ -225,6 +419,8 @@ export const collectStudentFee = async (req, res) => {
     return res.status(500).json({ message: "Server error during payment" });
   }
 };
+
+export const collectStudentFee = collectStudentFeeInternal;
 
 //  get all history of that particular school students
 export const AllStudentHistory = async (req, res) => {
@@ -866,6 +1062,7 @@ const buildStudentFeeResponse = async ({ studentId, schoolId }) => {
   return {
     success: true,
     student: {
+      _id: student._id,
       name: `${student.firstName} ${student.lastName}`.trim(),
       className: student.classId?.name || "",
       section: student.sectionId?.name || "",
@@ -1044,5 +1241,319 @@ export const notifyDefaulter = async (req, res) => {
       .json({ success: true, message: "Notification sent to student" });
   } catch (error) {
     return res.status(500).json({ success: false, error: error.message });
+  }
+};
+
+// ─────────────────────────────────────────────────────────────
+// GET /api/fees/receipt/:paymentId — printable fee receipt
+// ─────────────────────────────────────────────────────────────
+export const getFeeReceipt = async (req, res) => {
+  try {
+    const { paymentId } = req.params;
+    const role = req.user?.role;
+
+    if (!paymentId || !mongoose.Types.ObjectId.isValid(paymentId)) {
+      return res.status(400).json({ success: false, message: "Invalid payment id" });
+    }
+
+    const payment = await Payment.findById(paymentId).lean();
+    if (!payment) {
+      return res.status(404).json({ success: false, message: "Receipt not found" });
+    }
+
+    if (role === "student_admin") {
+      if (String(payment.studentId) !== String(req.user.student_id)) {
+        return res.status(403).json({ success: false, message: "Not authorized" });
+      }
+    } else if (role === "school_admin" || role === "staff_admin" || role === "teacher_admin") {
+      if (String(payment.schoolId) !== String(req.user.school_id)) {
+        return res.status(403).json({ success: false, message: "Not authorized" });
+      }
+    } else if (role !== "super_admin") {
+      return res.status(403).json({ success: false, message: "Not authorized" });
+    }
+
+    const [student, school] = await Promise.all([
+      Student.findById(payment.studentId)
+        .populate("classId", "name")
+        .populate("sectionId", "name")
+        .select(
+          "firstName lastName studentId rollNo fatherName totalFee finalFee totalPaid totalDue classId sectionId",
+        )
+        .lean(),
+      School.findById(payment.schoolId)
+        .select("school_name school_logo address contact_phone contact_email")
+        .lean(),
+    ]);
+
+    if (!student) {
+      return res.status(404).json({ success: false, message: "Student not found" });
+    }
+
+    return res.json({
+      success: true,
+      receipt: {
+        receiptNo: payment.receiptNo,
+        amountPaid: payment.amountPaid,
+        paymentMode: payment.paymentMode,
+        paidDate: payment.paidDate,
+        remarks: payment.remarks || "",
+        razorpayPaymentId: payment.razorpayPaymentId || "",
+        paymentId: payment._id,
+      },
+      student: {
+        _id: student._id,
+        name: `${student.firstName || ""} ${student.lastName || ""}`.trim(),
+        studentId: student.studentId || "",
+        rollNo: student.rollNo || "",
+        fatherName: student.fatherName || "",
+        className: student.classId?.name || "",
+        sectionName: student.sectionId?.name || "",
+        finalFee: student.finalFee || 0,
+        totalPaid: student.totalPaid || 0,
+        totalDue: student.totalDue || 0,
+      },
+      school: {
+        name: school?.school_name || "",
+        logo: school?.school_logo || "",
+        address: school?.address || "",
+        phone: school?.contact_phone || "",
+        email: school?.contact_email || "",
+      },
+    });
+  } catch (error) {
+    console.error("getFeeReceipt error:", error);
+    return res.status(500).json({ success: false, message: "Failed to load receipt" });
+  }
+};
+
+// ─────────────────────────────────────────────────────────────
+// GET /api/fees/financial-report — school / super admin reports
+// Query: year, month?, schoolId? (required for super_admin)
+// ─────────────────────────────────────────────────────────────
+export const getFinancialReport = async (req, res) => {
+  try {
+    const role = req.user?.role;
+    let schoolId = req.user?.school_id;
+
+    if (role === "super_admin") {
+      schoolId = req.query.schoolId;
+      if (!schoolId) {
+        return res.status(400).json({
+          success: false,
+          message: "schoolId is required for admin reports",
+        });
+      }
+    } else if (!["school_admin", "staff_admin"].includes(role)) {
+      return res.status(403).json({ success: false, message: "Not authorized" });
+    }
+
+    if (!schoolId) {
+      return res.status(400).json({ success: false, message: "School ID required" });
+    }
+
+    const year = parseInt(req.query.year, 10) || new Date().getFullYear();
+    const month = parseInt(req.query.month, 10) || null;
+    const schoolObjectId = new mongoose.Types.ObjectId(schoolId);
+
+    const dateMatch = {
+      schoolId: schoolObjectId,
+      $expr: {
+        $and: [
+          { $eq: [{ $year: "$paidDate" }, year] },
+          ...(month ? [{ $eq: [{ $month: "$paidDate" }, month] }] : []),
+        ],
+      },
+    };
+
+    const [agg] = await Payment.aggregate([
+      { $match: dateMatch },
+      {
+        $facet: {
+          totals: [
+            {
+              $group: {
+                _id: null,
+                totalCollected: { $sum: "$amountPaid" },
+                paymentCount: { $sum: 1 },
+                avgPayment: { $avg: "$amountPaid" },
+              },
+            },
+          ],
+          byMode: [
+            {
+              $group: {
+                _id: "$paymentMode",
+                total: { $sum: "$amountPaid" },
+                count: { $sum: 1 },
+              },
+            },
+            { $sort: { total: -1 } },
+          ],
+          byMonth: [
+            {
+              $group: {
+                _id: { $month: "$paidDate" },
+                total: { $sum: "$amountPaid" },
+                count: { $sum: 1 },
+              },
+            },
+            { $sort: { _id: 1 } },
+          ],
+          recent: [
+            { $sort: { paidDate: -1 } },
+            { $limit: 10 },
+            {
+              $lookup: {
+                from: "students",
+                localField: "studentId",
+                foreignField: "_id",
+                as: "student",
+              },
+            },
+            { $unwind: { path: "$student", preserveNullAndEmptyArrays: true } },
+            {
+              $project: {
+                _id: 1,
+                receiptNo: 1,
+                amountPaid: 1,
+                paymentMode: 1,
+                paidDate: 1,
+                studentName: {
+                  $trim: {
+                    input: {
+                      $concat: [
+                        { $ifNull: ["$student.firstName", ""] },
+                        " ",
+                        { $ifNull: ["$student.lastName", ""] },
+                      ],
+                    },
+                  },
+                },
+                studentCode: "$student.studentId",
+              },
+            },
+          ],
+        },
+      },
+    ]);
+
+    const byClass = await Payment.aggregate([
+      { $match: dateMatch },
+      {
+        $lookup: {
+          from: "students",
+          localField: "studentId",
+          foreignField: "_id",
+          as: "student",
+        },
+      },
+      { $unwind: { path: "$student", preserveNullAndEmptyArrays: true } },
+      {
+        $lookup: {
+          from: "classes",
+          localField: "student.classId",
+          foreignField: "_id",
+          as: "classDoc",
+        },
+      },
+      { $unwind: { path: "$classDoc", preserveNullAndEmptyArrays: true } },
+      {
+        $group: {
+          _id: "$classDoc._id",
+          className: { $first: { $ifNull: ["$classDoc.name", "Unassigned"] } },
+          total: { $sum: "$amountPaid" },
+          count: { $sum: 1 },
+        },
+      },
+      { $sort: { total: -1 } },
+    ]);
+
+    const dueSummary = await Student.aggregate([
+      { $match: { schoolId: schoolObjectId } },
+      {
+        $group: {
+          _id: null,
+          totalDue: { $sum: { $ifNull: ["$totalDue", 0] } },
+          totalPaidAllTime: { $sum: { $ifNull: ["$totalPaid", 0] } },
+          studentsWithDue: {
+            $sum: {
+              $cond: [{ $gt: [{ $ifNull: ["$totalDue", 0] }, 0] }, 1, 0],
+            },
+          },
+          studentCount: { $sum: 1 },
+        },
+      },
+    ]);
+
+    const school = await School.findById(schoolId)
+      .select("school_name school_logo")
+      .lean();
+
+    const totals = agg?.totals?.[0] || {
+      totalCollected: 0,
+      paymentCount: 0,
+      avgPayment: 0,
+    };
+
+    const monthNames = [
+      "",
+      "Jan",
+      "Feb",
+      "Mar",
+      "Apr",
+      "May",
+      "Jun",
+      "Jul",
+      "Aug",
+      "Sep",
+      "Oct",
+      "Nov",
+      "Dec",
+    ];
+
+    return res.json({
+      success: true,
+      school: {
+        _id: schoolId,
+        name: school?.school_name || "",
+        logo: school?.school_logo || "",
+      },
+      filters: { year, month },
+      summary: {
+        totalCollected: totals.totalCollected || 0,
+        paymentCount: totals.paymentCount || 0,
+        avgPayment: Math.round(totals.avgPayment || 0),
+        outstandingDue: dueSummary[0]?.totalDue || 0,
+        studentsWithDue: dueSummary[0]?.studentsWithDue || 0,
+        studentCount: dueSummary[0]?.studentCount || 0,
+        totalPaidAllTime: dueSummary[0]?.totalPaidAllTime || 0,
+      },
+      byMode: (agg?.byMode || []).map((r) => ({
+        mode: r._id || "Unknown",
+        total: r.total,
+        count: r.count,
+      })),
+      byMonth: (agg?.byMonth || []).map((r) => ({
+        month: r._id,
+        monthLabel: monthNames[r._id] || String(r._id),
+        total: r.total,
+        count: r.count,
+      })),
+      byClass: byClass.map((r) => ({
+        classId: r._id,
+        className: r.className,
+        total: r.total,
+        count: r.count,
+      })),
+      recentPayments: agg?.recent || [],
+    });
+  } catch (error) {
+    console.error("getFinancialReport error:", error);
+    return res.status(500).json({
+      success: false,
+      message: "Failed to generate financial report",
+      error: error.message,
+    });
   }
 };

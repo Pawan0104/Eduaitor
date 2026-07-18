@@ -1,0 +1,297 @@
+import { useEffect, useState } from "react";
+import axios from "axios";
+import { toast } from "react-toastify";
+import { useNavigate, useParams, useSearchParams } from "react-router-dom";
+import { FaArrowLeft, FaIdCard, FaPrint, FaDownload } from "react-icons/fa";
+import { useAuth } from "../context/AuthContext";
+
+const API = import.meta.env.VITE_API_URL;
+
+/**
+ * ID Card page
+ * Routes:
+ *   /student/id-card          → own student card
+ *   /staff/id-card            → own staff card
+ *   /school/id-card/student/:id
+ *   /school/id-card/staff/:id
+ *   /parent/id-card           → child's card
+ * Query: ?type=student|staff&id=xxx
+ */
+export default function IdCard() {
+  const navigate = useNavigate();
+  const { user } = useAuth();
+  const { id: paramId } = useParams();
+  const [searchParams] = useSearchParams();
+  const isMobile = window.innerWidth <= 768;
+
+  const typeFromQuery = searchParams.get("type");
+  const idFromQuery = searchParams.get("id");
+
+  const role = user?.role;
+  let cardType =
+    typeFromQuery ||
+    (role === "staff_admin"
+      ? "staff"
+      : role === "student_admin"
+        ? "student"
+        : paramId
+          ? "student"
+          : "student");
+
+  // Path segments: /school/id-card/staff/:id
+  const path = window.location.pathname;
+  if (path.includes("/id-card/staff")) cardType = "staff";
+  if (path.includes("/id-card/student")) cardType = "student";
+
+  const personId = paramId || idFromQuery || null;
+
+  const [loading, setLoading] = useState(true);
+  const [payload, setPayload] = useState(null);
+
+  useEffect(() => {
+    const load = async () => {
+      try {
+        setLoading(true);
+        let url = `${API}/id-card/me`;
+        if (personId) {
+          url =
+            cardType === "staff"
+              ? `${API}/id-card/staff/${personId}`
+              : `${API}/id-card/student/${personId}`;
+        } else if (cardType === "staff" && role === "staff_admin") {
+          url = `${API}/id-card/staff`;
+        } else if (cardType === "student") {
+          url = `${API}/id-card/student`;
+        }
+
+        const { data } = await axios.get(url, { withCredentials: true });
+        setPayload(data);
+      } catch (err) {
+        toast.error(err.response?.data?.message || "Failed to load ID card");
+        setPayload(null);
+      } finally {
+        setLoading(false);
+      }
+    };
+    load();
+  }, [cardType, personId, role]);
+
+  const handlePrint = () => window.print();
+
+  if (loading) {
+    return (
+      <div className="p-10 text-center text-[rgb(var(--text-light))]">
+        Loading ID card...
+      </div>
+    );
+  }
+
+  if (!payload?.person) {
+    return (
+      <div className="p-10 text-center">
+        <p className="text-[rgb(var(--text-light))] mb-4">ID card not available.</p>
+        <button
+          onClick={() => navigate(-1)}
+          className="px-4 py-2 rounded-lg border text-sm"
+        >
+          Go back
+        </button>
+      </div>
+    );
+  }
+
+  const { school, person, type } = payload;
+
+  return (
+    <div className="p-4 sm:p-6 lg:p-8 min-h-screen text-[rgb(var(--text))]">
+      <div className="mb-6 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 print:hidden">
+        <div>
+          {isMobile && (
+            <button
+              onClick={() => navigate(-1)}
+              className="flex items-center gap-2 px-3 py-1.5 mb-3 rounded-xl bg-[rgb(var(--surface))] border text-sm font-bold"
+            >
+              <FaArrowLeft /> Back
+            </button>
+          )}
+          <h1 className="text-2xl font-bold flex items-center gap-2">
+            <FaIdCard className="text-[rgb(var(--primary))]" />
+            {type === "staff" ? "Staff" : "Student"} ID Card
+          </h1>
+          <p className="text-sm text-[rgb(var(--text-light))] mt-1">
+            Issued on admission / registration — print or save as PDF
+          </p>
+        </div>
+        <div className="flex gap-2">
+          <button
+            onClick={handlePrint}
+            className="px-4 py-2 rounded-lg bg-emerald-600 text-white text-sm font-medium flex items-center gap-2"
+          >
+            <FaPrint /> Print / Download PDF
+          </button>
+          <button
+            onClick={handlePrint}
+            className="px-4 py-2 rounded-lg bg-[rgb(var(--primary))] text-sm font-medium flex items-center gap-2"
+          >
+            <FaDownload /> Save
+          </button>
+        </div>
+      </div>
+
+      <div className="flex justify-center">
+        <IdCardVisual school={school} person={person} type={type} />
+      </div>
+
+      <p className="text-center text-xs text-[rgb(var(--text-light))] mt-4 print:hidden">
+        Tip: In the print dialog, choose “Save as PDF” to download the ID card.
+      </p>
+
+      <style>{`
+        @media print {
+          body * { visibility: hidden !important; }
+          #id-card-print, #id-card-print * { visibility: visible !important; }
+          #id-card-print {
+            position: absolute;
+            left: 50%;
+            top: 20mm;
+            transform: translateX(-50%);
+          }
+          @page { size: auto; margin: 10mm; }
+        }
+      `}</style>
+    </div>
+  );
+}
+
+export function IdCardVisual({ school, person, type }) {
+  const isStaff = type === "staff";
+  const accent = isStaff ? "#0f766e" : "#4f46e5";
+  const photo =
+    person.photo ||
+    `https://ui-avatars.com/api/?name=${encodeURIComponent(person.name || "U")}&background=e2e8f0&color=334155&size=128`;
+
+  return (
+    <div
+      id="id-card-print"
+      className="w-[340px] rounded-2xl overflow-hidden shadow-xl border border-slate-200 bg-white text-slate-900"
+      style={{ fontFamily: "Segoe UI, system-ui, sans-serif" }}
+    >
+      {/* Header */}
+      <div
+        className="px-4 py-3 flex items-center gap-3 text-white"
+        style={{ background: `linear-gradient(135deg, ${accent}, ${accent}cc)` }}
+      >
+        {school?.logo ? (
+          <img
+            src={school.logo}
+            alt=""
+            className="w-11 h-11 rounded-lg object-contain bg-white/90 p-0.5"
+          />
+        ) : (
+          <div className="w-11 h-11 rounded-lg bg-white/20 flex items-center justify-center text-lg font-black">
+            {(school?.name || "S").charAt(0)}
+          </div>
+        )}
+        <div className="min-w-0 flex-1">
+          <p className="text-sm font-black leading-tight truncate">
+            {school?.name || "School"}
+          </p>
+          <p className="text-[10px] opacity-90 uppercase tracking-wider mt-0.5">
+            {isStaff ? "Staff Identity Card" : "Student Identity Card"}
+          </p>
+        </div>
+      </div>
+
+      {/* Body */}
+      <div className="p-4 flex gap-3">
+        <img
+          src={photo}
+          alt={person.name}
+          className="w-24 h-28 rounded-xl object-cover border-2 shrink-0"
+          style={{ borderColor: accent }}
+          onError={(e) => {
+            e.target.src = `https://ui-avatars.com/api/?name=${encodeURIComponent(person.name || "U")}&background=e2e8f0&color=334155&size=128`;
+          }}
+        />
+        <div className="min-w-0 flex-1 text-[11px] space-y-1">
+          <p className="text-base font-bold leading-tight text-slate-900">
+            {person.name}
+          </p>
+          <Row label="ID" value={person.idNumber} mono />
+          {isStaff ? (
+            <>
+              <Row label="Role" value={person.roleLabel} />
+              <Row label="Phone" value={person.phone} />
+              <Row label="Email" value={person.email} />
+              <Row
+                label="Joined"
+                value={
+                  person.joiningDate
+                    ? new Date(person.joiningDate).toLocaleDateString("en-IN")
+                    : "—"
+                }
+              />
+            </>
+          ) : (
+            <>
+              <Row
+                label="Class"
+                value={`${person.className}${
+                  person.sectionName && person.sectionName !== "—"
+                    ? ` – ${person.sectionName}`
+                    : ""
+                }`}
+              />
+              <Row label="Roll No." value={person.rollNo} />
+              <Row label="Blood" value={person.bloodGroup} />
+              <Row
+                label="DOB"
+                value={
+                  person.dob
+                    ? new Date(person.dob).toLocaleDateString("en-IN")
+                    : "—"
+                }
+              />
+              {person.house && (
+                <Row label="House" value={person.house} />
+              )}
+            </>
+          )}
+        </div>
+      </div>
+
+      {!isStaff && (
+        <div className="px-4 pb-2 text-[10px] text-slate-600">
+          <span className="font-semibold">Guardian:</span> {person.fatherName}
+        </div>
+      )}
+
+      <div className="px-4 pb-3 text-[10px] text-slate-500 leading-snug">
+        {school?.address || person.address || ""}
+      </div>
+
+      {/* Footer */}
+      <div
+        className="px-4 py-2 flex items-center justify-between text-[9px] text-white uppercase tracking-wide"
+        style={{ background: accent }}
+      >
+        <span>
+          Issued{" "}
+          {person.issuedAt
+            ? new Date(person.issuedAt).toLocaleDateString("en-IN")
+            : "—"}
+        </span>
+        <span>Session {person.validSession || "—"}</span>
+      </div>
+    </div>
+  );
+}
+
+const Row = ({ label, value, mono }) => (
+  <div className="flex gap-1.5">
+    <span className="text-slate-400 shrink-0 w-12">{label}</span>
+    <span className={`font-semibold text-slate-800 truncate ${mono ? "font-mono" : ""}`}>
+      {value || "—"}
+    </span>
+  </div>
+);

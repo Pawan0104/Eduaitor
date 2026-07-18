@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from "react";
+import { useNavigate } from "react-router-dom";
 import axios from "axios";
 import { useAuth } from "../context/AuthContext";
 import { toast } from "react-toastify";
@@ -267,6 +268,7 @@ const Badge = ({ children, color = "indigo" }) => {
 ───────────────────────────────────────────── */
 const MyChild = () => {
   const { user } = useAuth();
+  const navigate = useNavigate();
   const studentId = user?.student_id;
 
   const [student, setStudent] = useState(null);
@@ -408,6 +410,13 @@ const MyChild = () => {
                   {s.firstName} {s.lastName}
                 </h1>
                 <Badge color="indigo">{s.studentId}</Badge>
+                <button
+                  type="button"
+                  onClick={() => navigate("/parent/id-card")}
+                  className="text-xs font-bold px-2.5 py-1 rounded-full bg-emerald-600 text-white"
+                >
+                  Download ID Card
+                </button>
               </div>
               <div className="flex flex-wrap gap-1.5 mt-1.5">
                 {s.classId?.name && (

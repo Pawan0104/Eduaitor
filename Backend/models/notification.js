@@ -11,7 +11,7 @@ const classTargetSchema = new mongoose.Schema({
 const targetSchema = new mongoose.Schema({
   type: {
     type: String,
-    enum: ['all', 'role', 'class', 'exam', 'student', 'teacher', 'diary', 'assignment', 'attendance', 'gatepass'],
+    enum: ['all', 'role', 'class', 'exam', 'student', 'teacher', 'diary', 'assignment', 'attendance', 'gatepass', 'homework', 'daily_learning'],
     default: 'all',
   },
   roles:     [{ type: String, enum: ['teacher_admin', 'student_admin', 'school_admin', 'staff_admin'] }],
@@ -39,7 +39,7 @@ const notificationSchema = new mongoose.Schema({
   targets:          [targetSchema],
   notificationType: {
     type: String,
-    enum: ['general', 'exam', 'result', 'attendance', 'fee', 'diary', 'assignment', 'gatepass'],
+    enum: ['general', 'exam', 'result', 'attendance', 'fee', 'diary', 'assignment', 'gatepass', 'transport', 'homework', 'daily_learning'],
     default: 'general',
   },
   attachments:  [attachmentSchema],        // ← multiple PDFs

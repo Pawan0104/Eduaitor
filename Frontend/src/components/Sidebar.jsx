@@ -6,7 +6,6 @@ import {
   FaSignOutAlt,
   FaClock,
   FaWallet,
-  FaTimes,
   FaUserShield,
   FaSchool,
   FaCalendarAlt,
@@ -19,6 +18,11 @@ import {
   FaUsers,
   FaLock,
   FaIdCard,
+  FaClipboardList,
+  FaHotel,
+  FaHome,
+  FaStore,
+  FaHeadset,
 } from "react-icons/fa";
 import { FiUsers } from "react-icons/fi";
 import {
@@ -33,20 +37,12 @@ import { HiAcademicCap } from "react-icons/hi2";
 import { useNavigate, useLocation } from "react-router-dom";
 import { useState } from "react";
 import { useAuth } from "../context/AuthContext";
+import { useLanguage } from "../context/LanguageContext";
 import axios from "axios";
 import { toast } from "react-toastify";
+import { clearSessionKeepPrefs as preservePrefsAndClear } from "../utils/clearSessionKeepPrefs";
 
 const API = import.meta.env.VITE_API_URL;
-
-const getInitials = (name) => {
-  if (!name) return "U";
-  return name
-    .split(" ")
-    .map((n) => n[0])
-    .join("")
-    .toUpperCase()
-    .slice(0, 2);
-};
 
 // ── ICON BADGE — small tinted square behind every nav icon ──
 // active = filled solid primary (mirrors the bottom-nav active state in the mockup)
@@ -68,35 +64,38 @@ const IconBadge = ({ icon, variant = "default" }) => {
 };
 
 // ── UPGRADE POPUP — shown when clicking a disabled module ──
-const UpgradePopup = ({ moduleName, onClose }) => (
-  <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-999 p-4">
-    <div className="card w-full max-w-sm p-6 text-center">
-      <div className="w-12 h-12 bg-orange-100 rounded-full flex items-center justify-center mx-auto mb-4">
-        <FaLock className="text-orange-500" size={20} />
+const UpgradePopup = ({ moduleName, onClose }) => {
+  const { t, tn } = useLanguage();
+  return (
+    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-999 p-4">
+      <div className="card w-full max-w-sm p-6 text-center">
+        <div className="w-12 h-12 bg-orange-100 rounded-full flex items-center justify-center mx-auto mb-4">
+          <FaLock className="text-orange-500" size={20} />
+        </div>
+        <h3 className="text-base font-semibold mb-1 text-[rgb(var(--text))]">
+          {t("upgrade.title")}
+        </h3>
+        <p className="text-sm mb-5 text-[rgb(var(--text-muted))]">
+          <span className="font-medium text-[rgb(var(--text))]">
+            {tn(moduleName)}
+          </span>{" "}
+          {t("upgrade.message")}
+        </p>
+        <button
+          onClick={onClose}
+          className="w-full py-2 bg-[rgb(var(--primary))] text-white rounded-lg
+            text-sm font-medium transition hover:opacity-90"
+        >
+          {t("upgrade.ok")}
+        </button>
       </div>
-      <h3 className="text-base font-semibold mb-1 text-[rgb(var(--text))]">
-        Module Not Subscribed
-      </h3>
-      <p className="text-sm mb-5 text-[rgb(var(--text-muted))]">
-        <span className="font-medium text-[rgb(var(--text))]">
-          {moduleName}
-        </span>{" "}
-        is not included in your current subscription plan. Contact your
-        administrator to upgrade.
-      </p>
-      <button
-        onClick={onClose}
-        className="w-full py-2 bg-[rgb(var(--primary))] text-white rounded-lg
-          text-sm font-medium transition hover:opacity-90"
-      >
-        Got it
-      </button>
     </div>
-  </div>
-);
+  );
+};
 
 const Sidebar = ({ closeSidebar }) => {
   const { user, setUser } = useAuth();
+  const { t, tn } = useLanguage();
   const navigate = useNavigate();
   const location = useLocation();
   const [openMenu, setOpenMenu] = useState(null);
@@ -117,24 +116,18 @@ const Sidebar = ({ closeSidebar }) => {
   const logout = async () => {
     try {
       await axios.post(`${API}/auth/logout`, {}, { withCredentials: true });
-      toast.info("You have been logged out successfully.");
+      toast.info(t("topbar.logoutSuccess"));
     } catch (err) {
       console.error("Backend logout failed:", err);
-      toast.error("Logout failed. Please try again.");
+      toast.error(t("topbar.logoutFailed"));
     }
     setUser(null);
-    localStorage.clear();
-    sessionStorage.clear();
+    preservePrefsAndClear();
     navigate("/admin/login", { replace: true });
   };
 
-  const isMobile = window.innerWidth <= 768;
-
   /* ── SUPER ADMIN MENU ── */
   const superAdminMenu = [
-    ...(isMobile
-      ? [{ name: "Menu", icon: <FaTachometerAlt />, path: "/admin/menu" }]
-      : []),
     { name: "Dashboard", icon: <FaTachometerAlt />, path: "/admin/dashboard" },
     {
       name: "Access Control",
@@ -159,13 +152,20 @@ const Sidebar = ({ closeSidebar }) => {
       icon: <FaSchoolFlag />,
       path: "/admin/school-detail",
     },
+    {
+      name: "Syllabus Catalog",
+      icon: <FaBookDead />,
+      path: "/admin/syllabus-catalog",
+    },
+    {
+      name: "Help Requests",
+      icon: <FaHeadset />,
+      path: "/admin/messages",
+    },
   ];
 
   /* ── SCHOOL ADMIN MENU ── */
   const schoolAdminMenu = [
-    ...(isMobile
-      ? [{ name: "Menu", icon: <FaTachometerAlt />, path: "/school/menu" }]
-      : []),
     { name: "Dashboard", icon: <FaTachometerAlt />, path: "/school/dashboard" },
     { name: "Notifications", icon: <FaBell />, path: "/school/notification" },
     {
@@ -177,6 +177,11 @@ const Sidebar = ({ closeSidebar }) => {
         { name: "Add Student", path: "/school/student-manage" },
         { name: "Bulk Upload", path: "/school/students/bulk-upload" },
       ],
+    },
+    {
+      name: "Lead Management",
+      icon: <FaClipboardList />,
+      path: "/school/leads",
     },
     {
       name: "Teachers",
@@ -207,7 +212,12 @@ const Sidebar = ({ closeSidebar }) => {
       name: "Exam Management",
       icon: <GiOpenBook />,
       module: "exams",
-      children: [{ name: "Exam Structure", path: "/school/exam-structure" }],
+      children: [
+        { name: "Exam Structure", path: "/school/exam-structure" },
+        { name: "Marks Entry", path: "/school/exam-marks-entry" },
+        { name: "Exam Marks", path: "/school/exam-marks" },
+        { name: "Report Card", path: "/school/report-card" },
+      ],
     },
     {
       name: "Syllabus",
@@ -229,6 +239,7 @@ const Sidebar = ({ closeSidebar }) => {
         { name: "Fee Structure", path: "/school/fee-structure" },
         { name: "Fee Collection", path: "/school/fee-collection" },
         { name: "Fee History", path: "/school/fee-history" },
+        { name: "Financial Report", path: "/school/financial-report" },
         { name: "Defaulters", path: "/school/defaulters" },
       ],
     },
@@ -244,6 +255,12 @@ const Sidebar = ({ closeSidebar }) => {
       path: "/school/diary",
       module: "diary",
     },
+    {
+      name: "Homework",
+      icon: <FaClipboardList />,
+      path: "/school/homework",
+      module: "homework",
+    },
     { name: "Events", icon: <FaCalendar />, path: "/school/event" },
     { name: "Notices", icon: <FaBell />, path: "/school/notice" },
     { name: "Calendar", icon: <FaCalendarAlt />, path: "/school/calendar" },
@@ -256,6 +273,7 @@ const Sidebar = ({ closeSidebar }) => {
         { name: "Route Manage", path: "/school/transport-route" },
         { name: "Bus Manage", path: "/school/transport-bus" },
         { name: "Driver Manage", path: "/school/transport-driver" },
+        { name: "GPS Tracking", path: "/school/transport-gps", module: "gpsTracking" },
       ],
     },
     {
@@ -263,6 +281,24 @@ const Sidebar = ({ closeSidebar }) => {
       icon: <FaBookJournalWhills />,
       path: "/school/library",
       module: "library",
+    },
+    {
+      name: "Hostel Management",
+      icon: <FaHotel />,
+      path: "/school/hostel",
+      module: "hostel",
+    },
+    {
+      name: "House Allocation",
+      icon: <FaHome />,
+      path: "/school/house",
+      module: "house",
+    },
+    {
+      name: "School Commerce Suite",
+      icon: <FaStore />,
+      path: "/school/commerce",
+      module: "commerce",
     },
     {
       name: "Blogs",
@@ -275,6 +311,10 @@ const Sidebar = ({ closeSidebar }) => {
       icon: <FaUsers />,
       path: "/school/staff",
       module: "staff",
+      children: [
+        { name: "Staff Management", path: "/school/staff" },
+        { name: "Staff Attendance", path: "/school/staff-attendance" },
+      ],
     },
     {
       name: "Gate Pass",
@@ -286,13 +326,15 @@ const Sidebar = ({ closeSidebar }) => {
       icon: <FaBell />,
       path: "/school/messages",
     },
+    {
+      name: "Help / Support",
+      icon: <FaHeadset />,
+      path: "/school/help",
+    },
   ];
 
   /* ── TEACHER ADMIN MENU ── */
   const teacherAdminMenu = [
-    ...(isMobile
-      ? [{ name: "Menu", icon: <FaTachometerAlt />, path: "/teacher/menu" }]
-      : []),
     {
       name: "Dashboard",
       icon: <FaTachometerAlt />,
@@ -341,7 +383,7 @@ const Sidebar = ({ closeSidebar }) => {
       module: "exams",
       children: [
         { name: "Marks Entry", path: "/teacher/exam" },
-        { name: "Exam Report", path: "/teacher/exam-report" },
+        { name: "Report Card", path: "/teacher/report-card" },
       ],
     },
     {
@@ -355,6 +397,24 @@ const Sidebar = ({ closeSidebar }) => {
       icon: <FaBookOpen />,
       path: "/teacher/diary",
       module: "diary",
+    },
+    {
+      name: "Homework",
+      icon: <FaClipboardList />,
+      path: "/teacher/homework",
+      module: "homework",
+    },
+    {
+      name: "Pages taught",
+      icon: <FaBookOpen />,
+      path: "/teacher/page-progress",
+      module: "daily_learning",
+    },
+    {
+      name: "Daily learning",
+      icon: <FaClipboardList />,
+      path: "/teacher/daily-learning",
+      module: "daily_learning",
     },
     {
       name: "Group",
@@ -382,13 +442,15 @@ const Sidebar = ({ closeSidebar }) => {
       icon: <FaBell />,
       path: "/teacher/messages",
     },
+    {
+      name: "Help / Support",
+      icon: <FaHeadset />,
+      path: "/teacher/help",
+    },
   ];
 
   /* ── PARENT MENU ── */
   const parentMenu = [
-    ...(isMobile
-      ? [{ name: "Menu", icon: <FaTachometerAlt />, path: "/parent/menu" }]
-      : []),
     { name: "Dashboard", icon: <FaTachometerAlt />, path: "/parent/dashboard" },
     { name: "Notifications", icon: <FaBell />, path: "/parent/notification" },
     {
@@ -398,16 +460,38 @@ const Sidebar = ({ closeSidebar }) => {
       module: "students",
     },
     {
-      name: "Fee Details",
+      name: "Pay Fee",
       icon: <FaWallet />,
       path: "/parent/fees",
-      module: "fees",
     },
     {
-      name: "Transport",
+      name: "School Store",
+      icon: <FaStore />,
+      path: "/parent/store",
+      module: "commerce",
+    },
+    {
+      name: "Transport & GPS",
       icon: <FaBusAlt />,
       path: "/parent/transport",
       module: "transport",
+    },
+    {
+      name: "Exam Results",
+      icon: <GiOpenBook />,
+      path: "/parent/exam-result",
+      module: "exams",
+    },
+    {
+      name: "Report Card",
+      icon: <GiOpenBook />,
+      path: "/parent/report-card",
+      module: "exams",
+    },
+    {
+      name: "Student ID Card",
+      icon: <FaIdCard />,
+      path: "/parent/id-card",
     },
     { name: "Notices", icon: <FaBell />, path: "/parent/notice" },
     { name: "Events", icon: <FaCalendar />, path: "/parent/event" },
@@ -425,17 +509,42 @@ const Sidebar = ({ closeSidebar }) => {
       module: "gatepass",
     },
     {
+      name: "Homework",
+      icon: <FaClipboardList />,
+      path: "/parent/homework",
+      module: "homework",
+    },
+    {
+      name: "Learned today",
+      icon: <FaBookOpen />,
+      path: "/parent/learning-today",
+      module: "daily_learning",
+    },
+    {
+      name: "Daily learning",
+      icon: <FaClipboardList />,
+      path: "/parent/daily-learning",
+      module: "daily_learning",
+    },
+    {
+      name: "Syllabus Books",
+      icon: <FaBookDead />,
+      path: "/parent/syllabus-books",
+    },
+    {
       name: "Messages",
       icon: <FaBell />,
       path: "/parent/messages",
+    },
+    {
+      name: "Help / Support",
+      icon: <FaHeadset />,
+      path: "/parent/help",
     },
   ];
 
   /* ── STUDENT MENU ── */
   const studentMenu = [
-    ...(isMobile
-      ? [{ name: "Menu", icon: <FaTachometerAlt />, path: "/student/menu" }]
-      : []),
     {
       name: "Dashboard",
       icon: <FaTachometerAlt />,
@@ -470,10 +579,38 @@ const Sidebar = ({ closeSidebar }) => {
       module: "exams",
     },
     {
+      name: "Report Card",
+      icon: <GiOpenBook />,
+      path: "/student/report-card",
+      module: "exams",
+    },
+    {
+      name: "My ID Card",
+      icon: <FaIdCard />,
+      path: "/student/id-card",
+    },
+    {
       name: "Diary",
       icon: <FaBookOpen />,
       path: "/student/diary",
       module: "diary",
+    },
+    {
+      name: "Homework",
+      icon: <FaClipboardList />,
+      path: "/student/homework",
+      module: "homework",
+    },
+    {
+      name: "Daily learning",
+      icon: <FaClipboardList />,
+      path: "/student/daily-learning",
+      module: "daily_learning",
+    },
+    {
+      name: "Syllabus Books",
+      icon: <FaBookDead />,
+      path: "/student/syllabus-books",
     },
     {
       name: "Library",
@@ -501,13 +638,16 @@ const Sidebar = ({ closeSidebar }) => {
       icon: <FaBell />,
       path: "/student/messages",
     },
+    {
+      name: "Help / Support",
+      icon: <FaHeadset />,
+      path: "/student/help",
+    },
   ];
 
   const staffAdminMenu = [
-    ...(isMobile
-      ? [{ name: "Menu", icon: <FaTachometerAlt />, path: "/staff/menu" }]
-      : []),
     { name: "Dashboard", icon: <FaTachometerAlt />, path: "/staff/dashboard" },
+    { name: "My ID Card", icon: <FaIdCard />, path: "/staff/id-card" },
     { name: "Notifications", icon: <FaBell />, path: "/staff/notification" },
     {
       name: "Students",
@@ -521,12 +661,28 @@ const Sidebar = ({ closeSidebar }) => {
       path: "/staff/attendance",
       module: "attendance",
     },
-    { name: "Fees", icon: <FaWallet />, path: "/staff/fees", module: "fees" },
+    {
+      name: "Fees",
+      icon: <FaWallet />,
+      module: "fees",
+      children: [
+        { name: "Fee Collection", path: "/staff/fees" },
+        { name: "Fee History", path: "/staff/fee-history" },
+        { name: "Financial Report", path: "/staff/financial-report" },
+        { name: "Defaulters", path: "/staff/defaulters" },
+      ],
+    },
     {
       name: "Library",
       icon: <FaBookJournalWhills />,
       path: "/staff/library",
       module: "library",
+    },
+    {
+      name: "House Allocation",
+      icon: <FaHome />,
+      path: "/staff/house",
+      module: "house",
     },
     {
       name: "Transport",
@@ -553,16 +709,31 @@ const Sidebar = ({ closeSidebar }) => {
       module: "diary",
     },
     {
+      name: "Homework",
+      icon: <FaClipboardList />,
+      path: "/staff/homework",
+      module: "homework",
+    },
+    {
       name: "Exams",
       icon: <GiOpenBook />,
-      path: "/staff/exams",
       module: "exams",
+      children: [
+        { name: "Schedule Exams", path: "/staff/exams" },
+        { name: "Marks Entry", path: "/staff/exam-marks" },
+        { name: "Report Card", path: "/staff/report-card" },
+      ],
     },
     {
       name: "Assignments",
       icon: <GiSchoolBag />,
       path: "/staff/assignments",
       module: "assignments",
+    },
+    {
+      name: "Lead Management",
+      icon: <FaClipboardList />,
+      path: "/staff/leads",
     },
     {
       name: "Groups",
@@ -583,9 +754,11 @@ const Sidebar = ({ closeSidebar }) => {
   else if (role === "student_admin") {
     menu = user?.loginAs === "student" ? studentMenu : parentMenu;
   } else if (role === "staff_admin") {
-    menu = staffAdminMenu.filter(
-      (item) => !item.module || user?.permissions?.includes(item.module),
-    );
+    menu = staffAdminMenu.filter((item) => {
+      if (!item.module) return true;
+      if (item.module === "staff") return true;
+      return user?.permissions?.includes(item.module);
+    });
   }
 
   const toggleMenu = (name) => {
@@ -600,11 +773,16 @@ const Sidebar = ({ closeSidebar }) => {
     if (childPath) {
       navigate(childPath);
       closeSidebar && closeSidebar();
-    } else if (item.path) {
+      return;
+    }
+    if (item.children) {
+      toggleMenu(item.name);
+      return;
+    }
+    if (item.path) {
       navigate(item.path);
       closeSidebar && closeSidebar();
-    } else {
-      toggleMenu(item.name);
+      return;
     }
   };
 
@@ -613,9 +791,6 @@ const Sidebar = ({ closeSidebar }) => {
     if (role === "school_admin" || role === "teacher_admin") return menu;
     return menu.filter((item) => !item.module || hasModule(item.module));
   })();
-
-  const displayName = user?.name || user?.school_name || "User";
-  const displayRole = user?.loginAs || role?.replace("_", " ") || "User";
 
   return (
     <>
@@ -627,38 +802,6 @@ const Sidebar = ({ closeSidebar }) => {
       )}
 
       <aside className="h-full w-full bg-[rgb(var(--sidebar))] border-r border-[rgb(var(--border))] flex flex-col shadow-sm">
-        {/* MOBILE HEADER */}
-        <div className="lg:hidden flex items-center justify-between px-4 py-3 border-b border-[rgb(var(--border))]">
-          <h2 className="font-semibold text-[rgb(var(--sidebar-text))]">
-            Menu
-          </h2>
-          <button
-            onClick={closeSidebar}
-            className="text-[rgb(var(--sidebar-text))] hover:text-red-400 transition"
-          >
-            <FaTimes />
-          </button>
-        </div>
-
-        {/* PROFILE SNAPSHOT */}
-        {isMobile && (
-          <div className="px-3 pt-4 pb-2">
-            <div className="flex items-center gap-3 p-3 rounded-2xl bg-[rgba(var(--primary),0.06)]">
-              <div className="w-10 h-10 rounded-full bg-[rgb(var(--primary))] text-white flex items-center justify-center text-xs font-bold shrink-0">
-                {getInitials(displayName)}
-              </div>
-              <div className="min-w-0">
-                <p className="text-sm font-semibold text-[rgb(var(--sidebar-text))] truncate">
-                  {displayName}
-                </p>
-                <p className="text-[11px] text-[rgb(var(--text-muted))] capitalize truncate">
-                  {displayRole}
-                </p>
-              </div>
-            </div>
-          </div>
-        )}
-
         {/* MENU */}
         <div className="flex-1 overflow-y-auto px-2 py-2">
           {finalMenu.map((item, index) => {
@@ -697,7 +840,7 @@ const Sidebar = ({ closeSidebar }) => {
                             : "text-[rgb(var(--sidebar-text))]"
                         }`}
                       >
-                        {item.name}
+                        {tn(item.name)}
                       </span>
                     </div>
                     {!isSubscribed ? (
@@ -720,7 +863,11 @@ const Sidebar = ({ closeSidebar }) => {
 
                   {isOpen && isSubscribed && (
                     <div className="ml-6 my-1 border-l border-[rgb(var(--border))]">
-                      {item.children.map((child, i) => {
+                      {item.children
+                        .filter(
+                          (child) => !child.module || hasModule(child.module),
+                        )
+                        .map((child, i) => {
                         const isActive = location.pathname === child.path;
                         return (
                           <div
@@ -733,7 +880,7 @@ const Sidebar = ({ closeSidebar }) => {
                                   : "text-[rgb(var(--text-muted))] hover:text-[rgb(var(--text))] hover:bg-[rgba(var(--primary),0.05)]"
                               }`}
                           >
-                            {child.name}
+                            {tn(child.name)}
                           </div>
                         );
                       })}
@@ -773,7 +920,7 @@ const Sidebar = ({ closeSidebar }) => {
                         : "text-[rgb(var(--sidebar-text))]"
                     }`}
                   >
-                    {item.name}
+                    {tn(item.name)}
                   </span>
                 </div>
                 {!isSubscribed && (
@@ -794,7 +941,7 @@ const Sidebar = ({ closeSidebar }) => {
             className="flex items-center gap-3 w-full px-3 py-2.5 rounded-2xl text-[rgb(var(--text-muted))] hover:bg-red-500/10 hover:text-red-500 transition-all"
           >
             <IconBadge icon={<FaSignOutAlt />} variant="default" />
-            <span className="font-medium text-sm">Logout</span>
+            <span className="font-medium text-sm">{t("common.logout")}</span>
           </button>
         </div>
       </aside>

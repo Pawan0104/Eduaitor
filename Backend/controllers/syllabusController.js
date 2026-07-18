@@ -3,14 +3,28 @@ import Topic from "../models/topic.js";
 import Chapter from "../models/chapter.js";
 import Class from "../models/class.js";
 import Subject from "../models/subject.js";
+import SyllabusPdf from "../models/syllabusPdf.js";
+import { uploadToCloudinary } from "../utils/uploadToCloudinary.js";
+import cloudinary from "../middlewares/cloudinary.js";
+import {
+  resolveChapterPdfUrl,
+  streamPdfFromUrl,
+} from "../utils/streamChapterPdf.js";
 
 // ==================== CHAPTER CONTROLLERS ====================
 
 export const createChapter = async (req, res) => {
   try {
     const schoolId = req.user?.school_id;
-    const { classId, subjectId, termId, name, description, learningOutcomes } =
-      req.body;
+    const {
+      classId,
+      subjectId,
+      termId,
+      name,
+      description,
+      content,
+      learningOutcomes,
+    } = req.body;
 
     if (!schoolId || !classId || !subjectId || !name) {
       return res.status(400).json({
@@ -38,6 +52,7 @@ export const createChapter = async (req, res) => {
       name,
       termId,
       description: description || "",
+      content: content || description || "",
       learningOutcomes: learningOutcomes || [],
       order: (maxOrder?.order || 0) + 1,
     });
@@ -86,10 +101,54 @@ export const getChapters = async (req, res) => {
   }
 };
 
+/**
+ * GET /syllabus/chapters/:chapterId/pdf-view
+ * Streams school chapter PDF (uploaded or NCERT) for in-app viewing.
+ */
+export const streamSchoolChapterPdf = async (req, res) => {
+  try {
+    const schoolId = req.user?.school_id;
+    const { chapterId } = req.params;
+    if (!schoolId || !chapterId) {
+      return res.status(400).json({
+        success: false,
+        message: "chapterId is required",
+      });
+    }
+
+    const chapter = await Chapter.findOne({
+      _id: chapterId,
+      schoolId,
+    }).lean();
+    if (!chapter) {
+      return res
+        .status(404)
+        .json({ success: false, message: "Chapter not found" });
+    }
+
+    const pdfUrl = resolveChapterPdfUrl(chapter);
+    if (!pdfUrl) {
+      return res
+        .status(404)
+        .json({ success: false, message: "No PDF linked to this chapter" });
+    }
+
+    await streamPdfFromUrl(res, pdfUrl);
+  } catch (err) {
+    console.error("streamSchoolChapterPdf:", err);
+    if (!res.headersSent) {
+      res.status(500).json({
+        success: false,
+        message: err.message || "Failed to load PDF",
+      });
+    }
+  }
+};
+
 export const updateChapter = async (req, res) => {
   try {
     const { chapterId } = req.params;
-    const { name, description, learningOutcomes, termId } = req.body;
+    const { name, description, content, learningOutcomes, termId } = req.body;
 
     if (!chapterId) {
       return res.status(400).json({
@@ -98,16 +157,15 @@ export const updateChapter = async (req, res) => {
       });
     }
 
-    const chapter = await Chapter.findByIdAndUpdate(
-      chapterId,
-      {
-        name,
-        description,
-        learningOutcomes,
-        termId,
-      },
-      { new: true, runValidators: true },
-    );
+    const updates = { name, learningOutcomes, termId };
+    if (description !== undefined) updates.description = description;
+    if (content !== undefined) updates.content = content;
+    else if (description !== undefined) updates.content = description;
+
+    const chapter = await Chapter.findByIdAndUpdate(chapterId, updates, {
+      new: true,
+      runValidators: true,
+    });
 
     if (!chapter) {
       return res.status(404).json({
@@ -190,6 +248,8 @@ export const createTopic = async (req, res) => {
       content,
       difficultyLevel,
       keywords,
+      pageFrom,
+      pageTo,
     } = req.body;
 
     if (!schoolId || !chapterId || !subjectId || !classId || !name) {
@@ -208,6 +268,13 @@ export const createTopic = async (req, res) => {
       order: -1,
     });
 
+    const parsePage = (value) => {
+      if (value === undefined || value === null || value === "") return null;
+      const n = Number(value);
+      if (!Number.isFinite(n) || n < 1) return null;
+      return Math.floor(n);
+    };
+
     const newTopic = new Topic({
       schoolId,
       chapterId,
@@ -215,6 +282,8 @@ export const createTopic = async (req, res) => {
       classId,
       name,
       content: content || "",
+      pageFrom: parsePage(pageFrom),
+      pageTo: parsePage(pageTo),
       difficultyLevel: difficultyLevel || "medium",
       keywords: keywords || [],
     });
@@ -259,7 +328,8 @@ export const getTopics = async (req, res) => {
 export const updateTopic = async (req, res) => {
   try {
     const { topicId } = req.params;
-    const { name, content, difficultyLevel, keywords } = req.body;
+    const { name, content, difficultyLevel, keywords, pageFrom, pageTo } =
+      req.body;
 
     if (!topicId) {
       return res.status(400).json({
@@ -268,16 +338,26 @@ export const updateTopic = async (req, res) => {
       });
     }
 
-    const topic = await Topic.findByIdAndUpdate(
-      topicId,
-      {
-        name,
-        content,
-        difficultyLevel,
-        keywords,
-      },
-      { new: true, runValidators: true },
-    );
+    const parsePage = (value) => {
+      if (value === undefined || value === null || value === "") return null;
+      const n = Number(value);
+      if (!Number.isFinite(n) || n < 1) return null;
+      return Math.floor(n);
+    };
+
+    const updates = {
+      name,
+      content,
+      difficultyLevel,
+      keywords,
+    };
+    if (pageFrom !== undefined) updates.pageFrom = parsePage(pageFrom);
+    if (pageTo !== undefined) updates.pageTo = parsePage(pageTo);
+
+    const topic = await Topic.findByIdAndUpdate(topicId, updates, {
+      new: true,
+      runValidators: true,
+    });
 
     if (!topic) {
       return res.status(404).json({
@@ -485,5 +565,168 @@ export const getCompleteSyllabus = async (req, res) => {
       message: "Failed to fetch syllabus",
       error: error.message,
     });
+  }
+};
+
+// ==================== SYLLABUS PDF UPLOAD ====================
+
+const deleteSyllabusPdfFromCloud = async (publicId) => {
+  if (!publicId) return;
+  try {
+    // PDFs are stored with resource_type "image" (same as notifications)
+    await cloudinary.uploader.destroy(publicId, { resource_type: "image" });
+  } catch (err) {
+    console.error("Syllabus PDF cloud delete:", err.message);
+  }
+};
+
+/** GET /syllabus/pdf?classId=&subjectId=&termId= */
+export const getSyllabusPdf = async (req, res) => {
+  try {
+    const schoolId = req.user?.school_id;
+    const { classId, subjectId, termId } = req.query;
+
+    if (!schoolId || !classId || !subjectId || !termId) {
+      return res.status(400).json({
+        success: false,
+        message: "classId, subjectId and termId are required",
+      });
+    }
+
+    const doc = await SyllabusPdf.findOne({
+      schoolId,
+      classId,
+      subjectId,
+      termId,
+    }).lean();
+
+    return res.json({
+      success: true,
+      data: doc || null,
+    });
+  } catch (err) {
+    return res.status(500).json({ success: false, message: err.message });
+  }
+};
+
+/** POST /syllabus/pdf  multipart: pdf + classId, subjectId, termId */
+export const uploadSyllabusPdf = async (req, res) => {
+  try {
+    const schoolId = req.user?.school_id;
+    const { classId, subjectId, termId } = req.body;
+    const file = req.file;
+
+    if (!schoolId) {
+      return res.status(403).json({
+        success: false,
+        message: "School not identified",
+      });
+    }
+    if (!classId || !subjectId || !termId) {
+      return res.status(400).json({
+        success: false,
+        message: "classId, subjectId and termId are required",
+      });
+    }
+    if (!file) {
+      return res.status(400).json({
+        success: false,
+        message: "PDF file is required",
+      });
+    }
+    if (file.mimetype !== "application/pdf") {
+      return res.status(400).json({
+        success: false,
+        message: "Only PDF files are allowed",
+      });
+    }
+
+    const uploaded = await uploadToCloudinary(
+      file,
+      "syllabus/pdfs",
+      "image",
+    );
+
+    const existing = await SyllabusPdf.findOne({
+      schoolId,
+      classId,
+      subjectId,
+      termId,
+    });
+
+    if (existing?.pdf?.public_id) {
+      await deleteSyllabusPdfFromCloud(existing.pdf.public_id);
+    }
+
+    const pdfPayload = {
+      url: uploaded.url,
+      public_id: uploaded.public_id,
+      name: file.originalname || "syllabus.pdf",
+      type: file.mimetype,
+    };
+
+    const doc = await SyllabusPdf.findOneAndUpdate(
+      { schoolId, classId, subjectId, termId },
+      {
+        $set: {
+          pdf: pdfPayload,
+          uploadedBy: req.user?._id || req.user?.teacher_id || null,
+          uploadedByRole: req.user?.role || "",
+        },
+      },
+      { upsert: true, new: true, setDefaultsOnInsert: true },
+    );
+
+    return res.status(201).json({
+      success: true,
+      message: existing
+        ? "Syllabus PDF replaced successfully"
+        : "Syllabus PDF uploaded successfully",
+      data: doc,
+    });
+  } catch (err) {
+    console.error("uploadSyllabusPdf:", err);
+    return res.status(500).json({
+      success: false,
+      message: err.message || "Failed to upload syllabus PDF",
+    });
+  }
+};
+
+/** DELETE /syllabus/pdf?classId=&subjectId=&termId= */
+export const deleteSyllabusPdf = async (req, res) => {
+  try {
+    const schoolId = req.user?.school_id;
+    const { classId, subjectId, termId } = req.query;
+
+    if (!schoolId || !classId || !subjectId || !termId) {
+      return res.status(400).json({
+        success: false,
+        message: "classId, subjectId and termId are required",
+      });
+    }
+
+    const doc = await SyllabusPdf.findOneAndDelete({
+      schoolId,
+      classId,
+      subjectId,
+      termId,
+    });
+
+    if (!doc) {
+      return res.status(404).json({
+        success: false,
+        message: "No syllabus PDF found",
+      });
+    }
+
+    await deleteSyllabusPdfFromCloud(doc.pdf?.public_id);
+
+    return res.json({
+      success: true,
+      message: "Syllabus PDF deleted",
+    });
+  } catch (err) {
+    return res.status(500).json({ success: false, message: err.message });
   }
 };

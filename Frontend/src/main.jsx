@@ -6,17 +6,20 @@ import { BrowserRouter } from "react-router-dom";
 import { ToastContainer } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
 import { AuthProvider } from "./context/AuthContext.jsx";
+import { LanguageProvider } from "./context/LanguageContext.jsx";
 import { HelmetProvider } from "react-helmet-async";
 
 createRoot(document.getElementById("root")).render(
   <BrowserRouter>
     <StrictMode>
-      <AuthProvider>
-        <HelmetProvider>
-          <App />
-        </HelmetProvider>
-      </AuthProvider>
-      <ToastContainer position="top-right" autoClose={2000} />
+      <LanguageProvider>
+        <AuthProvider>
+          <HelmetProvider>
+            <App />
+          </HelmetProvider>
+        </AuthProvider>
+        <ToastContainer position="top-right" autoClose={2000} />
+      </LanguageProvider>
     </StrictMode>
   </BrowserRouter>,
 );

@@ -35,6 +35,30 @@ const chapterSchema = new mongoose.Schema(
       type: String,
       default: "",
     },
+    /** Full chapter main content (imported from global catalog or written by school) */
+    content: {
+      type: String,
+      default: "",
+    },
+    /** Official NCERT chapter page on ncert.nic.in */
+    ncertPortalUrl: {
+      type: String,
+      default: "",
+      trim: true,
+    },
+    /** Direct NCERT chapter PDF URL when available */
+    ncertPdfUrl: {
+      type: String,
+      default: "",
+      trim: true,
+    },
+    /** Optional uploaded chapter PDF (overrides NCERT URL in-app) */
+    pdf: {
+      url: { type: String, default: "" },
+      public_id: { type: String, default: "" },
+      name: { type: String, default: "" },
+      type: { type: String, default: "application/pdf" },
+    },
     learningOutcomes: [
       {
         type: String,

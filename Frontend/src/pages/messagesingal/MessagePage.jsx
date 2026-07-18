@@ -66,6 +66,13 @@ const ThreadItem = ({ thread, onClick }) => {
 
   // Build subtitle — show child name for parent threads
   const subtitle = () => {
+    if (otherUser?.roleLabel) return otherUser.roleLabel;
+    if (thread?.schoolName && otherUser?.model === "SuperAdmin") {
+      return `Platform Support`;
+    }
+    if (thread?.isHelpThread && thread?.schoolName) {
+      return `${otherUser?.role || "User"} • ${thread.schoolName}`;
+    }
     if (otherUser?.subType === "parent" && otherUser?.childName) {
       return `Parent • Child: ${otherUser.childName}`;
     }
@@ -173,32 +180,57 @@ export default function MessagesPage() {
 
   // ── Role based path ────────────────────────────────────────
   let path = "";
-  if (user?.role === "school_admin") path = "/school";
+  if (user?.role === "super_admin") path = "/admin";
+  else if (user?.role === "school_admin") path = "/school";
   else if (user?.role === "teacher_admin") path = "/teacher";
   else if (user?.role === "student_admin")
     path = user.loginAs === "student" ? "/student" : "/parent";
   else if (user?.role === "staff_admin") path = "/staff";
 
+  const isSuperAdmin = user?.role === "super_admin";
+  const canRequestHelp =
+    user?.role === "school_admin" ||
+    user?.role === "teacher_admin" ||
+    user?.role === "student_admin";
+
   // ── Fetch threads ──────────────────────────────────────────
-  const fetchThreads = useCallback(async () => {
+  const fetchThreads = useCallback(async ({ silent = false } = {}) => {
     try {
-      setLoading(true);
-      setError("");
+      if (!silent) {
+        setLoading(true);
+        setError("");
+      }
       const res = await axios.get(`${API}/message-signal/threads`, {
         withCredentials: true,
       });
       setThreads(res.data.threads || []);
-      setFiltered(res.data.threads || []);
     } catch (err) {
       console.error("❌ fetchThreads error:", err.message);
-      setError("Failed to load messages. Please try again.");
+      if (!silent) setError("Failed to load messages. Please try again.");
     } finally {
-      setLoading(false);
+      if (!silent) setLoading(false);
     }
   }, []);
 
   useEffect(() => {
-    fetchThreads();
+    fetchThreads({ silent: false });
+  }, [fetchThreads]);
+
+  // Live inbox refresh
+  useEffect(() => {
+    const tick = () => {
+      if (document.hidden) return;
+      fetchThreads({ silent: true });
+    };
+    const id = setInterval(tick, 4000);
+    const onFocus = () => fetchThreads({ silent: true });
+    window.addEventListener("focus", onFocus);
+    document.addEventListener("visibilitychange", onFocus);
+    return () => {
+      clearInterval(id);
+      window.removeEventListener("focus", onFocus);
+      document.removeEventListener("visibilitychange", onFocus);
+    };
   }, [fetchThreads]);
 
   // ── Client side search ─────────────────────────────────────
@@ -279,24 +311,38 @@ export default function MessagesPage() {
           className="text-xl font-bold"
           style={{ color: "rgb(var(--primary))" }}
         >
-          Messages
+          {isSuperAdmin ? "Help Requests" : "Messages"}
         </h1>
 
-        {/* + New message button */}
-        <button
-          onClick={() => navigate(`${path}/messages/new`)}
-          className="p-2 rounded-xl transition"
-          style={{ color: "rgb(var(--primary))" }}
-          onMouseEnter={(e) =>
-            (e.currentTarget.style.backgroundColor = "rgb(var(--surface))")
-          }
-          onMouseLeave={(e) =>
-            (e.currentTarget.style.backgroundColor = "transparent")
-          }
-          title="New Message"
-        >
-          <FiPlus size={22} />
-        </button>
+        <div className="flex items-center gap-1">
+          {canRequestHelp && (
+            <button
+              onClick={() => navigate(`${path}/help`)}
+              className="px-2.5 py-1.5 rounded-xl text-xs font-bold transition
+                         bg-amber-500 text-white hover:bg-amber-600"
+              title="Help / Support"
+            >
+              Help
+            </button>
+          )}
+          {/* + New message — not for Super Admin help inbox */}
+          {!isSuperAdmin && (
+            <button
+              onClick={() => navigate(`${path}/messages/new`)}
+              className="p-2 rounded-xl transition"
+              style={{ color: "rgb(var(--primary))" }}
+              onMouseEnter={(e) =>
+                (e.currentTarget.style.backgroundColor = "rgb(var(--surface))")
+              }
+              onMouseLeave={(e) =>
+                (e.currentTarget.style.backgroundColor = "transparent")
+              }
+              title="New Message"
+            >
+              <FiPlus size={22} />
+            </button>
+          )}
+        </div>
       </div>
 
       {/* ── FIXED SEARCH BAR ── */}
@@ -382,7 +428,11 @@ export default function MessagesPage() {
               className="text-sm text-center"
               style={{ color: "rgb(var(--text-muted))" }}
             >
-              {search ? "No results found." : "No messages yet. Tap + to start."}
+              {search
+                ? "No results found."
+                : isSuperAdmin
+                  ? "No help requests yet. Users will appear here when they contact support."
+                  : "No messages yet. Tap + to start, or use Help / Support."}
             </p>
           </div>
         )}

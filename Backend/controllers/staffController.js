@@ -1,4 +1,5 @@
 import Staff from "../models/staff.js";
+import Teacher from "../models/teacher.js";
 import School from "../models/school.js";
 import bcrypt from "bcryptjs";
 import { uploadToCloudinary } from "../utils/uploadToCloudinary.js";
@@ -146,12 +147,14 @@ export const createStaff = async (req, res, next) => {
       status:         status     || "Active",
       photo,
       schoolId,
+      idCardIssuedAt: new Date(),
     });
 
     return res.status(201).json({
       success: true,
-      message: "Staff member created successfully",
+      message: "Staff member created successfully. ID card is ready to download.",
       data: staff,
+      idCardReady: true,
     });
 
   } catch (error) {
@@ -164,14 +167,33 @@ export const getStaff = async (req, res, next) => {
   try {
     const schoolId = req.user.school_id;
 
-    const staff = await Staff
-      .find({ schoolId })
-      .select("-password -temp_password") // never send passwords
-      .sort({ createdAt: -1 });
+    const [staff, teachers] = await Promise.all([
+      Staff.find({ schoolId })
+        .select("-password -temp_password")
+        .sort({ createdAt: -1 })
+        .lean(),
+      Teacher.find({ schoolId })
+        .select("-password -temp_password")
+        .sort({ createdAt: -1 })
+        .lean(),
+    ]);
+
+    const teacherItems = teachers.map((teacher) => ({
+      ...teacher,
+      staffRole: "teacher",
+      staffRoleCustom: null,
+      staffId: teacher.teacherId,
+      permissions: teacher.permissions || [],
+      status: teacher.status === "Inactive" ? "Inactive" : "Active",
+      model: "Teacher",
+    }));
+
+    const merged = [...staff.map((item) => ({ ...item, model: "Staff" })), ...teacherItems]
+      .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
 
     return res.json({
       success: true,
-      data: staff,
+      data: merged,
     });
   } catch (error) {
     next(error);
@@ -328,6 +350,45 @@ export const toggleStaffStatus = async (req, res, next) => {
       success: true,
       message: `Staff member ${staff.status === "Active" ? "activated" : "deactivated"} successfully`,
       data: { status: staff.status },
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+/* ---------------- TOGGLE ADMIN GROUP ---------------- */
+export const toggleAdminGroupMembership = async (req, res, next) => {
+  try {
+    const schoolId = req.user.school_id;
+    const { model } = req.params;
+    const { isAdminGroup } = req.body;
+
+    const normalizedModel = String(model || "").toLowerCase();
+    const TargetModel = normalizedModel === "teacher" ? Teacher : Staff;
+
+    if (!["teacher", "staff"].includes(normalizedModel)) {
+      return res.status(400).json({
+        success: false,
+        message: "Invalid member type",
+      });
+    }
+
+    const member = await TargetModel.findOne({ _id: req.params.id, schoolId });
+
+    if (!member) {
+      return res.status(404).json({
+        success: false,
+        message: `${normalizedModel === "teacher" ? "Teacher" : "Staff member"} not found`,
+      });
+    }
+
+    member.isAdminGroup = Boolean(isAdminGroup);
+    await member.save();
+
+    return res.json({
+      success: true,
+      message: "Admin group membership updated successfully",
+      data: { isAdminGroup: member.isAdminGroup },
     });
   } catch (error) {
     next(error);

@@ -2,6 +2,7 @@ import axios from "axios";
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { FaArrowLeft } from "react-icons/fa";
+import { toast } from "react-toastify";
 
 // ─── Mock data for development (replace with real API call) ───────────────────
 const MOCK_DATA = {
@@ -76,6 +77,19 @@ const fmtShortDate = (d) =>
     day: "numeric",
     month: "short",
     year: "2-digit",
+  });
+
+const loadRazorpayScript = () =>
+  new Promise((resolve) => {
+    if (window.Razorpay) {
+      resolve(true);
+      return;
+    }
+    const script = document.createElement("script");
+    script.src = "https://checkout.razorpay.com/v1/checkout.js";
+    script.onload = () => resolve(true);
+    script.onerror = () => resolve(false);
+    document.body.appendChild(script);
   });
 
 const initials = (name = "") =>
@@ -257,7 +271,7 @@ const FeeStructureTab = ({ feeStructure, totalFees }) => {
 };
 
 // ─── Payment History Tab ──────────────────────────────────────────────────────
-const PaymentHistoryTab = ({ payments }) => {
+const PaymentHistoryTab = ({ payments, onOpenReceipt }) => {
   if (!payments.length)
     return (
       <div className="flex flex-col items-center justify-center py-16 text-[rgb(var(--text))] gap-3">
@@ -331,10 +345,17 @@ const PaymentHistoryTab = ({ payments }) => {
           </div>
 
           {/* Receipt */}
-          <div className="text-right shrink-0">
+          <div className="text-right shrink-0 flex flex-col items-end gap-1.5">
             <span className="text-xs font-mono text-[rgb(var(--text))] bg-[rgb(var(--surface))] border border-gray-100 px-2 py-1 rounded-lg">
               {p.receiptNo}
             </span>
+            <button
+              type="button"
+              onClick={() => onOpenReceipt?.(p._id)}
+              className="text-[11px] font-bold text-emerald-700 hover:underline"
+            >
+              Download receipt
+            </button>
           </div>
         </div>
       ))}
@@ -516,30 +537,189 @@ export default function ParentFee({ studentId, token }) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [activeTab, setActiveTab] = useState("summary");
+  const [payAmount, setPayAmount] = useState("");
+  const [paying, setPaying] = useState(false);
+  const [devCheckout, setDevCheckout] = useState(null); // { orderId, amountRupees }
   const navigate = useNavigate();
   const isMobile = window.innerWidth <= 768;
 
   const API = import.meta.env.VITE_API_URL;
 
+  const fetchFeeDetails = async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const res = await axios.get(`${API}/fees/parent/student/me`, {
+        withCredentials: true,
+      });
+      setFeeData(res.data);
+      const due = Math.max(
+        0,
+        Number(res.data?.balanceDue) ||
+          Number(res.data?.totalDue) ||
+          Number(res.data?.finalFee) - Number(res.data?.totalPaid) ||
+          0,
+      );
+      setPayAmount(due > 0 ? String(due) : "");
+    } catch (e) {
+      setError(
+        e?.response?.data?.message || e.message || "Something went wrong",
+      );
+    } finally {
+      setLoading(false);
+    }
+  };
+
   useEffect(() => {
-    const fetchFeeDetails = async () => {
-      setLoading(true);
-      setError(null);
-      try {
-        const res = await axios.get(
-          `${API}/fees/parent/student/me`,
-          { withCredentials: true },
-        );
-        setFeeData(res.data);
-        console.log("Fetched fee details:", res.data);
-      } catch (e) {
-        setError(e.message || "Something went wrong");
-      } finally {
-        setLoading(false);
-      }
-    };
     fetchFeeDetails();
   }, []);
+
+  const verifyPayment = async (payload, amount) => {
+    const verifyRes = await axios.post(
+      `${API}/fees/razorpay/verify`,
+      {
+        ...payload,
+        studentId: feeData?.student?._id,
+        amountPaid: amount,
+      },
+      { withCredentials: true },
+    );
+
+    if (verifyRes.data?.success) {
+      toast.success("Payment successful");
+      await fetchFeeDetails();
+      return true;
+    }
+    toast.error(verifyRes.data?.message || "Payment verification failed");
+    return false;
+  };
+
+  const completeDevPayment = async () => {
+    if (!devCheckout) return;
+    try {
+      setPaying(true);
+      await verifyPayment(
+        {
+          orderId: devCheckout.orderId,
+          paymentId: `pay_local_${Date.now()}`,
+          signature: "local_test_signature",
+        },
+        Number(devCheckout.amountRupees),
+      );
+      setDevCheckout(null);
+    } catch (err) {
+      toast.error(
+        err?.response?.data?.message || "Payment verification failed",
+      );
+    } finally {
+      setPaying(false);
+    }
+  };
+
+  const handleOnlinePay = async () => {
+    const amount = Number(payAmount);
+    const due = Math.max(
+      0,
+      Number(feeData?.balanceDue) ||
+        Number(feeData?.totalDue) ||
+        Number(feeData?.finalFee) - Number(feeData?.totalPaid) ||
+        0,
+    );
+
+    if (!amount || amount <= 0) {
+      toast.error("Enter a valid payment amount");
+      return;
+    }
+    if (due > 0 && amount > due) {
+      toast.error("Amount cannot be more than remaining fee");
+      return;
+    }
+
+    try {
+      setPaying(true);
+
+      const { data } = await axios.post(
+        `${API}/fees/razorpay/order`,
+        {
+          studentId: feeData?.student?._id,
+          amount,
+        },
+        { withCredentials: true },
+      );
+
+      if (!data?.success) {
+        toast.error(data?.message || "Could not start payment");
+        setPaying(false);
+        return;
+      }
+
+      // Development gateway: open mock Razorpay screen with OK button
+      if (data.mock) {
+        setDevCheckout({
+          orderId: data.orderId,
+          amountRupees: amount,
+          studentName: feeData?.student?.name || "Student",
+        });
+        setPaying(false);
+        return;
+      }
+
+      const scriptLoaded = await loadRazorpayScript();
+      if (!scriptLoaded || !window.Razorpay) {
+        toast.error("Unable to load Razorpay checkout");
+        setPaying(false);
+        return;
+      }
+
+      const options = {
+        key: data.key_id,
+        amount: data.amount,
+        currency: data.currency || "INR",
+        name: "School Fee Payment",
+        description: `Fee payment for ${feeData?.student?.name || "student"}`,
+        order_id: data.orderId,
+        prefill: {
+          name: feeData?.student?.name || "",
+        },
+        handler: async (response) => {
+          try {
+            await verifyPayment(
+              {
+                orderId: response.razorpay_order_id,
+                paymentId: response.razorpay_payment_id,
+                signature: response.razorpay_signature,
+              },
+              amount,
+            );
+          } catch (err) {
+            toast.error(
+              err?.response?.data?.message || "Payment verification failed",
+            );
+          } finally {
+            setPaying(false);
+          }
+        },
+        theme: { color: "#4f46e5" },
+        modal: {
+          ondismiss: () => setPaying(false),
+        },
+      };
+
+      const rzp = new window.Razorpay(options);
+      rzp.on("payment.failed", (resp) => {
+        toast.error(
+          resp?.error?.description || "Payment failed. Please try again.",
+        );
+        setPaying(false);
+      });
+      rzp.open();
+    } catch (err) {
+      toast.error(
+        err?.response?.data?.message || "Could not start online payment",
+      );
+      setPaying(false);
+    }
+  };
 
   if (loading)
     return (
@@ -572,9 +752,7 @@ export default function ParentFee({ studentId, token }) {
           </p>
           <p className="text-xs text-[rgb(var(--text))] mb-4">{error}</p>
           <button
-            onClick={
-              () => setFeeData(MOCK_DATA) /* or re-trigger fetchFeeDetails */
-            }
+            onClick={() => fetchFeeDetails()}
             className="text-sm text-indigo-600 font-medium hover:underline"
           >
             Try again
@@ -593,9 +771,18 @@ export default function ParentFee({ studentId, token }) {
     discountAmount,
     totalPaid,
     balanceDue,
+    totalDue,
     paidPercent,
     payments,
   } = feeData;
+
+  const remainingDue = Math.max(
+    0,
+    Number(balanceDue) ||
+      Number(totalDue) ||
+      Number(finalFee) - Number(totalPaid) ||
+      0,
+  );
 
   const discountSub =
     discountAmount > 0
@@ -660,10 +847,66 @@ export default function ParentFee({ studentId, token }) {
           />
           <MetricCard
             label="Remaining fee"
-            value={fmtINR(balanceDue)}
-            valueClass={balanceDue > 0 ? "text-red-500" : "text-emerald-600"}
-            sub={balanceDue === 0 ? "Cleared" : "Pending"}
+            value={fmtINR(remainingDue)}
+            valueClass={remainingDue > 0 ? "text-red-500" : "text-emerald-600"}
+            sub={remainingDue === 0 ? "Cleared" : "Pending"}
           />
+        </div>
+
+        {/* ── Online payment ──────────────────────────────────────────────── */}
+        <div className="mt-4 bg-[rgb(var(--surface))] rounded-2xl border border-indigo-100 shadow-sm p-4">
+          <div className="flex items-start justify-between gap-3 mb-3">
+            <div>
+              <p className="text-sm font-semibold text-[rgb(var(--text))]">
+                Pay Fee
+              </p>
+              <p className="text-xs text-[rgb(var(--text))] mt-0.5">
+                {remainingDue > 0
+                  ? "Pay remaining fees online via UPI / Card / NetBanking."
+                  : "No pending dues right now. You can still open payment history below."}
+              </p>
+            </div>
+            {remainingDue > 0 && (
+              <span className="shrink-0 text-xs font-semibold px-2.5 py-1 rounded-full bg-red-50 text-red-600">
+                Due {fmtINR(remainingDue)}
+              </span>
+            )}
+          </div>
+
+          {remainingDue > 0 ? (
+            <div className="flex flex-col sm:flex-row gap-3">
+              <div className="flex-1">
+                <label className="block text-xs font-medium text-[rgb(var(--text))] mb-1">
+                  Amount (₹)
+                </label>
+                <input
+                  type="number"
+                  min="1"
+                  max={remainingDue}
+                  value={payAmount}
+                  onChange={(e) => setPayAmount(e.target.value)}
+                  className="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm bg-[rgb(var(--surface))] text-[rgb(var(--text))]"
+                  placeholder="Enter amount"
+                />
+              </div>
+              <button
+                type="button"
+                onClick={handleOnlinePay}
+                disabled={paying}
+                className="sm:self-end px-5 py-2.5 rounded-xl bg-indigo-600 text-white text-sm font-semibold hover:bg-indigo-700 disabled:opacity-60"
+              >
+                {paying ? "Processing…" : "Pay Fee"}
+              </button>
+            </div>
+          ) : (
+            <button
+              type="button"
+              onClick={() => setActiveTab("history")}
+              className="px-5 py-2.5 rounded-xl border border-slate-200 text-sm font-semibold text-[rgb(var(--text))]"
+            >
+              View payment history
+            </button>
+          )}
         </div>
 
         {/* ── Progress bar ────────────────────────────────────────────────── */}
@@ -677,7 +920,7 @@ export default function ParentFee({ studentId, token }) {
           <ProgressBar pct={paidPercent} />
           <div className="flex justify-between text-[11px] text-[rgb(var(--text))] mt-1.5">
             <span>{fmtINR(totalPaid)} paid</span>
-            <span>{fmtINR(balanceDue)} remaining</span>
+            <span>{fmtINR(remainingDue)} remaining</span>
           </div>
         </div>
 
@@ -706,7 +949,13 @@ export default function ParentFee({ studentId, token }) {
         <div className="mt-4">
           {activeTab === "summary" && (
             <SummaryTab
-              data={{ finalFee, totalPaid, balanceDue, paidPercent, payments }}
+              data={{
+                finalFee,
+                totalPaid,
+                balanceDue: remainingDue,
+                paidPercent,
+                payments,
+              }}
             />
           )}
           {activeTab === "structure" && (
@@ -715,9 +964,67 @@ export default function ParentFee({ studentId, token }) {
               totalFees={finalFee}
             />
           )}
-          {activeTab === "history" && <PaymentHistoryTab payments={payments} />}
+          {activeTab === "history" && (
+            <PaymentHistoryTab
+              payments={payments}
+              onOpenReceipt={(id) => navigate(`/parent/fees/receipt/${id}`)}
+            />
+          )}
         </div>
       </div>
+
+      {/* Development Razorpay mock gateway */}
+      {devCheckout && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+          <div className="w-full max-w-md overflow-hidden rounded-2xl bg-white shadow-2xl">
+            <div className="bg-[#072654] px-5 py-4 text-white">
+              <p className="text-xs uppercase tracking-wider text-blue-200">
+                Razorpay · Test Mode
+              </p>
+              <p className="mt-1 text-lg font-semibold">School Fee Payment</p>
+            </div>
+            <div className="space-y-4 p-5 text-slate-800">
+              <p className="text-sm text-slate-500">
+                Development gateway — click OK to simulate a successful payment.
+              </p>
+              <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
+                <div className="flex justify-between text-sm">
+                  <span className="text-slate-500">Student</span>
+                  <span className="font-medium">{devCheckout.studentName}</span>
+                </div>
+                <div className="mt-2 flex justify-between text-sm">
+                  <span className="text-slate-500">Amount</span>
+                  <span className="text-lg font-bold text-indigo-700">
+                    {fmtINR(devCheckout.amountRupees)}
+                  </span>
+                </div>
+                <div className="mt-2 flex justify-between text-xs text-slate-400">
+                  <span>Order</span>
+                  <span className="font-mono">{devCheckout.orderId}</span>
+                </div>
+              </div>
+              <div className="flex gap-3">
+                <button
+                  type="button"
+                  onClick={() => setDevCheckout(null)}
+                  disabled={paying}
+                  className="flex-1 rounded-xl border border-slate-200 px-4 py-2.5 text-sm font-semibold text-slate-600"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  onClick={completeDevPayment}
+                  disabled={paying}
+                  className="flex-1 rounded-xl bg-[#072654] px-4 py-2.5 text-sm font-semibold text-white disabled:opacity-60"
+                >
+                  {paying ? "Confirming…" : "OK — Pay"}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

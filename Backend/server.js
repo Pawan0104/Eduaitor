@@ -1,49 +1,106 @@
 import express from "express";
 import cors from "cors";
 import dotenv from "dotenv";
-import connectDB from "./config/db.js";
+import fs from "fs";
+import path from "path";
+import { fileURLToPath } from "url";
 import cookieParser from "cookie-parser";
+
+import connectDB from "./config/db.js";
 import School from "./models/school.js";
 import Staff from "./models/staff.js";
 import Student from "./models/student.js";
-dotenv.config();
+import { MODULE_KEYS } from "./constants/module.js";
+
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+// Load environment variables from Backend/.env (ensure correct path when started from workspace root)
+dotenv.config({ path: path.join(__dirname, ".env") });
+console.log("Mongo mode:", process.env.USE_ATLAS_DB === "true" ? "Atlas" : "In-memory fallback");
+
+// Development fallback: if OPENAI_API_KEY isn't set, allow using OPENROUTER_API_KEY
+if (!process.env.OPENAI_API_KEY && process.env.OPENROUTER_API_KEY) {
+  process.env.OPENAI_API_KEY = process.env.OPENROUTER_API_KEY;
+}
 
 const app = express();
+
+const normalizeOrigin = (value) => String(value || "").trim().replace(/\/$/, "");
+
+const productionAllowedOrigins = () => {
+  const fromEnv = [
+    process.env.CLIENT_URL,
+    ...(process.env.CLIENT_URLS || "").split(","),
+  ]
+    .map(normalizeOrigin)
+    .filter(Boolean);
+
+  return new Set([
+    ...fromEnv,
+    "capacitor://localhost",
+    "http://localhost",
+    "https://localhost",
+    "http://127.0.0.1",
+    "https://127.0.0.1",
+    "http://localhost:5173",
+    "http://localhost:5174",
+    "http://localhost:5175",
+    "http://127.0.0.1:5173",
+    "http://127.0.0.1:5174",
+    "http://127.0.0.1:5175",
+    "https://localhost:5173",
+    "https://localhost:5174",
+    "https://localhost:5175",
+    "https://127.0.0.1:5173",
+    "https://127.0.0.1:5174",
+    "https://127.0.0.1:5175",
+    "http://10.0.2.2",
+  ]);
+};
 
 // Middleware
 app.use(
   cors({
-    origin: function (origin, callback) {
-      const allowed = [
-        process.env.CLIENT_URL,
-        "capacitor://localhost",
-        "http://localhost",
-        "https://localhost",
-        "http://localhost:5173",
-        "http://localhost:5174",
-        "https://localhost:5173",
-        "https://localhost:5174",
-        "http://10.0.2.2",
-      ];
-      // Allow requests with no origin (native Android WebView sends null/no origin)
-      if (!origin || allowed.includes(origin)) {
-        callback(null, true);
-      } else {
-        callback(new Error("Not allowed by CORS: " + origin));
-      }
-    },
+    // Always allow local dev origins. Keep a strict allowlist only when we are
+    // explicitly in production.
+    origin:
+      process.env.NODE_ENV === "production"
+        ? function (origin, callback) {
+            const allowed = productionAllowedOrigins();
+            const normalized = normalizeOrigin(origin);
+            if (!origin || allowed.has(normalized)) {
+              callback(null, true);
+            } else {
+              callback(new Error("Not allowed by CORS: " + origin));
+            }
+          }
+        : true,
     credentials: true,
   }),
 );
+
+// Development helper: explicitly set CORS headers when running locally
+if (process.env.NODE_ENV !== "production") {
+  app.use((req, res, next) => {
+    const origin = req.headers.origin || "*";
+    res.setHeader("Access-Control-Allow-Origin", origin);
+    res.setHeader(
+      "Access-Control-Allow-Headers",
+      "Origin, X-Requested-With, Content-Type, Accept, Authorization",
+    );
+    res.setHeader("Access-Control-Allow-Methods", "GET,POST,PUT,DELETE,OPTIONS");
+    res.setHeader("Access-Control-Allow-Credentials", "true");
+    if (req.method === "OPTIONS") return res.sendStatus(204);
+    next();
+  });
+}
 
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 app.use(cookieParser());
 
 app.set("trust proxy", 1);
-
-// DB
-connectDB();
 
 // Health check
 app.get("/", (req, res) => {
@@ -70,20 +127,30 @@ import noticeRoute from "./routes/noticeRoute.js";
 import transportRoute from "./routes/transportRoute.js";
 import examRoute from "./routes/examRoute.js";
 import libraryRoute from "./routes/libraryRoute.js";
+import hostelRoute from "./routes/hostelRoute.js";
+import houseRoute from "./routes/houseRoute.js";
+import idCardRoute from "./routes/idCardRoute.js";
+import commerceRoute from "./routes/commerceRoute.js";
 import syllabusRoute from "./routes/syllabusRoute.js";
+import syllabusCatalogRoute from "./routes/syllabusCatalogRoute.js";
 import teacherAcademicRoute from "./routes/teacherAcademicRoute.js";
 import assignmentRoute from "./routes/assignmentRoute.js";
 import termRoute from "./routes/termRoute.js";
 import attendanceRoute from "./routes/attendanceRoute.js";
 import calendarRoute from "./routes/caledarRoute.js";
 import diaryRoute from "./routes/diaryRoute.js";
+import homeworkRoute from "./routes/homeworkRoute.js";
+import learningProgressRoute from "./routes/learningProgressRoute.js";
+import dailyLearningRoute from "./routes/dailyLearningRoute.js";
 import messageRoute from "./routes/messageRoute.js";
 import groupRoute from "./routes/groupRoute.js";
 import notificationRoute from "./routes/notificationRoute.js";
 import blogRoute from "./routes/blogRoute.js";
 import classAttendanceRoute from "./routes/classAttendanceRoute.js";
 import staffRoute from "./routes/staffRoute.js";
+import staffAttendanceRoute from "./routes/staffAttendanceRoute.js";
 import gatepassRoute from "./routes/gatepassRoute.js";
+import leadRoute from "./routes/leadRoute.js";
 import messageSingalRoute from "./routes/messageSingalRoute.js";
 
 import { authMiddleware } from "./auth/auth.js";
@@ -107,10 +174,17 @@ app.get("/api/auth/me", authMiddleware, async (req, res) => {
     /* ---------- FETCH SCHOOL MODULES (for all school-bound roles) ---------- */
     // school_id is in JWT for all 3 roles below
     const school = await School.findById(req.user.school_id).select(
-      "name school_logo subscribed_modules",
+      "name school_name school_logo subscribed_modules admin_email",
     );
 
-    const subscribed_modules = school?.subscribed_modules || [];
+    const subscribed_modules =
+      school?.subscribed_modules?.length > 0
+        ? school.subscribed_modules
+        : school?.admin_email === "school@admin.com" ||
+            (req.user.role === "school_admin" &&
+              req.user.email === "school@admin.com")
+          ? MODULE_KEYS
+          : [];
 
     /* ---------- SCHOOL ADMIN ---------- */
     if (req.user.role === "school_admin") {
@@ -278,21 +352,73 @@ app.use("/api/notices", noticeRoute);
 app.use("/api/transport", transportRoute);
 app.use("/api/exam", examRoute);
 app.use("/api/library", libraryRoute);
+app.use("/api/hostel", hostelRoute);
+app.use("/api/house", houseRoute);
+app.use("/api/id-card", idCardRoute);
+app.use("/api/commerce", commerceRoute);
 app.use("/api/syllabus", syllabusRoute);
+app.use("/api/syllabus-catalog", syllabusCatalogRoute);
 app.use("/api/teacher-academic", teacherAcademicRoute);
 app.use("/api/assignment", assignmentRoute);
 app.use("/api/terms", termRoute);
 app.use("/api/attendance", attendanceRoute);
 app.use("/api/calendar", calendarRoute);
 app.use("/api/diary", diaryRoute);
+app.use("/api/homework", homeworkRoute);
+app.use("/api/learning-progress", learningProgressRoute);
+app.use("/api/daily-learning", dailyLearningRoute);
 app.use("/api/messages", messageRoute);
 app.use("/api/groups", groupRoute);
 app.use("/api/notifications", notificationRoute);
 app.use("/api/blogs", blogRoute);
 app.use("/api/class-attendance", classAttendanceRoute);
 app.use("/api/staff", staffRoute);
+app.use("/api/staff-attendance", staffAttendanceRoute);
 app.use("/api/gatepass", gatepassRoute);
+app.use("/api/leads", leadRoute);
 app.use("/api/message-signal", messageSingalRoute);
+
+const frontendDist = path.join(__dirname, "../Frontend/dist");
+const serveFrontend = fs.existsSync(path.join(frontendDist, "index.html"));
+
+if (serveFrontend) {
+  app.use(express.static(frontendDist));
+  app.get(/.*/, (req, res) => {
+    if (req.path.startsWith("/api/")) {
+      return res
+        .status(404)
+        .json({ success: false, message: "API route not found." });
+    }
+    res.sendFile(path.join(frontendDist, "index.html"));
+  });
+} else {
+  // API-only host (Render): keep unknown non-API routes as JSON 404
+  app.use((req, res) => {
+    if (req.path.startsWith("/api/")) {
+      return res
+        .status(404)
+        .json({ success: false, message: "API route not found." });
+    }
+    res.status(404).json({
+      success: false,
+      message: "API only. Use the Netlify frontend URL.",
+    });
+  });
+}
+
 // Server
 const PORT = process.env.PORT || 5000;
-app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
+
+const startServer = async () => {
+  try {
+    await connectDB();
+    app.listen(PORT, "0.0.0.0", () =>
+      console.log(`Server running on port ${PORT}`),
+    );
+  } catch (error) {
+    console.error("Server startup failed:", error.message);
+    process.exit(1);
+  }
+};
+
+startServer();

@@ -3,6 +3,8 @@ import { useNavigate } from "react-router-dom";
 import axios from "axios";
 import { toast } from "react-toastify";
 import { useAuth } from "../context/AuthContext";
+import { useLanguage } from "../context/LanguageContext";
+import { clearSessionKeepPrefs } from "../utils/clearSessionKeepPrefs";
 
 /**
  * Bottom sheet shown from the "Profile" tab of BottomNav.
@@ -10,6 +12,7 @@ import { useAuth } from "../context/AuthContext";
  */
 const ProfileSheet = ({ onClose }) => {
   const { user, setUser } = useAuth();
+  const { t } = useLanguage();
   const navigate = useNavigate();
   const API = import.meta.env.VITE_API_URL;
   const [theme, setTheme] = useState(
@@ -33,13 +36,12 @@ const ProfileSheet = ({ onClose }) => {
   const logout = async () => {
     try {
       await axios.post(`${API}/auth/logout`, {}, { withCredentials: true });
-      toast.info("Logged out successfully");
+      toast.info(t("topbar.logoutSuccess"));
     } catch {
-      toast.error("Logout failed");
+      toast.error(t("topbar.logoutFailed"));
     }
     setUser(null);
-    localStorage.clear();
-    sessionStorage.clear();
+    clearSessionKeepPrefs();
     navigate("/admin/login", { replace: true });
   };
 
@@ -76,7 +78,7 @@ const ProfileSheet = ({ onClose }) => {
         <div className="mb-6">
           <div className="flex justify-between items-center mb-3">
             <span className="text-[11px] font-bold text-[rgb(var(--text))] opacity-40 uppercase">
-              Appearance
+              {t("common.appearance")}
             </span>
             <span className="text-[10px] px-2 py-0.5 rounded-full bg-orange-500/10 text-orange-500 font-bold capitalize">
               {theme.replace("theme-", "")}
@@ -104,22 +106,22 @@ const ProfileSheet = ({ onClose }) => {
                 color: "bg-emerald-500",
                 border: "border-emerald-400",
               },
-            ].map((t) => (
+            ].map((opt) => (
               <button
-                key={t.id}
+                key={opt.id}
                 onClick={() => {
-                  setTheme(t.id);
-                  document.documentElement.className = t.id;
-                  localStorage.setItem("theme", t.id);
+                  setTheme(opt.id);
+                  document.documentElement.className = opt.id;
+                  localStorage.setItem("theme", opt.id);
                 }}
                 className="relative group w-8 h-8 flex items-center justify-center"
               >
-                {theme === t.id && (
+                {theme === opt.id && (
                   <span className="absolute inset-0 rounded-full bg-orange-500/20 animate-pulse scale-125" />
                 )}
                 <div
-                  className={`w-6 h-6 rounded-full ${t.color} ${t.border} border shadow-sm transition-all transform group-hover:scale-110 group-active:scale-90 ${
-                    theme === t.id
+                  className={`w-6 h-6 rounded-full ${opt.color} ${opt.border} border shadow-sm transition-all transform group-hover:scale-110 group-active:scale-90 ${
+                    theme === opt.id
                       ? "ring-2 ring-orange-500 ring-offset-2 ring-offset-[rgb(var(--bg))]"
                       : "opacity-80 hover:opacity-100"
                   }`}
@@ -136,14 +138,14 @@ const ProfileSheet = ({ onClose }) => {
             className="flex-1 py-3.5 rounded-2xl text-sm font-extrabold active:scale-95 transition-transform border
               border-[rgb(var(--border))] bg-[rgb(var(--surface))] text-[rgb(var(--text))]"
           >
-            Close
+            {t("common.close")}
           </button>
           <button
             onClick={logout}
             className="flex-1 py-3.5 rounded-2xl text-sm font-extrabold text-white active:scale-95 transition-transform
               bg-gradient-to-br from-[rgb(var(--sidebar))] to-[rgb(var(--primary))]"
           >
-            Logout
+            {t("common.logout")}
           </button>
         </div>
       </div>

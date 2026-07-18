@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import axios from "axios";
 import { useParams, useNavigate } from "react-router-dom";
 import { toast } from "react-toastify";
-import { FaArrowLeft } from "react-icons/fa";
+import { FaArrowLeft, FaIdCard } from "react-icons/fa";
 import { useAuth } from "../context/AuthContext";
 
 const API = import.meta.env.VITE_API_URL;
@@ -81,14 +81,30 @@ const StudentView = () => {
               Student Profile
             </p>
           </div>
-          {user?.role === "school_admin" && (
+          <div className="flex flex-wrap gap-2">
             <button
-              onClick={() => navigate(`/school/student-manage/${student._id}`)}
-              className="px-4 py-2 bg-[rgb(var(--primary))] text-[rgb(var(--text))] rounded-lg text-sm font-medium  transition"
+              onClick={() =>
+                navigate(
+                  user?.role === "teacher_admin"
+                    ? `/teacher/id-card/student/${student._id}`
+                    : user?.role === "staff_admin"
+                      ? `/staff/id-card/student/${student._id}`
+                      : `/school/id-card/student/${student._id}`,
+                )
+              }
+              className="px-4 py-2 bg-emerald-600 text-white rounded-lg text-sm font-medium flex items-center gap-2"
             >
-              Edit Student
+              <FaIdCard /> Download ID Card
             </button>
-          )}
+            {user?.role === "school_admin" && (
+              <button
+                onClick={() => navigate(`/school/student-manage/${student._id}`)}
+                className="px-4 py-2 bg-[rgb(var(--primary))] text-[rgb(var(--text))] rounded-lg text-sm font-medium  transition"
+              >
+                Edit Student
+              </button>
+            )}
+          </div>
         </div>
       </div>
 

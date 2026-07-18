@@ -1,7 +1,15 @@
 import School from "../models/school.js";
 import bcrypt from "bcryptjs";
+import Razorpay from "razorpay";
 import {MODULE_KEYS,DEFAULT_MODULES} from "../constants/module.js";
 import { uploadToCloudinary } from "../utils/uploadToCloudinary.js";
+import { ensureDefaultHouses } from "../utils/ensureDefaultHouses.js";
+
+const isMockRazorpayKey = (keyId = "") =>
+  keyId === "rzp_test_local" || keyId.startsWith("rzp_test_eduaitor");
+
+const isValidRazorpayKeyId = (keyId = "") =>
+  /^rzp_(test|live)_[A-Za-z0-9]+$/.test(String(keyId).trim());
 
 /* ---------------- CREATE SCHOOL ---------------- */
 
@@ -78,7 +86,13 @@ export const createSchool = async (req, res, next) => {
       status: status || "Active",
       school_logo,
       subscribed_modules: modules,
+      razorpayKeyId: razorpayKeyId || "",
+      razorpayKeySecret: razorpayKeySecret || "",
     });
+
+    if (modules.includes("house")) {
+      await ensureDefaultHouses(school._id);
+    }
 
     return res.status(201).json({
       success: true,
@@ -149,6 +163,8 @@ export const updateSchool = async (req, res, next) => {
       admin_password,
       status,
       subscribed_modules,
+      razorpayKeyId,
+      razorpayKeySecret,
     } = req.body;
 
     // ── 1. BUILD UPDATE OBJECT ────────────────────────
@@ -165,6 +181,8 @@ export const updateSchool = async (req, res, next) => {
     if (admin_name)       updateData.admin_name       = admin_name;
     if (admin_email)      updateData.admin_email      = admin_email;
     if (status)           updateData.status           = status;
+    if (razorpayKeyId !== undefined)     updateData.razorpayKeyId     = razorpayKeyId;
+    if (razorpayKeySecret !== undefined) updateData.razorpayKeySecret = razorpayKeySecret;
 
     // ── 2. HANDLE PASSWORD ────────────────────────────
     if (admin_password) {
@@ -231,6 +249,10 @@ export const updateSchool = async (req, res, next) => {
       });
     }
 
+    if (school.subscribed_modules?.includes("house")) {
+      await ensureDefaultHouses(school._id);
+    }
+
     return res.json({
       success: true,
       message: "School updated successfully",
@@ -254,5 +276,168 @@ export const deleteSchool = async (req, res, next) => {
     });
   } catch (error) {
     next(error);
+  }
+};
+
+/* ---------------- SCHOOL SELF-SERVE RAZORPAY SETTINGS ---------------- */
+
+export const getMySchoolRazorpay = async (req, res, next) => {
+  try {
+    const schoolId = req.user?.school_id;
+    if (!schoolId) {
+      return res.status(400).json({
+        success: false,
+        message: "School context required",
+      });
+    }
+
+    const school = await School.findById(schoolId).select("razorpayKeyId razorpayKeySecret");
+    if (!school) {
+      return res.status(404).json({
+        success: false,
+        message: "School not found",
+      });
+    }
+
+    res.json({
+      success: true,
+      data: {
+        razorpayKeyId: school.razorpayKeyId || "",
+        hasSecret: !!school.razorpayKeySecret,
+      },
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const updateMySchoolRazorpay = async (req, res, next) => {
+  try {
+    const schoolId = req.user?.school_id;
+    if (!schoolId) {
+      return res.status(400).json({
+        success: false,
+        message: "School context required",
+      });
+    }
+
+    const { razorpayKeyId, razorpayKeySecret } = req.body;
+    const keyId = razorpayKeyId !== undefined ? String(razorpayKeyId).trim() : undefined;
+
+    if (keyId !== undefined) {
+      if (!keyId) {
+        return res.status(400).json({
+          success: false,
+          message: "Razorpay Key ID is required",
+        });
+      }
+      if (isMockRazorpayKey(keyId) || !isValidRazorpayKeyId(keyId)) {
+        return res.status(400).json({
+          success: false,
+          message:
+            "Enter a valid Razorpay Key ID from the dashboard (starts with rzp_test_ or rzp_live_).",
+        });
+      }
+    }
+
+    const updateData = {};
+    if (keyId !== undefined) updateData.razorpayKeyId = keyId;
+    if (razorpayKeySecret !== undefined && razorpayKeySecret !== "") {
+      updateData.razorpayKeySecret = String(razorpayKeySecret).trim();
+    }
+
+    const school = await School.findByIdAndUpdate(
+      schoolId,
+      { $set: updateData },
+      { returnDocument: "after", runValidators: true },
+    );
+
+    res.json({
+      success: true,
+      message: "Razorpay credentials updated successfully",
+      data: {
+        razorpayKeyId: school.razorpayKeyId || "",
+        hasSecret: !!school.razorpayKeySecret,
+        mode: String(school.razorpayKeyId || "").startsWith("rzp_live_")
+          ? "live"
+          : "test",
+      },
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const testMySchoolRazorpay = async (req, res, next) => {
+  try {
+    const schoolId = req.user?.school_id;
+    if (!schoolId) {
+      return res.status(400).json({
+        success: false,
+        message: "School context required",
+      });
+    }
+
+    const school = await School.findById(schoolId).select(
+      "razorpayKeyId razorpayKeySecret school_name",
+    );
+    if (!school) {
+      return res.status(404).json({
+        success: false,
+        message: "School not found",
+      });
+    }
+
+    if (!school.razorpayKeyId || !school.razorpayKeySecret) {
+      return res.status(400).json({
+        success: false,
+        message: "Save Razorpay Key ID and Secret first.",
+      });
+    }
+
+    if (
+      isMockRazorpayKey(school.razorpayKeyId) ||
+      !isValidRazorpayKeyId(school.razorpayKeyId)
+    ) {
+      return res.status(400).json({
+        success: false,
+        message:
+          "Current Key ID is invalid. Paste real keys from Razorpay Dashboard.",
+      });
+    }
+
+    const razorpay = new Razorpay({
+      key_id: school.razorpayKeyId,
+      key_secret: school.razorpayKeySecret,
+    });
+
+    // Tiny order proves both key + secret are accepted by Razorpay
+    const order = await razorpay.orders.create({
+      amount: 100, // ₹1 in paise
+      currency: "INR",
+      receipt: `keytest_${Date.now()}`.slice(0, 40),
+      notes: { purpose: "razorpay_key_setup_test" },
+    });
+
+    res.json({
+      success: true,
+      message: "Razorpay keys are working. Checkout is ready for parents.",
+      data: {
+        razorpayKeyId: school.razorpayKeyId,
+        mode: school.razorpayKeyId.startsWith("rzp_live_") ? "live" : "test",
+        testOrderId: order.id,
+        amount: order.amount,
+        currency: order.currency,
+      },
+    });
+  } catch (error) {
+    console.error("Razorpay key test failed:", error);
+    return res.status(400).json({
+      success: false,
+      message:
+        error?.error?.description ||
+        error?.message ||
+        "Razorpay rejected these keys. Check Key ID and Secret.",
+    });
   }
 };

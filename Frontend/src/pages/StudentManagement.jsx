@@ -9,6 +9,7 @@ const API = import.meta.env.VITE_API_URL;
 const steps = [
   "Student Details",
   "Parent / Guardian",
+  "Previous School",
   "Documents",
   "Class Details",
   "Fee Structure",
@@ -44,6 +45,10 @@ const emptyForm = {
 
   address: "",
 
+  previousSchoolName: "",
+  previousSchoolClass: "",
+  previousSchoolResult: "",
+
   classId: "",
   sectionId: "",
   rollNo: "",
@@ -71,8 +76,23 @@ const emptyForm = {
   fatherAadhar: null,
   motherAadhar: null,
 
-  parentUsername: "",
-  parentPassword: "",
+  username: "",
+  password: "",
+  extraDocuments: [],
+};
+
+const createExtraDocument = () => {
+  const uniqueSuffix = `${Date.now()}-${Math.floor(Math.random() * 100000)}`;
+  return {
+    id:
+      typeof crypto !== "undefined" && crypto.randomUUID
+        ? crypto.randomUUID()
+        : `extra-${uniqueSuffix}`,
+    fieldName: `extraDocument_${uniqueSuffix}`,
+    label: "",
+    file: null,
+    existingUrl: null,
+  };
 };
 
 const StudentManagement = () => {
@@ -96,6 +116,29 @@ const StudentManagement = () => {
   const [freqFilter, setFreqFilter] = useState("annually");
 
   const isMobile = window.innerWidth <= 768;
+
+  const addExtraDocument = () => {
+    setForm((prev) => ({
+      ...prev,
+      extraDocuments: [...prev.extraDocuments, createExtraDocument()],
+    }));
+  };
+
+  const updateExtraDocument = (id, updates) => {
+    setForm((prev) => ({
+      ...prev,
+      extraDocuments: prev.extraDocuments.map((doc) =>
+        doc.id === id ? { ...doc, ...updates } : doc,
+      ),
+    }));
+  };
+
+  const removeExtraDocument = (id) => {
+    setForm((prev) => ({
+      ...prev,
+      extraDocuments: prev.extraDocuments.filter((doc) => doc.id !== id),
+    }));
+  };
 
   const calcAmount = (amount) => {
     let value;
@@ -169,7 +212,7 @@ const StudentManagement = () => {
       return form.useTransport;
     }
 
-    return form.selectedOptionalFees.includes(String(fee._id));
+    return (form.selectedOptionalFees || []).includes(String(fee._id));
   };
 
   const getDisplayAmount = (fee) => {
@@ -218,12 +261,17 @@ const StudentManagement = () => {
   const toggleOptionalFee = (feeId) => {
     const normalizedId = String(feeId);
 
-    setForm((prev) => ({
-      ...prev,
-      selectedOptionalFees: prev.selectedOptionalFees.includes(normalizedId)
-        ? prev.selectedOptionalFees.filter((id) => id !== normalizedId)
-        : [...prev.selectedOptionalFees, normalizedId],
-    }));
+    setForm((prev) => {
+      const current = Array.isArray(prev.selectedOptionalFees)
+        ? prev.selectedOptionalFees
+        : [];
+      return {
+        ...prev,
+        selectedOptionalFees: current.includes(normalizedId)
+          ? current.filter((id) => id !== normalizedId)
+          : [...current, normalizedId],
+      };
+    });
   };
 
   const progress = (step / steps.length) * 100;
@@ -327,21 +375,102 @@ const StudentManagement = () => {
           withCredentials: true,
         });
         const student = res.data.data;
+        if (!student) {
+          toast.error("Student not found");
+          return;
+        }
 
+        const knownDocumentFields = new Set([
+          "studentPhoto",
+          "fatherPhoto",
+          "motherPhoto",
+          "guardianPhoto",
+          "birthCertificate",
+          "transferCertificate",
+          "studentAadhar",
+          "fatherAadhar",
+          "motherAadhar",
+        ]);
+
+        const extraDocumentsFromDocuments = Object.entries(student.documents || {})
+          .filter(([key]) => !knownDocumentFields.has(key))
+          .map(([key, value]) => ({
+            id: key,
+            fieldName: key,
+            label: value?.label || "",
+            file: null,
+            existingUrl: value?.url || null,
+          }));
+
+        const extraDocumentsFromArray = (student.extraDocuments || []).map(
+          (doc) => ({
+            id: doc.fieldName || doc.label || `extra-${Math.random()}`,
+            fieldName: doc.fieldName,
+            label: doc.label || "",
+            file: null,
+            existingUrl: doc.url || null,
+          }),
+        );
+
+        const extraDocuments = [
+          ...extraDocumentsFromDocuments,
+          ...extraDocumentsFromArray,
+        ];
+
+        const toDateInput = (value) => {
+          if (!value) return "";
+          if (typeof value === "string") return value.split("T")[0];
+          try {
+            return new Date(value).toISOString().split("T")[0];
+          } catch {
+            return "";
+          }
+        };
+
+        // Merge onto emptyForm so every controlled input keeps a defined value.
+        // Spreading the raw student object drops defaults and can blank the page.
         setForm({
-          ...student,
-          classId: student.classId?._id || student.classId,
-          sectionId: student.sectionId?._id || student.sectionId,
+          ...emptyForm,
+          firstName: student.firstName || "",
+          lastName: student.lastName || "",
+          dob: toDateInput(student.dob),
+          gender: student.gender || "",
+          bloodGroup: student.bloodGroup || "",
+          admissionDate: toDateInput(student.admissionDate),
+          fatherName: student.fatherName || "",
+          fatherMobile: student.fatherMobile || "",
+          fatherEmail: student.fatherEmail || "",
+          motherName: student.motherName || "",
+          motherMobile: student.motherMobile || "",
+          motherEmail: student.motherEmail || "",
+          guardianName: student.guardianName || "",
+          guardianMobile: student.guardianMobile || "",
+          guardianRelation: student.guardianRelation || "",
+          address: student.address || "",
+          previousSchoolName: student.previousSchoolName || "",
+          previousSchoolClass: student.previousSchoolClass || "",
+          previousSchoolResult: student.previousSchoolResult || "",
+          classId: student.classId?._id || student.classId || "",
+          sectionId: student.sectionId?._id || student.sectionId || "",
+          rollNo: student.rollNo || "",
+          studentType: student.studentType || "",
           transport: student.transport?._id || student.transport || "",
           useTransport: Boolean(student.transport),
-          selectedOptionalFees: student.selectedOptionalFees || [],
+          selectedOptionalFees: Array.isArray(student.selectedOptionalFees)
+            ? student.selectedOptionalFees.map(String)
+            : [],
           busFeeFrequency:
             student.busFeeFrequency === "quarterly" ? "quarterly" : "annually",
           busFeeQuarter: student.busFeeQuarter || "",
-          dob: student.dob ? student.dob.split("T")[0] : "",
-          admissionDate: student.admissionDate
-            ? student.admissionDate.split("T")[0]
-            : "",
+          totalFee: student.totalFee ?? "",
+          discountType: student.discountType || "",
+          discountValue: student.discountValue ?? "",
+          finalFee: student.finalFee ?? "",
+          username:
+            student.parentCredentials?.username || student.fatherMobile || "",
+          password: "",
+          documents: student.documents || {},
+          extraDocuments,
         });
         setFreqFilter(normalizeFeeFrequency(student.feeFrequency));
       } catch {
@@ -355,6 +484,40 @@ const StudentManagement = () => {
   /* CHANGE */
   const handleChange = (e) => {
     const { name, value } = e.target;
+
+    if (name === "dob") {
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      const selectedDob = new Date(value);
+      const minAgeDate = new Date(
+        today.getFullYear() - 3,
+        today.getMonth(),
+        today.getDate(),
+      );
+
+      if (!value) {
+        setErrors((prevErrors) => ({
+          ...prevErrors,
+          dob: "Date of Birth required",
+        }));
+      } else if (selectedDob >= today) {
+        setErrors((prevErrors) => ({
+          ...prevErrors,
+          dob: "Date of Birth must be a past date",
+        }));
+      } else if (selectedDob > minAgeDate) {
+        setErrors((prevErrors) => ({
+          ...prevErrors,
+          dob: "Age must be above 3 years",
+        }));
+      } else {
+        setErrors((prevErrors) => {
+          const updatedErrors = { ...prevErrors };
+          delete updatedErrors.dob;
+          return updatedErrors;
+        });
+      }
+    }
 
     setForm((prev) => ({
       ...prev,
@@ -375,7 +538,8 @@ const StudentManagement = () => {
         busFeeQuarter: value === "quarterly" ? form.busFeeQuarter : "",
       }),
     }));
-    if (errors[name]) {
+
+    if (name !== "dob" && errors[name]) {
       setErrors((prevErrors) => {
         const updatedErrors = { ...prevErrors };
         delete updatedErrors[name]; // Remove only this field's error
@@ -401,6 +565,16 @@ const StudentManagement = () => {
         delete newErrors[name];
         return newErrors;
       });
+    }
+
+    if (name.startsWith("extraDocument_")) {
+      setForm((prev) => ({
+        ...prev,
+        extraDocuments: prev.extraDocuments.map((doc) =>
+          doc.fieldName === name ? { ...doc, file } : doc,
+        ),
+      }));
+      return;
     }
 
     setForm((prev) => ({
@@ -445,8 +619,8 @@ const StudentManagement = () => {
     const errors = [];
 
     if (step === 1) {
-      if (!form.firstName.trim()) errors.push("First Name required");
-      if (!form.lastName.trim()) errors.push("Last Name required");
+      if (!form.firstName?.trim()) errors.push("First Name required");
+      if (!form.lastName?.trim()) errors.push("Last Name required");
       if (!form.dob) {
         errors.push("Date of Birth required");
       } else {
@@ -459,33 +633,33 @@ const StudentManagement = () => {
         if (selectedDob >= today) {
           errors.push("Date of Birth must be a past date");
         }
-      }
-      if (!form.gender) errors.push("Gender required");
-      if (!form.admissionDate) {
-        errors.push("Admission Date required");
-      } else {
-        const admissionDate = new Date(form.admissionDate);
-        const today = new Date();
 
-        today.setHours(0, 0, 0, 0);
+        const minAgeDate = new Date(
+          today.getFullYear() - 3,
+          today.getMonth(),
+          today.getDate(),
+        );
 
-        if (admissionDate > today) {
-          errors.push("Admission Date cannot be a future date");
+        if (selectedDob > minAgeDate) {
+          errors.push("Age must be above 3 years");
         }
       }
+      if (!form.gender) errors.push("Gender required");
+      if (!form.bloodGroup?.trim()) errors.push("Blood Group required");
+      if (!form.admissionDate) errors.push("Admission Date required");
     }
 
     if (step === 2) {
-      if (!form.fatherName.trim()) errors.push("Father name required");
-      if (!form.fatherMobile.trim()) errors.push("Father mobile required");
+      if (!form.fatherName?.trim()) errors.push("Father name required");
+      if (!form.fatherMobile?.trim()) errors.push("Father mobile required");
       if (!form.motherName?.trim()) errors.push("Mother name required");
       if (!form.motherMobile?.trim()) errors.push("Mother mobile required");
-      if (!form.address.trim()) errors.push("Address required");
+      if (!form.address?.trim()) errors.push("Address required");
       if (form.fatherMobile && !/^\d{10}$/.test(form.fatherMobile))
         errors.push("Invalid Father Mobile Number");
     }
 
-    if (step === 3) {
+    if (step === 4) {
       // Check Student Photo
       if (!form.studentPhoto && !form?.documents?.studentPhoto?.url) {
         errors.push("Student Photo is required");
@@ -500,7 +674,7 @@ const StudentManagement = () => {
       }
     }
 
-    if (step === 4) {
+    if (step === 5) {
       if (!form.classId) errors.push("Class required");
 
       if (sections.length > 0 && !form.sectionId) {
@@ -510,7 +684,7 @@ const StudentManagement = () => {
       if (!form.rollNo) errors.push("Roll number required");
     }
 
-    if (step === 5) {
+    if (step === 6) {
       if (form.totalFee === "" || form.totalFee === null) {
         errors.push("Total fee required");
       }
@@ -528,11 +702,13 @@ const StudentManagement = () => {
       }
     }
 
-    if (step === 6) {
-      if (!form.username?.trim()) errors.push("Username is required");
-      if (!isEdit && !form.password?.trim())
-        errors.push("Password is required");
-      if (form.password && form.password.length < 5)
+    if (step === 7) {
+      const resolvedUsername = (form.username || form.fatherMobile || "").trim();
+      const resolvedPassword = (form.password || "").trim();
+
+      if (!resolvedUsername) errors.push("Username is required");
+      if (!isEdit && !resolvedPassword) errors.push("Password is required");
+      if (resolvedPassword && resolvedPassword.length < 5)
         errors.push("Password must be at least 5 characters");
     }
 
@@ -553,7 +729,9 @@ const StudentManagement = () => {
         if (lowerErr.includes("first name")) errorMap.firstName = err;
         if (lowerErr.includes("last name")) errorMap.lastName = err;
         if (lowerErr.includes("date of birth")) errorMap.dob = err;
+        if (lowerErr.includes("age must be above 3 years")) errorMap.dob = err;
         if (lowerErr.includes("gender")) errorMap.gender = err;
+        if (lowerErr.includes("blood group")) errorMap.bloodGroup = err;
         if (lowerErr.includes("admission date")) errorMap.admissionDate = err;
         if (lowerErr.includes("father name")) errorMap.fatherName = err;
         if (
@@ -586,12 +764,11 @@ const StudentManagement = () => {
       return;
     }
 
-    // Handle Parent Login Auto-generation logic here (Step 5 to 6 transition)
-    if (step === 5) {
+    // Keep parent username aligned with father mobile for next step/review.
+    if (step === 7) {
       setForm((prev) => ({
         ...prev,
         username: prev.username || prev.fatherMobile,
-        password: prev.password || "123456",
       }));
     }
 
@@ -648,6 +825,28 @@ const forbidden = [
 
       Object.entries(form).forEach(([key, value]) => {
         if (forbidden.includes(key)) return;
+
+        if (key === "extraDocuments") {
+          const extraDocsMeta = [];
+
+          value.forEach((doc) => {
+            if (!doc) return;
+            if (doc.file) {
+              data.append(doc.fieldName, doc.file);
+            }
+            extraDocsMeta.push({
+              fieldName: doc.fieldName,
+              label: doc.label || "",
+            });
+          });
+
+          if (extraDocsMeta.length > 0) {
+            data.append("extraDocumentsMeta", JSON.stringify(extraDocsMeta));
+          }
+
+          return;
+        }
+
         if (value === null || value === "") return;
 
         if (
@@ -671,12 +870,21 @@ const forbidden = [
           withCredentials: true,
         });
         toast.success("Student Updated Successfully");
+        navigate("/school/students");
       } else {
-        await axios.post(`${API}/students`, data, { withCredentials: true });
-        toast.success("Student Added Successfully");
+        const res = await axios.post(`${API}/students`, data, {
+          withCredentials: true,
+        });
+        toast.success(
+          "Student admitted successfully. Opening ID card for download…",
+        );
+        const newId = res.data?.data?._id;
+        if (newId) {
+          navigate(`/school/id-card/student/${newId}`);
+        } else {
+          navigate("/school/students");
+        }
       }
-
-      navigate("/school/students");
     } catch (err) {
       console.error("Submit error:", err);
       console.error("Response data:", err?.response?.data);
@@ -949,6 +1157,34 @@ const forbidden = [
             {/* STEP 3 */}
 
             {step === 3 && (
+              <div className="grid gap-6">
+                <Input
+                  label="Previous School Name"
+                  placeholder="Enter previous school name"
+                  name="previousSchoolName"
+                  value={form.previousSchoolName}
+                  onChange={handleChange}
+                />
+                <Input
+                  label="Previous School Class"
+                  placeholder="Enter previous school class"
+                  name="previousSchoolClass"
+                  value={form.previousSchoolClass}
+                  onChange={handleChange}
+                />
+                <Input
+                  label="Previous School Result"
+                  placeholder="Enter previous school result"
+                  name="previousSchoolResult"
+                  value={form.previousSchoolResult}
+                  onChange={handleChange}
+                />
+              </div>
+            )}
+
+            {/* STEP 4 */}
+
+            {step === 4 && (
               <div className="grid gap-4">
                 <File
                   label="Student Photo"
@@ -1017,12 +1253,71 @@ const forbidden = [
                   onChange={handleFileChange}
                   error={errors.motherAadhar}
                 />
+
+                <div className="border rounded-xl p-4 bg-[rgb(var(--surface))]">
+                  <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between mb-4">
+                    <div>
+                      <h3 className="text-base font-semibold">Additional Documents</h3>
+                      <p className="text-sm text-slate-500">
+                        Add more files for this student.
+                      </p>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={addExtraDocument}
+                      className="inline-flex items-center justify-center rounded-lg border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50"
+                    >
+                      Add more
+                    </button>
+                  </div>
+
+                  {(!form.extraDocuments || form.extraDocuments.length === 0) ? (
+                    <p className="text-sm text-slate-500">
+                      No additional documents added yet.
+                    </p>
+                  ) : (
+                    <div className="space-y-4">
+                      {(form.extraDocuments || []).map((doc, index) => (
+                        <div
+                          key={doc.id}
+                          className="rounded-xl border border-slate-200 p-4"
+                        >
+                          <div className="grid gap-4 sm:grid-cols-[1fr_auto]">
+                            <Input
+                              label={`Document name ${index + 1}`}
+                              value={doc.label}
+                              placeholder="Enter document label"
+                              onChange={(e) =>
+                                updateExtraDocument(doc.id, {
+                                  label: e.target.value,
+                                })
+                              }
+                            />
+                            <button
+                              type="button"
+                              onClick={() => removeExtraDocument(doc.id)}
+                              className="self-end rounded-lg bg-red-500 px-3 py-2 text-sm font-semibold text-white hover:bg-red-600"
+                            >
+                              Remove
+                            </button>
+                          </div>
+                          <File
+                            label={`Upload document ${index + 1}`}
+                            name={doc.fieldName}
+                            existingUrl={doc.existingUrl}
+                            onChange={handleFileChange}
+                          />
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
               </div>
             )}
 
-            {/* STEP 4 */}
+            {/* STEP 5 */}
 
-            {step === 4 && (
+            {step === 5 && (
               <div className="grid gap-4">
                 <Select
                   label="Class *"
@@ -1067,7 +1362,8 @@ const forbidden = [
 
             {/* STEP 5 */}
 
-            {step === 5 && (
+            {/* STEP 6 */}
+            {step === 6 && (
               <div className="grid gap-4">
                 {feeStructure.length === 0 && form.classId && (
                   <div className="text-sm text-[rgb(var(--text))] ">
@@ -1167,7 +1463,7 @@ const forbidden = [
                         >
                           <input
                             type="checkbox"
-                            checked={form.selectedOptionalFees.includes(
+                            checked={(form.selectedOptionalFees || []).includes(
                               String(fee._id),
                             )}
                             onChange={() => toggleOptionalFee(fee._id)}
@@ -1254,7 +1550,7 @@ const forbidden = [
                   label="Total Annual Fee"
                   name="totalFee"
                   value={form.totalFee}
-                  readOnly
+                  onChange={handleChange}
                 />
 
                 <Select
@@ -1284,7 +1580,7 @@ const forbidden = [
             )}
 
             {/* STEP 6 PARENT LOGIN */}
-            {step === 6 && (
+            {step === 7 && (
               <ParentLoginStep
                 form={form}
                 handleChange={handleChange}
@@ -1292,8 +1588,8 @@ const forbidden = [
               />
             )}
 
-            {/* STEP 7 REVIEW */}
-            {step === 7 && (
+            {/* STEP 8 REVIEW */}
+            {step === 8 && (
               <ReviewStep
                 form={form}
                 classes={classes}
@@ -1515,9 +1811,9 @@ const ParentLoginStep = ({ form, handleChange, isEdit }) => {
           <input
             name="password"
             type={showPassword ? "text" : "password"}
-            defaultValue={"123456"}
+            value={form.password || ""}
             onChange={handleChange}
-            placeholder="Min. 5 characters"
+            placeholder={isEdit ? "Leave blank to keep current" : "Min. 5 characters or leave blank for default"}
             className="w-full border px-3 py-2 rounded-lg focus:ring-2 focus:ring-indigo-500 pr-10"
           />
           <button
@@ -1650,6 +1946,12 @@ const ReviewStep = ({
         <Field label="Guardian mobile" value={form.guardianMobile} />
         <Field label="Relation" value={form.guardianRelation} />
         <Field label="Address" value={form.address} />
+      </Section>
+
+      <Section title="Previous School" headerClass="">
+        <Field label="Previous School Name" value={form.previousSchoolName} />
+        <Field label="Previous School Class" value={form.previousSchoolClass} />
+        <Field label="Previous School Result" value={form.previousSchoolResult} />
       </Section>
 
       <Section title="Class details" headerClass="">

@@ -19,12 +19,32 @@ import Sidebar from "./Sidebar";
 import Topbar from "./Topbar";
 import BottomNav from "./BottomNav";
 import ProfileSheet from "./ProfileSheet";
+import DomI18n from "./DomI18n";
 import { useAuth } from "../context/AuthContext";
+import { useLanguage } from "../context/LanguageContext";
+
+/* ─── Role → menu hub path ──────────────────────────────────── */
+export const getMenuPath = (role, loginAs) => {
+  switch (role) {
+    case "super_admin":
+      return "/admin/menu";
+    case "school_admin":
+      return "/school/menu";
+    case "teacher_admin":
+      return "/teacher/menu";
+    case "staff_admin":
+      return "/staff/menu";
+    case "student_admin":
+      return loginAs === "parent" ? "/parent/menu" : "/student/menu";
+    default:
+      return "/";
+  }
+};
 
 /* ─── Bottom nav items per role ─────────────────────────────── */
-const getNavItems = (role, loginAs, openProfile) => {
+const getNavItems = (role, loginAs, openProfile, tn) => {
   const profileItem = {
-    label: "Profile",
+    label: tn("Profile"),
     icon: <FaUserAlt />,
     onClick: openProfile,
   };
@@ -33,55 +53,55 @@ const getNavItems = (role, loginAs, openProfile) => {
     case "teacher_admin":
       return [
         {
-          label: "Dashboard",
+          label: tn("Dashboard"),
           icon: <FaTachometerAlt />,
           path: "/teacher/dashboard",
         },
-        { label: "Classes", icon: <HiAcademicCap />, path: "/teacher/class" },
-        { label: "Tasks", icon: <GiSchoolBag />, path: "/teacher/assignment" },
-        { label: "Chat", icon: <FaComments />, path: "/teacher/messages" },
+        { label: tn("Classes"), icon: <HiAcademicCap />, path: "/teacher/class" },
+        { label: tn("Tasks"), icon: <GiSchoolBag />, path: "/teacher/assignment" },
+        { label: tn("Chat"), icon: <FaComments />, path: "/teacher/messages" },
         profileItem,
       ];
 
     case "school_admin":
       return [
         {
-          label: "Dashboard",
+          label: tn("Dashboard"),
           icon: <FaTachometerAlt />,
           path: "/school/dashboard",
         },
         {
-          label: "Students",
+          label: tn("Students"),
           icon: <FaUserGraduate />,
           path: "/school/students",
         },
         {
-          label: "Teachers",
+          label: tn("Teachers"),
           icon: <FaChalkboardTeacher />,
           path: "/school/teachers",
         },
-        { label: "Chat", icon: <FaComments />, path: "/school/messages" },
+        { label: tn("Chat"), icon: <FaComments />, path: "/school/messages" },
         profileItem,
       ];
 
     case "staff_admin":
       return [
         {
-          label: "Dashboard",
+          label: tn("Dashboard"),
           icon: <FaTachometerAlt />,
           path: "/staff/dashboard",
         },
         {
-          label: "Students",
+          label: tn("Students"),
           icon: <FaUserGraduate />,
           path: "/staff/students",
         },
         {
-          label: "Attendance",
+          label: tn("Attendance"),
           icon: <FaClipboardCheck />,
           path: "/staff/attendance",
         },
-        { label: "Chat", icon: <FaComments />, path: "/staff/messages" },
+        { label: tn("Chat"), icon: <FaComments />, path: "/staff/messages" },
         profileItem,
       ];
 
@@ -89,44 +109,43 @@ const getNavItems = (role, loginAs, openProfile) => {
       if (loginAs === "parent") {
         return [
           {
-            label: "Dashboard",
+            label: tn("Dashboard"),
             icon: <FaTachometerAlt />,
             path: "/parent/dashboard",
           },
-          { label: "Child", icon: <FaUserGraduate />, path: "/parent/student" },
-          { label: "Fees", icon: <FaWallet />, path: "/parent/fees" },
-          { label: "Chat", icon: <FaComments />, path: "/parent/messages" },
+          { label: tn("Child"), icon: <FaUserGraduate />, path: "/parent/student" },
+          { label: tn("Fees"), icon: <FaWallet />, path: "/parent/fees" },
+          { label: tn("Chat"), icon: <FaComments />, path: "/parent/messages" },
           profileItem,
         ];
       }
-      // loginAs === "student"
       return [
         {
-          label: "Dashboard",
+          label: tn("Dashboard"),
           icon: <FaTachometerAlt />,
           path: "/student/dashboard",
         },
-        { label: "Timetable", icon: <FaClock />, path: "/student/timetable" },
-        { label: "Tasks", icon: <GiSchoolBag />, path: "/student/assignment" },
-        { label: "Chat", icon: <FaComments />, path: "/student/messages" },
+        { label: tn("Timetable"), icon: <FaClock />, path: "/student/timetable" },
+        { label: tn("Tasks"), icon: <GiSchoolBag />, path: "/student/assignment" },
+        { label: tn("Chat"), icon: <FaComments />, path: "/student/messages" },
         profileItem,
       ];
 
     case "super_admin":
       return [
         {
-          label: "Dashboard",
+          label: tn("Dashboard"),
           icon: <FaTachometerAlt />,
           path: "/admin/dashboard",
         },
-        { label: "Schools", icon: <FaSchool />, path: "/admin/schools" },
+        { label: tn("Schools"), icon: <FaSchool />, path: "/admin/schools" },
         {
-          label: "Access",
+          label: tn("Access"),
           icon: <FaShieldAlt />,
           path: "/admin/access-control",
         },
         {
-          label: "Analytics",
+          label: tn("Analytics"),
           icon: <FaChartLine />,
           path: "/admin/platform-analytics",
         },
@@ -139,45 +158,30 @@ const getNavItems = (role, loginAs, openProfile) => {
 };
 
 const AdminLayout = () => {
-  const [sidebarOpen, setSidebarOpen] = useState(false);
   const [showProfile, setShowProfile] = useState(false);
   const { user } = useAuth();
+  const { tn } = useLanguage();
 
+  const menuPath = getMenuPath(user?.role, user?.loginAs);
   const navItems = getNavItems(user?.role, user?.loginAs, () =>
-    setShowProfile(true),
+    setShowProfile(true), tn
   );
 
   return (
     <div className="h-screen bg-[rgb(var(--bg))] overflow-hidden flex flex-col">
-      {/* FULL WIDTH TOPBAR */}
-      <Topbar toggleSidebar={() => setSidebarOpen(!sidebarOpen)} />
+      <Topbar menuPath={menuPath} />
 
       <div className="flex flex-1 overflow-hidden">
-        {/* Desktop Sidebar */}
+        {/* Desktop Sidebar only — mobile uses Menu hub + bottom nav */}
         <aside className="hidden lg:flex w-70 shrink-0">
           <Sidebar />
         </aside>
 
-        {/* Mobile Sidebar */}
-        {sidebarOpen && (
-          <div className="fixed inset-0 z-50 lg:hidden">
-            <div
-              className="absolute inset-0 bg-black/40 backdrop-blur-sm"
-              onClick={() => setSidebarOpen(false)}
-            />
-
-            <div className="absolute left-0 top-0 h-full w-70 bg-white shadow-2xl">
-              <Sidebar closeSidebar={() => setSidebarOpen(false)} />
-            </div>
-          </div>
-        )}
-
-        {/* Content */}
         <main className="flex-1 overflow-y-auto">
-          <div className="px-4 md:px-6 lg:px-8 py-6 pb-24 lg:pb-8">
-            <div className="max-w-400 mx-auto">
+          <div className="px-3 sm:px-4 md:px-6 lg:px-8 py-4 lg:py-6 pb-24 lg:pb-8">
+            <DomI18n className="max-w-400 mx-auto">
               <Outlet />
-            </div>
+            </DomI18n>
           </div>
         </main>
       </div>

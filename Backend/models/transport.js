@@ -107,6 +107,49 @@ const busSchema = new mongoose.Schema(
       type: Date,
       default: null,
     },
+
+    /* ── GPS TRACKING ── */
+    gpsEnabled: {
+      type: Boolean,
+      default: false,
+    },
+    gpsDeviceId: {
+      type: String,
+      trim: true,
+      default: "",
+    },
+    lastLatitude: {
+      type: Number,
+      default: null,
+    },
+    lastLongitude: {
+      type: Number,
+      default: null,
+    },
+    lastGpsAt: {
+      type: Date,
+      default: null,
+    },
+    gpsSpeedKmh: {
+      type: Number,
+      default: null,
+    },
+
+    /* ── Daily trip notifications (pickup → school → home) ── */
+    tripDate: {
+      type: String, // YYYY-MM-DD (school local day key)
+      default: "",
+    },
+    tripEvents: {
+      pickup: { at: { type: Date, default: null }, notified: { type: Boolean, default: false } },
+      arriveSchool: { at: { type: Date, default: null }, notified: { type: Boolean, default: false } },
+      departSchool: { at: { type: Date, default: null }, notified: { type: Boolean, default: false } },
+      arriveHome: { at: { type: Date, default: null }, notified: { type: Boolean, default: false } },
+    },
+    insideSchoolGeofence: {
+      type: Boolean,
+      default: false,
+    },
   },
   { timestamps: true },
 );

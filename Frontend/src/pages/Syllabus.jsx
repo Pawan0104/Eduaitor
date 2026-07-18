@@ -1,14 +1,27 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import axios from "axios";
-import { FiChevronDown, FiPlus, FiEdit2, FiTrash2, FiX } from "react-icons/fi";
+import {
+  FiChevronDown,
+  FiPlus,
+  FiEdit2,
+  FiTrash2,
+  FiX,
+  FiFileText,
+  FiUpload,
+  FiDownload,
+} from "react-icons/fi";
+import { FaCloudDownloadAlt } from "react-icons/fa";
 import { FaArrowLeft } from "react-icons/fa";
 import { toast } from "react-toastify";
 import TermManagement from "../components/TermManagement";
+import ImportSyllabusCatalog from "../components/ImportSyllabusCatalog";
+import ChapterPdfViewer from "../components/ChapterPdfViewer";
 import { useNavigate } from "react-router-dom";
 
 function Syllabus() {
   const API = import.meta.env.VITE_API_URL;
   const navigate = useNavigate();
+  const pdfInputRef = useRef(null);
 
   // ==================== STATE ====================
   const [classes, setClasses] = useState([]);
@@ -27,11 +40,15 @@ function Syllabus() {
   const [activeModal, setActiveModal] = useState(null);
   const [formData, setFormData] = useState({});
 
+  const [syllabusPdf, setSyllabusPdf] = useState(null);
+  const [pdfUploading, setPdfUploading] = useState(false);
+
   const [confirmState, setConfirmState] = useState({
     open: false,
-    type: "", // "chapter" | "topic"
+    type: "", // "chapter" | "topic" | "pdf"
     id: null,
   });
+  const [showImportCatalog, setShowImportCatalog] = useState(false);
 
   const isMobile = window.innerWidth <= 768;
 
@@ -86,6 +103,15 @@ function Syllabus() {
     }
   }, [selectedSubject, selectedTerm]);
 
+  useEffect(() => {
+    if (selectedClass && selectedSubject && selectedTerm) {
+      fetchSyllabusPdf();
+    } else {
+      setSyllabusPdf(null);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedClass, selectedSubject, selectedTerm]);
+
   const fetchTerms = async () => {
     const res = await axios.get(`${API}/terms`, { withCredentials: true });
     setTerms(res.data.terms);
@@ -94,6 +120,82 @@ function Syllabus() {
   useEffect(() => {
     fetchTerms();
   }, []);
+
+  const fetchSyllabusPdf = async () => {
+    try {
+      const res = await axios.get(`${API}/syllabus/pdf`, {
+        params: {
+          classId: selectedClass,
+          subjectId: selectedSubject,
+          termId: selectedTerm,
+        },
+        withCredentials: true,
+      });
+      setSyllabusPdf(res.data.data || null);
+    } catch (err) {
+      console.error("Error fetching syllabus PDF:", err);
+      setSyllabusPdf(null);
+    }
+  };
+
+  const handlePdfUpload = async (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (file.type !== "application/pdf") {
+      toast.error("Only PDF files are allowed");
+      e.target.value = "";
+      return;
+    }
+    if (file.size > 10 * 1024 * 1024) {
+      toast.error("PDF must be under 10MB");
+      e.target.value = "";
+      return;
+    }
+    if (!selectedClass || !selectedSubject || !selectedTerm) {
+      toast.error("Select class, subject and term first");
+      e.target.value = "";
+      return;
+    }
+
+    const fd = new FormData();
+    fd.append("pdf", file);
+    fd.append("classId", selectedClass);
+    fd.append("subjectId", selectedSubject);
+    fd.append("termId", selectedTerm);
+
+    try {
+      setPdfUploading(true);
+      const { data } = await axios.post(`${API}/syllabus/pdf`, fd, {
+        withCredentials: true,
+        headers: { "Content-Type": "multipart/form-data" },
+      });
+      setSyllabusPdf(data.data);
+      toast.success(data.message || "Syllabus PDF uploaded");
+    } catch (err) {
+      toast.error(err.response?.data?.message || "Failed to upload PDF");
+    } finally {
+      setPdfUploading(false);
+      e.target.value = "";
+    }
+  };
+
+  const handlePdfDelete = async () => {
+    try {
+      await axios.delete(`${API}/syllabus/pdf`, {
+        params: {
+          classId: selectedClass,
+          subjectId: selectedSubject,
+          termId: selectedTerm,
+        },
+        withCredentials: true,
+      });
+      setSyllabusPdf(null);
+      toast.success("Syllabus PDF removed");
+    } catch (err) {
+      toast.error(err.response?.data?.message || "Failed to delete PDF");
+    }
+  };
 
   const fetchChapters = async () => {
     try {
@@ -137,6 +239,7 @@ function Syllabus() {
         id: chapter._id,
         name: chapter.name,
         description: chapter.description || "",
+        content: chapter.content || chapter.description || "",
         learningOutcomes: chapter.learningOutcomes?.join("\n") || "",
       });
     } else {
@@ -144,10 +247,28 @@ function Syllabus() {
         type: "addChapter",
         name: "",
         description: "",
+        content: "",
         learningOutcomes: "",
       });
     }
     setActiveModal("chapter");
+  };
+
+  const openViewChapter = (chapter) => {
+    setFormData({
+      type: "viewChapter",
+      _id: chapter._id,
+      name: chapter.name,
+      order: chapter.order,
+      content: chapter.content || chapter.description || "",
+      description: chapter.description || "",
+      ncertPortalUrl: chapter.ncertPortalUrl || "",
+      ncertPdfUrl: chapter.ncertPdfUrl || "",
+      pdf: chapter.pdf || null,
+      learningOutcomes: chapter.learningOutcomes || [],
+      topics: topics[chapter._id] || [],
+    });
+    setActiveModal("viewChapter");
   };
 
   const openTopicModal = (chapterId, topic = null) => {
@@ -160,6 +281,8 @@ function Syllabus() {
         content: topic.content || "",
         difficultyLevel: topic.difficultyLevel || "medium",
         keywords: topic.keywords?.join(", ") || "",
+        pageFrom: topic.pageFrom || "",
+        pageTo: topic.pageTo || "",
       });
     } else {
       setFormData({
@@ -169,6 +292,8 @@ function Syllabus() {
         content: "",
         difficultyLevel: "medium",
         keywords: "",
+        pageFrom: "",
+        pageTo: "",
       });
     }
     setActiveModal("topic");
@@ -192,6 +317,7 @@ function Syllabus() {
         termId: formData.termId,
         name: formData.name,
         description: formData.description,
+        content: formData.content || formData.description || "",
         learningOutcomes: formData.learningOutcomes
           .split("\n")
           .filter((item) => item.trim()),
@@ -230,6 +356,8 @@ function Syllabus() {
         name: formData.name,
         content: formData.content,
         difficultyLevel: formData.difficultyLevel,
+        pageFrom: formData.pageFrom || null,
+        pageTo: formData.pageTo || null,
         keywords: formData.keywords
           .split(",")
           .map((k) => k.trim())
@@ -277,15 +405,22 @@ function Syllabus() {
   };
   const handleConfirmDelete = async () => {
     try {
-      if (confirmState.type === "chapter") {
-        await axios.delete(`${API}/syllabus/chapters/${confirmState.id}`);
+      if (confirmState.type === "pdf") {
+        await handlePdfDelete();
+      } else if (confirmState.type === "chapter") {
+        await axios.delete(`${API}/syllabus/chapters/${confirmState.id}`, {
+          withCredentials: true,
+        });
+        await fetchChapters();
       } else if (confirmState.type === "topic") {
-        await axios.delete(`${API}/syllabus/topics/${confirmState.id}`);
+        await axios.delete(`${API}/syllabus/topics/${confirmState.id}`, {
+          withCredentials: true,
+        });
+        await fetchChapters();
       }
-
-      await fetchChapters();
     } catch (err) {
       console.error("Delete error:", err);
+      toast.error(err.response?.data?.message || "Delete failed");
     } finally {
       setConfirmState({ open: false, type: "", id: null });
     }
@@ -319,11 +454,24 @@ function Syllabus() {
           </div>
         )}
         {/* Header */}
-        <div className="mb-8 text-[rgb(var(--text))] ">
-          <h1 className="text-4xl py-1 font-bold bg-clip-text mb-2">
-            Syllabus Management
-          </h1>
-          <p className="font-bold mt-2">Add chapters and topics.</p>
+        <div className="mb-8 text-[rgb(var(--text))] flex flex-wrap items-start justify-between gap-3">
+          <div>
+            <h1 className="text-4xl py-1 font-bold bg-clip-text mb-2">
+              Syllabus Management
+            </h1>
+            <p className="font-bold mt-2">
+              Add chapters and topics, or import NCERT / CBSE / RBSE from the
+              global catalog.
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={() => setShowImportCatalog(true)}
+            className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-semibold border border-slate-200 bg-[rgb(var(--surface))] hover:bg-slate-50"
+          >
+            <FaCloudDownloadAlt size={16} />
+            Import from catalog
+          </button>
         </div>
 
         {/* Filters */}
@@ -416,6 +564,81 @@ function Syllabus() {
         {/* Content Area */}
         {selectedSubject && (
           <div className="space-y-4 text-[rgb(var(--text))] bg-[rgb(var(--surface))]">
+            {/* Syllabus PDF upload */}
+            {selectedTerm ? (
+              <div className="rounded-xl border border-slate-200 bg-[rgb(var(--bg))] p-4 flex flex-col sm:flex-row sm:items-center gap-3 justify-between">
+                <div className="flex items-start gap-3 min-w-0">
+                  <div className="w-10 h-10 rounded-xl bg-rose-100 text-rose-600 flex items-center justify-center shrink-0">
+                    <FiFileText size={20} />
+                  </div>
+                  <div className="min-w-0">
+                    <p className="font-semibold text-sm">Syllabus PDF</p>
+                    {syllabusPdf?.pdf?.url ? (
+                      <p className="text-xs text-[rgb(var(--text-muted))] truncate mt-0.5">
+                        {syllabusPdf.pdf.name || "syllabus.pdf"}
+                        {syllabusPdf.updatedAt
+                          ? ` · Updated ${new Date(
+                              syllabusPdf.updatedAt,
+                            ).toLocaleDateString("en-IN")}`
+                          : ""}
+                      </p>
+                    ) : (
+                      <p className="text-xs text-[rgb(var(--text-muted))] mt-0.5">
+                        Upload the term syllabus as a PDF (max 10MB)
+                      </p>
+                    )}
+                  </div>
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  <input
+                    ref={pdfInputRef}
+                    type="file"
+                    accept="application/pdf,.pdf"
+                    className="hidden"
+                    onChange={handlePdfUpload}
+                  />
+                  {syllabusPdf?.pdf?.url && (
+                    <>
+                      <a
+                        href={syllabusPdf.pdf.url}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg bg-emerald-600 text-white text-xs font-bold"
+                      >
+                        <FiDownload size={14} /> View / Download
+                      </a>
+                      <button
+                        type="button"
+                        onClick={() =>
+                          setConfirmState({ open: true, type: "pdf", id: null })
+                        }
+                        className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg border border-rose-200 text-rose-600 text-xs font-bold"
+                      >
+                        <FiTrash2 size={14} /> Remove
+                      </button>
+                    </>
+                  )}
+                  <button
+                    type="button"
+                    disabled={pdfUploading}
+                    onClick={() => pdfInputRef.current?.click()}
+                    className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg bg-[rgb(var(--primary))] text-[rgb(var(--text))] text-xs font-bold disabled:opacity-50"
+                  >
+                    <FiUpload size={14} />
+                    {pdfUploading
+                      ? "Uploading…"
+                      : syllabusPdf?.pdf?.url
+                        ? "Replace PDF"
+                        : "Upload PDF"}
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <p className="text-xs text-amber-700 bg-amber-50 border border-amber-100 rounded-lg px-3 py-2">
+                Select a term to upload or view the syllabus PDF.
+              </p>
+            )}
+
             {/* Add Chapter Button */}
             <button
               onClick={() => openChapterModal()}
@@ -455,11 +678,22 @@ function Syllabus() {
                         <h3 className="text-lg font-semibold ">
                           Chapter {chapter.order}: {chapter.name}
                         </h3>
-                        {chapter.description && (
-                          <p className="text-sm  mt-1">{chapter.description}</p>
+                        {(chapter.content || chapter.description) && (
+                          <p className="text-sm mt-1 line-clamp-2 text-slate-600">
+                            {chapter.content || chapter.description}
+                          </p>
                         )}
                       </div>
                       <div className="flex items-center gap-2">
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            openViewChapter(chapter);
+                          }}
+                          className="px-3 py-2 text-xs font-semibold text-[rgb(var(--text))] bg-[rgb(var(--primary))] rounded-xl transition cursor-pointer"
+                        >
+                          View content
+                        </button>
                         <button
                           onClick={(e) => {
                             e.stopPropagation();
@@ -577,13 +811,20 @@ function Syllabus() {
         <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50">
           <div className="text-[rgb(var(--text))] bg-[rgb(var(--surface))]  rounded-2xl shadow-xl w-[90%] max-w-sm p-6">
             <h2 className="text-lg font-semibold mb-2">
-              Delete {confirmState.type === "chapter" ? "Chapter" : "Topic"}
+              Delete{" "}
+              {confirmState.type === "pdf"
+                ? "Syllabus PDF"
+                : confirmState.type === "chapter"
+                  ? "Chapter"
+                  : "Topic"}
             </h2>
 
             <p className="text-sm  mb-6">
-              {confirmState.type === "chapter"
-                ? "This will delete the chapter and all its topics."
-                : "This will delete the topic permanently."}
+              {confirmState.type === "pdf"
+                ? "This will permanently remove the uploaded syllabus PDF."
+                : confirmState.type === "chapter"
+                  ? "This will delete the chapter and all its topics."
+                  : "This will delete the topic permanently."}
             </p>
 
             <div className="flex justify-end gap-3">
@@ -626,6 +867,117 @@ function Syllabus() {
           onClose={closeModal}
         />
       )}
+
+      {activeModal === "viewChapter" && (
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="text-[rgb(var(--text))] bg-[rgb(var(--surface))] rounded-lg shadow-xl max-w-4xl w-full border border-slate-700 max-h-[90vh] flex flex-col">
+            <div className="flex items-center justify-between p-5 border-b border-slate-700">
+              <div>
+                <h2 className="text-lg font-bold">
+                  Chapter {formData.order}: {formData.name}
+                </h2>
+                <p className="text-xs text-slate-500 mt-0.5">
+                  {(formData.topics || []).length} modules
+                </p>
+              </div>
+              <button onClick={closeModal} className="transition">
+                <FiX className="w-6 h-6" />
+              </button>
+            </div>
+            <div className="p-5 overflow-y-auto space-y-4">
+              <ChapterPdfViewer
+                chapter={{
+                  _id: formData._id,
+                  name: formData.name,
+                  pdf: formData.pdf,
+                  ncertPdfUrl: formData.ncertPdfUrl,
+                  ncertPortalUrl: formData.ncertPortalUrl,
+                }}
+                topics={formData.topics || []}
+                source="school"
+              />
+              <div className="rounded-xl border-2 border-amber-200 bg-amber-50/70 px-4 py-4">
+                <p className="text-xs font-bold uppercase text-amber-800 mb-2">
+                  Study outline (Eduaitor)
+                </p>
+                <p className="text-sm whitespace-pre-wrap leading-relaxed">
+                  {formData.content?.trim()
+                    ? formData.content
+                    : "No study outline added for this chapter yet."}
+                </p>
+              </div>
+              {(formData.learningOutcomes || []).length > 0 && (
+                <div>
+                  <p className="text-xs font-bold uppercase text-slate-500 mb-2">
+                    Learning outcomes
+                  </p>
+                  <ul className="list-disc pl-5 space-y-1">
+                    {formData.learningOutcomes.map((lo, i) => (
+                      <li key={i} className="text-sm">
+                        {lo}
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+              <div>
+                <p className="text-xs font-bold uppercase text-slate-500 mb-2">
+                  Modules / topics
+                </p>
+                {(formData.topics || []).length === 0 ? (
+                  <p className="text-sm text-slate-500">No topics yet</p>
+                ) : (
+                  <div className="space-y-2">
+                    {formData.topics.map((t, idx) => (
+                      <div
+                        key={t._id || idx}
+                        className="rounded-xl border border-slate-200 px-3 py-2"
+                      >
+                        <p className="text-sm font-semibold">
+                          {idx + 1}. {t.name}
+                          {t.pageFrom ? (
+                            <span className="ml-2 text-[10px] font-semibold text-emerald-700">
+                              p.{t.pageFrom}
+                              {t.pageTo ? `–${t.pageTo}` : ""}
+                            </span>
+                          ) : null}
+                        </p>
+                        <p className="text-xs text-slate-600 mt-1 whitespace-pre-wrap">
+                          {t.content?.trim()
+                            ? t.content
+                            : "No topic content yet."}
+                        </p>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </div>
+            <div className="p-4 border-t border-slate-700">
+              <button
+                onClick={closeModal}
+                className="w-full py-2.5 rounded-xl text-sm font-medium bg-[rgb(var(--primary))]"
+              >
+                Close
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      <ImportSyllabusCatalog
+        open={showImportCatalog}
+        onClose={() => setShowImportCatalog(false)}
+        classes={classes}
+        terms={terms}
+        subjects={subjects}
+        selectedClass={selectedClass}
+        selectedSubject={selectedSubject}
+        selectedTerm={selectedTerm}
+        onImported={() => {
+          if (selectedSubject && selectedClass) fetchChapters();
+        }}
+      />
     </div>
   );
 }
@@ -687,15 +1039,19 @@ function ChapterModal({ formData, setFormData, onSubmit, onClose, terms }) {
 
           <div>
             <label className="block text-sm font-semibold  mb-2">
-              Description
+              Main content *
             </label>
             <textarea
-              value={formData.description || ""}
+              value={formData.content || formData.description || ""}
               onChange={(e) =>
-                setFormData({ ...formData, description: e.target.value })
+                setFormData({
+                  ...formData,
+                  content: e.target.value,
+                  description: formData.description || e.target.value,
+                })
               }
-              placeholder="Brief description of the chapter"
-              rows="3"
+              placeholder="Write the full main content of this chapter"
+              rows="8"
               className="w-full px-4 py-2  border border-slate-600 rounded-lg  placeholder-slate-400  outline-none transition resize-none"
             />
           </div>
@@ -776,6 +1132,39 @@ function TopicModal({ formData, setFormData, onSubmit, onClose }) {
               rows="6"
               className="w-full px-4 py-2 border border-slate-600 rounded-lg  placeholder-slate-400 focus:border-cyan-400 outline-none transition resize-none"
             />
+          </div>
+
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="block text-sm font-semibold mb-2">
+                PDF page from
+              </label>
+              <input
+                type="number"
+                min={1}
+                value={formData.pageFrom ?? ""}
+                onChange={(e) =>
+                  setFormData({ ...formData, pageFrom: e.target.value })
+                }
+                placeholder="e.g. 1"
+                className="w-full px-4 py-2 border border-slate-600 rounded-lg outline-none transition"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-semibold mb-2">
+                PDF page to
+              </label>
+              <input
+                type="number"
+                min={1}
+                value={formData.pageTo ?? ""}
+                onChange={(e) =>
+                  setFormData({ ...formData, pageTo: e.target.value })
+                }
+                placeholder="e.g. 3"
+                className="w-full px-4 py-2 border border-slate-600 rounded-lg outline-none transition"
+              />
+            </div>
           </div>
 
           <div>
