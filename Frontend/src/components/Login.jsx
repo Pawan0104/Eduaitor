@@ -14,7 +14,7 @@ import { toast } from "react-toastify";
 import logo from "/eduaitor.png";
 import LanguageSwitcher from "./LanguageSwitcher"; 
 
-const API = import.meta.env.VITE_API_URL;
+import { API } from "../config/api";
 
 export default function Login() {
   const [form, setForm] = useState({ email: "", password: "" });
