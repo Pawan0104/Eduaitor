@@ -1,12 +1,20 @@
 import Hostel from "../models/hostel.js";
 import HostelResident from "../models/hostelResident.js";
 import HostelVisitor from "../models/hostelVisitor.js";
+import { uploadToCloudinary } from "../utils/uploadToCloudinary.js";
+import { createNotificationHelper } from "./notificationController.js";
 
 const getSchoolId = (req) => req.user?.school_id;
 
+const resolveActor = (user = {}) => ({
+  userId: user._id || user.id || user.staff_id || user.teacher_id || null,
+  name: user.name || user.username || user.email || "Staff",
+  role: user.role || "",
+});
+
 const populateVisitor = (query) =>
   query
-    .populate("hostelId", "name code type")
+    .populate("hostelId", "name code type wardenName wardenPhone")
     .populate({
       path: "residentId",
       select: "bedNumber status roomId hostelId studentId",
@@ -19,6 +27,17 @@ const populateVisitor = (query) =>
       ],
     })
     .populate("studentId", "firstName lastName studentId");
+
+const uploadVisitorPhoto = async (req) => {
+  const file = req.file || req.files?.photo?.[0] || null;
+  if (!file) return null;
+  const uploaded = await uploadToCloudinary(file, "hostel/visitors");
+  return {
+    url: uploaded.url,
+    public_id: uploaded.public_id,
+    type: uploaded.type || file.mimetype,
+  };
+};
 
 /* ---------------- LIST ---------------- */
 export const getVisitors = async (req, res, next) => {
@@ -35,21 +54,17 @@ export const getVisitors = async (req, res, next) => {
     const filter = { schoolId };
 
     if (status && status !== "all") filter.status = status;
-    else if (!status) filter.status = "CheckedIn";
 
     if (hostelId) filter.hostelId = hostelId;
 
     let visitors = await populateVisitor(
-      HostelVisitor.find(filter).sort({ checkInAt: -1 }),
+      HostelVisitor.find(filter).sort({ createdAt: -1 }),
     ).lean();
 
     if (search?.trim()) {
       const q = search.trim().toLowerCase();
       visitors = visitors.filter((v) => {
-        const student =
-          v.studentId ||
-          v.residentId?.studentId ||
-          null;
+        const student = v.studentId || v.residentId?.studentId || null;
         const studentName = `${student?.firstName || ""} ${student?.lastName || ""}`
           .trim()
           .toLowerCase();
@@ -72,7 +87,7 @@ export const getVisitors = async (req, res, next) => {
   }
 };
 
-/* ---------------- CREATE (check-in) ---------------- */
+/* ---------------- CREATE (guard submits for approval) ---------------- */
 export const createVisitor = async (req, res, next) => {
   try {
     const schoolId = getSchoolId(req);
@@ -92,8 +107,6 @@ export const createVisitor = async (req, res, next) => {
       purpose,
       whomVisiting,
       residentId,
-      checkInAt,
-      approvedByName,
       notes,
     } = req.body;
 
@@ -107,6 +120,14 @@ export const createVisitor = async (req, res, next) => {
       return res.status(400).json({
         success: false,
         message: "Visitor name is required.",
+      });
+    }
+
+    const photo = await uploadVisitorPhoto(req);
+    if (!photo?.url) {
+      return res.status(400).json({
+        success: false,
+        message: "Live visitor photo is required.",
       });
     }
 
@@ -147,6 +168,8 @@ export const createVisitor = async (req, res, next) => {
       }
     }
 
+    const submittedBy = resolveActor(req.user);
+
     const visitor = await HostelVisitor.create({
       schoolId,
       hostelId,
@@ -158,21 +181,34 @@ export const createVisitor = async (req, res, next) => {
       whomVisiting: resolvedWhom,
       residentId: residentId || null,
       studentId,
-      checkInAt: checkInAt ? new Date(checkInAt) : new Date(),
-      status: "CheckedIn",
-      approvedByName:
-        String(approvedByName || "").trim() ||
-        req.user?.name ||
-        req.user?.username ||
-        "",
+      photo,
+      status: "Pending",
+      checkInAt: null,
+      submittedBy,
       notes: String(notes || "").trim(),
     });
+
+    try {
+      await createNotificationHelper({
+        title: "Hostel visitor approval needed",
+        message: `${visitor.visitorName} is waiting at the gate for ${hostel.name}. Review and approve or reject entry.`,
+        notificationType: "general",
+        schoolId,
+        createdBy: submittedBy.userId,
+        targets: [
+          { type: "role", roles: ["school_admin"] },
+          { type: "role", roles: ["staff_admin"] },
+        ],
+      });
+    } catch (notifyErr) {
+      console.error("Visitor approval notify failed:", notifyErr.message);
+    }
 
     const data = await populateVisitor(HostelVisitor.findById(visitor._id)).lean();
 
     return res.status(201).json({
       success: true,
-      message: "Visitor checked in successfully.",
+      message: "Visitor request submitted for warden approval.",
       data,
     });
   } catch (error) {
@@ -180,7 +216,96 @@ export const createVisitor = async (req, res, next) => {
   }
 };
 
-/* ---------------- UPDATE ---------------- */
+/* ---------------- APPROVE (warden — grants entry) ---------------- */
+export const approveVisitor = async (req, res, next) => {
+  try {
+    const schoolId = getSchoolId(req);
+    const { id } = req.params;
+
+    const visitor = await HostelVisitor.findOne({ _id: id, schoolId });
+    if (!visitor) {
+      return res.status(404).json({
+        success: false,
+        message: "Visitor record not found.",
+      });
+    }
+    if (visitor.status !== "Pending") {
+      return res.status(400).json({
+        success: false,
+        message: "Only pending visitor requests can be approved.",
+      });
+    }
+
+    const reviewer = resolveActor(req.user);
+    visitor.status = "CheckedIn";
+    visitor.checkInAt = new Date();
+    visitor.reviewedBy = reviewer;
+    visitor.reviewedAt = new Date();
+    visitor.approvedByName = reviewer.name;
+    visitor.rejectionReason = "";
+    await visitor.save();
+
+    const data = await populateVisitor(HostelVisitor.findById(visitor._id)).lean();
+
+    return res.json({
+      success: true,
+      message: "Visitor approved. Entry granted.",
+      data,
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+/* ---------------- REJECT ---------------- */
+export const rejectVisitor = async (req, res, next) => {
+  try {
+    const schoolId = getSchoolId(req);
+    const { id } = req.params;
+    const reason = String(req.body?.reason || req.body?.rejectionReason || "").trim();
+
+    if (!reason) {
+      return res.status(400).json({
+        success: false,
+        message: "Please provide a reason for rejection.",
+      });
+    }
+
+    const visitor = await HostelVisitor.findOne({ _id: id, schoolId });
+    if (!visitor) {
+      return res.status(404).json({
+        success: false,
+        message: "Visitor record not found.",
+      });
+    }
+    if (visitor.status !== "Pending") {
+      return res.status(400).json({
+        success: false,
+        message: "Only pending visitor requests can be rejected.",
+      });
+    }
+
+    const reviewer = resolveActor(req.user);
+    visitor.status = "Rejected";
+    visitor.reviewedBy = reviewer;
+    visitor.reviewedAt = new Date();
+    visitor.rejectionReason = reason;
+    visitor.approvedByName = "";
+    await visitor.save();
+
+    const data = await populateVisitor(HostelVisitor.findById(visitor._id)).lean();
+
+    return res.json({
+      success: true,
+      message: "Visitor request rejected.",
+      data,
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+/* ---------------- UPDATE (pending / checked-in only) ---------------- */
 export const updateVisitor = async (req, res, next) => {
   try {
     const schoolId = getSchoolId(req);
@@ -194,10 +319,10 @@ export const updateVisitor = async (req, res, next) => {
       });
     }
 
-    if (visitor.status === "CheckedOut") {
+    if (["CheckedOut", "Rejected"].includes(visitor.status)) {
       return res.status(400).json({
         success: false,
-        message: "Cannot edit a checked-out visitor. Create a new check-in.",
+        message: "Cannot edit a checked-out or rejected visitor.",
       });
     }
 
@@ -208,7 +333,6 @@ export const updateVisitor = async (req, res, next) => {
       "idProofNumber",
       "purpose",
       "whomVisiting",
-      "approvedByName",
       "notes",
     ];
     for (const key of fields) {
@@ -265,6 +389,9 @@ export const updateVisitor = async (req, res, next) => {
       }
     }
 
+    const photo = await uploadVisitorPhoto(req);
+    if (photo?.url) visitor.photo = photo;
+
     await visitor.save();
     const data = await populateVisitor(HostelVisitor.findById(visitor._id)).lean();
 
@@ -291,10 +418,10 @@ export const checkoutVisitor = async (req, res, next) => {
         message: "Visitor record not found.",
       });
     }
-    if (visitor.status === "CheckedOut") {
+    if (visitor.status !== "CheckedIn") {
       return res.status(400).json({
         success: false,
-        message: "Visitor is already checked out.",
+        message: "Only checked-in visitors can be checked out.",
       });
     }
 

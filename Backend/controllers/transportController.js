@@ -3,10 +3,31 @@ import Student from "../models/student.js";
 import School from "../models/school.js";
 import { Driver, Bus, TransportRoute, Activity } from "../models/transport.js";
 import { createNotificationHelper } from "./notificationController.js";
+import { uploadToCloudinary } from "../utils/uploadToCloudinary.js";
 
 // ── HELPERS ───────────────────────────────────────────────────────────────────
 
 const toId = (id) => new mongoose.Types.ObjectId(id);
+
+const getUploadedFile = (req, field) => {
+  const files = req.files;
+  if (!files) return null;
+  if (Array.isArray(files)) {
+    return files.find((f) => f.fieldname === field) || null;
+  }
+  return files[field]?.[0] || null;
+};
+
+const uploadDriverDoc = async (req, field, folder) => {
+  const file = getUploadedFile(req, field);
+  if (!file) return null;
+  const uploaded = await uploadToCloudinary(file, folder);
+  return {
+    url: uploaded.url,
+    public_id: uploaded.public_id,
+    type: uploaded.type || file.mimetype,
+  };
+};
 
 const notFound = (res, entity = "Record") =>
   res.status(404).json({ success: false, message: `${entity} not found` });
@@ -465,6 +486,22 @@ export const createDriver = async (req, res) => {
       }
     }
 
+    const photoUpload = await uploadDriverDoc(req, "photo", "drivers/photo");
+    const aadharDoc = await uploadDriverDoc(req, "aadhar", "drivers/aadhar");
+    const licenseDoc = await uploadDriverDoc(
+      req,
+      "licenseDocument",
+      "drivers/license",
+    );
+
+    const photo = photoUpload
+      ? {
+          url: photoUpload.url,
+          publicId: photoUpload.public_id,
+          type: photoUpload.type,
+        }
+      : undefined;
+
     const driver = new Driver({
       schoolId: toId(school_id),
       name,
@@ -475,6 +512,9 @@ export const createDriver = async (req, res) => {
       bus: busId,
       route: routeId,
       status: req.body.status || "Active",
+      ...(photo ? { photo } : {}),
+      ...(aadharDoc ? { aadharDoc } : {}),
+      ...(licenseDoc ? { licenseDoc } : {}),
     });
 
     if (req.body.status && req.body.status !== "Active") {
@@ -552,6 +592,23 @@ export const updateDriver = async (req, res) => {
 
     driver.bus = busId;
     driver.route = routeId;
+
+    const photoUpload = await uploadDriverDoc(req, "photo", "drivers/photo");
+    const aadharDoc = await uploadDriverDoc(req, "aadhar", "drivers/aadhar");
+    const licenseDoc = await uploadDriverDoc(
+      req,
+      "licenseDocument",
+      "drivers/license",
+    );
+    if (photoUpload) {
+      driver.photo = {
+        url: photoUpload.url,
+        publicId: photoUpload.public_id,
+        type: photoUpload.type,
+      };
+    }
+    if (aadharDoc) driver.aadharDoc = aadharDoc;
+    if (licenseDoc) driver.licenseDoc = licenseDoc;
 
     if (busId) {
       const existing = await Driver.findOne({
@@ -666,14 +723,29 @@ export const deleteDriver = async (req, res) => {
     const school_id = req.user?.school_id;
     const { id } = req.params;
 
-    const driver = await Driver.findOneAndDelete(
-      { _id: id, schoolId: toId(school_id) },
-      { session },
+    const driver = await Driver.findOne({
+      _id: id,
+      schoolId: toId(school_id),
+    }).session(session);
+
+    if (!driver) {
+      await session.abortTransaction();
+      return res.status(404).json({ message: "Driver not found" });
+    }
+
+    const { getDriverDeleteBlocker } = await import(
+      "../utils/staffDeleteGuards.js"
+    );
+    const blocker = await getDriverDeleteBlocker(driver);
+    if (blocker) {
+      await session.abortTransaction();
+      return res.status(409).json({ success: false, message: blocker });
+    }
+
+    await Driver.deleteOne({ _id: id, schoolId: toId(school_id) }).session(
+      session,
     );
 
-    if (!driver) return res.status(404).json({ message: "Driver not found" });
-
-    // REMOVE old relations
     await Bus.updateMany(
       { driver: id },
       { $set: { driver: null } },

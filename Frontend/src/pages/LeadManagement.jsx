@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import axios from "axios";
 import { toast } from "react-toastify";
+import { useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import {
   FaArrowLeft,
@@ -13,6 +14,7 @@ import {
   FaSchool,
   FaTimes,
   FaTrash,
+  FaUserGraduate,
   FaUserTie,
 } from "react-icons/fa";
 
@@ -33,8 +35,10 @@ const emptyForm = {
 
 const LeadManagement = () => {
   const { user } = useAuth();
+  const navigate = useNavigate();
   const isMobile = window.innerWidth <= 768;
   const isStaffLogin = user?.role === "staff_admin";
+  const basePath = isStaffLogin ? "/staff" : "/school";
 
   const [leads, setLeads] = useState([]);
   const [assignees, setAssignees] = useState([]);
@@ -159,9 +163,50 @@ const LeadManagement = () => {
     }
   };
 
+  const handleStartAdmission = async (lead) => {
+    if (!lead?._id) return;
+    if (lead.studentId || String(lead.status || "").toLowerCase() === "admitted") {
+      toast.info("This lead is already converted. Open the student record from Students.");
+      return;
+    }
+    if (String(lead.status || "").toLowerCase() === "cancelled") {
+      toast.error("Cancelled leads cannot be admitted");
+      return;
+    }
+
+    // Mark as processing so the pipeline reflects admission in progress
+    if (String(lead.status || "").toLowerCase() === "active") {
+      try {
+        await axios.patch(
+          `${API}/leads/${lead._id}/status`,
+          { status: "processing" },
+          { withCredentials: true },
+        );
+        setLeads((prev) =>
+          prev.map((item) =>
+            item._id === lead._id ? { ...item, status: "processing" } : item,
+          ),
+        );
+      } catch {
+        /* still open admission form */
+      }
+    }
+
+    navigate(`${basePath}/student-manage?leadId=${lead._id}`);
+  };
+
   const handleStatusChange = async (leadId, nextStatus) => {
     const normalized = String(nextStatus || "").toLowerCase();
     if (!leadStatusOptions.includes(normalized)) return;
+
+    if (normalized === "admitted") {
+      const lead = leads.find((item) => item._id === leadId);
+      if (!lead?.studentId) {
+        toast.info("Use Start Admission to convert this lead into a student");
+        handleStartAdmission(lead || { _id: leadId });
+        return;
+      }
+    }
 
     try {
       setStatusUpdatingId(leadId);
@@ -392,7 +437,14 @@ const LeadManagement = () => {
               >
                 <div className="space-y-2">
                   <div>
-                    <p className="text-lg font-semibold text-[rgb(var(--text))]">{lead.studentName}</p>
+                    <div className="flex flex-wrap items-center gap-2">
+                      <p className="text-lg font-semibold text-[rgb(var(--text))]">{lead.studentName}</p>
+                      {(lead.studentId || String(lead.status || "").toLowerCase() === "admitted") && (
+                        <span className="text-[10px] font-semibold uppercase tracking-wide px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-700">
+                          Converted
+                        </span>
+                      )}
+                    </div>
                     <p className="text-sm text-[rgb(var(--text-muted))]">Parent: {lead.parentName}</p>
                   </div>
 
@@ -506,14 +558,38 @@ const LeadManagement = () => {
                     </div>
                   </div>
 
-                  {!isStaffLogin && (
-                    <button
-                      onClick={() => handleDeleteLead(lead._id)}
-                      className="inline-flex items-center justify-center gap-2 px-3 py-2 rounded-xl border border-red-200 text-red-500 hover:bg-red-50 transition text-sm font-medium"
-                    >
-                      <FaTrash size={12} /> Delete
-                    </button>
-                  )}
+                  <div className="flex flex-col gap-2">
+                    {lead.studentId || String(lead.status || "").toLowerCase() === "admitted" ? (
+                      <button
+                        type="button"
+                        onClick={() =>
+                          lead.studentId
+                            ? navigate(`${basePath}/student-view/${lead.studentId}`)
+                            : toast.info("Student linked — open from Students list")
+                        }
+                        className="inline-flex items-center justify-center gap-2 px-3 py-2 rounded-xl border border-emerald-200 text-emerald-700 bg-emerald-50 hover:bg-emerald-100 transition text-sm font-medium"
+                      >
+                        <FaUserGraduate size={12} /> View Student
+                      </button>
+                    ) : String(lead.status || "").toLowerCase() !== "cancelled" ? (
+                      <button
+                        type="button"
+                        onClick={() => handleStartAdmission(lead)}
+                        className="inline-flex items-center justify-center gap-2 px-3 py-2 rounded-xl bg-[rgb(var(--primary))] text-white hover:opacity-90 transition text-sm font-medium"
+                      >
+                        <FaUserGraduate size={12} /> Start Admission
+                      </button>
+                    ) : null}
+
+                    {!isStaffLogin && (
+                      <button
+                        onClick={() => handleDeleteLead(lead._id)}
+                        className="inline-flex items-center justify-center gap-2 px-3 py-2 rounded-xl border border-red-200 text-red-500 hover:bg-red-50 transition text-sm font-medium"
+                      >
+                        <FaTrash size={12} /> Delete
+                      </button>
+                    )}
+                  </div>
                 </div>
               </div>
             ))}

@@ -1,5 +1,17 @@
 import mongoose from "mongoose";
 
+const fileSchema = {
+  url: { type: String, default: "" },
+  public_id: { type: String, default: "" },
+  type: { type: String, default: "" },
+};
+
+const actorSchema = {
+  userId: { type: mongoose.Schema.Types.Mixed, default: null },
+  name: { type: String, default: "" },
+  role: { type: String, default: "" },
+};
+
 const hostelVisitorSchema = new mongoose.Schema(
   {
     schoolId: {
@@ -57,20 +69,41 @@ const hostelVisitorSchema = new mongoose.Schema(
       default: null,
       index: true,
     },
+    /** Live photo captured by security guard at gate */
+    photo: fileSchema,
+    /**
+     * Pending  — submitted by guard, awaiting warden
+     * CheckedIn — approved; entry granted
+     * Rejected — warden denied entry
+     * CheckedOut — visitor left
+     */
+    status: {
+      type: String,
+      enum: ["Pending", "CheckedIn", "Rejected", "CheckedOut"],
+      default: "Pending",
+      index: true,
+    },
+    submittedBy: actorSchema,
+    reviewedBy: actorSchema,
+    reviewedAt: {
+      type: Date,
+      default: null,
+    },
+    rejectionReason: {
+      type: String,
+      trim: true,
+      default: "",
+    },
+    /** Set when warden approves (entry granted) */
     checkInAt: {
       type: Date,
-      default: Date.now,
+      default: null,
     },
     checkOutAt: {
       type: Date,
       default: null,
     },
-    status: {
-      type: String,
-      enum: ["CheckedIn", "CheckedOut"],
-      default: "CheckedIn",
-      index: true,
-    },
+    /** Legacy display name; kept in sync with reviewedBy.name on approve */
     approvedByName: {
       type: String,
       trim: true,
@@ -85,7 +118,7 @@ const hostelVisitorSchema = new mongoose.Schema(
   { timestamps: true },
 );
 
-hostelVisitorSchema.index({ schoolId: 1, checkInAt: -1 });
+hostelVisitorSchema.index({ schoolId: 1, createdAt: -1 });
 hostelVisitorSchema.index({ schoolId: 1, status: 1, hostelId: 1 });
 
 export default mongoose.model("HostelVisitor", hostelVisitorSchema);

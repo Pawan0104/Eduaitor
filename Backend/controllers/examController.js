@@ -7,6 +7,7 @@ import Term from "../models/Term.js";
 import ClassAttendance from "../models/classAttendance.js";
 import School from "../models/school.js";
 import { createNotificationHelper } from "./notificationController.js";
+import { getDocumentDesign } from "./certificateController.js";
 
 const formatExamDate = (d) =>
   new Date(d).toLocaleDateString("en-IN", {
@@ -946,6 +947,8 @@ export const getReportCard = async (req, res) => {
       ),
     }));
 
+    const design = await getDocumentDesign(schoolId, "report_card");
+
     return res.status(200).json({
       success: true,
       cumulative: true,
@@ -966,9 +969,10 @@ export const getReportCard = async (req, res) => {
         startDate: t.startDate,
         endDate: t.endDate,
       })),
+      design,
       school: {
         name: school?.school_name || "",
-        logo: school?.school_logo || "",
+        logo: design?.logoUrl || school?.school_logo || "",
         address: school?.address || "",
       },
       student: {

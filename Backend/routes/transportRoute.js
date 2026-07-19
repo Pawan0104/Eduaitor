@@ -1,4 +1,5 @@
 import express from "express";
+import upload from "../middlewares/upload.js";
 import {
   // Dashboard
   getSummary,
@@ -121,11 +122,17 @@ router.get("/activity", ...transportGuard, getActivity);
 // GET    /transport/drivers
 router.get("/drivers", ...transportGuard, getDrivers);
 
-// POST   /transport/drivers           body: { school_id, name, phone, ... }
-router.post("/drivers", ...transportGuard, createDriver);
+const driverDocUpload = upload.fields([
+  { name: "photo", maxCount: 1 },
+  { name: "aadhar", maxCount: 1 },
+  { name: "licenseDocument", maxCount: 1 },
+]);
 
-// PUT    /transport/drivers/:id        body: { school_id, ...fields }
-router.put("/drivers/:id", ...transportGuard, updateDriver);
+// POST   /transport/drivers           multipart: fields + aadhar + licenseDocument
+router.post("/drivers", ...transportGuard, driverDocUpload, createDriver);
+
+// PUT    /transport/drivers/:id        multipart: fields + optional doc uploads
+router.put("/drivers/:id", ...transportGuard, driverDocUpload, updateDriver);
 
 // PATCH  /transport/drivers/:id/status body: { school_id, status }
 router.patch("/drivers/:id/status", ...transportGuard, updateDriverStatus);

@@ -1,5 +1,6 @@
 export const MODULES = [
   { key: "students",    label: "Student Management",  default: true  },
+  { key: "certificates", label: "Certificates",        default: true  },
   { key: "teachers",   label: "Teacher Management",   default: true  },
   { key: "classes",    label: "Classes & Sections",   default: true  },
   { key: "attendance", label: "Attendance",            default: true  },

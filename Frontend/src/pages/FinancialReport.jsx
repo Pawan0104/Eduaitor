@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import axios from "axios";
 import { FaArrowLeft, FaChartBar, FaPrint } from "react-icons/fa";
@@ -6,26 +6,49 @@ import { useAuth } from "../context/AuthContext";
 
 const API = import.meta.env.VITE_API_URL;
 
-const MONTHS = [
-  { label: "All Months", value: "" },
-  { label: "January", value: "1" },
-  { label: "February", value: "2" },
-  { label: "March", value: "3" },
-  { label: "April", value: "4" },
-  { label: "May", value: "5" },
-  { label: "June", value: "6" },
-  { label: "July", value: "7" },
-  { label: "August", value: "8" },
-  { label: "September", value: "9" },
-  { label: "October", value: "10" },
-  { label: "November", value: "11" },
-  { label: "December", value: "12" },
+const FILTER_OPTIONS = [
+  { key: "fy", label: "Financial Year" },
+  { key: "last_month", label: "Last Month" },
+  { key: "custom", label: "Custom" },
 ];
 
-const currentYear = new Date().getFullYear();
-const YEARS = Array.from({ length: currentYear - 2019 }, (_, i) => {
-  const y = currentYear - i;
-  return { label: String(y), value: String(y) };
+const toYmd = (date) => {
+  const y = date.getFullYear();
+  const m = String(date.getMonth() + 1).padStart(2, "0");
+  const d = String(date.getDate()).padStart(2, "0");
+  return `${y}-${m}-${d}`;
+};
+
+/** Indian FY: 1 Apr → 31 Mar. `startYear` is the April calendar year. */
+const getFyBounds = (startYear) => {
+  const from = new Date(startYear, 3, 1);
+  const to = new Date(startYear + 1, 2, 31);
+  return {
+    from: toYmd(from),
+    to: toYmd(to),
+    label: `FY ${startYear}-${String(startYear + 1).slice(-2)}`,
+  };
+};
+
+const currentFyStartYear = () => {
+  const now = new Date();
+  return now.getMonth() >= 3 ? now.getFullYear() : now.getFullYear() - 1;
+};
+
+const getLastMonthBounds = () => {
+  const now = new Date();
+  const from = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+  const to = new Date(now.getFullYear(), now.getMonth(), 0);
+  return {
+    from: toYmd(from),
+    to: toYmd(to),
+    label: from.toLocaleDateString("en-IN", { month: "long", year: "numeric" }),
+  };
+};
+
+const FY_OPTIONS = Array.from({ length: 8 }, (_, i) => {
+  const start = currentFyStartYear() - i;
+  return { value: String(start), ...getFyBounds(start) };
 });
 
 const fmtINR = (n) =>
@@ -43,6 +66,17 @@ const fmtDate = (d) =>
         year: "numeric",
       })
     : "—";
+
+const fmtYmd = (ymd) => {
+  if (!ymd) return "—";
+  const [y, m, d] = ymd.split("-").map(Number);
+  if (!y || !m || !d) return ymd;
+  return new Date(y, m - 1, d).toLocaleDateString("en-IN", {
+    day: "2-digit",
+    month: "short",
+    year: "numeric",
+  });
+};
 
 function StatCard({ label, value, hint, tone = "slate" }) {
   const tones = {
@@ -66,36 +100,98 @@ export default function FinancialReport() {
   const { user } = useAuth();
   const navigate = useNavigate();
 
-  const [year, setYear] = useState(String(currentYear));
-  const [month, setMonth] = useState("");
+  const lastMonth = useMemo(() => getLastMonthBounds(), []);
+  const [filterMode, setFilterMode] = useState("fy");
+  const [fyStartYear, setFyStartYear] = useState(String(currentFyStartYear()));
+  const [customFrom, setCustomFrom] = useState(lastMonth.from);
+  const [customTo, setCustomTo] = useState(toYmd(new Date()));
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [report, setReport] = useState(null);
+  const [selectedClass, setSelectedClass] = useState(null);
+  const [classDetail, setClassDetail] = useState(null);
+  const [classLoading, setClassLoading] = useState(false);
 
   const basePath = user?.role === "staff_admin" ? "/staff" : "/school";
 
-  const fetchReport = useCallback(async () => {
+  const resetClassView = () => {
+    setSelectedClass(null);
+    setClassDetail(null);
+    setClassLoading(false);
+  };
+
+  const range = useMemo(() => {
+    if (filterMode === "last_month") {
+      return getLastMonthBounds();
+    }
+    if (filterMode === "custom") {
+      return {
+        from: customFrom,
+        to: customTo,
+        label: `${fmtYmd(customFrom)} – ${fmtYmd(customTo)}`,
+      };
+    }
+    return getFyBounds(Number(fyStartYear) || currentFyStartYear());
+  }, [filterMode, fyStartYear, customFrom, customTo]);
+
+  const fetchReport = useCallback(
+    async (from = range.from, to = range.to) => {
+      if (!from || !to) {
+        setError("Select both from and to dates");
+        return;
+      }
+      if (from > to) {
+        setError("From date must be on or before to date");
+        return;
+      }
+
+      try {
+        setLoading(true);
+        setError("");
+        resetClassView();
+        const { data } = await axios.get(`${API}/fees/financial-report`, {
+          params: { from, to },
+          withCredentials: true,
+        });
+        setReport(data);
+      } catch (err) {
+        setError(err.response?.data?.message || "Failed to load report");
+        setReport(null);
+      } finally {
+        setLoading(false);
+      }
+    },
+    [range.from, range.to],
+  );
+
+  const openClassDetail = async (row) => {
+    if (!row) return;
+    setSelectedClass(row);
+    setClassLoading(true);
+    setClassDetail(null);
     try {
-      setLoading(true);
-      setError("");
-      const params = { year };
-      if (month) params.month = month;
       const { data } = await axios.get(`${API}/fees/financial-report`, {
-        params,
+        params: {
+          from: range.from,
+          to: range.to,
+          classId: row.classId || "unassigned",
+        },
         withCredentials: true,
       });
-      setReport(data);
+      setClassDetail(data.classDetail || null);
     } catch (err) {
-      setError(err.response?.data?.message || "Failed to load report");
-      setReport(null);
+      setClassDetail(null);
+      setError(err.response?.data?.message || "Failed to load class report");
     } finally {
-      setLoading(false);
+      setClassLoading(false);
     }
-  }, [year, month]);
+  };
 
+  // Auto-load for Financial Year / Last Month; Custom waits for Apply
   useEffect(() => {
-    fetchReport();
-  }, [fetchReport]);
+    if (filterMode === "custom") return;
+    fetchReport(range.from, range.to);
+  }, [filterMode, fyStartYear, range.from, range.to, fetchReport]);
 
   const exportCsv = () => {
     if (!report) return;
@@ -110,7 +206,7 @@ export default function FinancialReport() {
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
-    a.download = `financial-report-${year}${month ? `-${month}` : ""}.csv`;
+    a.download = `financial-report-${range.from}_to_${range.to}.csv`;
     a.click();
     URL.revokeObjectURL(url);
   };
@@ -138,28 +234,6 @@ export default function FinancialReport() {
         </div>
 
         <div className="flex flex-wrap gap-2 items-center">
-          <select
-            value={month}
-            onChange={(e) => setMonth(e.target.value)}
-            className="px-3 py-2 rounded-lg border text-sm bg-[rgb(var(--surface))]"
-          >
-            {MONTHS.map((m) => (
-              <option key={m.value} value={m.value}>
-                {m.label}
-              </option>
-            ))}
-          </select>
-          <select
-            value={year}
-            onChange={(e) => setYear(e.target.value)}
-            className="px-3 py-2 rounded-lg border text-sm bg-[rgb(var(--surface))]"
-          >
-            {YEARS.map((y) => (
-              <option key={y.value} value={y.value}>
-                {y.label}
-              </option>
-            ))}
-          </select>
           <button
             type="button"
             onClick={() => window.print()}
@@ -175,6 +249,87 @@ export default function FinancialReport() {
           >
             Export CSV
           </button>
+        </div>
+      </div>
+
+      {/* Bank-style period filter */}
+      <div className="mb-5 rounded-2xl border bg-[rgb(var(--surface))] p-3 sm:p-4 print:hidden">
+        <p className="text-[11px] font-bold uppercase tracking-wide text-[rgb(var(--text-light))] mb-2">
+          Period
+        </p>
+        <div className="flex p-1 rounded-xl bg-[rgb(var(--bg))] border border-[rgb(var(--border))]">
+          {FILTER_OPTIONS.map((opt) => (
+            <button
+              key={opt.key}
+              type="button"
+              onClick={() => setFilterMode(opt.key)}
+              className={`flex-1 px-2 sm:px-3 py-2.5 rounded-lg text-xs sm:text-sm font-semibold transition ${
+                filterMode === opt.key
+                  ? "bg-[rgb(var(--primary))] text-white shadow-sm"
+                  : "text-[rgb(var(--text-muted))] hover:text-[rgb(var(--text))]"
+              }`}
+            >
+              {opt.label}
+            </button>
+          ))}
+        </div>
+
+        <div className="mt-3 flex flex-col sm:flex-row sm:flex-wrap gap-3 sm:items-end">
+          {filterMode === "fy" && (
+            <label className="flex flex-col gap-1 text-xs font-medium text-[rgb(var(--text-muted))]">
+              Select financial year
+              <select
+                value={fyStartYear}
+                onChange={(e) => setFyStartYear(e.target.value)}
+                className="px-3 py-2 rounded-lg border text-sm bg-[rgb(var(--bg))] text-[rgb(var(--text))] min-w-[180px]"
+              >
+                {FY_OPTIONS.map((fy) => (
+                  <option key={fy.value} value={fy.value}>
+                    {fy.label}
+                  </option>
+                ))}
+              </select>
+            </label>
+          )}
+
+          {filterMode === "last_month" && (
+            <p className="text-sm text-[rgb(var(--text))]">
+              Showing{" "}
+              <span className="font-semibold">{getLastMonthBounds().label}</span>
+            </p>
+          )}
+
+          {filterMode === "custom" && (
+            <>
+              <label className="flex flex-col gap-1 text-xs font-medium text-[rgb(var(--text-muted))]">
+                From
+                <input
+                  type="date"
+                  value={customFrom}
+                  max={customTo || undefined}
+                  onChange={(e) => setCustomFrom(e.target.value)}
+                  className="px-3 py-2 rounded-lg border text-sm bg-[rgb(var(--bg))] text-[rgb(var(--text))]"
+                />
+              </label>
+              <label className="flex flex-col gap-1 text-xs font-medium text-[rgb(var(--text-muted))]">
+                To
+                <input
+                  type="date"
+                  value={customTo}
+                  min={customFrom || undefined}
+                  onChange={(e) => setCustomTo(e.target.value)}
+                  className="px-3 py-2 rounded-lg border text-sm bg-[rgb(var(--bg))] text-[rgb(var(--text))]"
+                />
+              </label>
+              <button
+                type="button"
+                onClick={() => fetchReport(customFrom, customTo)}
+                className="px-4 py-2 rounded-lg bg-[rgb(var(--primary))] text-white text-sm font-semibold"
+              >
+                Apply
+              </button>
+            </>
+          )}
         </div>
       </div>
 
@@ -199,11 +354,10 @@ export default function FinancialReport() {
               {report.school?.name || "School"}
             </p>
             <p className="text-xs text-[rgb(var(--text-light))] mt-0.5">
-              Period:{" "}
-              {month
-                ? `${MONTHS.find((m) => m.value === month)?.label || month} `
-                : "Full year "}
-              {year}
+              Period: {range.label}
+            </p>
+            <p className="text-[11px] text-[rgb(var(--text-light))] mt-0.5">
+              {fmtYmd(range.from)} – {fmtYmd(range.to)}
             </p>
           </div>
 
@@ -261,7 +415,7 @@ export default function FinancialReport() {
               ) : (
                 <div className="space-y-2">
                   {report.byMonth.map((r) => (
-                    <div key={r.month} className="text-sm">
+                    <div key={`${r.year}-${r.month}`} className="text-sm">
                       <div className="flex justify-between mb-1">
                         <span className="font-medium">{r.monthLabel}</span>
                         <span>{fmtINR(r.total)}</span>
@@ -282,35 +436,150 @@ export default function FinancialReport() {
           </div>
 
           <div className="rounded-2xl border bg-[rgb(var(--surface))] p-4 overflow-x-auto">
-            <h2 className="font-bold text-sm mb-3">By class</h2>
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="text-left text-xs uppercase tracking-wider text-[rgb(var(--text-light))] border-b">
-                  <th className="py-2">Class</th>
-                  <th className="py-2">Payments</th>
-                  <th className="py-2 text-right">Collected</th>
-                </tr>
-              </thead>
-              <tbody>
-                {report.byClass.length === 0 ? (
-                  <tr>
-                    <td colSpan={3} className="py-6 text-center text-[rgb(var(--text-light))]">
-                      No class-wise data
-                    </td>
-                  </tr>
-                ) : (
-                  report.byClass.map((r) => (
-                    <tr key={r.classId || r.className} className="border-b border-slate-100">
-                      <td className="py-2.5 font-medium">{r.className}</td>
-                      <td className="py-2.5">{r.count}</td>
-                      <td className="py-2.5 text-right font-semibold">
-                        {fmtINR(r.total)}
-                      </td>
+            {!selectedClass ? (
+              <>
+                <h2 className="font-bold text-sm mb-3">By class</h2>
+                <p className="text-xs text-[rgb(var(--text-light))] mb-3">
+                  Click a class to view its payments for this period
+                </p>
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="text-left text-xs uppercase tracking-wider text-[rgb(var(--text-light))] border-b">
+                      <th className="py-2">Class</th>
+                      <th className="py-2">Payments</th>
+                      <th className="py-2 text-right">Collected</th>
                     </tr>
-                  ))
+                  </thead>
+                  <tbody>
+                    {report.byClass.length === 0 ? (
+                      <tr>
+                        <td colSpan={3} className="py-6 text-center text-[rgb(var(--text-light))]">
+                          No class-wise data
+                        </td>
+                      </tr>
+                    ) : (
+                      report.byClass.map((r) => (
+                        <tr
+                          key={r.classId || r.className}
+                          onClick={() => openClassDetail(r)}
+                          className="border-b border-slate-100 cursor-pointer hover:bg-[rgba(var(--primary),0.06)] transition"
+                        >
+                          <td className="py-2.5 font-medium text-[rgb(var(--primary))] underline underline-offset-2 decoration-dotted">
+                            {r.className}
+                          </td>
+                          <td className="py-2.5">{r.count}</td>
+                          <td className="py-2.5 text-right font-semibold">
+                            {fmtINR(r.total)}
+                          </td>
+                        </tr>
+                      ))
+                    )}
+                  </tbody>
+                </table>
+              </>
+            ) : (
+              <>
+                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 mb-3">
+                  <div>
+                    <button
+                      type="button"
+                      onClick={resetClassView}
+                      className="inline-flex items-center gap-2 text-sm font-semibold text-[rgb(var(--primary))] mb-1"
+                    >
+                      <FaArrowLeft size={12} /> Back to all classes
+                    </button>
+                    <h2 className="font-bold text-sm">
+                      {selectedClass.className}
+                    </h2>
+                    <p className="text-xs text-[rgb(var(--text-light))] mt-0.5">
+                      Class collection for {range.label}
+                    </p>
+                  </div>
+                  {classDetail && (
+                    <div className="text-sm sm:text-right">
+                      <p className="font-bold text-emerald-700">
+                        {fmtINR(classDetail.total)}
+                      </p>
+                      <p className="text-xs text-[rgb(var(--text-light))]">
+                        {classDetail.count} payment
+                        {classDetail.count === 1 ? "" : "s"}
+                      </p>
+                    </div>
+                  )}
+                </div>
+
+                {classLoading ? (
+                  <p className="py-8 text-center text-sm text-[rgb(var(--text-light))]">
+                    Loading class data…
+                  </p>
+                ) : !classDetail ? (
+                  <p className="py-8 text-center text-sm text-[rgb(var(--text-light))]">
+                    No data for this class.
+                  </p>
+                ) : (
+                  <div className="space-y-4">
+                    {classDetail.byMode?.length > 0 && (
+                      <div className="flex flex-wrap gap-2">
+                        {classDetail.byMode.map((m) => (
+                          <span
+                            key={m.mode}
+                            className="text-xs px-2.5 py-1 rounded-full border bg-[rgb(var(--bg))]"
+                          >
+                            {m.mode}: {fmtINR(m.total)} ({m.count})
+                          </span>
+                        ))}
+                      </div>
+                    )}
+
+                    <table className="w-full text-sm">
+                      <thead>
+                        <tr className="text-left text-xs uppercase tracking-wider text-[rgb(var(--text-light))] border-b">
+                          <th className="py-2">Receipt</th>
+                          <th className="py-2">Student</th>
+                          <th className="py-2">Mode</th>
+                          <th className="py-2">Date</th>
+                          <th className="py-2 text-right">Amount</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {(classDetail.payments || []).length === 0 ? (
+                          <tr>
+                            <td
+                              colSpan={5}
+                              className="py-6 text-center text-[rgb(var(--text-light))]"
+                            >
+                              No payments in this period
+                            </td>
+                          </tr>
+                        ) : (
+                          classDetail.payments.map((p) => (
+                            <tr key={p._id} className="border-b border-slate-100">
+                              <td className="py-2.5 font-mono text-xs">
+                                {p.receiptNo}
+                              </td>
+                              <td className="py-2.5">
+                                {p.studentName || "—"}
+                                {p.studentCode ? (
+                                  <span className="block text-xs text-[rgb(var(--text-light))]">
+                                    {p.studentCode}
+                                    {p.rollNo ? ` · Roll ${p.rollNo}` : ""}
+                                  </span>
+                                ) : null}
+                              </td>
+                              <td className="py-2.5">{p.paymentMode}</td>
+                              <td className="py-2.5">{fmtDate(p.paidDate)}</td>
+                              <td className="py-2.5 text-right font-semibold">
+                                {fmtINR(p.amountPaid)}
+                              </td>
+                            </tr>
+                          ))
+                        )}
+                      </tbody>
+                    </table>
+                  </div>
                 )}
-              </tbody>
-            </table>
+              </>
+            )}
           </div>
 
           <div className="rounded-2xl border bg-[rgb(var(--surface))] p-4 overflow-x-auto">

@@ -141,11 +141,11 @@ const Teachers = () => {
         </div>
 
         <button
-          onClick={() => navigate("/school/teacher-manage")}
+          onClick={() => navigate("/school/staff?add=1")}
           className="bg-[rgb(var(--primary))] text-[rgb(var(--text))] px-4 py-2 rounded-lg flex items-center gap-2 shadow transition"
         >
           <FaPlus />
-          Add Teacher
+          Add Staff
         </button>
       </div>
 
@@ -344,7 +344,7 @@ const Teachers = () => {
                   <td colSpan="8" className="text-center py-10 text-[rgb(var(--text-muted))]">
                     {filterClass
                       ? "No teachers found for selected class"
-                      : "No teachers found. Click 'Add Teacher' to get started."}
+                      : "No teachers found. Click 'Add Staff' to get started."}
                   </td>
                 </tr>
               )}

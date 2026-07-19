@@ -7,6 +7,7 @@ import {
   syncTeacherGroups,
   removeTeacherFromOldGroups,
 } from "../utils/groupSync.js";
+import { resolveRolePermissions } from "../utils/resolveRolePermissions.js";
 
 /* ================= GENERATE TEACHER ID ================= */
 
@@ -72,22 +73,61 @@ export const createTeacher = async (req, res) => {
     let hashedPassword = await bcrypt.hash(req.body.password, 10);
     req.body.password = hashedPassword;
 
+    const customRoleId = req.body.customRoleId;
+    if (!customRoleId) {
+      return res.status(400).json({
+        success: false,
+        message: "Access role is required",
+      });
+    }
+
+    const resolved = await resolveRolePermissions({
+      schoolId,
+      customRoleId,
+      requireRole: true,
+      reqUser: req.user,
+      entityLabel: "teacher",
+    });
+    if (resolved.error) {
+      return res.status(400).json({
+        success: false,
+        message: resolved.error,
+      });
+    }
+
+    const {
+      customRoleId: _omitRole,
+      permissions: _omitPerms,
+      ...restBody
+    } = req.body;
+
     const teacher = await Teacher.create({
-      ...req.body,
+      ...restBody,
       teacherId,
       photo,
       assignedClasses,
       subjects,
       schoolId,
+      customRoleId: resolved.customRoleId,
+      permissions: resolved.permissions,
     });
 
     // Sync teacher groups based on assigned classes and subjects
     await syncTeacherGroups(teacher);
 
+    const populated = await Teacher.findById(teacher._id)
+      .populate("customRoleId", "name permissions isActive")
+      .lean();
+
     res.status(201).json({
       success: true,
       message: "Teacher created successfully",
-      data: teacher,
+      data: {
+        ...populated,
+        customRoleName: populated.customRoleId?.name || null,
+        customRoleId:
+          populated.customRoleId?._id || populated.customRoleId || null,
+      },
     });
   } catch (error) {
     console.error("Create teacher error:", error);
@@ -115,11 +155,17 @@ export const getTeachers = async (req, res) => {
     const teachers = await Teacher.find({ schoolId })
       .populate("assignedClasses", "name className section")
       .populate("subjects", "name")
-      .sort({ createdAt: -1 });
+      .populate("customRoleId", "name permissions isActive")
+      .sort({ createdAt: -1 })
+      .lean();
 
     res.json({
       success: true,
-      data: teachers,
+      data: teachers.map((t) => ({
+        ...t,
+        customRoleName: t.customRoleId?.name || null,
+        customRoleId: t.customRoleId?._id || t.customRoleId || null,
+      })),
     });
   } catch (error) {
     console.error("Get teachers error:", error);
@@ -146,7 +192,9 @@ export const getTeacher = async (req, res) => {
 
     const teacher = await Teacher.findOne({ _id: req.params.id, schoolId })
       .populate("assignedClasses", "name className section")
-      .populate("subjects", "name");
+      .populate("subjects", "name")
+      .populate("customRoleId", "name permissions isActive")
+      .lean();
 
     if (!teacher) {
       return res.status(404).json({
@@ -157,7 +205,12 @@ export const getTeacher = async (req, res) => {
 
     res.json({
       success: true,
-      data: teacher,
+      data: {
+        ...teacher,
+        customRoleName: teacher.customRoleId?.name || null,
+        customRoleId:
+          teacher.customRoleId?._id || teacher.customRoleId || null,
+      },
     });
   } catch (error) {
     console.error("Get teacher error:", error);
@@ -251,8 +304,14 @@ export const updateTeacher = async (req, res) => {
     }
 
     // Prepare update data
+    const {
+      customRoleId: bodyRoleId,
+      permissions: _bodyPerms,
+      ...restSafe
+    } = safeBody;
+
     const updateData = {
-      ...safeBody,
+      ...restSafe,
       subjects,
       schoolId: safeSchoolId,
       assignedClasses,
@@ -264,11 +323,41 @@ export const updateTeacher = async (req, res) => {
 
     if (!photo) delete updateData.photo;
 
+    // Access role → permissions (required when provided; keep existing if omitted)
+    if (bodyRoleId) {
+      const resolved = await resolveRolePermissions({
+        schoolId: safeSchoolId,
+        customRoleId: bodyRoleId,
+        reqUser: req.user,
+        entityLabel: "teacher",
+      });
+      if (resolved.error) {
+        return res.status(400).json({
+          success: false,
+          message: resolved.error,
+        });
+      }
+      updateData.customRoleId = resolved.customRoleId;
+      updateData.permissions = resolved.permissions;
+    } else if (teacher.customRoleId) {
+      const resolved = await resolveRolePermissions({
+        schoolId: safeSchoolId,
+        customRoleId: teacher.customRoleId,
+        reqUser: req.user,
+        entityLabel: "teacher",
+      });
+      if (!resolved.error) {
+        updateData.permissions = resolved.permissions;
+      }
+    }
+
     const updatedTeacher = await Teacher.findByIdAndUpdate(
       req.params.id,
-      { $set: updateData }, // ← keep $set
-      { returnDocument: "after" }, // ← also fixes the deprecation warning
-    ).populate("assignedClasses", "name className section");
+      { $set: updateData },
+      { returnDocument: "after" },
+    )
+      .populate("assignedClasses", "name className section")
+      .populate("customRoleId", "name permissions isActive");
 
     const classesChanged =
       JSON.stringify(oldTeacher.assignedClasses) !==
@@ -279,10 +368,14 @@ export const updateTeacher = async (req, res) => {
       await syncTeacherGroups(updatedTeacher);
     }
 
+    const data = updatedTeacher.toObject();
+    data.customRoleName = data.customRoleId?.name || null;
+    data.customRoleId = data.customRoleId?._id || data.customRoleId || null;
+
     res.json({
       success: true,
       message: "Teacher updated successfully",
-      data: updatedTeacher,
+      data,
     });
   } catch (error) {
     console.error("Update teacher error:", error);
@@ -316,6 +409,17 @@ export const deleteTeacher = async (req, res) => {
       return res.status(404).json({
         success: false,
         message: "Teacher not found",
+      });
+    }
+
+    const { getTeacherDeleteBlocker } = await import(
+      "../utils/staffDeleteGuards.js"
+    );
+    const blocker = await getTeacherDeleteBlocker(teacher._id, schoolId);
+    if (blocker) {
+      return res.status(409).json({
+        success: false,
+        message: blocker,
       });
     }
 

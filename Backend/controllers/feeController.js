@@ -337,6 +337,10 @@ const collectStudentFeeInternal = async (req, res) => {
   try {
     const { studentId, amountPaid, paymentMode, remarks } = req.body;
     const schoolId = req.user?.school_id;
+    const utr = String(req.body.utr || "").trim();
+    const transactionId = String(
+      req.body.transactionId || req.body.paymentId || "",
+    ).trim();
 
     if (!studentId || amountPaid === undefined || !paymentMode || !schoolId) {
       return res.status(400).json({
@@ -347,6 +351,25 @@ const collectStudentFeeInternal = async (req, res) => {
     // 0. validate school
     if (!schoolId) {
       return res.status(400).json({ message: "School ID is required" });
+    }
+
+    if (paymentMode === "UPI" && !utr) {
+      return res.status(400).json({
+        success: false,
+        message: "UTR number is required for UPI payments",
+      });
+    }
+
+    if (
+      paymentMode === "Online" &&
+      !transactionId &&
+      !req.body.orderId &&
+      !req.body.paymentId
+    ) {
+      return res.status(400).json({
+        success: false,
+        message: "Transaction ID is required for Online payments",
+      });
     }
 
     // 1. Explicitly Convert to ObjectId 👈 CHANGE THIS
@@ -382,6 +405,11 @@ const collectStudentFeeInternal = async (req, res) => {
       remarks: remarks || "",
       receiptNo: receiptId,
       paidDate: new Date(),
+      utr: paymentMode === "UPI" ? utr : "",
+      transactionId:
+        paymentMode === "Online"
+          ? transactionId || String(req.body.paymentId || "").trim()
+          : "",
       razorpayOrderId: req.body.orderId || null,
       razorpayPaymentId: req.body.paymentId || null,
       razorpaySignature: req.body.signature || null,
@@ -1298,6 +1326,9 @@ export const getFeeReceipt = async (req, res) => {
         paymentMode: payment.paymentMode,
         paidDate: payment.paidDate,
         remarks: payment.remarks || "",
+        utr: payment.utr || "",
+        transactionId: payment.transactionId || "",
+        razorpayOrderId: payment.razorpayOrderId || "",
         razorpayPaymentId: payment.razorpayPaymentId || "",
         paymentId: payment._id,
       },
@@ -1329,7 +1360,7 @@ export const getFeeReceipt = async (req, res) => {
 
 // ─────────────────────────────────────────────────────────────
 // GET /api/fees/financial-report — school / super admin reports
-// Query: year, month?, schoolId? (required for super_admin)
+// Query: from & to (YYYY-MM-DD) preferred; legacy year / month still supported
 // ─────────────────────────────────────────────────────────────
 export const getFinancialReport = async (req, res) => {
   try {
@@ -1352,19 +1383,185 @@ export const getFinancialReport = async (req, res) => {
       return res.status(400).json({ success: false, message: "School ID required" });
     }
 
-    const year = parseInt(req.query.year, 10) || new Date().getFullYear();
-    const month = parseInt(req.query.month, 10) || null;
     const schoolObjectId = new mongoose.Types.ObjectId(schoolId);
+
+    const ymdRe = /^\d{4}-\d{2}-\d{2}$/;
+    const fromRaw = String(req.query.from || "").trim();
+    const toRaw = String(req.query.to || "").trim();
+    const year = parseInt(req.query.year, 10) || null;
+    const month = parseInt(req.query.month, 10) || null;
+
+    let rangeStart = null;
+    let rangeEnd = null;
+
+    if (ymdRe.test(fromRaw) && ymdRe.test(toRaw)) {
+      rangeStart = new Date(`${fromRaw}T00:00:00.000Z`);
+      rangeEnd = new Date(`${toRaw}T23:59:59.999Z`);
+      if (Number.isNaN(rangeStart.getTime()) || Number.isNaN(rangeEnd.getTime())) {
+        return res.status(400).json({
+          success: false,
+          message: "Invalid from/to date",
+        });
+      }
+      if (rangeStart > rangeEnd) {
+        return res.status(400).json({
+          success: false,
+          message: "From date must be on or before to date",
+        });
+      }
+    } else {
+      const y = year || new Date().getFullYear();
+      if (month) {
+        rangeStart = new Date(Date.UTC(y, month - 1, 1, 0, 0, 0, 0));
+        rangeEnd = new Date(Date.UTC(y, month, 0, 23, 59, 59, 999));
+      } else {
+        rangeStart = new Date(Date.UTC(y, 0, 1, 0, 0, 0, 0));
+        rangeEnd = new Date(Date.UTC(y, 11, 31, 23, 59, 59, 999));
+      }
+    }
 
     const dateMatch = {
       schoolId: schoolObjectId,
-      $expr: {
-        $and: [
-          { $eq: [{ $year: "$paidDate" }, year] },
-          ...(month ? [{ $eq: [{ $month: "$paidDate" }, month] }] : []),
-        ],
-      },
+      paidDate: { $gte: rangeStart, $lte: rangeEnd },
     };
+
+    // Drill-down: single class payments for the selected period
+    const classIdParam = String(req.query.classId || "").trim();
+    if (classIdParam) {
+      const isUnassigned =
+        classIdParam === "unassigned" ||
+        classIdParam === "null" ||
+        classIdParam === "undefined";
+
+      let classObjectId = null;
+      if (!isUnassigned) {
+        if (!mongoose.Types.ObjectId.isValid(classIdParam)) {
+          return res.status(400).json({
+            success: false,
+            message: "Invalid classId",
+          });
+        }
+        classObjectId = new mongoose.Types.ObjectId(classIdParam);
+      }
+
+      const classPayments = await Payment.aggregate([
+        { $match: dateMatch },
+        {
+          $lookup: {
+            from: "students",
+            localField: "studentId",
+            foreignField: "_id",
+            as: "student",
+          },
+        },
+        { $unwind: { path: "$student", preserveNullAndEmptyArrays: true } },
+        {
+          $match: isUnassigned
+            ? {
+                $or: [
+                  { "student.classId": null },
+                  { "student.classId": { $exists: false } },
+                ],
+              }
+            : { "student.classId": classObjectId },
+        },
+        {
+          $lookup: {
+            from: "classes",
+            localField: "student.classId",
+            foreignField: "_id",
+            as: "classDoc",
+          },
+        },
+        { $unwind: { path: "$classDoc", preserveNullAndEmptyArrays: true } },
+        { $sort: { paidDate: -1 } },
+        {
+          $facet: {
+            totals: [
+              {
+                $group: {
+                  _id: null,
+                  total: { $sum: "$amountPaid" },
+                  count: { $sum: 1 },
+                  className: {
+                    $first: { $ifNull: ["$classDoc.name", "Unassigned"] },
+                  },
+                },
+              },
+            ],
+            byMode: [
+              {
+                $group: {
+                  _id: "$paymentMode",
+                  total: { $sum: "$amountPaid" },
+                  count: { $sum: 1 },
+                },
+              },
+              { $sort: { total: -1 } },
+            ],
+            payments: [
+              {
+                $project: {
+                  _id: 1,
+                  receiptNo: 1,
+                  amountPaid: 1,
+                  paymentMode: 1,
+                  paidDate: 1,
+                  utr: 1,
+                  transactionId: 1,
+                  studentName: {
+                    $trim: {
+                      input: {
+                        $concat: [
+                          { $ifNull: ["$student.firstName", ""] },
+                          " ",
+                          { $ifNull: ["$student.lastName", ""] },
+                        ],
+                      },
+                    },
+                  },
+                  studentCode: "$student.studentId",
+                  rollNo: "$student.rollNo",
+                },
+              },
+            ],
+          },
+        },
+      ]);
+
+      const facet = classPayments[0] || {};
+      const totals = facet.totals?.[0] || {
+        total: 0,
+        count: 0,
+        className: isUnassigned ? "Unassigned" : "Class",
+      };
+
+      let className = totals.className || "Unassigned";
+      if (!isUnassigned && classObjectId) {
+        const classDoc = await Class.findById(classObjectId).select("name").lean();
+        if (classDoc?.name) className = classDoc.name;
+      }
+
+      return res.json({
+        success: true,
+        classDetail: {
+          classId: isUnassigned ? null : String(classObjectId),
+          className,
+          total: totals.total || 0,
+          count: totals.count || 0,
+          byMode: (facet.byMode || []).map((r) => ({
+            mode: r._id || "Unknown",
+            total: r.total,
+            count: r.count,
+          })),
+          payments: facet.payments || [],
+          filters: {
+            from: rangeStart.toISOString(),
+            to: rangeEnd.toISOString(),
+          },
+        },
+      });
+    }
 
     const [agg] = await Payment.aggregate([
       { $match: dateMatch },
@@ -1393,12 +1590,15 @@ export const getFinancialReport = async (req, res) => {
           byMonth: [
             {
               $group: {
-                _id: { $month: "$paidDate" },
+                _id: {
+                  year: { $year: "$paidDate" },
+                  month: { $month: "$paidDate" },
+                },
                 total: { $sum: "$amountPaid" },
                 count: { $sum: 1 },
               },
             },
-            { $sort: { _id: 1 } },
+            { $sort: { "_id.year": 1, "_id.month": 1 } },
           ],
           recent: [
             { $sort: { paidDate: -1 } },
@@ -1519,7 +1719,12 @@ export const getFinancialReport = async (req, res) => {
         name: school?.school_name || "",
         logo: school?.school_logo || "",
       },
-      filters: { year, month },
+      filters: {
+        from: rangeStart.toISOString(),
+        to: rangeEnd.toISOString(),
+        year: year || null,
+        month: month || null,
+      },
       summary: {
         totalCollected: totals.totalCollected || 0,
         paymentCount: totals.paymentCount || 0,
@@ -1534,12 +1739,17 @@ export const getFinancialReport = async (req, res) => {
         total: r.total,
         count: r.count,
       })),
-      byMonth: (agg?.byMonth || []).map((r) => ({
-        month: r._id,
-        monthLabel: monthNames[r._id] || String(r._id),
-        total: r.total,
-        count: r.count,
-      })),
+      byMonth: (agg?.byMonth || []).map((r) => {
+        const m = r._id?.month;
+        const y = r._id?.year;
+        return {
+          month: m,
+          year: y,
+          monthLabel: `${monthNames[m] || m} ${y || ""}`.trim(),
+          total: r.total,
+          count: r.count,
+        };
+      }),
       byClass: byClass.map((r) => ({
         classId: r._id,
         className: r.className,

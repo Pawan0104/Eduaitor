@@ -176,6 +176,12 @@ const Sidebar = ({ closeSidebar }) => {
         { name: "All Students", path: "/school/students" },
         { name: "Add Student", path: "/school/student-manage" },
         { name: "Bulk Upload", path: "/school/students/bulk-upload" },
+        { name: "House Allocation", path: "/school/house" },
+        { name: "Certificates", path: "/school/certificates" },
+        {
+          name: "Document Designs",
+          path: "/school/certificates/settings",
+        },
       ],
     },
     {
@@ -189,7 +195,6 @@ const Sidebar = ({ closeSidebar }) => {
       module: "teachers",
       children: [
         { name: "All Teachers", path: "/school/teachers" },
-        { name: "Add Teacher", path: "/school/teacher-manage" },
       ],
     },
     {
@@ -289,12 +294,6 @@ const Sidebar = ({ closeSidebar }) => {
       module: "hostel",
     },
     {
-      name: "House Allocation",
-      icon: <FaHome />,
-      path: "/school/house",
-      module: "house",
-    },
-    {
       name: "School Commerce Suite",
       icon: <FaStore />,
       path: "/school/commerce",
@@ -313,6 +312,7 @@ const Sidebar = ({ closeSidebar }) => {
       module: "staff",
       children: [
         { name: "Staff Management", path: "/school/staff" },
+        { name: "Staff Roles", path: "/school/staff-roles" },
         { name: "Staff Attendance", path: "/school/staff-attendance" },
       ],
     },
@@ -422,8 +422,18 @@ const Sidebar = ({ closeSidebar }) => {
       path: "/teacher/group",
       module: "groups",
     },
-    { name: "Notices", icon: <FaBell />, path: "/teacher/notice" },
-    { name: "Events", icon: <FaCalendar />, path: "/teacher/event" },
+    {
+      name: "Notices",
+      icon: <FaBell />,
+      path: "/teacher/notice",
+      module: "notices",
+    },
+    {
+      name: "Events",
+      icon: <FaCalendar />,
+      path: "/teacher/event",
+      module: "events",
+    },
     { name: "Calendar", icon: <FaCalendarAlt />, path: "/teacher/calendar" },
     {
       name: "Blogs",
@@ -441,6 +451,7 @@ const Sidebar = ({ closeSidebar }) => {
       name: "Messages",
       icon: <FaBell />,
       path: "/teacher/messages",
+      module: "message",
     },
     {
       name: "Help / Support",
@@ -736,12 +747,27 @@ const Sidebar = ({ closeSidebar }) => {
       path: "/staff/leads",
     },
     {
+      name: "Hostel Management",
+      icon: <FaHotel />,
+      path: "/staff/hostel",
+      module: "hostel",
+    },
+    {
       name: "Groups",
       icon: <FaUserGroup />,
       path: "/staff/group",
       module: "groups",
     },
-    { name: "Staff", icon: <FiUsers />, path: "/staff/staff", module: "staff" },
+    {
+      name: "Staff",
+      icon: <FiUsers />,
+      path: "/staff/staff",
+      module: "staff",
+      children: [
+        { name: "Staff Management", path: "/staff/staff" },
+        { name: "Staff Roles", path: "/staff/staff-roles" },
+      ],
+    },
     { name: "Notices", icon: <FaBell />, path: "/staff/notice" },
     { name: "Events", icon: <FaCalendar />, path: "/staff/event" },
     { name: "Calendar", icon: <FaCalendarAlt />, path: "/staff/calendar" },
@@ -750,8 +776,17 @@ const Sidebar = ({ closeSidebar }) => {
   let menu = [];
   if (role === "super_admin") menu = superAdminMenu;
   else if (role === "school_admin") menu = schoolAdminMenu;
-  else if (role === "teacher_admin") menu = teacherAdminMenu;
-  else if (role === "student_admin") {
+  else if (role === "teacher_admin") {
+    const teacherPerms = user?.permissions || [];
+    // Legacy teachers with no access role keep full teaching menu
+    menu =
+      teacherPerms.length === 0
+        ? teacherAdminMenu
+        : teacherAdminMenu.filter((item) => {
+            if (!item.module) return true;
+            return teacherPerms.includes(item.module);
+          });
+  } else if (role === "student_admin") {
     menu = user?.loginAs === "student" ? studentMenu : parentMenu;
   } else if (role === "staff_admin") {
     menu = staffAdminMenu.filter((item) => {
@@ -788,7 +823,11 @@ const Sidebar = ({ closeSidebar }) => {
 
   const finalMenu = (() => {
     if (role === "super_admin") return menu;
-    if (role === "school_admin" || role === "teacher_admin") return menu;
+    if (role === "school_admin") return menu;
+    // Teachers: already filtered by personal permissions; also respect school subscription
+    if (role === "teacher_admin") {
+      return menu.filter((item) => !item.module || hasModule(item.module));
+    }
     return menu.filter((item) => !item.module || hasModule(item.module));
   })();
 

@@ -1,10 +1,18 @@
 import { useState, useEffect } from "react";
 import axios from "axios";
 import { toast } from "react-toastify";
-import { useParams, useNavigate } from "react-router-dom";
+import { useParams, useNavigate, useSearchParams } from "react-router-dom";
 import { FaArrowLeft } from "react-icons/fa";
+import { useAuth } from "../context/AuthContext";
 
 const API = import.meta.env.VITE_API_URL;
+
+const splitStudentName = (fullName = "") => {
+  const parts = String(fullName).trim().split(/\s+/).filter(Boolean);
+  if (parts.length === 0) return { firstName: "", lastName: "" };
+  if (parts.length === 1) return { firstName: parts[0], lastName: "-" };
+  return { firstName: parts[0], lastName: parts.slice(1).join(" ") };
+};
 
 const steps = [
   "Student Details",
@@ -98,11 +106,17 @@ const createExtraDocument = () => {
 const StudentManagement = () => {
   const { id } = useParams();
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const { user } = useAuth();
   const isEdit = Boolean(id);
+  const leadIdParam = !isEdit ? searchParams.get("leadId") || "" : "";
+  const basePath = user?.role === "staff_admin" ? "/staff" : "/school";
 
   const [step, setStep] = useState(1);
   const [form, setForm] = useState(emptyForm);
   const [errors, setErrors] = useState({});
+  const [sourceLead, setSourceLead] = useState(null);
+  const [leadId, setLeadId] = useState("");
 
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [confirmAction, setConfirmAction] = useState(null);
@@ -364,6 +378,53 @@ const StudentManagement = () => {
 
     fetchFeeStructure();
   }, [form.classId]);
+
+  /* PREFILL FROM LEAD */
+  useEffect(() => {
+    if (isEdit || !leadIdParam) return;
+
+    const fetchLead = async () => {
+      try {
+        const res = await axios.get(`${API}/leads/${leadIdParam}`, {
+          withCredentials: true,
+        });
+        const lead = res.data?.data;
+        if (!lead) {
+          toast.error("Lead not found");
+          return;
+        }
+        if (lead.studentId) {
+          toast.info("This lead is already converted");
+          navigate(`${basePath}/student-view/${lead.studentId}`, { replace: true });
+          return;
+        }
+        if (String(lead.status || "").toLowerCase() === "cancelled") {
+          toast.error("Cancelled leads cannot be admitted");
+          navigate(`${basePath}/leads`, { replace: true });
+          return;
+        }
+
+        const { firstName, lastName } = splitStudentName(lead.studentName);
+        setSourceLead(lead);
+        setLeadId(lead._id);
+        setForm((prev) => ({
+          ...prev,
+          firstName: firstName || prev.firstName,
+          lastName: lastName || prev.lastName,
+          fatherName: lead.parentName || prev.fatherName,
+          fatherMobile: lead.parentMobile || prev.fatherMobile,
+          fatherEmail: lead.parentEmail || prev.fatherEmail,
+          previousSchoolName: lead.previousSchoolName || prev.previousSchoolName,
+          username: lead.parentMobile || prev.username,
+        }));
+      } catch (err) {
+        toast.error(err?.response?.data?.message || "Failed to load lead");
+        navigate(`${basePath}/leads`, { replace: true });
+      }
+    };
+
+    fetchLead();
+  }, [isEdit, leadIdParam, basePath, navigate]);
 
   /* FETCH STUDENT */
   useEffect(() => {
@@ -780,20 +841,35 @@ const StudentManagement = () => {
     if (step > 1) setStep((s) => s - 1);
   };
 
+  const applyLeadPrefill = (base = emptyForm, lead = sourceLead) => {
+    if (!lead) return { ...base };
+    const { firstName, lastName } = splitStudentName(lead.studentName);
+    return {
+      ...base,
+      firstName,
+      lastName,
+      fatherName: lead.parentName || "",
+      fatherMobile: lead.parentMobile || "",
+      fatherEmail: lead.parentEmail || "",
+      previousSchoolName: lead.previousSchoolName || "",
+      username: lead.parentMobile || "",
+    };
+  };
+
   const resetForm = () => {
-    if (!isDirty()) {
-      setForm(emptyForm);
+    const doReset = () => {
+      setForm(applyLeadPrefill(emptyForm));
       setStep(1);
+      setErrors({});
+    };
+
+    if (!isDirty()) {
+      doReset();
       return;
     }
 
     setConfirmMessage("Are you sure you want to reset the form?");
-    setConfirmAction(() => () => {
-      setForm(emptyForm);
-      setStep(1);
-      setErrors({});
-    });
-
+    setConfirmAction(() => doReset);
     setConfirmOpen(true);
   };
 
@@ -864,25 +940,30 @@ const forbidden = [
       });
 
       data.set("feeFrequency", freqFilter);
+      if (!isEdit && leadId) {
+        data.set("leadId", leadId);
+      }
 
       if (isEdit) {
         await axios.put(`${API}/students/${id}`, data, {
           withCredentials: true,
         });
         toast.success("Student Updated Successfully");
-        navigate("/school/students");
+        navigate(`${basePath}/students`);
       } else {
         const res = await axios.post(`${API}/students`, data, {
           withCredentials: true,
         });
         toast.success(
-          "Student admitted successfully. Opening ID card for download…",
+          leadId
+            ? "Student admitted from lead. Opening ID card for download…"
+            : "Student admitted successfully. Opening ID card for download…",
         );
         const newId = res.data?.data?._id;
         if (newId) {
-          navigate(`/school/id-card/student/${newId}`);
+          navigate(`${basePath}/id-card/student/${newId}`);
         } else {
-          navigate("/school/students");
+          navigate(leadId ? `${basePath}/leads` : `${basePath}/students`);
         }
       }
     } catch (err) {
@@ -923,9 +1004,27 @@ const forbidden = [
       )}
       {/* HEADER */}
       <div className="flex flex-col sm:flex-row justify-between mb-6 gap-4">
-        <h1 className="text-2xl lg:text-3xl font-bold">
-          {isEdit ? "Edit Student Details" : "Student Admission"}
-        </h1>
+        <div>
+          <h1 className="text-2xl lg:text-3xl font-bold">
+            {isEdit ? "Edit Student Details" : "Student Admission"}
+          </h1>
+          {sourceLead && (
+            <p className="mt-1 text-sm text-[rgb(var(--text-muted))]">
+              Prefilled from lead:{" "}
+              <span className="font-semibold text-[rgb(var(--text))]">
+                {sourceLead.studentName}
+              </span>
+              {" · "}
+              <button
+                type="button"
+                onClick={() => navigate(`${basePath}/leads`)}
+                className="text-[rgb(var(--primary))] underline underline-offset-2"
+              >
+                Back to leads
+              </button>
+            </p>
+          )}
+        </div>
 
         <button
           onClick={resetForm}
@@ -934,6 +1033,13 @@ const forbidden = [
           Reset
         </button>
       </div>
+
+      {sourceLead && (
+        <div className="mb-5 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-800">
+          Lead details transferred. Complete class, fees, and documents, then save
+          to mark the lead as admitted.
+        </div>
+      )}
 
       <div className="grid grid-cols-12 gap-6">
         {/* STEP SIDEBAR */}

@@ -188,11 +188,16 @@ function FeeCollection() {
   const [selectedStudent, setSelectedStudent] = useState(null);
   const [amountToPay, setAmountToPay] = useState("");
   const [paymentMode, setPaymentMode] = useState("Cash");
+  const [utr, setUtr] = useState("");
+  const [transactionId, setTransactionId] = useState("");
 
   // This function triggers when you click the "Collect Fee" button in your table
   const handleCollectFee = (student) => {
     setSelectedStudent(student);
     setAmountToPay(student.totalDue); // Default to total due amount
+    setPaymentMode("Cash");
+    setUtr("");
+    setTransactionId("");
     setIsModalOpen(true);
   };
 
@@ -202,11 +207,25 @@ function FeeCollection() {
       return;
     }
 
+    if (paymentMode === "UPI" && !utr.trim()) {
+      toast.error("Please enter the UTR number for UPI payment");
+      return;
+    }
+
+    if (paymentMode === "Online" && !transactionId.trim()) {
+      toast.error("Please enter the transaction ID for online payment");
+      return;
+    }
+
     const payload = {
       studentId: selectedStudent._id,
       amountPaid: Number(amountToPay),
       paymentMode: paymentMode,
       remarks: "Fee collection via Accountant",
+      ...(paymentMode === "UPI" ? { utr: utr.trim() } : {}),
+      ...(paymentMode === "Online"
+        ? { transactionId: transactionId.trim() }
+        : {}),
     };
 
     const loadingToast = toast.loading("Processing payment...");
@@ -640,7 +659,12 @@ function FeeCollection() {
                     {["Cash", "UPI", "Cheque", "Online"].map((mode) => (
                       <button
                         key={mode}
-                        onClick={() => setPaymentMode(mode)}
+                        type="button"
+                        onClick={() => {
+                          setPaymentMode(mode);
+                          if (mode !== "UPI") setUtr("");
+                          if (mode !== "Online") setTransactionId("");
+                        }}
                         className={`py-3 px-2 rounded-xl border-2 text-xs font-bold transition-all ${
                           paymentMode === mode
                             ? "border-blue-600  text-[rgb(var(--primary))]"
@@ -652,6 +676,38 @@ function FeeCollection() {
                     ))}
                   </div>
                 </div>
+
+                {paymentMode === "UPI" && (
+                  <div>
+                    <label className="text-[10px] font-bold text-[rgb(var(--primary))] uppercase ml-1">
+                      UTR Number <span className="text-red-500">*</span>
+                    </label>
+                    <input
+                      type="text"
+                      value={utr}
+                      onChange={(e) => setUtr(e.target.value)}
+                      className="w-full mt-1 px-4 py-3 border-2 focus:border-blue-500 rounded-xl outline-none font-medium text-sm transition-all"
+                      placeholder="Enter 12-digit UTR / UPI reference"
+                      autoComplete="off"
+                    />
+                  </div>
+                )}
+
+                {paymentMode === "Online" && (
+                  <div>
+                    <label className="text-[10px] font-bold text-[rgb(var(--primary))] uppercase ml-1">
+                      Transaction ID <span className="text-red-500">*</span>
+                    </label>
+                    <input
+                      type="text"
+                      value={transactionId}
+                      onChange={(e) => setTransactionId(e.target.value)}
+                      className="w-full mt-1 px-4 py-3 border-2 focus:border-blue-500 rounded-xl outline-none font-medium text-sm transition-all"
+                      placeholder="Enter bank / gateway transaction ID"
+                      autoComplete="off"
+                    />
+                  </div>
+                )}
               </div>
             </div>
 

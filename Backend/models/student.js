@@ -120,6 +120,13 @@ const studentSchema = new mongoose.Schema(
       ref: "School", // or whatever your school model is named
     },
 
+    /** Lead this student was admitted from (Lead Management → admission) */
+    convertedFromLeadId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "Lead",
+      default: null,
+    },
+
     studentCredentials: {
       username: { type: String }, // STU0001
       password: { type: String },
@@ -146,6 +153,10 @@ studentSchema.index(
 );
 studentSchema.index(
   { schoolId: 1, "parentCredentials.username": 1 },
+  { unique: true, sparse: true },
+);
+studentSchema.index(
+  { schoolId: 1, convertedFromLeadId: 1 },
   { unique: true, sparse: true },
 );
 export default mongoose.model("Student", studentSchema);

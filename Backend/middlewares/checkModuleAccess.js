@@ -1,5 +1,9 @@
-import School from "../models/school.js";
 import Staff from "../models/staff.js"; // ADDED
+import {
+  getSchoolWithModules,
+  resolveSubscribedModules,
+  ensureDefaultSchoolModules,
+} from "../utils/schoolModules.js";
 
 const checkModuleAccess = (moduleKey) => {
   return async (req, res, next) => {
@@ -20,9 +24,7 @@ const checkModuleAccess = (moduleKey) => {
       }
 
       // ── 3. FETCH SCHOOL MODULES FROM DB ──────────────
-      const school = await School
-        .findById(schoolId)
-        .select("subscribed_modules status");
+      let school = await getSchoolWithModules(schoolId);
 
       // ── 4. SCHOOL EXISTS? ─────────────────────────────
       if (!school) {
@@ -40,9 +42,18 @@ const checkModuleAccess = (moduleKey) => {
         });
       }
 
+      // Heal default school empty/incomplete subscription (matches /auth/me UI)
+      const moduleCtx = {
+        userEmail: req.user.email,
+        role: req.user.role,
+      };
+      school = await ensureDefaultSchoolModules(school, moduleCtx);
+
+      const subscribed = resolveSubscribedModules(school, moduleCtx);
+
       // ── 6. SCHOOL MODULE SUBSCRIBED? ─────────────────
       // applies to ALL roles — school, teacher, student, staff
-      if (!school.subscribed_modules.includes(moduleKey)) {
+      if (!subscribed.includes(moduleKey)) {
         return res.status(403).json({
           success: false,
           message: `Your school has not subscribed to the '${moduleKey}' module. Please upgrade your plan.`,

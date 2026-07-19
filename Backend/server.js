@@ -9,8 +9,12 @@ import cookieParser from "cookie-parser";
 import connectDB from "./config/db.js";
 import School from "./models/school.js";
 import Staff from "./models/staff.js";
+import Teacher from "./models/teacher.js";
 import Student from "./models/student.js";
-import { MODULE_KEYS } from "./constants/module.js";
+import {
+  resolveSubscribedModules,
+  ensureDefaultSchoolModules,
+} from "./utils/schoolModules.js";
 
 
 const __filename = fileURLToPath(import.meta.url);
@@ -137,6 +141,7 @@ import libraryRoute from "./routes/libraryRoute.js";
 import hostelRoute from "./routes/hostelRoute.js";
 import houseRoute from "./routes/houseRoute.js";
 import idCardRoute from "./routes/idCardRoute.js";
+import certificateRoute from "./routes/certificateRoute.js";
 import commerceRoute from "./routes/commerceRoute.js";
 import syllabusRoute from "./routes/syllabusRoute.js";
 import syllabusCatalogRoute from "./routes/syllabusCatalogRoute.js";
@@ -156,6 +161,7 @@ import blogRoute from "./routes/blogRoute.js";
 import classAttendanceRoute from "./routes/classAttendanceRoute.js";
 import staffRoute from "./routes/staffRoute.js";
 import staffAttendanceRoute from "./routes/staffAttendanceRoute.js";
+import schoolStaffRoleRoute from "./routes/schoolStaffRoleRoute.js";
 import gatepassRoute from "./routes/gatepassRoute.js";
 import leadRoute from "./routes/leadRoute.js";
 import messageSingalRoute from "./routes/messageSingalRoute.js";
@@ -180,18 +186,19 @@ app.get("/api/auth/me", authMiddleware, async (req, res) => {
 
     /* ---------- FETCH SCHOOL MODULES (for all school-bound roles) ---------- */
     // school_id is in JWT for all 3 roles below
-    const school = await School.findById(req.user.school_id).select(
-      "name school_name school_logo subscribed_modules admin_email",
-    );
+    let school = await School.findById(req.user.school_id)
+      .select(
+        "name school_name school_logo subscribed_modules admin_email status",
+      )
+      .lean();
 
-    const subscribed_modules =
-      school?.subscribed_modules?.length > 0
-        ? school.subscribed_modules
-        : school?.admin_email === "school@admin.com" ||
-            (req.user.role === "school_admin" &&
-              req.user.email === "school@admin.com")
-          ? MODULE_KEYS
-          : [];
+    const moduleCtx = {
+      userEmail: req.user.email,
+      role: req.user.role,
+    };
+    school = await ensureDefaultSchoolModules(school, moduleCtx);
+
+    const subscribed_modules = resolveSubscribedModules(school, moduleCtx);
 
     /* ---------- SCHOOL ADMIN ---------- */
     if (req.user.role === "school_admin") {
@@ -212,6 +219,17 @@ app.get("/api/auth/me", authMiddleware, async (req, res) => {
 
     /* ---------- TEACHER ADMIN ---------- */
     if (req.user.role === "teacher_admin") {
+      const teacherMember = await Teacher.findById(req.user.teacher_id)
+        .select("permissions status customRoleId")
+        .populate("customRoleId", "name");
+
+      if (!teacherMember) {
+        return res.status(403).json({
+          success: false,
+          message: "Teacher account not found.",
+        });
+      }
+
       return res.json({
         success: true,
         user: {
@@ -220,10 +238,16 @@ app.get("/api/auth/me", authMiddleware, async (req, res) => {
           school_id: req.user.school_id,
           teacher_id: req.user.teacher_id,
           name: req.user.name,
-          school_name: school?.name,
+          school_name: school?.name || school?.school_name,
           school_logo: school?.school_logo,
           _id: req.user._id,
-          subscribed_modules, // ← added
+          customRoleId:
+            teacherMember.customRoleId?._id ||
+            teacherMember.customRoleId ||
+            null,
+          customRoleName: teacherMember.customRoleId?.name || null,
+          permissions: teacherMember.permissions || [],
+          subscribed_modules,
         },
       });
     }
@@ -233,9 +257,11 @@ app.get("/api/auth/me", authMiddleware, async (req, res) => {
     if (req.user.role === "staff_admin") {
       // fetch fresh permissions from DB — not from JWT
       // so if school admin updates permissions, takes effect on next refresh
-      const staffMember = await Staff.findById(req.user.staff_id).select(
-        "permissions status staffRole staffRoleCustom firstTimeLogin",
-      );
+      const staffMember = await Staff.findById(req.user.staff_id)
+        .select(
+          "permissions status staffRole staffRoleCustom firstTimeLogin customRoleId",
+        )
+        .populate("customRoleId", "name");
 
       // staff deleted or deactivated
       if (!staffMember || staffMember.status === "Inactive") {
@@ -256,6 +282,8 @@ app.get("/api/auth/me", authMiddleware, async (req, res) => {
           _id: req.user._id,
           staffRole: staffMember.staffRole,
           staffRoleCustom: staffMember.staffRoleCustom,
+          customRoleId: staffMember.customRoleId?._id || staffMember.customRoleId || null,
+          customRoleName: staffMember.customRoleId?.name || null,
           firstTimeLogin: staffMember.firstTimeLogin,
           permissions: staffMember.permissions, // ← always fresh from DB
           subscribed_modules, // ← already fetched above
@@ -362,6 +390,7 @@ app.use("/api/library", libraryRoute);
 app.use("/api/hostel", hostelRoute);
 app.use("/api/house", houseRoute);
 app.use("/api/id-card", idCardRoute);
+app.use("/api/certificates", certificateRoute);
 app.use("/api/commerce", commerceRoute);
 app.use("/api/syllabus", syllabusRoute);
 app.use("/api/syllabus-catalog", syllabusCatalogRoute);
@@ -381,6 +410,7 @@ app.use("/api/blogs", blogRoute);
 app.use("/api/class-attendance", classAttendanceRoute);
 app.use("/api/staff", staffRoute);
 app.use("/api/staff-attendance", staffAttendanceRoute);
+app.use("/api/school-staff-roles", schoolStaffRoleRoute);
 app.use("/api/gatepass", gatepassRoute);
 app.use("/api/leads", leadRoute);
 app.use("/api/message-signal", messageSingalRoute);

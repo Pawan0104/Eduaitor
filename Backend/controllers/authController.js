@@ -5,7 +5,11 @@ import jwt from "jsonwebtoken";
 import bcrypt from "bcryptjs";
 import Staff from "../models/staff.js";
 import mongoose from "mongoose";
-import { MODULE_KEYS } from "../constants/module.js";
+import {
+  resolveSubscribedModules,
+  ensureDefaultSchoolModules,
+} from "../utils/schoolModules.js";
+import SchoolStaffRole from "../models/schoolStaffRole.js";
 
 const generateToken = (payload) => {
   return jwt.sign(payload, process.env.JWT_SECRET, {
@@ -58,10 +62,26 @@ export const loginUser = async (req, res) => {
 
     if (teacher && (await bcrypt.compare(password, teacher.password))) {
       const school = await School.findById(teacher.schoolId).select(
-        "subscribed_modules",
+        "subscribed_modules admin_email school_name",
       );
 
-      const subscribed_modules = school?.subscribed_modules || [];
+      const moduleCtx = {
+        userEmail: teacher.email,
+        role: "teacher_admin",
+      };
+      const healed = await ensureDefaultSchoolModules(
+        school?.toObject?.() || school,
+        moduleCtx,
+      );
+      const subscribed_modules = resolveSubscribedModules(healed, moduleCtx);
+
+      let customRoleName = null;
+      if (teacher.customRoleId) {
+        const roleDoc = await SchoolStaffRole.findById(teacher.customRoleId)
+          .select("name")
+          .lean();
+        customRoleName = roleDoc?.name || null;
+      }
 
       const token = generateToken({
         role: "teacher_admin",
@@ -82,6 +102,9 @@ export const loginUser = async (req, res) => {
           name: teacher.fullName,
           email: teacher.email,
           school_id: teacher.schoolId,
+          customRoleId: teacher.customRoleId || null,
+          customRoleName,
+          permissions: teacher.permissions || [],
           subscribed_modules,
         },
       });
@@ -229,6 +252,7 @@ export const loginUser = async (req, res) => {
           school_id: staff.schoolId,
           staffRole: staff.staffRole,
           staffRoleCustom: staff.staffRoleCustom,
+          customRoleId: staff.customRoleId || null,
           firstTimeLogin: staff.firstTimeLogin,
           permissions: staff.permissions, // ← staff personal module access
           subscribed_modules, // ← school level modules for sidebar
@@ -248,6 +272,16 @@ export const loginUser = async (req, res) => {
       });
     }
 
+    const moduleCtx = {
+      userEmail: school.admin_email,
+      role: "school_admin",
+    };
+    const healedSchool = await ensureDefaultSchoolModules(
+      school.toObject?.() || school,
+      moduleCtx,
+    );
+    const subscribed_modules = resolveSubscribedModules(healedSchool, moduleCtx);
+
     const token = generateToken({
       role: "school_admin",
       email: school.admin_email,
@@ -265,12 +299,7 @@ export const loginUser = async (req, res) => {
         school_id: school._id,
         school_name: school.school_name,
         email: school.admin_email,
-        subscribed_modules:
-          school?.subscribed_modules?.length > 0
-            ? school.subscribed_modules
-            : school.admin_email === "school@admin.com"
-              ? MODULE_KEYS
-              : [],
+        subscribed_modules,
       },
     });
   } catch (error) {

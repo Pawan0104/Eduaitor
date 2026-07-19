@@ -191,10 +191,43 @@ export default function FeeReceipt() {
               <p className="text-slate-600 text-xs mt-1">
                 Mode: {receipt.paymentMode}
               </p>
-              {receipt.razorpayPaymentId && (
-                <p className="text-slate-500 text-[11px] mt-1 font-mono">
-                  Txn: {receipt.razorpayPaymentId}
+              {receipt.paymentMode === "UPI" && receipt.utr && (
+                <p className="text-slate-600 text-xs mt-1">
+                  UTR:{" "}
+                  <span className="font-mono font-semibold text-slate-800">
+                    {receipt.utr}
+                  </span>
                 </p>
+              )}
+              {receipt.paymentMode === "Online" && (
+                <div className="mt-1 space-y-0.5 text-[11px] text-slate-500 font-mono">
+                  {(receipt.transactionId || receipt.razorpayPaymentId) && (
+                    <p>
+                      Txn ID:{" "}
+                      <span className="font-semibold text-slate-700">
+                        {receipt.transactionId || receipt.razorpayPaymentId}
+                      </span>
+                    </p>
+                  )}
+                  {receipt.razorpayOrderId && (
+                    <p>
+                      Order ID:{" "}
+                      <span className="font-semibold text-slate-700">
+                        {receipt.razorpayOrderId}
+                      </span>
+                    </p>
+                  )}
+                  {receipt.razorpayPaymentId &&
+                    receipt.transactionId &&
+                    receipt.transactionId !== receipt.razorpayPaymentId && (
+                      <p>
+                        Payment ID:{" "}
+                        <span className="font-semibold text-slate-700">
+                          {receipt.razorpayPaymentId}
+                        </span>
+                      </p>
+                    )}
+                </div>
               )}
             </div>
           </div>

@@ -104,23 +104,25 @@ export default function TeacherMenu() {
     navigate("/admin/login", { replace: true });
   };
 
-  const menu = [
+  const allMenu = [
     { name: "Dashboard", icon: <FaTachometerAlt />, path: "/teacher/dashboard" },
     { name: "Notifications", icon: <MdNotificationsActive />, path: "/teacher/notification" },
-    { name: "Students", icon: <FaUserGraduate />, path: "/teacher/students" },
+    { name: "Students", icon: <FaUserGraduate />, path: "/teacher/students", module: "students" },
     {
       name: "Attendance",
       icon: <FaClipboardCheck />,
+      module: "attendance",
       children: [
         { name: "Mark Attendance", path: "/teacher/attendance/mark" },
         { name: "Attendance Report", path: "/teacher/attendance/report" },
       ],
     },
-    { name: "My Classes", icon: <HiAcademicCap />, path: "/teacher/class" },
-    { name: "Syllabus", icon: <FaBook />, path: "/teacher/syllabus" },
+    { name: "My Classes", icon: <HiAcademicCap />, path: "/teacher/class", module: "classes" },
+    { name: "Syllabus", icon: <FaBook />, path: "/teacher/syllabus", module: "syllabus" },
     {
       name: "Assignment",
       icon: <GiSchoolBag />,
+      module: "assignments",
       children: [
         { name: "My Assignments", path: "/teacher/assignment" },
         { name: "Assignment Result", path: "/teacher/assignment/result" },
@@ -129,22 +131,34 @@ export default function TeacherMenu() {
     {
       name: "Exams",
       icon: <GiOpenBook />,
+      module: "exams",
       children: [{ name: "Marks Entry", path: "/teacher/marks-entry" }],
     },
-    { name: "Timetable", icon: <FaClock />, path: "/teacher/timetable" },
-    { name: "Diary", icon: <FaBookOpen />, path: "/teacher/diary" },
-    { name: "Homework", icon: <FaClipboardList />, path: "/teacher/homework" },
-    { name: "Pages taught", icon: <FaBookOpen />, path: "/teacher/page-progress" },
-    { name: "Daily learning", icon: <FaClipboardList />, path: "/teacher/daily-learning" },
-    { name: "Group", icon: <FaUsers />, path: "/teacher/group" },
-    { name: "Notices", icon: <FaBell />, path: "/teacher/notice" },
-    { name: "Events", icon: <FaCalendar />, path: "/teacher/event" },
+    { name: "Timetable", icon: <FaClock />, path: "/teacher/timetable", module: "timetable" },
+    { name: "Diary", icon: <FaBookOpen />, path: "/teacher/diary", module: "diary" },
+    { name: "Homework", icon: <FaClipboardList />, path: "/teacher/homework", module: "homework" },
+    { name: "Pages taught", icon: <FaBookOpen />, path: "/teacher/page-progress", module: "daily_learning" },
+    { name: "Daily learning", icon: <FaClipboardList />, path: "/teacher/daily-learning", module: "daily_learning" },
+    { name: "Group", icon: <FaUsers />, path: "/teacher/group", module: "groups" },
+    { name: "Notices", icon: <FaBell />, path: "/teacher/notice", module: "notices" },
+    { name: "Events", icon: <FaCalendar />, path: "/teacher/event", module: "events" },
     { name: "Calendar", icon: <FaCalendarAlt />, path: "/teacher/calendar" },
-    { name: "Blog", icon: <FaBlog />, path: "/teacher/blogs" },
-    { name: "Gate Pass", icon: <FaPassport />, path: "/teacher/gatepass" },
-    { name: "Messages", icon: <FaComments />, path: "/teacher/messages" },
+    { name: "Blog", icon: <FaBlog />, path: "/teacher/blogs", module: "blogs" },
+    { name: "Gate Pass", icon: <FaPassport />, path: "/teacher/gatepass", module: "gatepass" },
+    { name: "Messages", icon: <FaComments />, path: "/teacher/messages", module: "message" },
     { name: "Help / Support", icon: <FaHeadset />, path: "/teacher/help" },
   ];
+
+  const teacherPerms = user?.permissions || [];
+  const schoolMods = user?.subscribed_modules || [];
+  const menu =
+    teacherPerms.length === 0
+      ? allMenu
+      : allMenu.filter((item) => {
+          if (!item.module) return true;
+          if (!schoolMods.includes(item.module)) return false;
+          return teacherPerms.includes(item.module);
+        });
 
   return (
     <div className="min-h-screen font-nunito" style={{ background: "rgb(var(--bg))" }}>

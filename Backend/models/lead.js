@@ -89,6 +89,12 @@ const leadSchema = new mongoose.Schema(
       enum: ["active", "processing", "admitted", "cancelled"],
       default: "active",
     },
+    /** Set when lead is converted via admission form */
+    studentId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "Student",
+      default: null,
+    },
     followUps: {
       type: [followUpSchema],
       default: [],

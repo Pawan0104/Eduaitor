@@ -258,8 +258,8 @@ export const getStaffAttendanceSummary = async (req, res, next) => {
     const summary = await StaffAttendance.aggregate([
       {
         $match: {
-          schoolId: mongoose.Types.ObjectId(schoolId),
-          staffId: mongoose.Types.ObjectId(staffId),
+          schoolId: new mongoose.Types.ObjectId(schoolId),
+          staffId: new mongoose.Types.ObjectId(staffId),
           month: Number(month),
           year: Number(year),
         },

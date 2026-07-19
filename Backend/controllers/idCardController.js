@@ -1,6 +1,7 @@
 import Student from "../models/student.js";
 import Staff from "../models/staff.js";
 import School from "../models/school.js";
+import { getDocumentDesign } from "./certificateController.js";
 
 const getSchoolCard = async (schoolId) => {
   const school = await School.findById(schoolId)
@@ -77,11 +78,14 @@ export const getStudentIdCard = async (req, res) => {
 
     student = await ensureStudentIdCard(student);
     const school = await getSchoolCard(schoolId);
+    const design = await getDocumentDesign(schoolId, "id_card");
+    if (design?.logoUrl && school) school.logo = design.logoUrl;
 
     return res.json({
       success: true,
       type: "student",
       school,
+      design,
       person: {
         _id: student._id,
         name: `${student.firstName} ${student.lastName || ""}`.trim(),
@@ -154,6 +158,8 @@ export const getStaffIdCard = async (req, res) => {
 
     staff = await ensureStaffIdCard(staff);
     const school = await getSchoolCard(schoolId);
+    const design = await getDocumentDesign(schoolId, "id_card");
+    if (design?.logoUrl && school) school.logo = design.logoUrl;
 
     const roleLabel =
       staff.staffRole === "other"
@@ -166,6 +172,7 @@ export const getStaffIdCard = async (req, res) => {
       success: true,
       type: "staff",
       school,
+      design,
       person: {
         _id: staff._id,
         name: staff.fullName,

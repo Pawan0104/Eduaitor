@@ -1,8 +1,10 @@
 import { useState, useEffect } from "react";
 import axios from "axios";
 import { toast } from "react-toastify";
-import { useParams, useNavigate } from "react-router-dom";
-import { FaArrowLeft } from "react-icons/fa";
+import { useParams, useNavigate, useSearchParams } from "react-router-dom";
+import { FaArrowLeft, FaShieldAlt } from "react-icons/fa";
+import { MODULES } from "../constants/module.js";
+import { useAuth } from "../context/AuthContext";
 
 const API = import.meta.env.VITE_API_URL;
 
@@ -36,6 +38,7 @@ const emptyForm = {
 
   assignedClasses: [],
   role: "",
+  customRoleId: "",
   username: "",
   password: "",
 };
@@ -43,8 +46,13 @@ const emptyForm = {
 const TeacherManagement = () => {
   const { id } = useParams();
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const { user } = useAuth();
 
   const isEdit = Boolean(id);
+  const basePath = user?.role === "staff_admin" ? "/staff" : "/school";
+  const fromStaff = searchParams.get("from") === "staff";
+  const listPath = fromStaff ? `${basePath}/staff` : `${basePath}/teachers`;
 
   const [step, setStep] = useState(1);
   const [form, setForm] = useState(emptyForm);
@@ -57,9 +65,15 @@ const TeacherManagement = () => {
   // Dropdowns
   const [subjects, setSubjects] = useState([]);
   const [classes, setClasses] = useState([]);
+  const [accessRoles, setAccessRoles] = useState([]);
   const [loading, setLoading] = useState(true);
   const isMobile = window.innerWidth <= 768;
   const progress = (step / steps.length) * 100;
+
+  const selectedAccessRole = accessRoles.find(
+    (r) => String(r._id) === String(form.customRoleId),
+  );
+  const rolePermissions = selectedAccessRole?.permissions || [];
 
   /* FETCH DROPDOWN DATA */
 
@@ -68,13 +82,33 @@ const TeacherManagement = () => {
       try {
         setLoading(true);
 
-        const [subjectsRes, classesRes] = await Promise.all([
+        const [subjectsRes, classesRes, rolesRes] = await Promise.all([
           axios.get(`${API}/subjects/all`, { withCredentials: true }),
           axios.get(`${API}/classes/all`, { withCredentials: true }),
+          axios.get(`${API}/school-staff-roles`, { withCredentials: true }),
         ]);
 
         setSubjects(subjectsRes.data.subjects || []);
         setClasses(classesRes.data.classes || []);
+        const roles = rolesRes.data.data || [];
+        setAccessRoles(roles);
+
+        // Default new teachers to the "Teacher" starter role when present
+        if (!id) {
+          const teacherRole =
+            roles.find(
+              (r) =>
+                r.isActive !== false &&
+                String(r.name).toLowerCase() === "teacher",
+            ) || roles.find((r) => r.isActive !== false);
+          if (teacherRole) {
+            setForm((prev) =>
+              prev.customRoleId
+                ? prev
+                : { ...prev, customRoleId: String(teacherRole._id) },
+            );
+          }
+        }
       } catch (error) {
         toast.error("Failed to load dropdown data");
         console.error(error);
@@ -84,7 +118,7 @@ const TeacherManagement = () => {
     };
 
     fetchDropdownData();
-  }, []);
+  }, [id]);
 
   /* FETCH TEACHER */
 
@@ -103,6 +137,9 @@ const TeacherManagement = () => {
           ...t,
           dob: t.dob ? t.dob.split("T")[0] : "",
           joiningDate: t.joiningDate ? t.joiningDate.split("T")[0] : "",
+          customRoleId: t.customRoleId
+            ? String(t.customRoleId._id || t.customRoleId)
+            : "",
           // Normalize to plain IDs in case they come back as populated objects
           assignedClasses: (t.assignedClasses || []).map((c) =>
             typeof c === "object" ? c._id : c,
@@ -264,7 +301,8 @@ const TeacherManagement = () => {
     if (step === 4) {
       if (!form.username) errors.push("Username required");
       if (!isEdit && !form.password) errors.push("Password required");
-      if (!form.role) errors.push("Role required");
+      if (!form.role) errors.push("Job title required");
+      if (!form.customRoleId) errors.push("Access role required");
     }
 
     return errors;
@@ -301,7 +339,8 @@ const TeacherManagement = () => {
         }
         if (lowerErr.includes("username")) errorMap.username = err;
         if (lowerErr.includes("password")) errorMap.password = err;
-        if (lowerErr.includes("role")) errorMap.role = err;
+        if (lowerErr.includes("job title")) errorMap.role = err;
+        if (lowerErr.includes("access role")) errorMap.customRoleId = err;
       });
 
       setErrors(errorMap);
@@ -400,7 +439,7 @@ const TeacherManagement = () => {
         toast.success("Teacher added successfully");
       }
 
-      navigate("/school/teachers");
+      navigate(listPath);
     } catch (err) {
       toast.error(err?.response?.data?.message || "Operation failed");
     }
@@ -458,7 +497,7 @@ const TeacherManagement = () => {
       )}{" "}
       <div className="flex flex-col sm:flex-row sm:justify-between gap-3 mb-6">
         <h1 className="text-2xl sm:text-3xl font-bold">
-          {isEdit ? "Edit Teacher Details" : "Add Teacher"}
+          {isEdit ? "Edit Teaching Staff" : "Add Teaching Staff"}
         </h1>
 
         <button
@@ -716,13 +755,88 @@ const TeacherManagement = () => {
                 </div>
 
                 <Select
-                  label="Role *"
+                  label="Job Title *"
                   name="role"
                   value={form.role}
                   options={["Teacher", "Class Teacher", "HOD", "Coordinator"]}
                   onChange={handleChange}
                   error={errors.role}
                 />
+
+                <div>
+                  <label className="block text-sm font-medium mb-1">
+                    Access Role <span className="text-red-500">*</span>
+                  </label>
+                  <select
+                    name="customRoleId"
+                    value={form.customRoleId}
+                    onChange={handleChange}
+                    className={`w-full border px-3 py-2 rounded-lg ${
+                      errors.customRoleId ? "border-red-500" : ""
+                    }`}
+                  >
+                    <option value="">Select access role</option>
+                    {accessRoles
+                      .filter(
+                        (r) =>
+                          r.isActive !== false ||
+                          String(r._id) === String(form.customRoleId),
+                      )
+                      .map((r) => (
+                        <option key={r._id} value={r._id}>
+                          {r.name}
+                          {r.isActive === false ? " (inactive)" : ""}
+                          {` — ${(r.permissions || []).length} modules`}
+                        </option>
+                      ))}
+                  </select>
+                  {errors.customRoleId && (
+                    <p className="text-xs text-red-500 mt-1">
+                      {errors.customRoleId}
+                    </p>
+                  )}
+                  <p className="text-xs text-gray-500 mt-1">
+                    Module access comes from Staff Roles — not chosen per
+                    teacher.{" "}
+                    <button
+                      type="button"
+                      onClick={() => navigate(`${basePath}/staff-roles`)}
+                      className="text-[rgb(var(--primary))] font-semibold underline"
+                    >
+                      Manage roles
+                    </button>
+                  </p>
+                </div>
+
+                {form.customRoleId && (
+                  <div className="md:col-span-2 rounded-xl border p-3 bg-[rgba(var(--primary),0.05)]">
+                    <p className="text-sm font-semibold flex items-center gap-2 mb-2">
+                      <FaShieldAlt className="text-[rgb(var(--primary))]" />
+                      Modules from{" "}
+                      {selectedAccessRole?.name || "selected role"} (
+                      {rolePermissions.length})
+                    </p>
+                    <div className="flex flex-wrap gap-1.5">
+                      {rolePermissions.map((key) => {
+                        const label =
+                          MODULES.find((m) => m.key === key)?.label || key;
+                        return (
+                          <span
+                            key={key}
+                            className="px-2 py-0.5 rounded-lg text-[11px] font-medium border bg-white"
+                          >
+                            {label}
+                          </span>
+                        );
+                      })}
+                      {rolePermissions.length === 0 && (
+                        <span className="text-xs text-gray-500">
+                          No modules on this role
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                )}
 
                 <Input
                   label="Username *"
@@ -771,7 +885,11 @@ const TeacherManagement = () => {
                     label="Employment Type"
                     value={form.employmentType}
                   />
-                  <ReviewField label="Role" value={form.role} />
+                  <ReviewField label="Job Title" value={form.role} />
+                  <ReviewField
+                    label="Access Role"
+                    value={selectedAccessRole?.name || "—"}
+                  />
                   <ReviewField label="Username" value={form.username} />
                   <ReviewField
                     label="Assigned Classes"

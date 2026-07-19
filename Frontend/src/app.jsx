@@ -91,6 +91,8 @@ import TeacherCalendar from "./pages/TeacherCalendar";
 import ParentResultView from "./pages/ParentResultView";
 import ReportCard from "./pages/ReportCard";
 import IdCard from "./pages/IdCard";
+import Certificates from "./pages/Certificates";
+import CertificateSettings from "./pages/CertificateSettings";
 import DiaryParent from "./pages/DiaryParent";
 import ParentFee from "./pages/ParentFee";
 import ParentStore from "./pages/ParentStore";
@@ -106,6 +108,7 @@ import BlogDetail from "./components/BlogDetail";
 import AttendanceWithTabs from "./pages/AttendanceWithTabs";
 import StudentAttendanceDetail from "./pages/StudentAttendanceDetail";
 import StaffManagement from "./pages/StaffManagement";
+import SchoolStaffRoles from "./pages/SchoolStaffRoles";
 import StaffDashboard from "./pages/StaffDashboard";
 import ParentGatepass from "./pages/ParentGatepass";
 import TeacherGatepass from "./pages/TeacherGatepass";
@@ -184,6 +187,8 @@ const App = () => {
           <Route path="student-view/:id" element={<StudentView />} />
           <Route path="id-card/student/:id" element={<IdCard />} />
           <Route path="id-card/staff/:id" element={<IdCard />} />
+          <Route path="certificates" element={<Certificates />} />
+          <Route path="certificates/settings" element={<CertificateSettings />} />
           <Route path="students/bulk-upload" element={<BulkStudentUpload />} />
           <Route path="teachers" element={<Teachers />} />
           <Route path="teacher-manage" element={<TeacherManagement />} />
@@ -200,6 +205,7 @@ const App = () => {
             element={<StudentAttendanceDetail />}
           />
           <Route path="staff-attendance" element={<StaffAttendance />} />
+          <Route path="staff-roles" element={<SchoolStaffRoles />} />
           <Route path="timetable" element={<TimeTable />} />
           <Route path="fee-structure" element={<FeeStructure />} />
           <Route path="fee-collection" element={<FeeCollection />} />
@@ -404,6 +410,9 @@ const App = () => {
 
           {/* module gated pages — reuse existing components where possible */}
           <Route path="students" element={<Students />} />
+          <Route path="student-manage" element={<StudentManagement />} />
+          <Route path="student-manage/:id" element={<StudentManagement />} />
+          <Route path="student-view/:id" element={<StudentView />} />
           <Route path="attendance" element={<StaffAttendance />} />
           <Route path="fees" element={<FeeCollection />} />
           <Route path="fee-history" element={<FeeHistory />} />
@@ -413,6 +422,12 @@ const App = () => {
           <Route path="library" element={<LibraryManagement />} />
           <Route path="house" element={<HouseAllocation />} />
           <Route path="transport" element={<Transport />} />
+          <Route path="transport-driver" element={<DriverManagement />} />
+          <Route path="hostel" element={<HostelManagement />} />
+          <Route path="hostel/buildings" element={<HostelBuildings />} />
+          <Route path="hostel/rooms" element={<HostelRooms />} />
+          <Route path="hostel/residents" element={<HostelResidents />} />
+          <Route path="hostel/visitors" element={<HostelVisitors />} />
           <Route path="timetable" element={<ReadTimetable />} />
           <Route path="syllabus" element={<Syllabus />} />
           <Route path="diary" element={<DiaryPrincipal />} />
@@ -424,6 +439,11 @@ const App = () => {
           <Route path="leads" element={<LeadManagement />} />
           <Route path="group" element={<Group />} />
           <Route path="staff" element={<StaffManagement />} />
+          <Route path="staff-roles" element={<SchoolStaffRoles />} />
+          <Route path="teachers" element={<Teachers />} />
+          <Route path="teacher-manage" element={<TeacherManagement />} />
+          <Route path="teacher-manage/:id" element={<TeacherManagement />} />
+          <Route path="teacher-view/:id" element={<TeacherView />} />
           <Route path="messages" element={<MessagesPage />} />
           <Route path="messages/new" element={<NewMessagePage />} />
           <Route path="messages/:threadId" element={<ChatPage />} />

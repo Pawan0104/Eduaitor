@@ -54,6 +54,8 @@ const staffSchema = new mongoose.Schema(
         "accountant",
         "receptionist",
         "counselor",
+        "security_guard",
+        "hostel_warden",
         "other",
       ],
       required: true,
@@ -85,10 +87,17 @@ const staffSchema = new mongoose.Schema(
 
     // ── PERMISSIONS ───────────────────────────────
     // which modules this staff member can access
-    // assigned by school_admin or administrator
+    // usually synced from customRoleId (school-defined role)
     permissions: {
       type: [String],
       default: [],
+    },
+
+    /** School-level custom role — source of truth for permissions when set */
+    customRoleId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "SchoolStaffRole",
+      default: null,
     },
 
     isAdminGroup: {

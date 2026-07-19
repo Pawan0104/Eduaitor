@@ -15,6 +15,7 @@ import {
   FaCalendar,
   FaCalendarAlt,
   FaIdCard,
+  FaHotel,
 } from "react-icons/fa";
 import { FaBookJournalWhills, FaUserGroup } from "react-icons/fa6";
 import { FiUsers } from "react-icons/fi";
@@ -127,6 +128,12 @@ export default function StaffMenu() {
         module: "transport",
       },
       {
+        name: "Hostel Management",
+        icon: <FaHotel />,
+        path: "/staff/hostel",
+        module: "hostel",
+      },
+      {
         name: "Timetable",
         icon: <FaClock />,
         path: "/staff/timetable",
@@ -177,7 +184,15 @@ export default function StaffMenu() {
         path: "/staff/group",
         module: "groups",
       },
-      { name: "Staff", icon: <FiUsers />, path: "/staff/staff", module: "staff" },
+      {
+        name: "Staff",
+        icon: <FiUsers />,
+        module: "staff",
+        children: [
+          { name: "Staff Management", path: "/staff/staff" },
+          { name: "Staff Roles", path: "/staff/staff-roles" },
+        ],
+      },
       { name: "Notices", icon: <FaBell />, path: "/staff/notice" },
       { name: "Events", icon: <FaCalendar />, path: "/staff/event" },
       { name: "Calendar", icon: <FaCalendarAlt />, path: "/staff/calendar" },

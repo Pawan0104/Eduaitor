@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import axios from "axios";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import { MODULES } from "../constants/module.js";
 import { toast } from "react-toastify";
@@ -9,7 +9,7 @@ import {
   FaToggleOn, FaToggleOff, FaSearch, FaArrowLeft,
   FaCamera, FaCheckCircle, FaShieldAlt, FaUserTie,
   FaEnvelope, FaPhone, FaIdBadge, FaCalendarAlt,
-  FaMoneyBillWave, FaLock, FaIdCard,
+  FaMoneyBillWave, FaLock, FaIdCard, FaUsers, FaBus,
 } from "react-icons/fa";
 import { GiTeacher } from "react-icons/gi";
 
@@ -17,9 +17,26 @@ const API = import.meta.env.VITE_API_URL;
 
 /* ── CONSTANTS ───────────────────────────────────── */
 const STAFF_ROLES = [
-  "principal", "administrator", "librarian", "teacher",
-  "accountant", "receptionist", "counselor", "other",
+  "principal",
+  "administrator",
+  "librarian",
+  "teacher",
+  "accountant",
+  "receptionist",
+  "counselor",
+  "security_guard",
+  "hostel_warden",
+  "driver",
+  "other",
 ];
+
+const formatRoleLabel = (role) => {
+  if (!role) return "—";
+  return String(role)
+    .split("_")
+    .map((p) => p.charAt(0).toUpperCase() + p.slice(1))
+    .join(" ");
+};
 const EMPLOYMENT_TYPES = ["Full-Time", "Part-Time", "Contract"];
 
 const emptyForm = {
@@ -31,6 +48,7 @@ const emptyForm = {
   address:         "",
   staffRole:       "",
   staffRoleCustom: "",
+  customRoleId:    "",
   joiningDate:     "",
   employmentType:  "Full-Time",
   salary:          "",
@@ -58,6 +76,7 @@ const StaffManagement = () => {
 
   const [form, setForm]                     = useState(emptyForm);
   const [permissions, setPermissions]       = useState([]);
+  const [customRoles, setCustomRoles]       = useState([]);
   const [photoFile, setPhotoFile]           = useState(null);
   const [photoPreview, setPhotoPreview]     = useState(null);
   const [changePassword, setChangePassword] = useState(false);
@@ -70,10 +89,18 @@ const StaffManagement = () => {
   const [confirmModal, setConfirmModal]     = useState(false);
   const [confirmMsg, setConfirmMsg]         = useState("");
   const [confirmAction, setConfirmAction]   = useState(null);
+  const [showTypePicker, setShowTypePicker] = useState(false);
+  const [searchParams, setSearchParams]     = useSearchParams();
+
+  const basePath = user?.role === "staff_admin" ? "/staff" : "/school";
 
   /* ── SCHOOL SUBSCRIBED MODULES ONLY ─────────────── */
   const schoolModules = MODULES.filter((m) =>
     user?.subscribed_modules?.includes(m.key)
+  );
+
+  const selectedCustomRole = customRoles.find(
+    (r) => String(r._id) === String(form.customRoleId),
   );
 
   /* ── FETCH ──────────────────────────────────────── */
@@ -89,28 +116,44 @@ const StaffManagement = () => {
     }
   };
 
-  useEffect(() => { fetchStaff(); }, []);
+  const fetchCustomRoles = async () => {
+    try {
+      const res = await axios.get(`${API}/school-staff-roles`, {
+        withCredentials: true,
+      });
+      setCustomRoles(res.data.data || []);
+    } catch {
+      /* roles page / staff module may be unavailable */
+      setCustomRoles([]);
+    }
+  };
+
+  useEffect(() => {
+    fetchStaff();
+    fetchCustomRoles();
+  }, []);
+
+  useEffect(() => {
+    if (searchParams.get("add") === "1") {
+      setShowTypePicker(true);
+      setSearchParams({}, { replace: true });
+    }
+  }, [searchParams, setSearchParams]);
 
   /* ── FORM HANDLERS ──────────────────────────────── */
   const handleChange = (e) => {
     setDirty(true);
-    setForm((p) => ({ ...p, [e.target.name]: e.target.value }));
-  };
+    const { name, value } = e.target;
+    setForm((p) => ({ ...p, [name]: value }));
 
-  const handlePermissionToggle = (key) => {
-    setDirty(true);
-    setPermissions((p) =>
-      p.includes(key) ? p.filter((k) => k !== key) : [...p, key]
-    );
-  };
-
-  const handleSelectAllPerms = () => {
-    setDirty(true);
-    setPermissions(
-      permissions.length === schoolModules.length
-        ? []
-        : schoolModules.map((m) => m.key)
-    );
+    if (name === "customRoleId") {
+      if (!value) {
+        setPermissions([]);
+        return;
+      }
+      const role = customRoles.find((r) => String(r._id) === String(value));
+      setPermissions(role?.permissions || []);
+    }
   };
 
   const handlePhotoChange = (e) => {
@@ -126,11 +169,38 @@ const StaffManagement = () => {
     setDirty(true);
   };
 
-  /* ── OPEN ADD ───────────────────────────────────── */
-  const openAddModal = () => {
-    setForm(emptyForm);
-    // all modules checked by default
-    setPermissions(schoolModules.map((m) => m.key));
+  /* ── OPEN ADD — type picker first ───────────────── */
+  const openAddModal = () => setShowTypePicker(true);
+
+  const openTeachingFlow = () => {
+    setShowTypePicker(false);
+    navigate(`${basePath}/teacher-manage?from=staff`);
+  };
+
+  const openDriverFlow = () => {
+    setShowTypePicker(false);
+    navigate(`${basePath}/transport-driver?add=1&from=staff`);
+  };
+
+  const openNonTeachingForm = async () => {
+    setShowTypePicker(false);
+    let roles = customRoles;
+    try {
+      const res = await axios.get(`${API}/school-staff-roles`, {
+        withCredentials: true,
+      });
+      roles = res.data.data || [];
+      setCustomRoles(roles);
+    } catch {
+      /* keep cached */
+    }
+    const activeRoles = roles.filter((r) => r.isActive !== false);
+    const defaultRoleId = activeRoles[0]?._id || "";
+    setForm({
+      ...emptyForm,
+      customRoleId: defaultRoleId ? String(defaultRoleId) : "",
+    });
+    setPermissions(defaultRoleId ? activeRoles[0]?.permissions || [] : []);
     setPhotoFile(null);
     setPhotoPreview(null);
     setChangePassword(false);
@@ -141,6 +211,17 @@ const StaffManagement = () => {
 
   /* ── OPEN EDIT ──────────────────────────────────── */
   const openEditModal = (staff) => {
+    if (staff.model === "Teacher") {
+      navigate(`${basePath}/teacher-manage/${staff._id}?from=staff`);
+      return;
+    }
+    if (staff.model === "Driver") {
+      navigate(`${basePath}/transport-driver?edit=${staff._id}&from=staff`);
+      return;
+    }
+    fetchCustomRoles();
+    const roleId =
+      staff.customRoleId?._id || staff.customRoleId || "";
     setForm({
       fullName:        staff.fullName        || "",
       email:           staff.email           || "",
@@ -150,6 +231,7 @@ const StaffManagement = () => {
       address:         staff.address         || "",
       staffRole:       staff.staffRole       || "",
       staffRoleCustom: staff.staffRoleCustom || "",
+      customRoleId:    roleId ? String(roleId) : "",
       joiningDate:     staff.joiningDate?.slice(0, 10) || "",
       employmentType:  staff.employmentType  || "Full-Time",
       salary:          staff.salary          || "",
@@ -176,13 +258,17 @@ const StaffManagement = () => {
     if (!form.fullName.trim())  return "Full name is required";
     if (!form.email.trim())     return "Email is required";
     if (!/\S+@\S+\.\S+/.test(form.email)) return "Valid email is required";
-    if (!form.staffRole)        return "Staff role is required";
+    if (!form.staffRole)        return "Job title is required";
     if (form.staffRole === "other" && !form.staffRoleCustom.trim())
-                                return "Please specify the custom role";
+                                return "Please specify the custom job title";
+    if (!form.customRoleId)
+                                return "Select an access role for module permissions";
     if (!editingId && !form.password.trim()) return "Password is required";
     if (changePassword && !form.password.trim())
                                 return "Enter new password or cancel";
-    if (permissions.length === 0) return "Assign at least one module permission";
+    if (permissions.length === 0) {
+      return "Selected role has no modules — update the role in Staff Roles first";
+    }
     return null;
   };
 
@@ -201,10 +287,16 @@ const StaffManagement = () => {
 
         Object.entries(form).forEach(([key, val]) => {
           if (key === "password" && editingId && !changePassword) return;
+          if (key === "customRoleId") return;
           if (val !== "") fd.append(key, val);
         });
 
         fd.append("permissions", JSON.stringify(permissions));
+        if (form.customRoleId) {
+          fd.append("customRoleId", form.customRoleId);
+        } else if (editingId) {
+          fd.append("customRoleId", "");
+        }
         if (photoFile) fd.append("photo", photoFile);
 
         if (editingId) {
@@ -254,10 +346,10 @@ const StaffManagement = () => {
           `${API}/staff/${staff._id}/toggle-status`, {},
           { withCredentials: true }
         );
-        toast.success(`Staff ${action}d successfully`);
+        toast.success(`Updated successfully`);
         fetchStaff();
-      } catch {
-        toast.error("Failed to update status");
+      } catch (err) {
+        toast.error(err.response?.data?.message || "Failed to update status");
       }
     });
     setConfirmModal(true);
@@ -265,20 +357,31 @@ const StaffManagement = () => {
 
   /* ── DELETE ─────────────────────────────────────── */
   const handleDelete = (staff) => {
-    setConfirmMsg(`Permanently delete ${staff.fullName}? This cannot be undone.`);
+    const label = staff.fullName || staff.name || "this person";
+    setConfirmMsg(
+      `Permanently delete ${label}? If they have active assignments, deletion will be blocked.`,
+    );
     setConfirmAction(() => async () => {
       try {
-        await axios.delete(`${API}/staff/${staff._id}`, { withCredentials: true });
-        toast.success("Staff deleted");
+        await axios.delete(`${API}/staff/${staff._id}`, {
+          withCredentials: true,
+        });
+        toast.success("Deleted successfully");
         fetchStaff();
-      } catch {
-        toast.error("Failed to delete staff");
+      } catch (err) {
+        toast.error(
+          err.response?.data?.message || "Failed to delete — check dependencies",
+        );
       }
     });
     setConfirmModal(true);
   };
 
   const handleAdminGroupToggle = async (member) => {
+    if (member.model === "Driver") {
+      toast.info("Drivers are managed under transport and cannot join admin group");
+      return;
+    }
     try {
       await axios.patch(
         `${API}/staff/admin-group/${member.model.toLowerCase()}/${member._id}`,
@@ -333,20 +436,21 @@ const StaffManagement = () => {
   const getRoleLabel = (s) =>
     s.staffRole === "other" && s.staffRoleCustom
       ? s.staffRoleCustom
-      : s.staffRole
-          ? s.staffRole.charAt(0).toUpperCase() + s.staffRole.slice(1)
-          : "—";
+      : formatRoleLabel(s.staffRole);
 
   const roleColor = (role) => {
     const map = {
-      principal:     "bg-purple-100 text-purple-600",
+      principal: "bg-purple-100 text-purple-600",
       administrator: "bg-blue-100 text-blue-600",
-      librarian:     "bg-green-100 text-green-600",
-      teacher:       "bg-indigo-100 text-indigo-600",
-      accountant:    "bg-yellow-100 text-yellow-700",
-      receptionist:  "bg-pink-100 text-pink-600",
-      counselor:     "bg-orange-100 text-orange-600",
-      other:         "bg-gray-100 text-gray-600",
+      librarian: "bg-green-100 text-green-600",
+      teacher: "bg-indigo-100 text-indigo-600",
+      accountant: "bg-yellow-100 text-yellow-700",
+      receptionist: "bg-pink-100 text-pink-600",
+      counselor: "bg-orange-100 text-orange-600",
+      security_guard: "bg-slate-200 text-slate-700",
+      hostel_warden: "bg-teal-100 text-teal-700",
+      driver: "bg-cyan-100 text-cyan-700",
+      other: "bg-gray-100 text-gray-600",
     };
     return map[role] || "bg-gray-100 text-gray-600";
   };
@@ -379,7 +483,8 @@ const StaffManagement = () => {
             Staff Management
           </h1>
           <p className="text-sm text-[rgb(var(--text-muted))] mt-0.5">
-            {staffList.length} staff member{staffList.length !== 1 ? "s" : ""} registered
+            {staffList.length} member{staffList.length !== 1 ? "s" : ""} ·
+            teachers, staff, guards, wardens & drivers
           </p>
         </div>
         <button
@@ -391,6 +496,114 @@ const StaffManagement = () => {
           <FaPlus size={12} /> Add Staff
         </button>
       </div>
+
+      {/* ── TYPE PICKER — teaching vs non-teaching ─── */}
+      {showTypePicker && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center
+          bg-black/40 p-4" onClick={() => setShowTypePicker(false)}>
+          <div
+            className="w-full max-w-lg bg-[rgb(var(--surface))]
+              border border-[rgb(var(--border))] rounded-2xl shadow-xl p-6"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-start justify-between mb-1">
+              <div>
+                <h2 className="text-lg font-bold text-[rgb(var(--text))]">
+                  Add Staff
+                </h2>
+                <p className="text-sm text-[rgb(var(--text-muted))] mt-0.5">
+                  Choose the type of staff member to register
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowTypePicker(false)}
+                className="p-1.5 rounded-lg text-[rgb(var(--text-muted))]
+                  hover:bg-[rgba(var(--primary),0.08)] transition"
+              >
+                <FaTimes size={14} />
+              </button>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mt-5">
+              <button
+                type="button"
+                onClick={openTeachingFlow}
+                className="group text-left p-4 rounded-xl border
+                  border-[rgb(var(--border))]
+                  hover:border-[rgb(var(--primary))]
+                  hover:bg-[rgba(var(--primary),0.06)]
+                  transition focus:outline-none focus:ring-2
+                  focus:ring-[rgb(var(--primary))]"
+              >
+                <div className="w-10 h-10 rounded-xl flex items-center
+                  justify-center mb-3
+                  bg-[rgba(var(--primary),0.12)]
+                  text-[rgb(var(--primary))]
+                  group-hover:scale-105 transition">
+                  <GiTeacher size={22} />
+                </div>
+                <p className="font-semibold text-[rgb(var(--text))]">
+                  Teaching Staff
+                </p>
+                <p className="text-xs text-[rgb(var(--text-muted))] mt-1 leading-relaxed">
+                  Teachers — subjects, classes, ERP
+                </p>
+              </button>
+
+              <button
+                type="button"
+                onClick={openNonTeachingForm}
+                className="group text-left p-4 rounded-xl border
+                  border-[rgb(var(--border))]
+                  hover:border-[rgb(var(--primary))]
+                  hover:bg-[rgba(var(--primary),0.06)]
+                  transition focus:outline-none focus:ring-2
+                  focus:ring-[rgb(var(--primary))]"
+              >
+                <div className="w-10 h-10 rounded-xl flex items-center
+                  justify-center mb-3
+                  bg-[rgba(var(--primary),0.12)]
+                  text-[rgb(var(--primary))]
+                  group-hover:scale-105 transition">
+                  <FaUsers size={20} />
+                </div>
+                <p className="font-semibold text-[rgb(var(--text))]">
+                  Non-Teaching Staff
+                </p>
+                <p className="text-xs text-[rgb(var(--text-muted))] mt-1 leading-relaxed">
+                  Guard, warden, admin, accounts…
+                </p>
+              </button>
+
+              <button
+                type="button"
+                onClick={openDriverFlow}
+                className="group text-left p-4 rounded-xl border
+                  border-[rgb(var(--border))]
+                  hover:border-[rgb(var(--primary))]
+                  hover:bg-[rgba(var(--primary),0.06)]
+                  transition focus:outline-none focus:ring-2
+                  focus:ring-[rgb(var(--primary))]"
+              >
+                <div className="w-10 h-10 rounded-xl flex items-center
+                  justify-center mb-3
+                  bg-[rgba(var(--primary),0.12)]
+                  text-[rgb(var(--primary))]
+                  group-hover:scale-105 transition">
+                  <FaBus size={20} />
+                </div>
+                <p className="font-semibold text-[rgb(var(--text))]">
+                  Transport Driver
+                </p>
+                <p className="text-xs text-[rgb(var(--text-muted))] mt-1 leading-relaxed">
+                  License, Aadhaar, bus & route
+                </p>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* ── FILTERS ───────────────────────────────── */}
       <div className="bg-[rgb(var(--surface))] border border-[rgb(var(--border))]
@@ -421,7 +634,7 @@ const StaffManagement = () => {
           <option value="">All Roles</option>
           {STAFF_ROLES.map((r) => (
             <option key={r} value={r}>
-              {r.charAt(0).toUpperCase() + r.slice(1)}
+              {formatRoleLabel(r)}
             </option>
           ))}
         </select>
@@ -500,6 +713,8 @@ const StaffManagement = () => {
                           leading-tight">{s.fullName}</p>
                         <p className="text-xs text-[rgb(var(--text-muted))]">
                           {s.staffId}
+                          {s.model && s.model !== "Staff" ? ` · ${s.model}` : ""}
+                          {s.busLabel ? ` · ${s.busLabel}` : ""}
                         </p>
                       </div>
                     </div>
@@ -525,24 +740,35 @@ const StaffManagement = () => {
 
                   {/* permissions count */}
                   <td className="px-5 py-3.5">
-                    <span className="px-2.5 py-1 rounded-lg text-xs
-                      font-medium bg-[rgba(var(--primary),0.1)]
-                      text-[rgb(var(--primary))]">
-                      {s.permissions?.length || 0} modules
-                    </span>
+                    <div className="space-y-1">
+                      {s.customRoleName ? (
+                        <p className="text-xs font-semibold text-[rgb(var(--text))]">
+                          {s.customRoleName}
+                        </p>
+                      ) : null}
+                      <span className="px-2.5 py-1 rounded-lg text-xs
+                        font-medium bg-[rgba(var(--primary),0.1)]
+                        text-[rgb(var(--primary))]">
+                        {s.permissions?.length || 0} modules
+                      </span>
+                    </div>
                   </td>
 
                   <td className="px-5 py-3.5">
-                    <button
-                      onClick={() => handleAdminGroupToggle(s)}
-                      className={`px-2.5 py-1 rounded-lg text-xs font-medium transition ${
-                        s.isAdminGroup
-                          ? "bg-green-100 text-green-700 hover:bg-green-200"
-                          : "bg-gray-100 text-gray-600 hover:bg-gray-200"
-                      }`}
-                    >
-                      {s.isAdminGroup ? "In Admin Group" : "Add to Admin Group"}
-                    </button>
+                    {s.model === "Driver" ? (
+                      <span className="text-xs text-[rgb(var(--text-muted))]">—</span>
+                    ) : (
+                      <button
+                        onClick={() => handleAdminGroupToggle(s)}
+                        className={`px-2.5 py-1 rounded-lg text-xs font-medium transition ${
+                          s.isAdminGroup
+                            ? "bg-green-100 text-green-700 hover:bg-green-200"
+                            : "bg-gray-100 text-gray-600 hover:bg-gray-200"
+                        }`}
+                      >
+                        {s.isAdminGroup ? "In Admin Group" : "Add to Admin Group"}
+                      </button>
+                    )}
                   </td>
 
                   {/* joined */}
@@ -665,16 +891,18 @@ const StaffManagement = () => {
                 <FaShieldAlt size={11}/>
                 {s.permissions?.length || 0} modules
               </span>
-              <button
-                onClick={() => handleAdminGroupToggle(s)}
-                className={`px-2 py-1 rounded-lg text-xs font-medium ${
-                  s.isAdminGroup
-                    ? "bg-green-100 text-green-700"
-                    : "bg-gray-100 text-gray-600"
-                }`}
-              >
-                {s.isAdminGroup ? "Admin Group" : "Assign Admin Group"}
-              </button>
+              {s.model !== "Driver" && (
+                <button
+                  onClick={() => handleAdminGroupToggle(s)}
+                  className={`px-2 py-1 rounded-lg text-xs font-medium ${
+                    s.isAdminGroup
+                      ? "bg-green-100 text-green-700"
+                      : "bg-gray-100 text-gray-600"
+                  }`}
+                >
+                  {s.isAdminGroup ? "Admin Group" : "Assign Admin Group"}
+                </button>
+              )}
             </div>
 
             <div className="mt-3 pt-3 flex gap-2
@@ -824,11 +1052,59 @@ const StaffManagement = () => {
                     </select>
                   </div>
 
-                  {/* staff role */}
+                  {/* access role (school-defined) */}
+                  <div className="sm:col-span-2">
+                    <label className="text-xs font-medium
+                      text-[rgb(var(--text-muted))] mb-1 block">
+                      Access Role <span className="text-red-500">*</span>
+                    </label>
+                    <select
+                      name="customRoleId"
+                      value={form.customRoleId}
+                      onChange={handleChange}
+                      className="w-full border border-[rgb(var(--border))]
+                        rounded-lg px-3 py-2 text-sm
+                        bg-[rgb(var(--bg))] text-[rgb(var(--text))]
+                        focus:outline-none focus:ring-2
+                        focus:ring-[rgb(var(--primary))] transition">
+                      <option value="">Select access role</option>
+                      {customRoles
+                        .filter(
+                          (r) =>
+                            r.isActive !== false ||
+                            String(r._id) === String(form.customRoleId),
+                        )
+                        .map((r) => (
+                          <option key={r._id} value={r._id}>
+                            {r.name}
+                            {r.isActive === false ? " (inactive)" : ""}
+                            {` — ${(r.permissions || []).length} modules`}
+                          </option>
+                        ))}
+                    </select>
+                    <p className="text-[11px] text-[rgb(var(--text-muted))] mt-1">
+                      Module access comes from this role.{" "}
+                      <button
+                        type="button"
+                        onClick={() =>
+                          navigate(
+                            user?.role === "staff_admin"
+                              ? "/staff/staff-roles"
+                              : "/school/staff-roles",
+                          )
+                        }
+                        className="text-[rgb(var(--primary))] font-semibold underline"
+                      >
+                        Manage roles
+                      </button>
+                    </p>
+                  </div>
+
+                  {/* job title */}
                   <div>
                     <label className="text-xs font-medium
                       text-[rgb(var(--text-muted))] mb-1 block">
-                      Staff Role <span className="text-red-500">*</span>
+                      Job Title <span className="text-red-500">*</span>
                     </label>
                     <select name="staffRole" value={form.staffRole}
                       onChange={handleChange}
@@ -837,18 +1113,19 @@ const StaffManagement = () => {
                         bg-[rgb(var(--bg))] text-[rgb(var(--text))]
                         focus:outline-none focus:ring-2
                         focus:ring-[rgb(var(--primary))] transition">
-                      <option value="">Select Role</option>
-                      {STAFF_ROLES.map((r) => (
+                      <option value="">Select job title</option>
+                      {STAFF_ROLES.filter(
+                        (r) => r !== "driver" && r !== "teacher",
+                      ).map((r) => (
                         <option key={r} value={r}>
-                          {r.charAt(0).toUpperCase() + r.slice(1)}
+                          {formatRoleLabel(r)}
                         </option>
                       ))}
                     </select>
                   </div>
 
-                  {/* custom role */}
                   {form.staffRole === "other" && (
-                    <MInput label="Specify Role" name="staffRoleCustom"
+                    <MInput label="Specify Job Title" name="staffRoleCustom"
                       value={form.staffRoleCustom} onChange={handleChange}
                       required placeholder="e.g. Sports Coach"/>
                   )}
@@ -964,60 +1241,61 @@ const StaffManagement = () => {
                 )}
               </div>
 
-              {/* ── MODULE PERMISSIONS ── */}
-              <div>
-                <div className="flex items-center justify-between mb-3">
-                  <div>
-                    <p className="text-sm font-semibold">
-                      Module Permissions
-                    </p>
-                    <p className="text-xs text-[rgb(var(--text-muted))]
-                      mt-0.5">
-                      Only your school's subscribed modules are shown.
-                      {" "}{permissions.length} of {schoolModules.length} selected.
-                    </p>
-                  </div>
-                  <button type="button" onClick={handleSelectAllPerms}
-                    className="text-xs px-3 py-1.5 rounded-lg
-                      border border-[rgb(var(--border))]
-                      hover:bg-[rgba(var(--primary),0.08)]
-                      transition font-medium shrink-0">
-                    {permissions.length === schoolModules.length
-                      ? "Deselect All" : "Select All"}
-                  </button>
-                </div>
-
-                {schoolModules.length === 0 ? (
-                  <p className="text-sm text-[rgb(var(--text-muted))]
-                    bg-[rgba(var(--primary),0.05)] rounded-xl p-4
-                    text-center">
-                    No modules subscribed. Contact Super Admin.
+              {/* Access comes only from the selected role — no per-staff module picker */}
+              <div className="rounded-xl border border-[rgb(var(--border))]
+                bg-[rgba(var(--primary),0.05)] p-4">
+                <p className="text-sm font-semibold flex items-center gap-2">
+                  <FaShieldAlt className="text-[rgb(var(--primary))]" />
+                  Module access
+                </p>
+                {!form.customRoleId ? (
+                  <p className="text-xs text-[rgb(var(--text-muted))] mt-1.5">
+                    Select an <span className="font-semibold">Access Role</span> above.
+                    Permissions are defined in Staff Roles — not chosen per staff.
                   </p>
                 ) : (
-                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5">
-                    {schoolModules.map((mod) => {
-                      const isChecked = permissions.includes(mod.key);
-                      return (
-                        <label key={mod.key}
-                          className={`flex items-center gap-2.5 p-3
-                            rounded-xl border cursor-pointer
-                            transition select-none text-sm
-                            ${isChecked
-                              ? "border-[rgb(var(--primary))] bg-[rgba(var(--primary),0.08)]"
-                              : "border-[rgb(var(--border))] hover:border-[rgb(var(--border-strong))]"
-                            }`}>
-                          <input type="checkbox" checked={isChecked}
-                            onChange={() => handlePermissionToggle(mod.key)}
-                            className="accent-[rgb(var(--primary))]
-                              w-4 h-4 shrink-0"/>
-                          <span className="font-medium leading-tight
-                            text-[rgb(var(--text))]">
-                            {mod.label}
-                          </span>
-                        </label>
-                      );
-                    })}
-                  </div>
+                  <>
+                    <p className="text-xs text-[rgb(var(--text-muted))] mt-1.5">
+                      From role{" "}
+                      <span className="font-semibold text-[rgb(var(--text))]">
+                        {selectedCustomRole?.name || "selected"}
+                      </span>
+                      {" "}({permissions.length} modules). Change access in{" "}
+                      <button
+                        type="button"
+                        onClick={() =>
+                          navigate(
+                            user?.role === "staff_admin"
+                              ? "/staff/staff-roles"
+                              : "/school/staff-roles",
+                          )
+                        }
+                        className="text-[rgb(var(--primary))] font-semibold underline"
+                      >
+                        Staff Roles
+                      </button>
+                      .
+                    </p>
+                    {permissions.length > 0 && (
+                      <div className="mt-3 flex flex-wrap gap-1.5">
+                        {permissions.map((key) => {
+                          const label =
+                            schoolModules.find((m) => m.key === key)?.label ||
+                            MODULES.find((m) => m.key === key)?.label ||
+                            key;
+                          return (
+                            <span
+                              key={key}
+                              className="px-2 py-0.5 rounded-lg text-[11px] font-medium
+                                bg-[rgb(var(--surface))] border border-[rgb(var(--border))]"
+                            >
+                              {label}
+                            </span>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </>
                 )}
               </div>
 
@@ -1149,7 +1427,11 @@ const StaffManagement = () => {
                   Module Permissions
                   <span className="text-xs font-normal
                     text-[rgb(var(--text-muted))]">
-                    ({viewStaff.permissions?.length || 0} assigned)
+                    ({viewStaff.permissions?.length || 0} assigned
+                    {viewStaff.customRoleName
+                      ? ` · ${viewStaff.customRoleName}`
+                      : ""}
+                    )
                   </span>
                 </p>
                 {!viewStaff.permissions?.length ? (

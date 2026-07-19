@@ -49,6 +49,20 @@ const driverSchema = new mongoose.Schema(
       publicId: { type: String, default: "" },
       type: { type: String, default: "" },
     },
+
+    /** Uploaded Aadhaar card (image / PDF) */
+    aadharDoc: {
+      url: { type: String, default: "" },
+      public_id: { type: String, default: "" },
+      type: { type: String, default: "" },
+    },
+
+    /** Uploaded driving license document (image / PDF) */
+    licenseDoc: {
+      url: { type: String, default: "" },
+      public_id: { type: String, default: "" },
+      type: { type: String, default: "" },
+    },
   },
   { timestamps: true },
 );

@@ -8,11 +8,14 @@ import {
   FaClipboardList,
 } from "react-icons/fa";
 import { useLanguage } from "../context/LanguageContext";
+import { useAuth } from "../context/AuthContext";
 
 const HostelManagement = () => {
   const navigate = useNavigate();
+  const { user } = useAuth();
   const isMobile = window.innerWidth <= 768;
   const { t } = useLanguage();
+  const base = user?.role === "staff_admin" ? "/staff" : "/school";
 
   const cards = [
     {
@@ -20,7 +23,7 @@ const HostelManagement = () => {
       descKey: "hostel.hostelsDesc",
       icon: <FaHotel size={20} />,
       tone: "bg-indigo-50 text-indigo-600",
-      path: "/school/hostel/buildings",
+      path: `${base}/hostel/buildings`,
       ready: true,
     },
     {
@@ -28,7 +31,7 @@ const HostelManagement = () => {
       descKey: "hostel.roomsDesc",
       icon: <FaBed size={20} />,
       tone: "bg-emerald-50 text-emerald-600",
-      path: "/school/hostel/rooms",
+      path: `${base}/hostel/rooms`,
       ready: true,
     },
     {
@@ -36,7 +39,7 @@ const HostelManagement = () => {
       descKey: "hostel.residentsDesc",
       icon: <FaUserFriends size={20} />,
       tone: "bg-amber-50 text-amber-600",
-      path: "/school/hostel/residents",
+      path: `${base}/hostel/residents`,
       ready: true,
     },
     {
@@ -44,7 +47,7 @@ const HostelManagement = () => {
       descKey: "hostel.visitorsDesc",
       icon: <FaIdCard size={20} />,
       tone: "bg-violet-50 text-violet-600",
-      path: "/school/hostel/visitors",
+      path: `${base}/hostel/visitors`,
       ready: true,
     },
     {

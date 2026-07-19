@@ -1,6 +1,12 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { FaChevronDown, FaSearch, FaTimes } from "react-icons/fa";
+import {
+  FaCheck,
+  FaChevronDown,
+  FaSearch,
+  FaThLarge,
+  FaTimes,
+} from "react-icons/fa";
 import { useLanguage } from "../context/LanguageContext";
 
 export const DEFAULT_COLOR = { bg: "#F3F4F6", icon: "#6B7280", dot: "#E5E7EB" };
@@ -494,10 +500,104 @@ function useGridColumns(styleId) {
   return cols;
 }
 
-/** Compact picker for Topbar (left of language switcher). */
+/** Tiny layout sketch shown inside each style option. */
+function MenuStylePreview({ id, active }) {
+  const accent = active
+    ? "rgb(var(--primary))"
+    : "color-mix(in srgb, rgb(var(--text)) 28%, transparent)";
+  const soft = active
+    ? "color-mix(in srgb, rgb(var(--primary)) 22%, transparent)"
+    : "color-mix(in srgb, rgb(var(--text)) 10%, transparent)";
+
+  if (id === "list") {
+    return (
+      <div className="flex h-9 w-11 flex-col justify-center gap-1 px-0.5">
+        {[0, 1, 2].map((i) => (
+          <div key={i} className="flex items-center gap-1">
+            <span
+              className="h-1.5 w-1.5 rounded-sm shrink-0"
+              style={{ background: accent }}
+            />
+            <span
+              className="h-1 flex-1 rounded-full"
+              style={{ background: soft }}
+            />
+          </div>
+        ))}
+      </div>
+    );
+  }
+
+  if (id === "minimal") {
+    return (
+      <div className="grid h-9 w-11 grid-cols-2 gap-1 place-content-center">
+        {[0, 1, 2, 3].map((i) => (
+          <span
+            key={i}
+            className="mx-auto h-1.5 w-1.5 rounded-full"
+            style={{ background: accent }}
+          />
+        ))}
+      </div>
+    );
+  }
+
+  if (id === "solid") {
+    return (
+      <div className="grid h-9 w-11 grid-cols-2 gap-1 place-content-center">
+        {[0, 1, 2, 3].map((i) => (
+          <span
+            key={i}
+            className="h-3 w-3 rounded-md"
+            style={{ background: accent }}
+          />
+        ))}
+      </div>
+    );
+  }
+
+  if (id === "soft") {
+    return (
+      <div className="grid h-9 w-11 grid-cols-2 gap-1 place-content-center">
+        {[0, 1, 2, 3].map((i) => (
+          <span
+            key={i}
+            className="flex h-3.5 w-3.5 items-center justify-center rounded-lg"
+            style={{ background: soft }}
+          >
+            <span
+              className="h-1.5 w-1.5 rounded-sm"
+              style={{ background: accent }}
+            />
+          </span>
+        ))}
+      </div>
+    );
+  }
+
+  /* glass */
+  return (
+    <div className="grid h-9 w-11 grid-cols-2 gap-1 place-content-center">
+      {[0, 1, 2, 3].map((i) => (
+        <span
+          key={i}
+          className="h-3.5 w-3.5 rounded-full border"
+          style={{
+            background: soft,
+            borderColor: accent,
+          }}
+        />
+      ))}
+    </div>
+  );
+}
+
+/** Compact visual picker for Topbar (mobile only). */
 export function MenuStylePicker({ className = "" }) {
   const { t } = useLanguage();
   const [value, setValue] = useState(getSavedMenuStyle);
+  const [open, setOpen] = useState(false);
+  const rootRef = useRef(null);
 
   useEffect(() => {
     const onChange = (e) => setValue(e.detail || getSavedMenuStyle());
@@ -505,38 +605,144 @@ export function MenuStylePicker({ className = "" }) {
     return () => window.removeEventListener(MENU_STYLE_EVENT, onChange);
   }, []);
 
+  useEffect(() => {
+    if (!open) return;
+    const onDoc = (e) => {
+      if (!rootRef.current?.contains(e.target)) setOpen(false);
+    };
+    const onKey = (e) => {
+      if (e.key === "Escape") setOpen(false);
+    };
+    document.addEventListener("mousedown", onDoc);
+    document.addEventListener("touchstart", onDoc, { passive: true });
+    document.addEventListener("keydown", onKey);
+    return () => {
+      document.removeEventListener("mousedown", onDoc);
+      document.removeEventListener("touchstart", onDoc);
+      document.removeEventListener("keydown", onKey);
+    };
+  }, [open]);
+
+  const activeOpt =
+    MENU_STYLE_OPTIONS.find((o) => o.id === value) || MENU_STYLE_OPTIONS[0];
+
+  const pick = (id) => {
+    setValue(id);
+    setSavedMenuStyle(id);
+    setOpen(false);
+  };
+
   return (
-    <div
-      className={`relative flex items-center gap-1.5 rounded-xl px-2 sm:px-2.5 h-9 lg:h-10 border shrink-0 ${className}`}
-      style={{
-        background: "rgb(var(--surface))",
-        borderColor: "rgb(var(--border))",
-      }}
-    >
-      <select
-        value={value}
-        onChange={(e) => {
-          const id = e.target.value;
-          setValue(id);
-          setSavedMenuStyle(id);
-        }}
-        className="max-w-[7.5rem] sm:max-w-[9rem] bg-transparent outline-none text-[11px] sm:text-[12px]
-          font-bold cursor-pointer appearance-none pr-4 truncate"
-        style={{ color: "rgb(var(--text))" }}
+    <div ref={rootRef} className={`relative shrink-0 ${className}`}>
+      <button
+        type="button"
+        onClick={() => setOpen((v) => !v)}
+        aria-haspopup="listbox"
+        aria-expanded={open}
         aria-label={t("menu.style", "Menu style")}
         title={t("menu.style", "Menu style")}
+        className="group flex h-9 items-center gap-1.5 rounded-xl border px-2 pl-2.5
+          transition active:scale-[0.97]
+          border-[rgb(var(--border))] bg-[rgb(var(--surface))]
+          hover:border-[rgba(var(--primary),0.35)]
+          hover:bg-[rgba(var(--primary),0.06)]"
       >
-        {MENU_STYLE_OPTIONS.map((opt) => (
-          <option key={opt.id} value={opt.id}>
-            {t(`menuStyle.${opt.id}`, opt.label)}
-          </option>
-        ))}
-      </select>
-      <FaChevronDown
-        size={9}
-        className="pointer-events-none absolute right-2 opacity-50"
-        style={{ color: "rgb(var(--text-muted))" }}
-      />
+        <span
+          className="flex h-6 w-6 items-center justify-center rounded-lg text-white shadow-sm"
+          style={{
+            background:
+              "linear-gradient(135deg, rgb(var(--primary)) 0%, rgb(var(--sidebar)) 100%)",
+          }}
+        >
+          <FaThLarge size={10} />
+        </span>
+        <span className="max-w-[4.5rem] truncate text-left text-[11px] font-bold leading-tight text-[rgb(var(--text))]">
+          {t(`menuStyle.${activeOpt.id}`, activeOpt.label)}
+        </span>
+        <FaChevronDown
+          size={9}
+          className={`opacity-45 transition-transform duration-200 ${
+            open ? "rotate-180" : ""
+          }`}
+          style={{ color: "rgb(var(--text-muted))" }}
+        />
+      </button>
+
+      {open && (
+        <div
+          role="listbox"
+          aria-label={t("menu.style", "Menu style")}
+          className="absolute right-0 top-[calc(100%+0.4rem)] z-50 w-[min(18.5rem,calc(100vw-1rem))]
+            overflow-hidden rounded-2xl border border-[rgb(var(--border))]
+            bg-[rgb(var(--surface))] shadow-[0_12px_40px_rgba(0,0,0,0.14)]"
+        >
+          <div
+            className="border-b border-[rgb(var(--border))] px-3.5 py-2.5"
+            style={{
+              background:
+                "linear-gradient(135deg, rgba(var(--primary),0.10) 0%, transparent 70%)",
+            }}
+          >
+            <p className="text-[12px] font-extrabold text-[rgb(var(--text))]">
+              {t("menu.style", "Menu style")}
+            </p>
+            <p className="mt-0.5 text-[10.5px] font-medium text-[rgb(var(--text-muted))]">
+              {t("menu.styleHint", "Choose how modules look on your menu")}
+            </p>
+          </div>
+
+          <div className="grid grid-cols-1 gap-1.5 p-2">
+            {MENU_STYLE_OPTIONS.map((opt) => {
+              const active = value === opt.id;
+              return (
+                <button
+                  key={opt.id}
+                  type="button"
+                  role="option"
+                  aria-selected={active}
+                  onClick={() => pick(opt.id)}
+                  className={`flex items-center gap-3 rounded-xl border px-2.5 py-2 text-left transition
+                    active:scale-[0.99]
+                    ${
+                      active
+                        ? "border-[rgba(var(--primary),0.45)] bg-[rgba(var(--primary),0.08)] shadow-sm"
+                        : "border-transparent hover:bg-[rgba(var(--primary),0.05)]"
+                    }`}
+                >
+                  <div
+                    className={`flex shrink-0 items-center justify-center rounded-xl border px-1.5 py-1
+                      ${
+                        active
+                          ? "border-[rgba(var(--primary),0.35)] bg-[rgb(var(--surface))]"
+                          : "border-[rgb(var(--border))] bg-[rgba(var(--bg),0.65)]"
+                      }`}
+                  >
+                    <MenuStylePreview id={opt.id} active={active} />
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <p className="truncate text-[12px] font-extrabold text-[rgb(var(--text))]">
+                      {t(`menuStyle.${opt.id}`, opt.label)}
+                    </p>
+                    <p className="truncate text-[10px] font-medium text-[rgb(var(--text-muted))]">
+                      {t(`menuStyle.${opt.id}Desc`, opt.label)}
+                    </p>
+                  </div>
+                  <span
+                    className={`flex h-5 w-5 shrink-0 items-center justify-center rounded-full transition
+                      ${
+                        active
+                          ? "bg-[rgb(var(--primary))] text-white"
+                          : "border border-[rgb(var(--border))] text-transparent"
+                      }`}
+                  >
+                    <FaCheck size={9} />
+                  </span>
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      )}
     </div>
   );
 }

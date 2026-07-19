@@ -16,7 +16,14 @@ export default defineConfig(({ mode }) => {
   const apiUrl = normalizeApiUrl(env.VITE_API_URL);
 
   return {
+    // Relative paths only for APK builds; absolute "/" for local Vite / Netlify
+    base: mode === "apk" ? "./" : "/",
     plugins: [react(), tailwindcss()],
+    server: {
+      host: true,
+      port: 5173,
+      strictPort: true,
+    },
     define: {
       "import.meta.env.VITE_API_URL": JSON.stringify(apiUrl),
     },

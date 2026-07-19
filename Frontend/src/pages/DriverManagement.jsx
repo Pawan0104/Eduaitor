@@ -1,9 +1,10 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import axios from "axios";
 import { FaPlus, FaTrash, FaEdit, FaEye, FaIdCard } from "react-icons/fa";
 import { toast } from "react-toastify";
 import { FaArrowLeft } from "react-icons/fa";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
+import { useAuth } from "../context/AuthContext";
 
 const API = import.meta.env.VITE_API_URL;
 
@@ -21,6 +22,9 @@ const EMPTY_FORM = {
 
 const DriverManagement = () => {
   const navigate = useNavigate();
+  const { user } = useAuth();
+  const [searchParams, setSearchParams] = useSearchParams();
+  const basePath = user?.role === "staff_admin" ? "/staff" : "/school";
   const isMobile = window.innerWidth <= 768;
   const [drivers, setDrivers] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -36,6 +40,14 @@ const DriverManagement = () => {
   const [editId, setEditId] = useState(null);
   const [form, setForm] = useState(EMPTY_FORM);
   const [formLoading, setFormLoading] = useState(false);
+  const [photoFile, setPhotoFile] = useState(null);
+  const [aadharFile, setAadharFile] = useState(null);
+  const [licenseFile, setLicenseFile] = useState(null);
+  const [existingDocs, setExistingDocs] = useState({
+    photo: null,
+    aadharDoc: null,
+    licenseDoc: null,
+  });
 
   const [viewModal, setViewModal] = useState(false);
   const [viewDriver, setViewDriver] = useState(null);
@@ -82,12 +94,34 @@ const DriverManagement = () => {
     fetchMeta();
   }, []);
 
+  /* Deep-link from Staff Management: ?add=1 or ?edit=:id */
+  useEffect(() => {
+    if (loading) return;
+    const add = searchParams.get("add");
+    const editId = searchParams.get("edit");
+    if (add === "1") {
+      openAdd();
+      setSearchParams({}, { replace: true });
+      return;
+    }
+    if (editId && drivers.length) {
+      const driver = drivers.find((d) => String(d._id) === String(editId));
+      if (driver) openEdit(driver);
+      setSearchParams({}, { replace: true });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [loading, drivers, searchParams]);
+
   /* ── ADD / EDIT ───────────────────────────────────────────────────────── */
 
   const openAdd = () => {
     setIsEdit(false);
     setEditId(null);
     setForm(EMPTY_FORM);
+    setPhotoFile(null);
+    setAadharFile(null);
+    setLicenseFile(null);
+    setExistingDocs({ photo: null, aadharDoc: null, licenseDoc: null });
     setFormModal(true);
   };
 
@@ -105,6 +139,14 @@ const DriverManagement = () => {
       experience: driver.experience || "",
       status: driver.status || "Active",
     });
+    setPhotoFile(null);
+    setAadharFile(null);
+    setLicenseFile(null);
+    setExistingDocs({
+      photo: driver.photo?.url ? driver.photo : null,
+      aadharDoc: driver.aadharDoc?.url ? driver.aadharDoc : null,
+      licenseDoc: driver.licenseDoc?.url ? driver.licenseDoc : null,
+    });
     setFormModal(true);
   };
 
@@ -114,6 +156,15 @@ const DriverManagement = () => {
     }
     if (!/^\d{10}$/.test(form.phone)) {
       return toast.error("Enter valid 10-digit phone number");
+    }
+    if (!isEdit && !photoFile) {
+      return toast.error("Please upload driver photo");
+    }
+    if (!isEdit && !aadharFile) {
+      return toast.error("Please upload Aadhaar document");
+    }
+    if (!isEdit && !licenseFile) {
+      return toast.error("Please upload License document");
     }
     const today = new Date();
     today.setHours(0, 0, 0, 0);
@@ -126,28 +177,37 @@ const DriverManagement = () => {
     }
     try {
       setFormLoading(true);
-      const payload = {
-        name: form.name.trim(),
-        phone: form.phone.trim(),
-        license: form.license.trim() || "",
-        licenseExpiry: form.licenseExpiry || null,
-        experience: form.experience.trim() || "",
-        bus: form.bus || null,
-        route: form.route || null,
-        status: form.status,
-      };
+      const fd = new FormData();
+      fd.append("name", form.name.trim());
+      fd.append("phone", form.phone.trim());
+      fd.append("license", form.license.trim() || "");
+      if (form.licenseExpiry) fd.append("licenseExpiry", form.licenseExpiry);
+      fd.append("experience", form.experience.trim() || "");
+      fd.append("bus", form.bus || "");
+      fd.append("route", form.route || "");
+      fd.append("status", form.status);
+      if (photoFile) fd.append("photo", photoFile);
+      if (aadharFile) fd.append("aadhar", aadharFile);
+      if (licenseFile) fd.append("licenseDocument", licenseFile);
+
       if (isEdit) {
-        await axios.put(`${API}/transport/drivers/${editId}`, payload, {
+        await axios.put(`${API}/transport/drivers/${editId}`, fd, {
           withCredentials: true,
+          headers: { "Content-Type": "multipart/form-data" },
         });
         toast.success("Driver updated successfully");
       } else {
-        await axios.post(`${API}/transport/drivers`, payload, {
+        await axios.post(`${API}/transport/drivers`, fd, {
           withCredentials: true,
+          headers: { "Content-Type": "multipart/form-data" },
         });
         toast.success("Driver added successfully");
       }
       setFormModal(false);
+      setPhotoFile(null);
+      setAadharFile(null);
+      setLicenseFile(null);
+      setExistingDocs({ photo: null, aadharDoc: null, licenseDoc: null });
       fetchDrivers();
       fetchMeta();
     } catch (err) {
@@ -460,9 +520,20 @@ const DriverManagement = () => {
           isEdit={isEdit}
           form={form}
           setForm={setForm}
+          photoFile={photoFile}
+          setPhotoFile={setPhotoFile}
+          aadharFile={aadharFile}
+          setAadharFile={setAadharFile}
+          licenseFile={licenseFile}
+          setLicenseFile={setLicenseFile}
+          existingDocs={existingDocs}
           onClose={() => {
             setFormModal(false);
             setForm(EMPTY_FORM);
+            setPhotoFile(null);
+            setAadharFile(null);
+            setLicenseFile(null);
+            setExistingDocs({ photo: null, aadharDoc: null, licenseDoc: null });
           }}
           onSubmit={handleFormSubmit}
           loading={formLoading}
@@ -509,16 +580,113 @@ const StatCard = ({ title, value, color = "blue" }) => {
 
 /* ── DRIVER FORM MODAL (ADD / EDIT) ───────────────────────────────────────── */
 
+const ACCEPT_DOCS = "image/jpeg,image/png,image/webp,image/jpg,application/pdf";
+const ACCEPT_PHOTO = "image/jpeg,image/png,image/webp,image/jpg";
+
+const DocUploadField = ({
+  label,
+  required,
+  file,
+  onFileChange,
+  existingUrl,
+  accept = ACCEPT_DOCS,
+  hint = "JPG, PNG, WEBP or PDF · max 5MB",
+  imagesOnly = false,
+  previewUrl = null,
+}) => (
+  <div className="sm:col-span-2">
+    <label className="block text-xs font-semibold uppercase tracking-wide mb-1">
+      {label}
+      {required ? <span className="text-red-500"> *</span> : null}
+    </label>
+    <div className="flex items-start gap-3">
+      {previewUrl && (
+        <img
+          src={previewUrl}
+          alt=""
+          className="w-14 h-14 rounded-full object-cover border shrink-0"
+        />
+      )}
+      <div className="flex-1 min-w-0">
+        <input
+          type="file"
+          accept={accept}
+          onChange={(e) => {
+            const selected = e.target.files?.[0] || null;
+            if (!selected) {
+              onFileChange(null);
+              return;
+            }
+            const okType = imagesOnly
+              ? selected.type.startsWith("image/")
+              : selected.type.startsWith("image/") ||
+                selected.type === "application/pdf";
+            if (!okType) {
+              toast.error(
+                imagesOnly
+                  ? "Only image files allowed"
+                  : "Only images or PDF allowed",
+              );
+              e.target.value = "";
+              return;
+            }
+            if (selected.size > 5 * 1024 * 1024) {
+              toast.error("File must be under 5MB");
+              e.target.value = "";
+              return;
+            }
+            onFileChange(selected);
+          }}
+          className="w-full border rounded-lg px-3 py-2 text-sm file:mr-3 file:py-1 file:px-3 file:rounded-lg file:border-0 file:text-xs file:font-semibold file:bg-[rgba(var(--primary),0.12)] file:text-[rgb(var(--primary))]"
+        />
+        <p className="text-[11px] text-[rgb(var(--text-muted))] mt-1">
+          {hint}
+          {file ? (
+            <span className="block font-medium text-[rgb(var(--text))] mt-0.5">
+              Selected: {file.name}
+            </span>
+          ) : existingUrl ? (
+            <a
+              href={existingUrl}
+              target="_blank"
+              rel="noreferrer"
+              className="block font-medium text-[rgb(var(--primary))] mt-0.5 underline"
+            >
+              View current {imagesOnly ? "photo" : "document"}
+            </a>
+          ) : null}
+        </p>
+      </div>
+    </div>
+  </div>
+);
+
 const DriverFormModal = ({
   isEdit,
   form,
   setForm,
+  photoFile,
+  setPhotoFile,
+  aadharFile,
+  setAadharFile,
+  licenseFile,
+  setLicenseFile,
+  existingDocs,
   onClose,
   onSubmit,
   loading,
   buses,
   routes,
 }) => {
+  const photoPreview = useMemo(() => {
+    if (photoFile) return URL.createObjectURL(photoFile);
+    return existingDocs?.photo?.url || null;
+  }, [photoFile, existingDocs?.photo?.url]);
+
+  useEffect(() => {
+    if (!photoFile || !photoPreview?.startsWith("blob:")) return undefined;
+    return () => URL.revokeObjectURL(photoPreview);
+  }, [photoFile, photoPreview]);
   const fields = [
     { label: "Full Name", key: "name", placeholder: "e.g. Ramesh Kumar" },
     { label: "Phone Number", key: "phone", placeholder: "+91 98760 00000" },
@@ -587,6 +755,33 @@ const DriverFormModal = ({
               />
             </div>
           ))}
+
+          <DocUploadField
+            label="Driver Photo"
+            required={!isEdit}
+            file={photoFile}
+            onFileChange={setPhotoFile}
+            existingUrl={existingDocs?.photo?.url}
+            accept={ACCEPT_PHOTO}
+            hint="JPG, PNG or WEBP · max 5MB"
+            imagesOnly
+            previewUrl={photoPreview}
+          />
+          <DocUploadField
+            label="Aadhaar Upload"
+            required={!isEdit}
+            file={aadharFile}
+            onFileChange={setAadharFile}
+            existingUrl={existingDocs?.aadharDoc?.url}
+          />
+          <DocUploadField
+            label="License Upload"
+            required={!isEdit}
+            file={licenseFile}
+            onFileChange={setLicenseFile}
+            existingUrl={existingDocs?.licenseDoc?.url}
+          />
+
           {/* BUS */}
           <div>
             <label className="text-xs font-semibold mb-1 block">
@@ -692,7 +887,7 @@ const ViewModal = ({ driver, onClose, isExpiringSoon, initials }) => {
 
   return (
     <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50">
-      <div className="text-[rgb(var(--text))] bg-[rgb(var(--surface))] rounded-xl p-6 w-full max-w-md mx-4">
+      <div className="text-[rgb(var(--text))] bg-[rgb(var(--surface))] rounded-xl p-6 w-full max-w-md mx-4 max-h-[90vh] overflow-y-auto">
         {/* Avatar + name */}
         <div className="flex items-center gap-4 mb-5">
           {driver.photo?.url ? (
@@ -733,6 +928,43 @@ const ViewModal = ({ driver, onClose, isExpiringSoon, initials }) => {
               </p>
             </div>
           ))}
+        </div>
+
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-5">
+          <div className="rounded-lg border p-3">
+            <p className="text-xs uppercase font-semibold tracking-wide mb-1">
+              Aadhaar
+            </p>
+            {driver.aadharDoc?.url ? (
+              <a
+                href={driver.aadharDoc.url}
+                target="_blank"
+                rel="noreferrer"
+                className="text-sm font-semibold text-[rgb(var(--primary))] underline"
+              >
+                View Aadhaar
+              </a>
+            ) : (
+              <p className="text-sm text-[rgb(var(--text-muted))]">Not uploaded</p>
+            )}
+          </div>
+          <div className="rounded-lg border p-3">
+            <p className="text-xs uppercase font-semibold tracking-wide mb-1">
+              License document
+            </p>
+            {driver.licenseDoc?.url ? (
+              <a
+                href={driver.licenseDoc.url}
+                target="_blank"
+                rel="noreferrer"
+                className="text-sm font-semibold text-[rgb(var(--primary))] underline"
+              >
+                View License
+              </a>
+            ) : (
+              <p className="text-sm text-[rgb(var(--text-muted))]">Not uploaded</p>
+            )}
+          </div>
         </div>
 
         <div className="flex justify-end">

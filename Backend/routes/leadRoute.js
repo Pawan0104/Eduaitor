@@ -5,6 +5,7 @@ import {
   createLead,
   deleteLead,
   getLeadAssignees,
+  getLeadById,
   getLeadFollowUps,
   getLeads,
   updateLeadAssignee,
@@ -16,6 +17,7 @@ const router = express.Router();
 router.get("/assignable-users", authMiddleware, getLeadAssignees);
 router.get("/", authMiddleware, getLeads);
 router.post("/", authMiddleware, createLead);
+router.get("/:id", authMiddleware, getLeadById);
 router.patch("/:id/status", authMiddleware, updateLeadStatus);
 router.patch("/:id/assignee", authMiddleware, updateLeadAssignee);
 router.get("/:id/followups", authMiddleware, getLeadFollowUps);

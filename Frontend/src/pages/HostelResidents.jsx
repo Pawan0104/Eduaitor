@@ -10,6 +10,7 @@ import {
 } from "react-icons/fa";
 import { toast } from "react-toastify";
 import { useNavigate } from "react-router-dom";
+import { useAuth } from "../context/AuthContext";
 
 const API = import.meta.env.VITE_API_URL;
 
@@ -24,6 +25,8 @@ const EMPTY_FORM = {
 
 const HostelResidents = () => {
   const navigate = useNavigate();
+  const { user } = useAuth();
+  const basePath = user?.role === "staff_admin" ? "/staff" : "/school";
   const isMobile = window.innerWidth <= 768;
 
   const [hostels, setHostels] = useState([]);
@@ -283,7 +286,7 @@ const HostelResidents = () => {
       {isMobile && (
         <div className="pt-4">
           <button
-            onClick={() => navigate("/school/hostel")}
+            onClick={() => navigate(`${basePath}/hostel`)}
             className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-white shadow-sm border border-slate-100 text-sm font-bold text-slate-600 mb-2.5"
           >
             <FaArrowLeft size={16} />
@@ -296,7 +299,7 @@ const HostelResidents = () => {
         <div>
           {!isMobile && (
             <button
-              onClick={() => navigate("/school/hostel")}
+              onClick={() => navigate(`${basePath}/hostel`)}
               className="flex items-center gap-2 text-sm text-[rgb(var(--text-muted))] hover:text-[rgb(var(--text))] mb-2"
             >
               <FaArrowLeft size={12} /> Hostel Management

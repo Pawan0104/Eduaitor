@@ -1,6 +1,7 @@
 import express from "express";
 import { authMiddleware } from "../auth/auth.js";
 import checkModuleAccess from "../middlewares/checkModuleAccess.js";
+import upload from "../middlewares/upload.js";
 import {
   getHostels,
   getHostel,
@@ -26,12 +27,15 @@ import {
   getVisitors,
   createVisitor,
   updateVisitor,
+  approveVisitor,
+  rejectVisitor,
   checkoutVisitor,
   deleteVisitor,
 } from "../controllers/hostelVisitorController.js";
 
 const router = express.Router();
 const guard = [authMiddleware, checkModuleAccess("hostel")];
+const visitorPhotoUpload = upload.single("photo");
 
 /* Nested resources before /:id */
 router.get("/rooms", ...guard, getRooms);
@@ -47,8 +51,10 @@ router.post("/residents/:id/checkout", ...guard, checkoutResident);
 router.delete("/residents/:id", ...guard, deleteResident);
 
 router.get("/visitors", ...guard, getVisitors);
-router.post("/visitors", ...guard, createVisitor);
-router.put("/visitors/:id", ...guard, updateVisitor);
+router.post("/visitors", ...guard, visitorPhotoUpload, createVisitor);
+router.put("/visitors/:id", ...guard, visitorPhotoUpload, updateVisitor);
+router.post("/visitors/:id/approve", ...guard, approveVisitor);
+router.post("/visitors/:id/reject", ...guard, rejectVisitor);
 router.post("/visitors/:id/checkout", ...guard, checkoutVisitor);
 router.delete("/visitors/:id", ...guard, deleteVisitor);
 

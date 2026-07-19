@@ -100,7 +100,8 @@ export default function IdCard() {
     );
   }
 
-  const { school, person, type } = payload;
+  const { school, person, type, design } = payload;
+  const canEditDesign = role === "school_admin";
 
   return (
     <div className="p-4 sm:p-6 lg:p-8 min-h-screen text-[rgb(var(--text))]">
@@ -122,7 +123,17 @@ export default function IdCard() {
             Issued on admission / registration — print or save as PDF
           </p>
         </div>
-        <div className="flex gap-2">
+        <div className="flex flex-wrap gap-2">
+          {canEditDesign && (
+            <button
+              onClick={() =>
+                navigate("/school/certificates/settings?type=id_card")
+              }
+              className="px-4 py-2 rounded-lg border text-sm font-medium"
+            >
+              Customize design
+            </button>
+          )}
           <button
             onClick={handlePrint}
             className="px-4 py-2 rounded-lg bg-emerald-600 text-white text-sm font-medium flex items-center gap-2"
@@ -139,7 +150,12 @@ export default function IdCard() {
       </div>
 
       <div className="flex justify-center">
-        <IdCardVisual school={school} person={person} type={type} />
+        <IdCardVisual
+          school={school}
+          person={person}
+          type={type}
+          design={design}
+        />
       </div>
 
       <p className="text-center text-xs text-[rgb(var(--text-light))] mt-4 print:hidden">
@@ -163,27 +179,56 @@ export default function IdCard() {
   );
 }
 
-export function IdCardVisual({ school, person, type }) {
+export function IdCardVisual({ school, person, type, design }) {
   const isStaff = type === "staff";
-  const accent = isStaff ? "#0f766e" : "#4f46e5";
+  const primary = design?.primaryColor || (isStaff ? "#0f766e" : "#4f46e5");
+  const accent =
+    design?.accentColor || (isStaff ? "#0f766e" : "#4f46e5");
+  const headerColor = isStaff ? accent : primary;
+  const bg = design?.backgroundColor || "#ffffff";
+  const text = design?.textColor || "#0f172a";
+  const borderCol = design?.borderColor || headerColor;
+  const showBorder = design?.showBorder !== false;
+  const logo =
+    design?.showLogo === false
+      ? ""
+      : design?.logoUrl || school?.logo || "";
+  const cardTitle = isStaff
+    ? design?.subtitle || "Staff Identity Card"
+    : design?.title || "Student Identity Card";
   const photo =
     person.photo ||
     `https://ui-avatars.com/api/?name=${encodeURIComponent(person.name || "U")}&background=e2e8f0&color=334155&size=128`;
 
+  const borderWidth =
+    !showBorder
+      ? 0
+      : design?.borderStyle === "classic"
+        ? 4
+        : design?.borderStyle === "minimal"
+          ? 1
+          : 3;
+
   return (
     <div
       id="id-card-print"
-      className="w-[340px] rounded-2xl overflow-hidden shadow-xl border border-slate-200 bg-white text-slate-900"
-      style={{ fontFamily: "Segoe UI, system-ui, sans-serif" }}
+      className="w-[340px] rounded-2xl overflow-hidden shadow-xl"
+      style={{
+        fontFamily: "Segoe UI, system-ui, sans-serif",
+        background: bg,
+        color: text,
+        border: showBorder ? `${borderWidth}px solid ${borderCol}` : "none",
+      }}
     >
-      {/* Header */}
       <div
         className="px-4 py-3 flex items-center gap-3 text-white"
-        style={{ background: `linear-gradient(135deg, ${accent}, ${accent}cc)` }}
+        style={{
+          background: `linear-gradient(135deg, ${headerColor}, ${headerColor}cc)`,
+        }}
       >
-        {school?.logo ? (
+        {logo ? (
           <img
-            src={school.logo}
+            src={logo}
             alt=""
             className="w-11 h-11 rounded-lg object-contain bg-white/90 p-0.5"
           />
@@ -197,24 +242,23 @@ export function IdCardVisual({ school, person, type }) {
             {school?.name || "School"}
           </p>
           <p className="text-[10px] opacity-90 uppercase tracking-wider mt-0.5">
-            {isStaff ? "Staff Identity Card" : "Student Identity Card"}
+            {cardTitle}
           </p>
         </div>
       </div>
 
-      {/* Body */}
       <div className="p-4 flex gap-3">
         <img
           src={photo}
           alt={person.name}
           className="w-24 h-28 rounded-xl object-cover border-2 shrink-0"
-          style={{ borderColor: accent }}
+          style={{ borderColor: headerColor }}
           onError={(e) => {
             e.target.src = `https://ui-avatars.com/api/?name=${encodeURIComponent(person.name || "U")}&background=e2e8f0&color=334155&size=128`;
           }}
         />
         <div className="min-w-0 flex-1 text-[11px] space-y-1">
-          <p className="text-base font-bold leading-tight text-slate-900">
+          <p className="text-base font-bold leading-tight" style={{ color: text }}>
             {person.name}
           </p>
           <Row label="ID" value={person.idNumber} mono />
@@ -252,28 +296,31 @@ export function IdCardVisual({ school, person, type }) {
                     : "—"
                 }
               />
-              {person.house && (
-                <Row label="House" value={person.house} />
-              )}
+              {person.house && <Row label="House" value={person.house} />}
             </>
           )}
         </div>
       </div>
 
       {!isStaff && (
-        <div className="px-4 pb-2 text-[10px] text-slate-600">
+        <div className="px-4 pb-2 text-[10px] opacity-80">
           <span className="font-semibold">Guardian:</span> {person.fatherName}
         </div>
       )}
 
-      <div className="px-4 pb-3 text-[10px] text-slate-500 leading-snug">
+      <div className="px-4 pb-2 text-[10px] opacity-70 leading-snug">
         {school?.address || person.address || ""}
       </div>
 
-      {/* Footer */}
+      {design?.footerText ? (
+        <div className="px-4 pb-2 text-[9px] opacity-60 italic">
+          {design.footerText}
+        </div>
+      ) : null}
+
       <div
         className="px-4 py-2 flex items-center justify-between text-[9px] text-white uppercase tracking-wide"
-        style={{ background: accent }}
+        style={{ background: headerColor }}
       >
         <span>
           Issued{" "}

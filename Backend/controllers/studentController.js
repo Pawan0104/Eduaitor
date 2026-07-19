@@ -1,5 +1,6 @@
 import mongoose from "mongoose";
 import Student from "../models/student.js";
+import Lead from "../models/lead.js";
 import Group from "../models/group.js";
 import Teacher from "../models/teacher.js";
 import Class from "../models/class.js";
@@ -182,6 +183,47 @@ export const createStudent = async (req, res) => {
     delete safeBody.temp_password;
     delete safeBody.firstTimeLogin;
 
+    const leadIdRaw = safeBody.leadId || safeBody.convertedFromLeadId || null;
+    delete safeBody.leadId;
+    delete safeBody.convertedFromLeadId;
+
+    let convertedFromLeadId = null;
+    if (leadIdRaw) {
+      if (!mongoose.Types.ObjectId.isValid(leadIdRaw)) {
+        return res.status(400).json({
+          success: false,
+          message: "Invalid lead reference",
+        });
+      }
+
+      const leadQuery = { _id: leadIdRaw, schoolId };
+      if (req.user?.role === "staff_admin" && req.user?.staff_id) {
+        leadQuery["assignedTo.userType"] = "staff";
+        leadQuery["assignedTo.userId"] = req.user.staff_id;
+      }
+
+      const lead = await Lead.findOne(leadQuery);
+      if (!lead) {
+        return res.status(404).json({
+          success: false,
+          message: "Lead not found or not assigned to you",
+        });
+      }
+      if (lead.studentId) {
+        return res.status(400).json({
+          success: false,
+          message: "This lead has already been converted to a student",
+        });
+      }
+      if (String(lead.status || "").toLowerCase() === "cancelled") {
+        return res.status(400).json({
+          success: false,
+          message: "Cancelled leads cannot be admitted",
+        });
+      }
+      convertedFromLeadId = lead._id;
+    }
+
     // Auto-assign a random active house when school uses House Allocation
     let houseId = safeBody.houseId || null;
     if (!houseId) {
@@ -216,7 +258,19 @@ export const createStudent = async (req, res) => {
       parentCredentials,
       houseId,
       idCardIssuedAt: new Date(),
+      convertedFromLeadId,
     });
+
+    if (convertedFromLeadId) {
+      await Lead.findOneAndUpdate(
+        {
+          _id: convertedFromLeadId,
+          schoolId,
+          $or: [{ studentId: null }, { studentId: { $exists: false } }],
+        },
+        { $set: { status: "admitted", studentId: student._id } },
+      );
+    }
 
     // AUTO ADD TO GROUPS
     await syncStudentGroups(student);
@@ -229,6 +283,13 @@ export const createStudent = async (req, res) => {
     });
   } catch (error) {
     console.error("Create student error:", error);
+
+    if (error?.code === 11000 && error?.keyPattern?.convertedFromLeadId) {
+      return res.status(400).json({
+        success: false,
+        message: "This lead has already been converted to a student",
+      });
+    }
 
     res.status(500).json({
       success: false,

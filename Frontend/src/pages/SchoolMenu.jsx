@@ -17,7 +17,6 @@ import {
   FaBook,
   FaBlog,
   FaHotel,
-  FaHome,
   FaStore,
   FaHeadset,
 } from "react-icons/fa";
@@ -46,6 +45,7 @@ export const COLOR_MAP = {
 
   // Student / Principal
   Students: { bg: "#EFF6FF", icon: "#3B82F6", dot: "#BFDBFE" },
+  Certificates: { bg: "#F5F3FF", icon: "#7C3AED", dot: "#DDD6FE" },
   "Lead Management": { bg: "#FFF7ED", icon: "#EA580C", dot: "#FED7AA" },
   Teachers: { bg: "#F0FDF4", icon: "#22C55E", dot: "#BBF7D0" },
   Classes: { bg: "#FAF5FF", icon: "#A855F7", dot: "#E9D5FF" },
@@ -415,6 +415,12 @@ export default function SchoolMenu() {
         { name: "All Students", path: "/school/students" },
         { name: "Add Student", path: "/school/student-manage" },
         { name: "Bulk Upload", path: "/school/students/bulk-upload" },
+        { name: "House Allocation", path: "/school/house" },
+        { name: "Certificates", path: "/school/certificates" },
+        {
+          name: "Document Designs",
+          path: "/school/certificates/settings",
+        },
       ],
     },
     {
@@ -427,7 +433,6 @@ export default function SchoolMenu() {
       icon: <GiTeacher />,
       children: [
         { name: "All Teachers", path: "/school/teachers" },
-        { name: "Add Teacher", path: "/school/teacher-manage" },
       ],
     },
     {
@@ -443,6 +448,15 @@ export default function SchoolMenu() {
       name: "Attendance",
       icon: <FaClipboardCheck />,
       path: "/school/attendance",
+    },
+    {
+      name: "Staff",
+      icon: <FiUsers />,
+      children: [
+        { name: "Staff Management", path: "/school/staff" },
+        { name: "Staff Roles", path: "/school/staff-roles" },
+        { name: "Staff Attendance", path: "/school/staff-attendance" },
+      ],
     },
     {
       name: "Exam Management",
@@ -520,11 +534,6 @@ export default function SchoolMenu() {
       name: "Hostel Management",
       icon: <FaHotel />,
       path: "/school/hostel",
-    },
-    {
-      name: "House Allocation",
-      icon: <FaHome />,
-      path: "/school/house",
     },
     {
       name: "School Commerce Suite",

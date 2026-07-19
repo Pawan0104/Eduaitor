@@ -1,9 +1,91 @@
 import Staff from "../models/staff.js";
 import Teacher from "../models/teacher.js";
-import School from "../models/school.js";
+import SchoolStaffRole from "../models/schoolStaffRole.js";
+import Group from "../models/group.js";
+import { Driver } from "../models/transport.js";
 import bcrypt from "bcryptjs";
 import { uploadToCloudinary } from "../utils/uploadToCloudinary.js";
+import { deleteFromCloudinary } from "../utils/deleteFromCloudinary.js";
 import { MODULE_KEYS } from "../constants/module.js";
+import {
+  getSchoolWithModules,
+  resolveSubscribedModules,
+  ensureDefaultSchoolModules,
+} from "../utils/schoolModules.js";
+import {
+  getTeacherDeleteBlocker,
+  getDriverDeleteBlocker,
+  getStaffDeleteBlocker,
+} from "../utils/staffDeleteGuards.js";
+
+/** Resolve permissions from custom role or client payload; enforce school modules. */
+const resolveStaffPermissions = async ({
+  schoolId,
+  customRoleId,
+  permissionsRaw,
+  requireRole = false,
+  reqUser = {},
+}) => {
+  let school = await getSchoolWithModules(schoolId);
+  const ctx = { userEmail: reqUser.email, role: reqUser.role };
+  school = await ensureDefaultSchoolModules(school, ctx);
+  const schoolModules = resolveSubscribedModules(school, ctx);
+
+  if (customRoleId) {
+    const role = await SchoolStaffRole.findOne({
+      _id: customRoleId,
+      schoolId,
+    });
+    if (!role) {
+      return { error: "Custom role not found" };
+    }
+    if (!role.isActive) {
+      return { error: "Selected role is inactive" };
+    }
+    const permissions = (role.permissions || []).filter((p) =>
+      schoolModules.includes(p),
+    );
+    if (permissions.length === 0) {
+      return {
+        error:
+          "Selected role has no modules available for your school. Update the role first.",
+      };
+    }
+    return { permissions, customRoleId: role._id, role };
+  }
+
+  if (requireRole) {
+    return { error: "Custom role is required for new staff" };
+  }
+
+  let parsedPermissions = [];
+  if (permissionsRaw) {
+    try {
+      parsedPermissions =
+        typeof permissionsRaw === "string"
+          ? JSON.parse(permissionsRaw)
+          : permissionsRaw;
+    } catch {
+      return { error: "Invalid permissions format" };
+    }
+  }
+
+  const invalidPerms = parsedPermissions.filter((p) => !MODULE_KEYS.includes(p));
+  if (invalidPerms.length > 0) {
+    return { error: `Invalid permission(s): ${invalidPerms.join(", ")}` };
+  }
+
+  const invalidForSchool = parsedPermissions.filter(
+    (p) => !schoolModules.includes(p),
+  );
+  if (invalidForSchool.length > 0) {
+    return {
+      error: `School has not subscribed to: ${invalidForSchool.join(", ")}`,
+    };
+  }
+
+  return { permissions: parsedPermissions, customRoleId: null, role: null };
+};
 
 /* ── HELPER — auto generate staffId ─────────────────
    Finds highest existing staffId in school and increments
@@ -43,10 +125,11 @@ export const createStaff = async (req, res, next) => {
       address,
       staffRole,
       staffRoleCustom,
+      customRoleId,
       joiningDate,
       employmentType,
       salary,
-      permissions,  // JSON string from FormData
+      permissions,  // JSON string from FormData (ignored when customRoleId set)
       password,
       status,
     } = req.body;
@@ -58,10 +141,13 @@ export const createStaff = async (req, res, next) => {
     // ── 2. VALIDATE REQUIRED ──────────────────────
     if (!fullName?.trim())  return res.status(400).json({ success: false, message: "Full name is required" });
     if (!email?.trim())     return res.status(400).json({ success: false, message: "Email is required" });
-    if (!staffRole)         return res.status(400).json({ success: false, message: "Staff role is required" });
+    if (!staffRole)         return res.status(400).json({ success: false, message: "Job title is required" });
     if (!password?.trim())  return res.status(400).json({ success: false, message: "Password is required" });
     if (staffRole === "other" && !staffRoleCustom?.trim()) {
-      return res.status(400).json({ success: false, message: "Please specify the custom role" });
+      return res.status(400).json({ success: false, message: "Please specify the custom job title" });
+    }
+    if (!customRoleId) {
+      return res.status(400).json({ success: false, message: "Custom role is required" });
     }
 
     // ── 3. CHECK EMAIL UNIQUE IN SCHOOL ───────────
@@ -73,39 +159,16 @@ export const createStaff = async (req, res, next) => {
       });
     }
 
-    // ── 4. PARSE + VALIDATE PERMISSIONS ──────────
-    let parsedPermissions = [];
-    if (permissions) {
-      try {
-        parsedPermissions = JSON.parse(permissions);
-      } catch {
-        return res.status(400).json({ success: false, message: "Invalid permissions format" });
-      }
-    }
-
-    // validate each permission key is real
-    const invalidPerms = parsedPermissions.filter((p) => !MODULE_KEYS.includes(p));
-    if (invalidPerms.length > 0) {
-      return res.status(400).json({
-        success: false,
-        message: `Invalid permission(s): ${invalidPerms.join(", ")}`,
-      });
-    }
-
-    // ── 5. VALIDATE PERMISSIONS AGAINST SCHOOL ────
-    // staff can only be given modules the school has subscribed to
-    const school = await School
-      .findById(schoolId)
-      .select("subscribed_modules");
-
-    const invalidForSchool = parsedPermissions.filter(
-      (p) => !school.subscribed_modules.includes(p)
-    );
-    if (invalidForSchool.length > 0) {
-      return res.status(400).json({
-        success: false,
-        message: `School has not subscribed to: ${invalidForSchool.join(", ")}`,
-      });
+    // ── 4–5. RESOLVE PERMISSIONS FROM CUSTOM ROLE ─
+    const resolved = await resolveStaffPermissions({
+      schoolId,
+      customRoleId,
+      permissionsRaw: permissions,
+      requireRole: true,
+      reqUser: req.user,
+    });
+    if (resolved.error) {
+      return res.status(400).json({ success: false, message: resolved.error });
     }
 
     // ── 6. GENERATE IDs ───────────────────────────
@@ -136,10 +199,11 @@ export const createStaff = async (req, res, next) => {
       address,
       staffRole,
       staffRoleCustom: staffRole === "other" ? staffRoleCustom : null,
+      customRoleId:   resolved.customRoleId,
       joiningDate:    joiningDate || null,
       employmentType: employmentType || "Full-Time",
       salary:         salary     || null,
-      permissions:    parsedPermissions,
+      permissions:    resolved.permissions,
       staffId,
       username,
       password:       hashedPassword,
@@ -167,13 +231,20 @@ export const getStaff = async (req, res, next) => {
   try {
     const schoolId = req.user.school_id;
 
-    const [staff, teachers] = await Promise.all([
+    const [staff, teachers, drivers] = await Promise.all([
       Staff.find({ schoolId })
         .select("-password -temp_password")
+        .populate("customRoleId", "name permissions isActive")
         .sort({ createdAt: -1 })
         .lean(),
       Teacher.find({ schoolId })
         .select("-password -temp_password")
+        .populate("customRoleId", "name permissions isActive")
+        .sort({ createdAt: -1 })
+        .lean(),
+      Driver.find({ schoolId })
+        .populate("bus", "busId regNo")
+        .populate("route", "name")
         .sort({ createdAt: -1 })
         .lean(),
     ]);
@@ -182,14 +253,54 @@ export const getStaff = async (req, res, next) => {
       ...teacher,
       staffRole: "teacher",
       staffRoleCustom: null,
+      customRoleName: teacher.customRoleId?.name || null,
+      customRoleId:
+        teacher.customRoleId?._id || teacher.customRoleId || null,
       staffId: teacher.teacherId,
       permissions: teacher.permissions || [],
       status: teacher.status === "Inactive" ? "Inactive" : "Active",
       model: "Teacher",
+      personType: "Teaching",
     }));
 
-    const merged = [...staff.map((item) => ({ ...item, model: "Staff" })), ...teacherItems]
-      .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+    const staffItems = staff.map((item) => ({
+      ...item,
+      customRoleName: item.customRoleId?.name || null,
+      customRoleId: item.customRoleId?._id || item.customRoleId || null,
+      model: "Staff",
+      personType: "Non-Teaching",
+    }));
+
+    const driverItems = drivers.map((driver) => ({
+      ...driver,
+      fullName: driver.name,
+      email: "",
+      staffRole: "driver",
+      staffRoleCustom: null,
+      customRoleName: null,
+      customRoleId: null,
+      staffId: driver.driverId,
+      permissions: [],
+      photo: driver.photo?.url
+        ? {
+            url: driver.photo.url,
+            public_id: driver.photo.publicId || driver.photo.public_id,
+            type: driver.photo.type,
+          }
+        : null,
+      status: driver.status === "Inactive" ? "Inactive" : "Active",
+      employmentType: null,
+      joiningDate: null,
+      isAdminGroup: false,
+      model: "Driver",
+      personType: "Transport",
+      busLabel: driver.bus?.busId || null,
+      routeLabel: driver.route?.name || null,
+    }));
+
+    const merged = [...staffItems, ...teacherItems, ...driverItems].sort(
+      (a, b) => new Date(b.createdAt) - new Date(a.createdAt),
+    );
 
     return res.json({
       success: true,
@@ -207,13 +318,18 @@ export const getSingleStaff = async (req, res, next) => {
 
     const staff = await Staff
       .findOne({ _id: req.params.id, schoolId })
-      .select("-password -temp_password");
+      .select("-password -temp_password")
+      .populate("customRoleId", "name permissions isActive");
 
     if (!staff) {
       return res.status(404).json({ success: false, message: "Staff member not found" });
     }
 
-    return res.json({ success: true, data: staff });
+    const data = staff.toObject();
+    data.customRoleName = data.customRoleId?.name || null;
+    data.customRoleId = data.customRoleId?._id || data.customRoleId || null;
+
+    return res.json({ success: true, data });
   } catch (error) {
     next(error);
   }
@@ -233,6 +349,7 @@ export const updateStaff = async (req, res, next) => {
       address,
       staffRole,
       staffRoleCustom,
+      customRoleId,
       joiningDate,
       employmentType,
       salary,
@@ -266,37 +383,58 @@ export const updateStaff = async (req, res, next) => {
       updateData.staffRoleCustom = staffRoleCustom;
     }
 
-    // ── 3. HANDLE PERMISSIONS ─────────────────────
-    if (permissions) {
-      let parsedPermissions = [];
-      try {
-        parsedPermissions = JSON.parse(permissions);
-      } catch {
-        return res.status(400).json({ success: false, message: "Invalid permissions format" });
-      }
+    // ── 3. HANDLE CUSTOM ROLE / PERMISSIONS ───────
+    const roleChanging = customRoleId !== undefined && customRoleId !== "";
+    const roleClearing = customRoleId === "" || customRoleId === "null";
 
-      // validate keys
-      const invalidPerms = parsedPermissions.filter((p) => !MODULE_KEYS.includes(p));
-      if (invalidPerms.length > 0) {
-        return res.status(400).json({
-          success: false,
-          message: `Invalid permission(s): ${invalidPerms.join(", ")}`,
+    if (roleChanging && !roleClearing) {
+      const resolved = await resolveStaffPermissions({
+        schoolId,
+        customRoleId,
+        permissionsRaw: permissions,
+        requireRole: false,
+        reqUser: req.user,
+      });
+      if (resolved.error) {
+        return res.status(400).json({ success: false, message: resolved.error });
+      }
+      updateData.customRoleId = resolved.customRoleId;
+      updateData.permissions = resolved.permissions;
+    } else if (roleClearing) {
+      updateData.customRoleId = null;
+      if (permissions) {
+        const resolved = await resolveStaffPermissions({
+          schoolId,
+          customRoleId: null,
+          permissionsRaw: permissions,
+          reqUser: req.user,
         });
+        if (resolved.error) {
+          return res.status(400).json({ success: false, message: resolved.error });
+        }
+        updateData.permissions = resolved.permissions;
       }
-
-      // validate against school subscriptions
-      const school = await School.findById(schoolId).select("subscribed_modules");
-      const invalidForSchool = parsedPermissions.filter(
-        (p) => !school.subscribed_modules.includes(p)
-      );
-      if (invalidForSchool.length > 0) {
-        return res.status(400).json({
-          success: false,
-          message: `School has not subscribed to: ${invalidForSchool.join(", ")}`,
-        });
+    } else if (staff.customRoleId) {
+      // Keep role-driven permissions in sync (ignore client permission overrides)
+      const resolved = await resolveStaffPermissions({
+        schoolId,
+        customRoleId: staff.customRoleId,
+        reqUser: req.user,
+      });
+      if (!resolved.error) {
+        updateData.permissions = resolved.permissions;
       }
-
-      updateData.permissions = parsedPermissions;
+    } else if (permissions) {
+      const resolved = await resolveStaffPermissions({
+        schoolId,
+        customRoleId: null,
+        permissionsRaw: permissions,
+        reqUser: req.user,
+      });
+      if (resolved.error) {
+        return res.status(400).json({ success: false, message: resolved.error });
+      }
+      updateData.permissions = resolved.permissions;
     }
 
     // ── 4. HANDLE PASSWORD ────────────────────────
@@ -320,12 +458,18 @@ export const updateStaff = async (req, res, next) => {
       req.params.id,
       updateData,
       { new: true, runValidators: true }
-    ).select("-password -temp_password");
+    )
+      .select("-password -temp_password")
+      .populate("customRoleId", "name permissions isActive");
+
+    const data = updated.toObject();
+    data.customRoleName = data.customRoleId?.name || null;
+    data.customRoleId = data.customRoleId?._id || data.customRoleId || null;
 
     return res.json({
       success: true,
       message: "Staff member updated successfully",
-      data: updated,
+      data,
     });
 
   } catch (error) {
@@ -337,19 +481,42 @@ export const updateStaff = async (req, res, next) => {
 export const toggleStaffStatus = async (req, res, next) => {
   try {
     const schoolId = req.user.school_id;
+    const id = req.params.id;
 
-    const staff = await Staff.findOne({ _id: req.params.id, schoolId });
-    if (!staff) {
+    let member = await Staff.findOne({ _id: id, schoolId });
+    let kind = "Staff";
+    if (!member) {
+      member = await Teacher.findOne({ _id: id, schoolId });
+      kind = "Teacher";
+    }
+    if (!member) {
+      member = await Driver.findOne({ _id: id, schoolId });
+      kind = "Driver";
+    }
+    if (!member) {
       return res.status(404).json({ success: false, message: "Staff member not found" });
     }
 
-    staff.status = staff.status === "Active" ? "Inactive" : "Active";
-    await staff.save();
+    if (kind === "Driver") {
+      member.status = member.status === "Active" ? "Inactive" : "Active";
+    } else if (kind === "Teacher") {
+      member.status = member.status === "Inactive" ? "Active" : "Inactive";
+    } else {
+      member.status = member.status === "Active" ? "Inactive" : "Active";
+    }
+    await member.save();
+
+    const activeLabel =
+      member.status === "Active" || member.status === "Present"
+        ? "activated"
+        : "deactivated";
 
     return res.json({
       success: true,
-      message: `Staff member ${staff.status === "Active" ? "activated" : "deactivated"} successfully`,
-      data: { status: staff.status },
+      message: `${kind} ${activeLabel} successfully`,
+      data: {
+        status: member.status === "Inactive" ? "Inactive" : "Active",
+      },
     });
   } catch (error) {
     next(error);
@@ -399,15 +566,68 @@ export const toggleAdminGroupMembership = async (req, res, next) => {
 export const deleteStaff = async (req, res, next) => {
   try {
     const schoolId = req.user.school_id;
+    const id = req.params.id;
 
-    const staff = await Staff.findOneAndDelete({ _id: req.params.id, schoolId });
-    if (!staff) {
-      return res.status(404).json({ success: false, message: "Staff member not found" });
+    const staff = await Staff.findOne({ _id: id, schoolId });
+    if (staff) {
+      const blocker = await getStaffDeleteBlocker(staff._id, schoolId);
+      if (blocker) {
+        return res.status(409).json({ success: false, message: blocker });
+      }
+      if (staff.photo?.public_id) {
+        try {
+          await deleteFromCloudinary(staff.photo.public_id);
+        } catch {
+          /* non-blocking */
+        }
+      }
+      await staff.deleteOne();
+      return res.json({
+        success: true,
+        message: "Staff member deleted successfully",
+      });
     }
 
-    return res.json({
-      success: true,
-      message: "Staff member deleted successfully",
+    const teacher = await Teacher.findOne({ _id: id, schoolId });
+    if (teacher) {
+      const blocker = await getTeacherDeleteBlocker(teacher._id, schoolId);
+      if (blocker) {
+        return res.status(409).json({ success: false, message: blocker });
+      }
+      if (teacher.photo?.public_id) {
+        try {
+          await deleteFromCloudinary(teacher.photo.public_id);
+        } catch {
+          /* non-blocking */
+        }
+      }
+      await Group.updateMany(
+        { schoolId, "members.userId": teacher._id },
+        { $pull: { members: { userId: teacher._id } } },
+      );
+      await teacher.deleteOne();
+      return res.json({
+        success: true,
+        message: "Teacher deleted successfully",
+      });
+    }
+
+    const driver = await Driver.findOne({ _id: id, schoolId });
+    if (driver) {
+      const blocker = await getDriverDeleteBlocker(driver);
+      if (blocker) {
+        return res.status(409).json({ success: false, message: blocker });
+      }
+      await driver.deleteOne();
+      return res.json({
+        success: true,
+        message: "Driver deleted successfully",
+      });
+    }
+
+    return res.status(404).json({
+      success: false,
+      message: "Staff member not found",
     });
   } catch (error) {
     next(error);

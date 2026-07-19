@@ -159,6 +159,16 @@ export default function ReportCard() {
               })),
             ]}
           />
+          {role === "school_admin" && (
+            <button
+              onClick={() =>
+                navigate("/school/certificates/settings?type=report_card")
+              }
+              className="px-4 py-2 rounded-lg border text-sm font-medium h-10"
+            >
+              Customize design
+            </button>
+          )}
           <button
             onClick={loadReport}
             disabled={loading}
@@ -191,29 +201,78 @@ export default function ReportCard() {
       )}
 
       {card && (
+        <ReportCardPrint card={card} includedLabel={includedLabel} />
+      )}
+
+      <style>{`
+        @media print {
+          body * { visibility: hidden; }
+          #report-card-print, #report-card-print * { visibility: visible; }
+          #report-card-print { position: absolute; left: 0; top: 0; width: 100%; }
+        }
+      `}</style>
+    </div>
+  );
+}
+
+function ReportCardPrint({ card, includedLabel }) {
+  const d = card.design || {};
+  const primary = d.primaryColor || "#1e3a5f";
+  const accent = d.accentColor || "#4f46e5";
+  const bg = d.backgroundColor || "#ffffff";
+  const text = d.textColor || "#0f172a";
+  const border = d.borderColor || primary;
+  const showBorder = d.showBorder !== false;
+  const logo = d.showLogo === false ? "" : d.logoUrl || card.school?.logo;
+  const borderCss = !showBorder
+    ? "none"
+    : d.borderStyle === "classic"
+      ? `6px double ${border}`
+      : d.borderStyle === "modern"
+        ? `3px solid ${border}`
+        : `1px solid ${border}`;
+
+  return (
         <div
           id="report-card-print"
-          className="max-w-3xl mx-auto bg-white text-slate-900 rounded-2xl border shadow-sm p-6 sm:p-8 print:shadow-none print:border-0"
+          className="max-w-3xl mx-auto rounded-2xl shadow-sm p-6 sm:p-8 print:shadow-none"
+          style={{
+            background: bg,
+            color: text,
+            border: borderCss,
+          }}
         >
-          <div className="text-center border-b pb-4 mb-4">
-            {card.school?.logo && (
+          <div
+            className="text-center pb-4 mb-4"
+            style={{ borderBottom: `1px solid ${accent}44` }}
+          >
+            {logo ? (
               <img
-                src={card.school.logo}
+                src={logo}
                 alt=""
                 className="h-14 mx-auto mb-2 object-contain"
               />
-            )}
-            <h2 className="text-xl font-black tracking-wide">
+            ) : null}
+            <h2
+              className="text-xl font-black tracking-wide"
+              style={{ color: primary }}
+            >
               {card.school?.name || "School"}
             </h2>
             {card.school?.address && (
-              <p className="text-xs text-slate-500 mt-1">{card.school.address}</p>
+              <p className="text-xs opacity-60 mt-1">{card.school.address}</p>
             )}
-            <p className="mt-3 text-sm font-bold uppercase tracking-widest text-indigo-700">
-              Report Card · {card.selectedTerm?.name || "Term"}
+            <p
+              className="mt-3 text-sm font-bold uppercase tracking-widest"
+              style={{ color: accent }}
+            >
+              {d.title || "Report Card"} · {card.selectedTerm?.name || "Term"}
               {card.academicYear ? ` · ${card.academicYear}` : ""}
             </p>
-            <p className="text-xs text-slate-500 mt-1">
+            {d.subtitle ? (
+              <p className="text-xs italic opacity-70 mt-1">{d.subtitle}</p>
+            ) : null}
+            <p className="text-xs opacity-60 mt-1">
               Cumulative marks: {includedLabel || "—"}
             </p>
           </div>
@@ -375,35 +434,39 @@ export default function ReportCard() {
               : "today"}
           </p>
 
-          <div className="grid grid-cols-2 gap-8 mt-10 pt-6 border-t text-xs text-slate-500">
+          <div
+            className="grid grid-cols-2 gap-8 mt-10 pt-6 text-xs opacity-70"
+            style={{ borderTop: `1px solid ${accent}44` }}
+          >
             <div className="text-center">
-              <div className="border-t border-slate-400 mt-10 pt-2">
+              <div
+                className="mt-10 pt-2"
+                style={{ borderTop: `1px solid ${text}66` }}
+              >
                 Class Teacher
               </div>
             </div>
             <div className="text-center">
-              <div className="border-t border-slate-400 mt-10 pt-2">
-                Principal
+              <div
+                className="mt-10 pt-2"
+                style={{ borderTop: `1px solid ${text}66` }}
+              >
+                {d.signatoryDesignation || "Principal"}
               </div>
             </div>
           </div>
-          <p className="text-[10px] text-slate-400 mt-4 text-center">
+          {d.footerText ? (
+            <p className="text-[10px] opacity-60 mt-4 text-center italic">
+              {d.footerText}
+            </p>
+          ) : null}
+          <p className="text-[10px] opacity-50 mt-4 text-center">
             Generated{" "}
             {card.generatedAt
               ? new Date(card.generatedAt).toLocaleString()
               : ""}
           </p>
         </div>
-      )}
-
-      <style>{`
-        @media print {
-          body * { visibility: hidden; }
-          #report-card-print, #report-card-print * { visibility: visible; }
-          #report-card-print { position: absolute; left: 0; top: 0; width: 100%; }
-        }
-      `}</style>
-    </div>
   );
 }
 

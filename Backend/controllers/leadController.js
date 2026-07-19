@@ -124,6 +124,32 @@ export const getLeads = async (req, res) => {
   }
 };
 
+export const getLeadById = async (req, res) => {
+  try {
+    const schoolId = req.user?.school_id;
+
+    if (!schoolId) {
+      return res.status(400).json({ success: false, message: "School ID is required" });
+    }
+
+    const query = { _id: req.params.id, schoolId };
+
+    if (req.user?.role === "staff_admin" && req.user?.staff_id) {
+      query["assignedTo.userType"] = "staff";
+      query["assignedTo.userId"] = req.user.staff_id;
+    }
+
+    const lead = await Lead.findOne(query).lean();
+    if (!lead) {
+      return res.status(404).json({ success: false, message: "Lead not found" });
+    }
+
+    return res.json({ success: true, data: lead });
+  } catch (error) {
+    return res.status(500).json({ success: false, message: error.message || "Failed to load lead" });
+  }
+};
+
 export const createLead = async (req, res) => {
   try {
     const schoolId = req.user?.school_id;
@@ -234,6 +260,20 @@ export const updateLeadStatus = async (req, res) => {
     if (req.user?.role === "staff_admin" && req.user?.staff_id) {
       query["assignedTo.userType"] = "staff";
       query["assignedTo.userId"] = req.user.staff_id;
+    }
+
+    const existing = await Lead.findOne(query).select("status studentId").lean();
+    if (!existing) {
+      return res.status(404).json({ success: false, message: "Lead not found" });
+    }
+
+    // Admitted is set automatically when admission form saves the student.
+    if (nextStatus === "admitted" && !existing.studentId) {
+      return res.status(400).json({
+        success: false,
+        message: "Use Start Admission to convert this lead into a student",
+        code: "START_ADMISSION_REQUIRED",
+      });
     }
 
     const lead = await Lead.findOneAndUpdate(

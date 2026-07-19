@@ -56,6 +56,18 @@ const teacherSchema = new mongoose.Schema(
       default: false,
     },
 
+    /** School-level access role — same system as Staff */
+    customRoleId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "SchoolStaffRole",
+      default: null,
+    },
+
+    permissions: {
+      type: [String],
+      default: [],
+    },
+
     role: {
       type: String,
       default: "teacher_admin",

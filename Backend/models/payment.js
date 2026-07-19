@@ -7,6 +7,10 @@ const paymentSchema = new mongoose.Schema({
     paymentMode: { type: String, enum: ['Cash', 'UPI', 'Cheque', 'Online'], required: true },
     paidDate: { type: Date, default: Date.now },
     remarks: { type: String },
+    /** UPI reference number (UTR) — required when paymentMode is UPI */
+    utr: { type: String, trim: true, default: "" },
+    /** Manual / gateway transaction reference for Online payments */
+    transactionId: { type: String, trim: true, default: "" },
     schoolId: {
         type: mongoose.Schema.Types.ObjectId,
         ref: 'School',
