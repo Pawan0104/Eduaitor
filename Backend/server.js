@@ -69,7 +69,11 @@ app.use(
         ? function (origin, callback) {
             const allowed = productionAllowedOrigins();
             const normalized = normalizeOrigin(origin);
-            if (!origin || allowed.has(normalized)) {
+            // Netlify sites/previews (frontend host) — required for cookie/CORS
+            const isNetlify =
+              /\.netlify\.app$/i.test(normalized) ||
+              /\.netlify\.com$/i.test(normalized);
+            if (!origin || allowed.has(normalized) || isNetlify) {
               callback(null, true);
             } else {
               // Do not throw — throwing becomes HTTP 500 and the UI shows

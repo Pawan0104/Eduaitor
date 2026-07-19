@@ -127,11 +127,15 @@ export default function Login() {
         toast.success(t("login.success"));
       }
     } catch (error) {
+      const rawMsg = String(error?.message || "");
+      const isNetwork =
+        !error?.response &&
+        (/Network/i.test(rawMsg) || /Failed to fetch/i.test(rawMsg));
       const backendMessage =
         error?.response?.data?.message ||
         error?.response?.data?.error ||
-        (error?.message?.includes("Network")
-          ? "Cannot reach API. Check Render/CORS (CLIENT_URL)."
+        (isNetwork
+          ? "Cannot reach API (CORS/network). Set CLIENT_URL on Render to your Netlify URL."
           : "Invalid credentials");
       setError(backendMessage);
       toast.error(
