@@ -1,7 +1,6 @@
 import { createContext, useContext, useEffect, useState } from "react";
-import axios from "axios";
+import api, { clearAuthToken } from "../config/axios";
 
-const API = import.meta.env.VITE_API_URL;
 const AuthContext = createContext();
 
 export const AuthProvider = ({ children }) => {
@@ -10,19 +9,18 @@ export const AuthProvider = ({ children }) => {
 
   const fetchUser = async () => {
     try {
-      const res = await axios.get(`${API}/auth/me`, {
-        withCredentials: true,
-      });
+      const res = await api.get(`/auth/me`);
       setUser(res.data.user);
     } catch {
       setUser(null);
+      clearAuthToken();
     } finally {
       setLoading(false);
     }
   };
 
   useEffect(() => {
-    fetchUser(); // 🔥 runs once on app load
+    fetchUser();
   }, []);
 
   return (

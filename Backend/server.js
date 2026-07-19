@@ -72,7 +72,10 @@ app.use(
             if (!origin || allowed.has(normalized)) {
               callback(null, true);
             } else {
-              callback(new Error("Not allowed by CORS: " + origin));
+              // Do not throw — throwing becomes HTTP 500 and the UI shows
+              // a misleading "Invalid credentials" on Netlify.
+              console.warn("CORS blocked origin:", origin);
+              callback(null, false);
             }
           }
         : true,

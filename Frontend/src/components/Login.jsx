@@ -9,12 +9,10 @@ import {
   FaEye,
   FaEyeSlash,
 } from "react-icons/fa";
-import axios from "axios";
 import { toast } from "react-toastify";
 import logo from "/eduaitor.png";
-import LanguageSwitcher from "./LanguageSwitcher"; 
-
-import { API } from "../config/api";
+import LanguageSwitcher from "./LanguageSwitcher";
+import api, { setAuthToken } from "../config/axios";
 
 export default function Login() {
   const [form, setForm] = useState({ email: "", password: "" });
@@ -58,9 +56,9 @@ export default function Login() {
         password: form.password,
       };
 
-      const res = await axios.post(`${API}/auth/login`, payload, {
-        withCredentials: true,
-      });
+      const res = await api.post(`/auth/login`, payload);
+
+      if (res.data?.token) setAuthToken(res.data.token);
 
       const role = res.data.data.role;
       const loginAs = res.data.data.loginAs; // "student" or "parent"
@@ -132,7 +130,9 @@ export default function Login() {
       const backendMessage =
         error?.response?.data?.message ||
         error?.response?.data?.error ||
-        "Invalid credentials";
+        (error?.message?.includes("Network")
+          ? "Cannot reach API. Check Render/CORS (CLIENT_URL)."
+          : "Invalid credentials");
       setError(backendMessage);
       toast.error(
         backendMessage === "Invalid credentials"
