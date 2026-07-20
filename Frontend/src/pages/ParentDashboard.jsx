@@ -553,21 +553,13 @@ const ParentDashboard = () => {
                   />
                 </div>
                 {data.transport?.data?.bus?.gps?.hasLiveFix && (
-                  <div className="mt-4 flex flex-wrap gap-2">
-                    <a
-                      href={`https://www.google.com/maps?q=${data.transport.data.bus.gps.latitude},${data.transport.data.bus.gps.longitude}`}
-                      target="_blank"
-                      rel="noreferrer"
-                      className="inline-flex items-center gap-2 rounded-xl bg-sky-600 px-4 py-2 text-sm font-bold text-white"
-                    >
-                      Track bus on map
-                    </a>
+                  <div className="mt-4">
                     <button
                       type="button"
                       onClick={() => navigate("/parent/transport")}
-                      className="inline-flex items-center gap-2 rounded-xl border border-slate-200 px-4 py-2 text-sm font-bold text-[rgb(var(--text))]"
+                      className="inline-flex items-center gap-2 rounded-xl bg-sky-600 px-4 py-2 text-sm font-bold text-white"
                     >
-                      Open transport & GPS
+                      Track bus on map
                     </button>
                   </div>
                 )}

@@ -151,7 +151,7 @@ export default function Login() {
   /* ================= UI ================= */
 
   return (
-    <div className="min-h-screen grid md:grid-cols-2">
+    <div className="app-safe-top min-h-screen grid md:grid-cols-2">
       {/* LEFT PANEL */}
       <div className="hidden md:flex flex-col justify-center items-center bg-linear-to-br from-[#e6edf8] via-[#d7e2f5] to-[#eef1fb]  text-white p-12">
        <img className="h-44" src={logo} alt="" />

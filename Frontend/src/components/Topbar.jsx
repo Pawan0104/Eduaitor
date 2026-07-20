@@ -206,7 +206,7 @@ const Topbar = ({ menuPath = "/" }) => {
   }, [openDropdown, openNotif]);
 
   return (
-    <header className="h-14 lg:h-16 bg-[rgb(var(--sidebar))] backdrop-blur border-b border-[rgb(var(--border-strong))] flex items-center justify-between px-3 sm:px-5 sticky top-0 z-30 shadow-md">
+    <header className="app-topbar box-border bg-[rgb(var(--sidebar))] backdrop-blur border-b border-[rgb(var(--border-strong))] flex items-center justify-between px-3 sm:px-5 sticky top-0 z-30 shadow-md">
       {/* LEFT */}
       <div className="flex items-center gap-2 sm:gap-3 min-w-0">
         {/* Mobile: back (when nested) + Menu hub — desktop uses permanent sidebar */}
@@ -301,7 +301,7 @@ const Topbar = ({ menuPath = "/" }) => {
           {openNotif && (
             <div
               onClick={(e) => e.stopPropagation()}
-              className="card fixed sm:absolute left-2 right-2 sm:left-auto sm:right-0 top-17 sm:top-auto sm:mt-2 w-auto sm:w-80 overflow-hidden z-50"
+              className="card fixed sm:absolute left-2 right-2 sm:left-auto sm:right-0 top-[calc(3.5rem+env(safe-area-inset-top,0px)+0.5rem)] sm:top-auto sm:mt-2 w-auto sm:w-80 overflow-hidden z-50"
             >
               {/* ── HEADER ── */}
               <div className="px-4 py-3 border-b border-[rgb(var(--border))] flex items-center justify-between">

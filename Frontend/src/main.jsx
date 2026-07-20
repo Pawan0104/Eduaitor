@@ -8,6 +8,9 @@ import "react-toastify/dist/ReactToastify.css";
 import { AuthProvider } from "./context/AuthContext.jsx";
 import { LanguageProvider } from "./context/LanguageContext.jsx";
 import { HelmetProvider } from "react-helmet-async";
+import { initNativeShell } from "./utils/initNativeShell.js";
+
+initNativeShell();
 
 createRoot(document.getElementById("root")).render(
   <BrowserRouter>

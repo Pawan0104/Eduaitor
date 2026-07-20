@@ -1,8 +1,10 @@
 import { useState, useEffect } from "react";
 import axios from "axios";
 import { toast } from "react-toastify";
+import BusLiveMap from "../components/BusLiveMap";
 
 const API = import.meta.env.VITE_API_URL;
+const GPS_POLL_MS = 20000;
 
 /* ─── helpers ─── */
 const fmt = (v) => (v !== null && v !== undefined && v !== "" ? v : "—");
@@ -233,6 +235,15 @@ const ParentTransport = () => {
   useEffect(() => {
     fetchTransport();
   }, []);
+
+  // Auto-refresh GPS while parent keeps this page open
+  useEffect(() => {
+    if (!assigned || !data?.bus?.gps?.enabled) return undefined;
+    const id = setInterval(() => {
+      fetchTransport({ silent: true });
+    }, GPS_POLL_MS);
+    return () => clearInterval(id);
+  }, [assigned, data?.bus?.gps?.enabled]);
 
   if (loading) return <LoadingSkeleton />;
   if (!assigned || !data) return <NoTransport />;
@@ -495,6 +506,16 @@ const ParentTransport = () => {
                 </span>
               </div>
 
+              {gps.hasLiveFix && (
+                <BusLiveMap
+                  latitude={gps.latitude}
+                  longitude={gps.longitude}
+                  label={bus?.busId ? `Bus ${bus.busId}` : "School bus"}
+                  speedKmh={gps.speedKmh}
+                  height={280}
+                />
+              )}
+
               <div className="grid grid-cols-2 gap-5">
                 <InfoCell
                   label="Latitude"
@@ -522,25 +543,30 @@ const ParentTransport = () => {
               </div>
 
               <div className="flex flex-col sm:flex-row gap-2">
+                <button
+                  type="button"
+                  onClick={() => fetchTransport({ silent: true })}
+                  disabled={refreshingGps}
+                  className="flex-1 flex items-center justify-center gap-2 py-3 rounded-xl bg-sky-600 text-white font-bold text-sm active:scale-[.98] transition-all disabled:opacity-60"
+                >
+                  {refreshingGps ? "Refreshing..." : "Refresh location"}
+                </button>
                 {gps.hasLiveFix && (
                   <a
                     href={`https://www.google.com/maps?q=${gps.latitude},${gps.longitude}`}
                     target="_blank"
                     rel="noreferrer"
-                    className="flex-1 flex items-center justify-center gap-2 py-3 rounded-xl bg-sky-600 text-white font-bold text-sm active:scale-[.98] transition-all"
+                    className="flex-1 flex items-center justify-center gap-2 py-3 rounded-xl border border-slate-200 bg-[rgb(var(--surface))] font-bold text-sm text-[rgb(var(--text))] active:scale-[.98] transition-all"
                   >
-                    Open in Maps
+                    Open externally
                   </a>
                 )}
-                <button
-                  type="button"
-                  onClick={() => fetchTransport({ silent: true })}
-                  disabled={refreshingGps}
-                  className="flex-1 flex items-center justify-center gap-2 py-3 rounded-xl border border-slate-200 bg-[rgb(var(--surface))] font-bold text-sm text-[rgb(var(--text))] active:scale-[.98] transition-all disabled:opacity-60"
-                >
-                  {refreshingGps ? "Refreshing..." : "Refresh location"}
-                </button>
               </div>
+              {gps.hasLiveFix && (
+                <p className="text-[11px] text-[rgb(var(--text-light))] text-center">
+                  Map updates automatically every 20 seconds
+                </p>
+              )}
             </div>
           ) : (
             <div className="px-5 py-4">

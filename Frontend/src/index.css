@@ -119,9 +119,32 @@
   --border-strong: 167 243 208;
 }
 
+html,
+body,
+#root {
+  height: 100%;
+}
+
 body {
   background: rgb(var(--bg));
   color: rgb(var(--text));
+}
+
+/* Sticky top chrome: extend bar under status icons, keep controls below them */
+.app-topbar {
+  padding-top: env(safe-area-inset-top, 0px);
+  min-height: calc(3.5rem + env(safe-area-inset-top, 0px));
+}
+
+@media (min-width: 1024px) {
+  .app-topbar {
+    min-height: calc(4rem + env(safe-area-inset-top, 0px));
+  }
+}
+
+/* Screens without Topbar (login, etc.) */
+.app-safe-top {
+  padding-top: env(safe-area-inset-top, 0px);
 }
 
 .card {

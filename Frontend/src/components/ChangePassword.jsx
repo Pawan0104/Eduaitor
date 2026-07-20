@@ -54,7 +54,7 @@ export default function ChangePassword() {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-[#e6edf8] via-[#d7e2f5] to-[#eef1fb] p-6">
+    <div className="app-safe-top min-h-screen flex items-center justify-center bg-gradient-to-br from-[#e6edf8] via-[#d7e2f5] to-[#eef1fb] p-6">
       <div className="w-full max-w-md bg-white/80 backdrop-blur-xl shadow-xl rounded-2xl p-8 border border-white/40">
         {/* Header */}
         <div className="text-center mb-8">
