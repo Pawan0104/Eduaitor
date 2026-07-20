@@ -9,6 +9,7 @@ import { AuthProvider } from "./context/AuthContext.jsx";
 import { LanguageProvider } from "./context/LanguageContext.jsx";
 import { HelmetProvider } from "react-helmet-async";
 import { initNativeShell } from "./utils/initNativeShell.js";
+import AppUpdatePrompt from "./components/AppUpdatePrompt.jsx";
 
 initNativeShell();
 
@@ -19,6 +20,7 @@ createRoot(document.getElementById("root")).render(
         <AuthProvider>
           <HelmetProvider>
             <App />
+            <AppUpdatePrompt />
           </HelmetProvider>
         </AuthProvider>
         <ToastContainer position="top-right" autoClose={2000} />

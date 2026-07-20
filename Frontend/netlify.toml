@@ -8,6 +8,25 @@
 [build.environment]
   NODE_VERSION = "20"
 
+# version.json must stay fresh so the APK/browser can detect updates
+[[headers]]
+  for = "/version.json"
+  [headers.values]
+    Cache-Control = "no-cache, no-store, must-revalidate"
+    Access-Control-Allow-Origin = "*"
+
+[[headers]]
+  for = "/index.html"
+  [headers.values]
+    Cache-Control = "no-cache, no-store, must-revalidate"
+
+# Prefer real static files (version.json) over SPA fallback
+[[redirects]]
+  from = "/version.json"
+  to = "/version.json"
+  status = 200
+  force = false
+
 # SPA fallback (React Router)
 [[redirects]]
   from = "/*"
