@@ -15,39 +15,43 @@ const DOCUMENT_FIELDS = [
     label: "Student Photo",
     category: "photos",
     icon: "👤",
-    accept: "image/*",
-    hint: "JPG / PNG",
+    accept: "image/jpeg,image/png,image/webp,.jpg,.jpeg,.png,.webp",
+    hint: "JPG / PNG / WEBP",
+    photoOnly: true,
   },
   {
     key: "fatherPhoto",
     label: "Father Photo",
     category: "photos",
     icon: "👨",
-    accept: "image/*",
-    hint: "JPG / PNG",
+    accept: "image/jpeg,image/png,image/webp,.jpg,.jpeg,.png,.webp",
+    hint: "JPG / PNG / WEBP",
+    photoOnly: true,
   },
   {
     key: "motherPhoto",
     label: "Mother Photo",
     category: "photos",
     icon: "👩",
-    accept: "image/*",
-    hint: "JPG / PNG",
+    accept: "image/jpeg,image/png,image/webp,.jpg,.jpeg,.png,.webp",
+    hint: "JPG / PNG / WEBP",
+    photoOnly: true,
   },
   {
     key: "guardianPhoto",
     label: "Guardian Photo",
     category: "photos",
     icon: "🧑",
-    accept: "image/*",
-    hint: "JPG / PNG",
+    accept: "image/jpeg,image/png,image/webp,.jpg,.jpeg,.png,.webp",
+    hint: "JPG / PNG / WEBP",
+    photoOnly: true,
   },
   {
     key: "studentAadhar",
     label: "Student Aadhar",
     category: "ids",
     icon: "🪪",
-    accept: "image/*,application/pdf",
+    accept: "image/jpeg,image/png,image/webp,application/pdf,.jpg,.jpeg,.png,.webp,.pdf",
     hint: "Image / PDF",
   },
   {
@@ -55,7 +59,7 @@ const DOCUMENT_FIELDS = [
     label: "Father Aadhar",
     category: "ids",
     icon: "🪪",
-    accept: "image/*,application/pdf",
+    accept: "image/jpeg,image/png,image/webp,application/pdf,.jpg,.jpeg,.png,.webp,.pdf",
     hint: "Image / PDF",
   },
   {
@@ -63,7 +67,7 @@ const DOCUMENT_FIELDS = [
     label: "Mother Aadhar",
     category: "ids",
     icon: "🪪",
-    accept: "image/*,application/pdf",
+    accept: "image/jpeg,image/png,image/webp,application/pdf,.jpg,.jpeg,.png,.webp,.pdf",
     hint: "Image / PDF",
   },
   {
@@ -71,7 +75,7 @@ const DOCUMENT_FIELDS = [
     label: "Birth Certificate",
     category: "certificates",
     icon: "📄",
-    accept: "image/*,application/pdf",
+    accept: "image/jpeg,image/png,image/webp,application/pdf,.jpg,.jpeg,.png,.webp,.pdf",
     hint: "Image / PDF",
   },
   {
@@ -79,7 +83,7 @@ const DOCUMENT_FIELDS = [
     label: "Transfer Certificate",
     category: "certificates",
     icon: "📋",
-    accept: "image/*,application/pdf",
+    accept: "image/jpeg,image/png,image/webp,application/pdf,.jpg,.jpeg,.png,.webp,.pdf",
     hint: "Image / PDF",
   },
 ];
@@ -98,6 +102,24 @@ const age = (dob) => {
 const fmtDate = (d) =>
   d ? new Date(d).toLocaleDateString("en-IN", { dateStyle: "medium" }) : "—";
 
+const validateUploadFile = (field, file) => {
+  if (!file) return "No file selected";
+  if (file.size > 2 * 1024 * 1024) return "File must be less than 2MB";
+
+  const photoMimes = ["image/jpeg", "image/jpg", "image/png", "image/webp"];
+  const docMimes = [...photoMimes, "application/pdf"];
+  const allowed = field.photoOnly ? photoMimes : docMimes;
+  const extOk = field.photoOnly
+    ? /\.(jpe?g|png|webp)$/i.test(file.name)
+    : /\.(jpe?g|png|webp|pdf)$/i.test(file.name);
+
+  if (!allowed.includes(file.type) && !extOk) {
+    return field.photoOnly
+      ? "Invalid file type. Photos must be JPG, PNG, or WEBP."
+      : "Invalid file type. Use JPG, PNG, WEBP, or PDF only.";
+  }
+  return null;
+};
 /* ─────────────────────────────────────────────
    SUB-COMPONENTS
 ───────────────────────────────────────────── */
@@ -128,10 +150,12 @@ const Card = ({ title, accent = "#6366f1", children }) => (
 );
 
 /* Document tile */
-const DocTile = ({ field, doc, onUpload, uploading }) => {
+const DocTile = ({ field, doc, onUpload, uploading, allowReplace }) => {
   const fileRef = useRef();
   const hasDoc = !!doc?.url;
-  const isPdf = doc?.type === "application/pdf" || doc?.url?.endsWith(".pdf");
+  const isPdf =
+    doc?.type === "application/pdf" || doc?.url?.endsWith(".pdf");
+  const displayUrl = doc?.url || "";
 
   return (
     <div
@@ -165,36 +189,66 @@ const DocTile = ({ field, doc, onUpload, uploading }) => {
       {/* Preview / placeholder */}
       <div className="px-3 pb-3">
         {hasDoc ? (
-          <div className="mt-1">
+          <div className="mt-1 space-y-2">
             {isPdf ? (
               <a
-                href={doc.url}
+                href={displayUrl}
                 target="_blank"
                 rel="noreferrer"
                 className="flex items-center gap-1.5 text-[11px] text-indigo-600 font-medium hover:underline"
               >
-                <svg
-                  width="12"
-                  height="12"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="2"
-                >
-                  <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
-                  <polyline points="14 2 14 8 20 8" />
-                </svg>
-                View PDF
+                Preview PDF ↗
               </a>
             ) : (
-              <a href={doc.url} target="_blank" rel="noreferrer">
+              <a href={displayUrl} target="_blank" rel="noreferrer">
                 <img
-                  src={doc.url}
+                  key={displayUrl}
+                  src={displayUrl}
                   alt={field.label}
                   className="w-full h-30 object-cover rounded-lg border border-slate-200"
                 />
               </a>
             )}
+            <div className="flex flex-wrap gap-2">
+              <a
+                href={displayUrl}
+                target="_blank"
+                rel="noreferrer"
+                className="text-[11px] text-indigo-600 font-semibold hover:underline"
+              >
+                View
+              </a>
+              <a
+                href={displayUrl}
+                download
+                target="_blank"
+                rel="noreferrer"
+                className="text-[11px] text-emerald-700 font-semibold hover:underline"
+              >
+                Download
+              </a>
+              {allowReplace && (
+                <button
+                  type="button"
+                  onClick={() => fileRef.current?.click()}
+                  disabled={uploading === field.key}
+                  className="text-[11px] text-amber-700 font-semibold hover:underline disabled:opacity-50"
+                >
+                  {uploading === field.key ? "Uploading…" : "Replace"}
+                </button>
+              )}
+            </div>
+            <input
+              ref={fileRef}
+              type="file"
+              accept={field.accept}
+              className="hidden"
+              onChange={(e) => {
+                const file = e.target.files?.[0];
+                if (file) onUpload(field.key, file, field);
+                e.target.value = "";
+              }}
+            />
           </div>
         ) : (
           <div className="mt-1 text-center py-2">
@@ -234,7 +288,7 @@ const DocTile = ({ field, doc, onUpload, uploading }) => {
               className="hidden"
               onChange={(e) => {
                 const file = e.target.files?.[0];
-                if (file) onUpload(field.key, file);
+                if (file) onUpload(field.key, file, field);
                 e.target.value = "";
               }}
             />
@@ -297,9 +351,18 @@ const MyChild = () => {
   }, [studentId]);
 
   /* ── Upload document ── */
-  const handleUpload = async (fieldKey, file) => {
-    // Guard: don't allow re-upload if already present
-    if (student?.documents?.[fieldKey]?.url) {
+  const handleUpload = async (fieldKey, file, fieldMeta) => {
+    const field =
+      fieldMeta || DOCUMENT_FIELDS.find((f) => f.key === fieldKey) || { key: fieldKey };
+    const validationError = validateUploadFile(field, file);
+    if (validationError) {
+      toast.error(validationError);
+      return;
+    }
+
+    const alreadyHas = !!student?.documents?.[fieldKey]?.url;
+    // Non-photo docs: keep one-time upload; photos can be replaced
+    if (alreadyHas && !field.photoOnly) {
       toast.warning(
         "Document already uploaded. Contact school admin to remove it.",
       );
@@ -321,10 +384,15 @@ const MyChild = () => {
       );
 
       if (data.success) {
+        const label = field.label || fieldKey.replace(/([A-Z])/g, " $1");
         toast.success(
-          `${fieldKey.replace(/([A-Z])/g, " $1")} uploaded successfully`,
+          alreadyHas
+            ? `${label} replaced successfully`
+            : `${label} uploaded successfully`,
         );
-        setStudent(data.data);
+        // Prefer full refetch so nested docs + cache-bust stay in sync
+        if (data.data) setStudent(data.data);
+        else await fetchStudent();
       } else {
         toast.error(data.message || "Upload failed");
       }
@@ -389,6 +457,7 @@ const MyChild = () => {
             <div className="relative shrink-0">
               {docs.studentPhoto?.url ? (
                 <img
+                  key={docs.studentPhoto.url}
                   src={docs.studentPhoto.url}
                   alt="Student"
                   className="w-20 h-20 rounded-2xl object-cover border-4 border-white shadow-md"
@@ -490,6 +559,14 @@ const MyChild = () => {
                 />
                 <InfoRow label="Roll Number" value={s.rollNo} />
                 <InfoRow label="Student ID" value={s.studentId} />
+              </div>
+            </Card>
+
+            <Card title="Previous School" accent="#8b5cf6">
+              <div className="grid grid-cols-2 gap-x-6 gap-y-4">
+                <InfoRow label="School Name" value={s.previousSchoolName} />
+                <InfoRow label="Class" value={s.previousSchoolClass} />
+                <InfoRow label="Result" value={s.previousSchoolResult} />
               </div>
             </Card>
 
@@ -618,6 +695,7 @@ const MyChild = () => {
                       doc={docs[f.key]}
                       onUpload={handleUpload}
                       uploading={uploading}
+                      allowReplace
                     />
                   ),
                 )}

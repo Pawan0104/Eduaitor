@@ -80,6 +80,11 @@ const leadSchema = new mongoose.Schema(
       ref: "School",
       required: true,
     },
+    /** Human-readable lead id per school, e.g. LEAD0001 */
+    leadNumber: {
+      type: String,
+      trim: true,
+    },
     createdBy: {
       type: mongoose.Schema.Types.ObjectId,
       required: true,
@@ -102,5 +107,7 @@ const leadSchema = new mongoose.Schema(
   },
   { timestamps: true },
 );
+
+leadSchema.index({ schoolId: 1, leadNumber: 1 }, { unique: true, sparse: true });
 
 export default mongoose.models.Lead || mongoose.model("Lead", leadSchema);

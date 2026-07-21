@@ -1,11 +1,12 @@
 import { useEffect, useState } from "react";
 import axios from "axios";
-import { FaPlus, FaArrowLeft, FaEye, FaEdit, FaUsers } from "react-icons/fa";
+import { FaPlus, FaArrowLeft, FaEye, FaEdit, FaUsers, FaFileExcel, FaFilePdf } from "react-icons/fa";
 import { MdPersonOutline } from "react-icons/md";
 import { PiChartPieSliceBold } from "react-icons/pi";
 import { useNavigate } from "react-router-dom";
 import { toast } from "react-toastify";
 import { FiTrash2 } from "react-icons/fi";
+import * as XLSX from "xlsx";
 import MessageButton from "../components/MessageButton";
 
 const API = import.meta.env.VITE_API_URL;
@@ -15,6 +16,7 @@ const Students = () => {
 
   const [students, setStudents] = useState([]);
   const [selectedClass, setSelectedClass] = useState("");
+  const [searchQuery, setSearchQuery] = useState("");
   const [classes, setClasses] = useState([]);
 
   const [confirmOpen, setConfirmOpen] = useState(false);
@@ -61,9 +63,25 @@ const Students = () => {
     students.map((s) => s.classId?._id).filter(Boolean),
   ).size;
 
-  const filteredStudents = selectedClass
-    ? students.filter((s) => s.classId?._id === selectedClass)
-    : students;
+  const filteredStudents = students.filter((s) => {
+    if (selectedClass && s.classId?._id !== selectedClass) return false;
+
+    const q = searchQuery.trim().toLowerCase();
+    if (!q) return true;
+
+    const admissionNo = String(s.studentId || "").toLowerCase();
+    const fullName = `${s.firstName || ""} ${s.lastName || ""}`.toLowerCase();
+    const father = String(s.fatherName || "").toLowerCase();
+    const mobile = String(s.fatherMobile || "").toLowerCase();
+
+    // Prefer exact/partial admission number match; also allow name/mobile
+    return (
+      admissionNo.includes(q) ||
+      fullName.includes(q) ||
+      father.includes(q) ||
+      mobile.includes(q)
+    );
+  });
 
   const handleDelete = (id) => {
     setConfirmMessage("Are you sure you want to delete this student?");
@@ -83,6 +101,119 @@ const Students = () => {
       console.error(err);
       toast.error("Failed to delete student");
     }
+  };
+
+  const buildExportRows = () =>
+    filteredStudents.map((s, index) => ({
+      "S.No": index + 1,
+      "Admission No": s.studentId || "",
+      "First Name": s.firstName || "",
+      "Last Name": s.lastName || "",
+      Class: s.classId?.name || s.classId?.className || "",
+      Section: s.sectionId?.name || s.sectionId?.sectionName || "",
+      "Roll No": s.rollNo || "",
+      Gender: s.gender || "",
+      "Father Name": s.fatherName || "",
+      "Father Mobile": s.fatherMobile || "",
+      "Mother Name": s.motherName || "",
+      "Mother Mobile": s.motherMobile || "",
+      "Student Type": s.studentType || "",
+      Address: s.address || "",
+    }));
+
+  const exportExcel = () => {
+    if (filteredStudents.length === 0) {
+      toast.error("No students to export");
+      return;
+    }
+
+    const rows = buildExportRows();
+    const worksheet = XLSX.utils.json_to_sheet(rows);
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, worksheet, "Students");
+    const buffer = XLSX.write(workbook, { type: "array", bookType: "xlsx" });
+    const blob = new Blob([buffer], {
+      type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    });
+    const url = window.URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    const stamp = new Date().toISOString().slice(0, 10);
+    link.href = url;
+    link.download = `students-${stamp}.xlsx`;
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    window.URL.revokeObjectURL(url);
+    toast.success("Excel downloaded");
+  };
+
+  const exportPdf = () => {
+    if (filteredStudents.length === 0) {
+      toast.error("No students to export");
+      return;
+    }
+
+    const rows = buildExportRows();
+    const headers = Object.keys(rows[0]);
+    const stamp = new Date().toLocaleString();
+
+    const tableHead = headers.map((h) => `<th>${h}</th>`).join("");
+    const tableBody = rows
+      .map(
+        (row) =>
+          `<tr>${headers
+            .map(
+              (h) =>
+                `<td>${String(row[h] ?? "")
+                  .replace(/&/g, "&amp;")
+                  .replace(/</g, "&lt;")
+                  .replace(/>/g, "&gt;")}</td>`,
+            )
+            .join("")}</tr>`,
+      )
+      .join("");
+
+    const html = `<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <title>Student List</title>
+  <style>
+    body { font-family: Arial, sans-serif; padding: 24px; color: #0f172a; }
+    h1 { font-size: 20px; margin: 0 0 4px; }
+    p { margin: 0 0 16px; color: #64748b; font-size: 12px; }
+    table { width: 100%; border-collapse: collapse; font-size: 11px; }
+    th, td { border: 1px solid #cbd5e1; padding: 6px 8px; text-align: left; }
+    th { background: #f1f5f9; }
+    @media print {
+      body { padding: 0; }
+    }
+  </style>
+</head>
+<body>
+  <h1>Student List</h1>
+  <p>Exported ${stamp} · ${rows.length} student(s)</p>
+  <table>
+    <thead><tr>${tableHead}</tr></thead>
+    <tbody>${tableBody}</tbody>
+  </table>
+  <script>
+    window.onload = function () {
+      window.print();
+    };
+  </script>
+</body>
+</html>`;
+
+    const win = window.open("", "_blank");
+    if (!win) {
+      toast.error("Popup blocked. Allow popups to export PDF.");
+      return;
+    }
+    win.document.open();
+    win.document.write(html);
+    win.document.close();
+    toast.info("Use Print → Save as PDF in the dialog");
   };
 
   return (
@@ -148,35 +279,72 @@ const Students = () => {
         />
       </div>
 
-      {/* CLASS FILTER */}
+      {/* CLASS FILTER + SEARCH */}
 
       <div className="bg-[rgb(var(--surface))] rounded-xl shadow p-4 sm:p-6 mb-6">
-        <p className="text-sm font-medium mb-2 text-[rgb(var(--text))]">Select Class</p>
+        <div className="grid gap-4 sm:grid-cols-2">
+          <div>
+            <p className="text-sm font-medium mb-2 text-[rgb(var(--text))]">
+              Select Class
+            </p>
+            <select
+              value={selectedClass}
+              onChange={(e) => setSelectedClass(e.target.value)}
+              className="border rounded-lg px-4 py-2 w-full text-[rgb(var(--text))] bg-[rgb(var(--surface))]"
+            >
+              <option value="">-- All Classes --</option>
+              {classes.map((cls) => (
+                <option key={cls._id} value={cls._id}>
+                  {cls.name}
+                </option>
+              ))}
+            </select>
+          </div>
 
-        <select
-          value={selectedClass}
-          onChange={(e) => setSelectedClass(e.target.value)}
-          className="border rounded-lg px-4 py-2 w-full sm:w-72 text-[rgb(var(--text))]"
-        >
-          <option value=""  
-          className="text-[rgb(var(--text))]  bg-[rgb(var(--surface))] "
-          >-- Select a Class --</option>
-
-          {classes.map((cls) => (
-            <option key={cls._id} value={cls._id} className="bg-[rgb(var(--surface))]  text-[rgb(var(--text))]">
-              {cls.name}
-            </option>
-          ))}
-        </select>
+          <div>
+            <p className="text-sm font-medium mb-2 text-[rgb(var(--text))]">
+              Search by Admission No.
+            </p>
+            <input
+              type="search"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              placeholder="e.g. STU0001"
+              className="border rounded-lg px-4 py-2 w-full text-[rgb(var(--text))] bg-[rgb(var(--surface))]"
+              aria-label="Search by admission number"
+            />
+            <p className="text-xs text-[rgb(var(--text-muted))] mt-1.5">
+              Also matches student name, father name, or mobile
+            </p>
+          </div>
+        </div>
       </div>
 
       {/* DIRECTORY */}
 
       <div className="bg-[rgb(var(--surface))] rounded-xl shadow p-4 sm:p-6">
-        <div className="flex justify-between items-center mb-4">
+        <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3 mb-4">
           <h2 className="text-lg sm:text-xl font-semibold text-[rgb(var(--text))]">
             Student Directory
           </h2>
+          <div className="flex flex-wrap gap-2">
+            <button
+              type="button"
+              onClick={exportExcel}
+              className="inline-flex items-center gap-2 px-3 py-2 rounded-lg border border-[rgb(var(--border))] bg-[rgb(var(--surface))] text-sm font-semibold text-[rgb(var(--text))] hover:bg-[rgb(var(--bg))]"
+            >
+              <FaFileExcel className="text-emerald-600" />
+              Export Excel
+            </button>
+            <button
+              type="button"
+              onClick={exportPdf}
+              className="inline-flex items-center gap-2 px-3 py-2 rounded-lg border border-[rgb(var(--border))] bg-[rgb(var(--surface))] text-sm font-semibold text-[rgb(var(--text))] hover:bg-[rgb(var(--bg))]"
+            >
+              <FaFilePdf className="text-rose-600" />
+              Export PDF
+            </button>
+          </div>
         </div>
 
         {students.length === 0 && <EmptyState text="No students available" />}
@@ -186,6 +354,7 @@ const Students = () => {
             <table className="w-full min-w-175 text-sm">
               <thead className="bg-[rgb(var(--surface))] ">
                 <tr>
+                  <th className="p-3 text-left">Admission No</th>
                   <th className="p-3 text-left">Name</th>
                   <th className="p-3 text-left">Class</th>
                   <th className="p-3 text-left">Father</th>
@@ -197,6 +366,9 @@ const Students = () => {
               <tbody>
                 {filteredStudents.map((student) => (
                   <tr key={student._id} className="border-t hover:bg-[rgb(var(--bg-hover))]">
+                    <td className="p-3 font-mono text-xs font-semibold">
+                      {student.studentId || "—"}
+                    </td>
                     <td className="p-3 font-medium">
                       {student.firstName} {student.lastName}
                     </td>
@@ -247,7 +419,7 @@ const Students = () => {
 
                 {filteredStudents.length === 0 && (
                   <tr>
-                    <td colSpan="5" className="text-center py-6 text-[rgb(var(--text))]">
+                    <td colSpan="6" className="text-center py-6 text-[rgb(var(--text))]">
                       No students found
                     </td>
                   </tr>

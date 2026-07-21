@@ -166,6 +166,14 @@ export const getExistingAttendance = async (req, res) => {
    for future PUT (edit) calls.
    ══════════════════════════════════════════════════════════════ */
 export const saveAttendance = async (req, res) => {
+  const role = req.user?.role;
+  if (!["teacher_admin", "school_admin"].includes(role)) {
+    return res.status(403).json({
+      success: false,
+      message: "Access denied — only teachers or school admin can mark attendance",
+    });
+  }
+
   const { classId, sectionId, subjectId, date, records } = req.body;
   const schoolId = req.user.school_id;
 

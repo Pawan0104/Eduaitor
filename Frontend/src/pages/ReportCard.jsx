@@ -43,7 +43,11 @@ export default function ReportCard() {
     if (isParentOrStudent) return;
     (async () => {
       try {
-        const { data } = await axios.get(`${API}/classes/all`, {
+        const url =
+          role === "teacher_admin"
+            ? `${API}/classes/teacher/my-classes`
+            : `${API}/classes/all`;
+        const { data } = await axios.get(url, {
           withCredentials: true,
         });
         setClasses(data.classes || data.data || data || []);
@@ -51,7 +55,7 @@ export default function ReportCard() {
         toast.error("Failed to load classes");
       }
     })();
-  }, [isParentOrStudent]);
+  }, [isParentOrStudent, role]);
 
   useEffect(() => {
     if (isParentOrStudent || !classId) {
@@ -60,7 +64,11 @@ export default function ReportCard() {
     }
     (async () => {
       try {
-        const { data } = await axios.get(`${API}/students`, {
+        const url =
+          role === "teacher_admin"
+            ? `${API}/students/teacher/my-students`
+            : `${API}/students`;
+        const { data } = await axios.get(url, {
           withCredentials: true,
         });
         const list = (data.data || []).filter(
@@ -71,7 +79,7 @@ export default function ReportCard() {
         toast.error("Failed to load students");
       }
     })();
-  }, [classId, isParentOrStudent]);
+  }, [classId, isParentOrStudent, role]);
 
   const loadReport = async () => {
     const sid = isParentOrStudent ? ownStudentId : studentId;

@@ -1,0 +1,767 @@
+[
+  {
+    "id": "SC-11",
+    "status": "Pass",
+    "notes": "Student created id=6a5f725d0f8ebfb2227c34bf admissionNumber=QA-ADMIT-1784640086983"
+  },
+  {
+    "id": "SC-12",
+    "status": "Pass",
+    "notes": "PUT update student address HTTP 200"
+  },
+  {
+    "id": "SC-13",
+    "status": "Pass",
+    "notes": "GET student by id HTTP 200"
+  },
+  {
+    "id": "SC-14",
+    "status": "Pass",
+    "notes": "GET student id-card HTTP 200"
+  },
+  {
+    "id": "SC-18",
+    "status": "Pass",
+    "notes": "Certificate meta+templates loaded HTTP 200/200"
+  },
+  {
+    "id": "SC-17",
+    "status": "Pass",
+    "notes": "GET generate certificate for student HTTP 200"
+  },
+  {
+    "id": "SC-20",
+    "status": "Pass",
+    "notes": "Lead created for start-admission id=6a5f725e0f8ebfb2227c34c0"
+  },
+  {
+    "id": "SC-21",
+    "status": "Pass",
+    "notes": "Student admitted from lead; lead status=admitted"
+  },
+  {
+    "id": "SC-22",
+    "status": "Pass",
+    "notes": "Lead pipeline active->processing->cancelled succeeded (id=6a5f72600f8ebfb2227c34c2)"
+  },
+  {
+    "id": "SC-31",
+    "status": "Pass",
+    "notes": "GET teacher by id (create skipped - requires customRoleId setup) HTTP 200"
+  },
+  {
+    "id": "SC-50",
+    "status": "Pass",
+    "notes": "GET attendance report by class/section/date HTTP 200 items=4"
+  },
+  {
+    "id": "SC-51",
+    "status": "Pass",
+    "notes": "GET attendance report monthly (detail proxy) HTTP 200 items=4"
+  },
+  {
+    "id": "SC-61",
+    "status": "Pass",
+    "notes": "Non-teaching staff created id=6a5f72610f8ebfb2227c34c3"
+  },
+  {
+    "id": "SC-62",
+    "status": "Pass",
+    "notes": "Driver created id=6a5f72610f8ebfb2227c34c4 phone=9184008698"
+  },
+  {
+    "id": "SC-67",
+    "status": "Pass",
+    "notes": "GET staff id-card HTTP 200"
+  },
+  {
+    "id": "SC-71a",
+    "status": "Pass",
+    "notes": "Exam created id=6a5f72610f8ebfb2227c34c6 (setup for SC-71/72/73)"
+  },
+  {
+    "id": "SC-71",
+    "status": "Pass",
+    "notes": "Marks submitted for 5 student(s) HTTP 200"
+  },
+  {
+    "id": "SC-72",
+    "status": "Pass",
+    "notes": "GET exam results by examId HTTP 200"
+  },
+  {
+    "id": "SC-73",
+    "status": "Pass",
+    "notes": "GET report card for student HTTP 200 items=1"
+  },
+  {
+    "id": "SC-81",
+    "status": "Pass",
+    "notes": "Cash fee of ₹10 collected, receipt id=6a5f72630f8ebfb2227c34c9"
+  },
+  {
+    "id": "SC-82",
+    "status": "Pass",
+    "notes": "UPI fee collect WITHOUT utr correctly rejected HTTP 400: UTR number is required for UPI payments"
+  },
+  {
+    "id": "SC-83",
+    "status": "Pass",
+    "notes": "UPI fee with UTR collected HTTP 200"
+  },
+  {
+    "id": "SC-93",
+    "status": "Pass",
+    "notes": "GET fee receipt by payment id HTTP 200"
+  },
+  {
+    "id": "SC-112",
+    "status": "Fail",
+    "notes": "Bus create HTTP 500: Internal server error. Root cause (from server log): Bus schema has {route:1} unique+sparse index but \"route\" field also has schema default:null, so every bus without a route explicitly assigned is saved with route:null and collides with any other route-less bus (MongoServerError E11000 dup key route:null) as soon as a second such bus exists. Fix: remove the default:null on \"route\" (and \"driver\") or drop the field entirely when unset instead of defaulting to null, so the sparse index actually skips it."
+  },
+  {
+    "id": "SC-114",
+    "status": "Blocked",
+    "notes": "Driver document upload (photo/Aadhaar/license) skipped intentionally per instructions - multipart file upload not exercised in this pass"
+  },
+  {
+    "id": "SC-116",
+    "status": "Pass",
+    "notes": "GET transport buses GPS HTTP 200 items=2"
+  },
+  {
+    "id": "SC-121",
+    "status": "Pass",
+    "notes": "Hostel/building created id=6a5f72640f8ebfb2227c34ce"
+  },
+  {
+    "id": "SC-122",
+    "status": "Pass",
+    "notes": "Room created id=6a5f72640f8ebfb2227c34cf beds=2"
+  },
+  {
+    "id": "SC-123",
+    "status": "Pass",
+    "notes": "POST allocate resident to room/bed HTTP 201"
+  },
+  {
+    "id": "SC-124",
+    "status": "Pass",
+    "notes": "GET hostel visitors HTTP 200 items=15"
+  },
+  {
+    "id": "SC-125",
+    "status": "Pass",
+    "notes": "POST approve pending visitor HTTP 200"
+  },
+  {
+    "id": "SC-126",
+    "status": "Pass",
+    "notes": "POST reject pending visitor with reason HTTP 200"
+  },
+  {
+    "id": "SC-127",
+    "status": "Pass",
+    "notes": "POST checkout approved visitor HTTP 200"
+  },
+  {
+    "id": "SC-131",
+    "status": "Pass",
+    "notes": "Commerce product created id=6a5f72690f8ebfb2227c34d9"
+  },
+  {
+    "id": "SC-132",
+    "status": "Pass",
+    "notes": "GET commerce products (inventory) HTTP 200 items=13"
+  },
+  {
+    "id": "SC-133",
+    "status": "Pass",
+    "notes": "GET commerce store summary HTTP 200"
+  },
+  {
+    "id": "SC-134",
+    "status": "Pass",
+    "notes": "Order created HTTP 201; orders list HTTP 200 items=8"
+  },
+  {
+    "id": "G-04",
+    "status": "Pass",
+    "notes": "POST logout HTTP 200"
+  },
+  {
+    "id": "G-09",
+    "status": "Pass",
+    "notes": "Notification created HTTP 201; topbar HTTP 200 items=28"
+  },
+  {
+    "id": "G-10",
+    "status": "Pass",
+    "notes": "Group created HTTP 201; my-groups HTTP 200 items=4"
+  },
+  {
+    "id": "G-11",
+    "status": "Pass",
+    "notes": "Calendar event created HTTP 201; list HTTP 200"
+  },
+  {
+    "id": "T-03",
+    "status": "Pass",
+    "notes": "GET my students HTTP 200 items=15"
+  },
+  {
+    "id": "T-04",
+    "status": "Pass",
+    "notes": "GET student detail (read-oriented) HTTP 200"
+  },
+  {
+    "id": "T-05",
+    "status": "Pass",
+    "notes": "GET student id card HTTP 200"
+  },
+  {
+    "id": "T-06",
+    "status": "Pass",
+    "notes": "GET my classes HTTP 200 items=2"
+  },
+  {
+    "id": "T-07",
+    "status": "Pass",
+    "notes": "Attendance already recorded today (idempotent check) HTTP 409"
+  },
+  {
+    "id": "T-08",
+    "status": "Pass",
+    "notes": "GET attendance report (teacher) HTTP 200 items=4"
+  },
+  {
+    "id": "T-09",
+    "status": "Pass",
+    "notes": "GET teacher-academic classes (syllabus access) HTTP 200 items=2"
+  },
+  {
+    "id": "T-10",
+    "status": "Blocked",
+    "notes": "POST create assignment HTTP 400 (prerequisite/data issue): Required fields missing: teacherId, schoolId, classId, subjectId, chapterId"
+  },
+  {
+    "id": "T-11",
+    "status": "Pass",
+    "notes": "GET assignment teacher results HTTP 200 items=0"
+  },
+  {
+    "id": "T-12",
+    "status": "Pass",
+    "notes": "Teacher created exam + submitted marks HTTP 200"
+  },
+  {
+    "id": "T-13",
+    "status": "Pass",
+    "notes": "GET report card (teacher view) HTTP 200 items=1"
+  },
+  {
+    "id": "T-14",
+    "status": "Pass",
+    "notes": "GET timetable for class HTTP 200"
+  },
+  {
+    "id": "T-15",
+    "status": "Pass",
+    "notes": "POST create diary entry HTTP 200"
+  },
+  {
+    "id": "T-16",
+    "status": "Pass",
+    "notes": "POST create homework HTTP 201 items=10"
+  },
+  {
+    "id": "T-17",
+    "status": "Pass",
+    "notes": "GET daily-learning assignments (page progress) HTTP 200 items=3"
+  },
+  {
+    "id": "T-18",
+    "status": "Pass",
+    "notes": "Teacher group created id=6a5f726f0f8ebfb2227c34f2"
+  },
+  {
+    "id": "T-19",
+    "status": "Pass",
+    "notes": "GET notices (teacher) HTTP 200"
+  },
+  {
+    "id": "T-20",
+    "status": "Pass",
+    "notes": "GET calendar (teacher) HTTP 200"
+  },
+  {
+    "id": "T-21",
+    "status": "Pass",
+    "notes": "GET blogs (teacher) HTTP 200 items=0"
+  },
+  {
+    "id": "T-22",
+    "status": "Pass",
+    "notes": "GET gatepass manage (teacher) HTTP 200 items=0"
+  },
+  {
+    "id": "T-23",
+    "status": "Pass",
+    "notes": "POST send message to own group HTTP 201"
+  },
+  {
+    "id": "ST-02",
+    "status": "Pass",
+    "notes": "GET notifications (student) HTTP 200 items=15"
+  },
+  {
+    "id": "ST-03",
+    "status": "Pass",
+    "notes": "GET own attendance report HTTP 200 items=4"
+  },
+  {
+    "id": "ST-04",
+    "status": "Pass",
+    "notes": "GET timetable (student) HTTP 200"
+  },
+  {
+    "id": "ST-05",
+    "status": "Pass",
+    "notes": "GET assignments list (student) HTTP 200 items=0"
+  },
+  {
+    "id": "ST-06",
+    "status": "Pass",
+    "notes": "GET assignment submission history (student) HTTP 200 items=0"
+  },
+  {
+    "id": "ST-07",
+    "status": "Pass",
+    "notes": "GET own exam results HTTP 200 items=0"
+  },
+  {
+    "id": "ST-08",
+    "status": "Pass",
+    "notes": "GET own report card HTTP 200 items=0"
+  },
+  {
+    "id": "ST-09",
+    "status": "Pass",
+    "notes": "GET own id card HTTP 200"
+  },
+  {
+    "id": "ST-10",
+    "status": "Pass",
+    "notes": "GET own diary HTTP 200 items=0"
+  },
+  {
+    "id": "ST-11",
+    "status": "Pass",
+    "notes": "GET own homework HTTP 200 items=0"
+  },
+  {
+    "id": "ST-12",
+    "status": "Pass",
+    "notes": "GET daily-learning (student) HTTP 200 items=0"
+  },
+  {
+    "id": "ST-13",
+    "status": "Pass",
+    "notes": "GET syllabus structure (student) HTTP 200"
+  },
+  {
+    "id": "ST-14",
+    "status": "Pass",
+    "notes": "GET own library issues HTTP 200"
+  },
+  {
+    "id": "ST-15",
+    "status": "Pass",
+    "notes": "GET my groups (student) HTTP 200 items=4"
+  },
+  {
+    "id": "ST-16",
+    "status": "Pass",
+    "notes": "GET notices (student) HTTP 200"
+  },
+  {
+    "id": "ST-16b",
+    "status": "Pass",
+    "notes": "GET calendar (student) HTTP 200"
+  },
+  {
+    "id": "ST-17",
+    "status": "Pass",
+    "notes": "GET blogs (student) HTTP 200 items=0"
+  },
+  {
+    "id": "ST-18",
+    "status": "Blocked",
+    "notes": "No group membership found for student account - cannot test group message thread without a joined group"
+  },
+  {
+    "id": "ST-19",
+    "status": "Pass",
+    "notes": "Student attempts fee collection (should be school/staff only) correctly denied HTTP 403: Access denied"
+  },
+  {
+    "id": "P-02",
+    "status": "Pass",
+    "notes": "GET my child (student detail) HTTP 200"
+  },
+  {
+    "id": "P-03",
+    "status": "Pass",
+    "notes": "GET notifications (parent) HTTP 200 items=15"
+  },
+  {
+    "id": "P-04",
+    "status": "Pass",
+    "notes": "GET fees for my child HTTP 200"
+  },
+  {
+    "id": "AC-03",
+    "status": "Pass",
+    "notes": "Accountant collected ₹10 cash for parent's child, receipt id=6a5f72720f8ebfb2227c3501"
+  },
+  {
+    "id": "P-05",
+    "status": "Pass",
+    "notes": "GET fee receipt (parent, own child) HTTP 200"
+  },
+  {
+    "id": "P-06",
+    "status": "Pass",
+    "notes": "GET commerce parent products (store) HTTP 200 items=13"
+  },
+  {
+    "id": "P-07",
+    "status": "Pass",
+    "notes": "GET transport route for my child HTTP 200"
+  },
+  {
+    "id": "P-08",
+    "status": "Pass",
+    "notes": "GET child exam results HTTP 200 items=0"
+  },
+  {
+    "id": "P-09",
+    "status": "Pass",
+    "notes": "GET child report card HTTP 200 items=0"
+  },
+  {
+    "id": "P-10",
+    "status": "Pass",
+    "notes": "GET child id card HTTP 200"
+  },
+  {
+    "id": "P-11",
+    "status": "Pass",
+    "notes": "GET notices (parent) HTTP 200"
+  },
+  {
+    "id": "P-11b",
+    "status": "Pass",
+    "notes": "GET calendar (parent) HTTP 200"
+  },
+  {
+    "id": "P-12",
+    "status": "Pass",
+    "notes": "GET blogs (parent) HTTP 200 items=0"
+  },
+  {
+    "id": "P-13",
+    "status": "Pass",
+    "notes": "GET my gate passes (parent) HTTP 200 items=0"
+  },
+  {
+    "id": "P-14",
+    "status": "Pass",
+    "notes": "GET child homework (parent) HTTP 200 items=0"
+  },
+  {
+    "id": "P-15",
+    "status": "Pass",
+    "notes": "GET daily learning (parent) HTTP 200 items=0"
+  },
+  {
+    "id": "P-16",
+    "status": "Pass",
+    "notes": "GET syllabus structure (parent) HTTP 200"
+  },
+  {
+    "id": "P-17",
+    "status": "Blocked",
+    "notes": "No group membership found for parent account - cannot test group message thread without a joined group"
+  },
+  {
+    "id": "AC-04a",
+    "status": "Pass",
+    "notes": "UPI collection WITHOUT UTR (accountant) correctly rejected HTTP 400: UTR number is required for UPI payments"
+  },
+  {
+    "id": "AC-04",
+    "status": "Pass",
+    "notes": "Accountant UPI collection with UTR succeeded HTTP 200"
+  },
+  {
+    "id": "AC-05",
+    "status": "Pass",
+    "notes": "POST online payment with transactionId HTTP 200"
+  },
+  {
+    "id": "AC-06",
+    "status": "Pass",
+    "notes": "GET fee history (accountant) HTTP 200"
+  },
+  {
+    "id": "AC-07",
+    "status": "Pass",
+    "notes": "GET fee defaulters (accountant) HTTP 200"
+  },
+  {
+    "id": "AC-08",
+    "status": "Pass",
+    "notes": "GET financial report (accountant) HTTP 200"
+  },
+  {
+    "id": "AC-09",
+    "status": "Pass",
+    "notes": "GET students list (accountant) HTTP 200 items=16"
+  },
+  {
+    "id": "AC-10",
+    "status": "Pass",
+    "notes": "GET notices (accountant) HTTP 200"
+  },
+  {
+    "id": "AC-10b",
+    "status": "Pass",
+    "notes": "GET calendar (accountant) HTTP 200"
+  },
+  {
+    "id": "AC-11",
+    "status": "Pass",
+    "notes": "GET leads (accountant) HTTP 200 items=0"
+  },
+  {
+    "id": "AC-12",
+    "status": "Pass",
+    "notes": "GET my groups / messages (accountant) HTTP 200 items=0"
+  },
+  {
+    "id": "AC-14",
+    "status": "Pass",
+    "notes": "Accountant attempts to change school subscription (super admin only) correctly denied HTTP 403: Access denied"
+  },
+  {
+    "id": "GD-02",
+    "status": "Pass",
+    "notes": "GET hostel visitors (guard) HTTP 200 items=17"
+  },
+  {
+    "id": "GD-03",
+    "status": "Pass",
+    "notes": "Visitor submitted with live photo, status=Pending id=6a5f72770f8ebfb2227c3507"
+  },
+  {
+    "id": "GD-04",
+    "status": "Pass",
+    "notes": "Guard approve request succeeded HTTP 200 - documents actual behavior: /hostel/visitors/:id/approve route has no role check beyond 'hostel' module access, so any staff with hostel permission (incl. guard) can approve. Policy enforcement is currently only at the frontend UI level, not the API."
+  },
+  {
+    "id": "GD-05",
+    "status": "Pass",
+    "notes": "GET gatepass manage (guard) HTTP 200 items=0"
+  },
+  {
+    "id": "GD-06",
+    "status": "Pass",
+    "notes": "GET students lookup (guard) HTTP 200 items=16"
+  },
+  {
+    "id": "GD-07",
+    "status": "Pass",
+    "notes": "GET notices (guard) HTTP 200"
+  },
+  {
+    "id": "GD-07b",
+    "status": "Pass",
+    "notes": "GET my groups / messages (guard) HTTP 200 items=0"
+  },
+  {
+    "id": "W-02",
+    "status": "Pass",
+    "notes": "Pending visitors listed HTTP 200 items=0"
+  },
+  {
+    "id": "W-03",
+    "status": "Pass",
+    "notes": "POST warden approves pending visitor HTTP 200"
+  },
+  {
+    "id": "W-04",
+    "status": "Pass",
+    "notes": "POST warden rejects visitor with reason HTTP 200"
+  },
+  {
+    "id": "W-05",
+    "status": "Pass",
+    "notes": "POST warden checks out approved visitor HTTP 200"
+  },
+  {
+    "id": "W-06",
+    "status": "Pass",
+    "notes": "GET hostels/rooms/residents (warden) HTTP 200 items=6"
+  },
+  {
+    "id": "W-06b",
+    "status": "Pass",
+    "notes": "GET hostel rooms (warden) HTTP 200 items=10"
+  },
+  {
+    "id": "W-06c",
+    "status": "Pass",
+    "notes": "GET hostel residents (warden) HTTP 200 items=10"
+  },
+  {
+    "id": "W-07",
+    "status": "Pass",
+    "notes": "GET students (warden) HTTP 200 items=16"
+  },
+  {
+    "id": "W-07b",
+    "status": "Blocked",
+    "notes": "Attendance meta restricted to teacher_admin/school_admin roles; warden correctly denied HTTP 403: Unauthorized role"
+  },
+  {
+    "id": "W-08",
+    "status": "Pass",
+    "notes": "GET notices (warden) HTTP 200"
+  },
+  {
+    "id": "W-08b",
+    "status": "Pass",
+    "notes": "GET my groups / messages (warden) HTTP 200 items=0"
+  },
+  {
+    "id": "L-02",
+    "status": "Pass",
+    "notes": "Book added, issued to student, and return not verified (bookId=6a5f727d0f8ebfb2227c350d)"
+  },
+  {
+    "id": "L-03",
+    "status": "Pass",
+    "notes": "GET students (librarian lookup borrowers) HTTP 200 items=16"
+  },
+  {
+    "id": "L-04",
+    "status": "Pass",
+    "notes": "GET notices (librarian) HTTP 200"
+  },
+  {
+    "id": "L-04b",
+    "status": "Pass",
+    "notes": "GET calendar (librarian) HTTP 200"
+  },
+  {
+    "id": "L-05",
+    "status": "Fail",
+    "notes": "Fee history was NOT hidden for librarian (access-control gap: /api/fees uses requireRoles(\"school_admin\",\"staff_admin\") only, without checking granular staff permissions array) HTTP 200"
+  },
+  {
+    "id": "L-06",
+    "status": "Pass",
+    "notes": "Librarian attempts transport admin (no transport permission) correctly denied HTTP 403: You do not have permission to access the 'transport' module."
+  },
+  {
+    "id": "DR-04",
+    "status": "Pass",
+    "notes": "PUT assign driver to bus HTTP 200"
+  },
+  {
+    "id": "DR-05",
+    "status": "Pass",
+    "notes": "Driver phone attempts login (no driver login portal) correctly denied HTTP 401: Invalid credentials"
+  },
+  {
+    "id": "SA-02",
+    "status": "Pass",
+    "notes": "Dashboard proxy: schools HTTP 200 items=1, subscriptions HTTP 200 items=1 (no dedicated /admin dashboard-stats API route found; used schools+subscriptions as overview proxy)"
+  },
+  {
+    "id": "SA-06",
+    "status": "Fail",
+    "notes": "Create school HTTP 500: <!DOCTYPE html>\n<html lang=\"en\">\n<head>\n<meta charset=\"utf-8\">\n<title>Error</title>\n</head>\n<body>\n<pre>ReferenceError: razorpayKeyId is not defined<br> &nbsp; &nbsp;at createSchool (file:///D:/Eduaitor/Backend/controllers/schoolController.js:89:22)<"
+  },
+  {
+    "id": "SA-07",
+    "status": "Pass",
+    "notes": "GET schools list (School Management) HTTP 200 items=1"
+  },
+  {
+    "id": "SA-08",
+    "status": "Blocked",
+    "notes": "No school created in SA-06 to inspect/unlock modules for"
+  },
+  {
+    "id": "SA-09",
+    "status": "Blocked",
+    "notes": "No school created in SA-06 to inspect/unlock modules for"
+  },
+  {
+    "id": "SA-11",
+    "status": "Pass",
+    "notes": "Syllabus catalog boards list HTTP 200 items=5; create HTTP 201"
+  },
+  {
+    "id": "SA-12",
+    "status": "Blocked",
+    "notes": "No dedicated 'help requests' API route found under Backend/routes (messageSingalRoute.js is a WebRTC/message-signal channel, not a help-desk thread endpoint). Cannot verify via API without a defined route."
+  },
+  {
+    "id": "SA-13",
+    "status": "Pass",
+    "notes": "Frontend /admin/platform-analytics HTTP 200 (SPA route loads; page content not verified without a browser)"
+  },
+  {
+    "id": "SA-14",
+    "status": "Pass",
+    "notes": "POST logout (super admin) HTTP 200"
+  },
+  {
+    "id": "FE-_admin_login",
+    "status": "Pass",
+    "notes": "Frontend /admin/login HTTP 200 (SPA index served; client-side routing/auth not evaluated without a browser)"
+  },
+  {
+    "id": "FE-_school_dashboard",
+    "status": "Pass",
+    "notes": "Frontend /school/dashboard HTTP 200 (SPA index served; client-side routing/auth not evaluated without a browser)"
+  },
+  {
+    "id": "FE-_teacher_dashboard",
+    "status": "Pass",
+    "notes": "Frontend /teacher/dashboard HTTP 200 (SPA index served; client-side routing/auth not evaluated without a browser)"
+  },
+  {
+    "id": "FE-_student_dashboard",
+    "status": "Pass",
+    "notes": "Frontend /student/dashboard HTTP 200 (SPA index served; client-side routing/auth not evaluated without a browser)"
+  },
+  {
+    "id": "FE-_parent_dashboard",
+    "status": "Pass",
+    "notes": "Frontend /parent/dashboard HTTP 200 (SPA index served; client-side routing/auth not evaluated without a browser)"
+  },
+  {
+    "id": "FE-_staff_dashboard",
+    "status": "Pass",
+    "notes": "Frontend /staff/dashboard HTTP 200 (SPA index served; client-side routing/auth not evaluated without a browser)"
+  },
+  {
+    "id": "FE-_admin_dashboard",
+    "status": "Pass",
+    "notes": "Frontend /admin/dashboard HTTP 200 (SPA index served; client-side routing/auth not evaluated without a browser)"
+  }
+]

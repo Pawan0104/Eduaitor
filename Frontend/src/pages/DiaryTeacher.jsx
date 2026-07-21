@@ -294,7 +294,7 @@ export default function DiaryTeacher() {
   // ── Fetch ──────────────────────────────────────────────────────────────────
   const fetchClasses = async () => {
     try {
-      const res = await axios.get(`${API}/classes/all`, {
+      const res = await axios.get(`${API}/classes/teacher/my-classes`, {
         withCredentials: true,
       });
       console.log("Classes:", res.data.classes);

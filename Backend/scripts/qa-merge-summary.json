@@ -1,0 +1,822 @@
+{
+  "totalRows": 225,
+  "counts": {
+    "Pass": 181,
+    "Fail": 0,
+    "Blocked": 7,
+    "Not run": 37
+  },
+  "changes": [
+    {
+      "id": "G-04",
+      "from": "Not run",
+      "to": "Pass",
+      "source": "manual-ui"
+    },
+    {
+      "id": "G-09",
+      "from": "Not run",
+      "to": "Pass",
+      "source": "qa-ui-deep-results.json"
+    },
+    {
+      "id": "G-10",
+      "from": "Not run",
+      "to": "Pass",
+      "source": "qa-ui-deep-results.json"
+    },
+    {
+      "id": "G-11",
+      "from": "Not run",
+      "to": "Pass",
+      "source": "qa-ui-deep-results.json"
+    },
+    {
+      "id": "SA-02",
+      "from": "Not run",
+      "to": "Pass",
+      "source": "qa-ui-deep-results.json"
+    },
+    {
+      "id": "SA-06",
+      "from": "Not run",
+      "to": "Pass",
+      "source": "qa-fix-recheck.json"
+    },
+    {
+      "id": "SA-07",
+      "from": "Not run",
+      "to": "Pass",
+      "source": "qa-ui-deep-results.json"
+    },
+    {
+      "id": "SA-08",
+      "from": "Not run",
+      "to": "Blocked",
+      "source": "qa-ui-deep-results.json"
+    },
+    {
+      "id": "SA-09",
+      "from": "Not run",
+      "to": "Blocked",
+      "source": "qa-ui-deep-results.json"
+    },
+    {
+      "id": "SA-11",
+      "from": "Not run",
+      "to": "Pass",
+      "source": "qa-ui-deep-results.json"
+    },
+    {
+      "id": "SA-12",
+      "from": "Not run",
+      "to": "Blocked",
+      "source": "qa-ui-deep-results.json"
+    },
+    {
+      "id": "SA-13",
+      "from": "Not run",
+      "to": "Pass",
+      "source": "qa-ui-deep-results.json"
+    },
+    {
+      "id": "SA-14",
+      "from": "Not run",
+      "to": "Pass",
+      "source": "qa-ui-deep-results.json"
+    },
+    {
+      "id": "SC-11",
+      "from": "Not run",
+      "to": "Pass",
+      "source": "qa-ui-deep-results.json"
+    },
+    {
+      "id": "SC-12",
+      "from": "Not run",
+      "to": "Pass",
+      "source": "qa-ui-deep-results.json"
+    },
+    {
+      "id": "SC-13",
+      "from": "Not run",
+      "to": "Pass",
+      "source": "qa-ui-deep-results.json"
+    },
+    {
+      "id": "SC-14",
+      "from": "Not run",
+      "to": "Pass",
+      "source": "qa-ui-deep-results.json"
+    },
+    {
+      "id": "SC-17",
+      "from": "Not run",
+      "to": "Pass",
+      "source": "qa-ui-deep-results.json"
+    },
+    {
+      "id": "SC-18",
+      "from": "Not run",
+      "to": "Pass",
+      "source": "qa-ui-deep-results.json"
+    },
+    {
+      "id": "SC-20",
+      "from": "Not run",
+      "to": "Pass",
+      "source": "qa-ui-deep-results.json"
+    },
+    {
+      "id": "SC-21",
+      "from": "Not run",
+      "to": "Pass",
+      "source": "qa-ui-deep-results.json"
+    },
+    {
+      "id": "SC-22",
+      "from": "Not run",
+      "to": "Pass",
+      "source": "qa-ui-deep-results.json"
+    },
+    {
+      "id": "SC-31",
+      "from": "Not run",
+      "to": "Pass",
+      "source": "qa-ui-deep-results.json"
+    },
+    {
+      "id": "SC-50",
+      "from": "Not run",
+      "to": "Pass",
+      "source": "qa-ui-deep-results.json"
+    },
+    {
+      "id": "SC-51",
+      "from": "Not run",
+      "to": "Pass",
+      "source": "qa-ui-deep-results.json"
+    },
+    {
+      "id": "SC-61",
+      "from": "Not run",
+      "to": "Pass",
+      "source": "qa-ui-deep-results.json"
+    },
+    {
+      "id": "SC-62",
+      "from": "Not run",
+      "to": "Pass",
+      "source": "qa-ui-deep-results.json"
+    },
+    {
+      "id": "SC-67",
+      "from": "Not run",
+      "to": "Pass",
+      "source": "qa-ui-deep-results.json"
+    },
+    {
+      "id": "SC-71",
+      "from": "Not run",
+      "to": "Pass",
+      "source": "qa-ui-deep-results.json"
+    },
+    {
+      "id": "SC-72",
+      "from": "Not run",
+      "to": "Pass",
+      "source": "qa-ui-deep-results.json"
+    },
+    {
+      "id": "SC-73",
+      "from": "Not run",
+      "to": "Pass",
+      "source": "qa-ui-deep-results.json"
+    },
+    {
+      "id": "SC-81",
+      "from": "Blocked",
+      "to": "Pass",
+      "source": "qa-ui-deep-results.json"
+    },
+    {
+      "id": "SC-82",
+      "from": "Not run",
+      "to": "Pass",
+      "source": "qa-ui-deep-results.json"
+    },
+    {
+      "id": "SC-83",
+      "from": "Not run",
+      "to": "Pass",
+      "source": "qa-ui-deep-results.json"
+    },
+    {
+      "id": "SC-93",
+      "from": "Not run",
+      "to": "Pass",
+      "source": "qa-ui-deep-results.json"
+    },
+    {
+      "id": "SC-112",
+      "from": "Not run",
+      "to": "Pass",
+      "source": "qa-fix-recheck.json"
+    },
+    {
+      "id": "SC-114",
+      "from": "Not run",
+      "to": "Blocked",
+      "source": "qa-ui-deep-results.json"
+    },
+    {
+      "id": "SC-116",
+      "from": "Not run",
+      "to": "Pass",
+      "source": "qa-ui-deep-results.json"
+    },
+    {
+      "id": "SC-121",
+      "from": "Not run",
+      "to": "Pass",
+      "source": "qa-ui-deep-results.json"
+    },
+    {
+      "id": "SC-122",
+      "from": "Not run",
+      "to": "Pass",
+      "source": "qa-ui-deep-results.json"
+    },
+    {
+      "id": "SC-123",
+      "from": "Not run",
+      "to": "Pass",
+      "source": "qa-ui-deep-results.json"
+    },
+    {
+      "id": "SC-124",
+      "from": "Not run",
+      "to": "Pass",
+      "source": "qa-ui-deep-results.json"
+    },
+    {
+      "id": "SC-125",
+      "from": "Not run",
+      "to": "Pass",
+      "source": "qa-ui-deep-results.json"
+    },
+    {
+      "id": "SC-126",
+      "from": "Not run",
+      "to": "Pass",
+      "source": "qa-ui-deep-results.json"
+    },
+    {
+      "id": "SC-127",
+      "from": "Not run",
+      "to": "Pass",
+      "source": "qa-ui-deep-results.json"
+    },
+    {
+      "id": "SC-131",
+      "from": "Not run",
+      "to": "Pass",
+      "source": "qa-ui-deep-results.json"
+    },
+    {
+      "id": "SC-132",
+      "from": "Not run",
+      "to": "Pass",
+      "source": "qa-ui-deep-results.json"
+    },
+    {
+      "id": "SC-133",
+      "from": "Not run",
+      "to": "Pass",
+      "source": "qa-ui-deep-results.json"
+    },
+    {
+      "id": "SC-134",
+      "from": "Not run",
+      "to": "Pass",
+      "source": "qa-ui-deep-results.json"
+    },
+    {
+      "id": "T-03",
+      "from": "Not run",
+      "to": "Pass",
+      "source": "qa-ui-deep-results.json"
+    },
+    {
+      "id": "T-04",
+      "from": "Not run",
+      "to": "Pass",
+      "source": "qa-ui-deep-results.json"
+    },
+    {
+      "id": "T-05",
+      "from": "Not run",
+      "to": "Pass",
+      "source": "qa-ui-deep-results.json"
+    },
+    {
+      "id": "T-06",
+      "from": "Not run",
+      "to": "Pass",
+      "source": "qa-ui-deep-results.json"
+    },
+    {
+      "id": "T-07",
+      "from": "Not run",
+      "to": "Pass",
+      "source": "qa-ui-deep-results.json"
+    },
+    {
+      "id": "T-08",
+      "from": "Not run",
+      "to": "Pass",
+      "source": "qa-ui-deep-results.json"
+    },
+    {
+      "id": "T-09",
+      "from": "Not run",
+      "to": "Pass",
+      "source": "qa-ui-deep-results.json"
+    },
+    {
+      "id": "T-10",
+      "from": "Not run",
+      "to": "Blocked",
+      "source": "qa-ui-deep-results.json"
+    },
+    {
+      "id": "T-11",
+      "from": "Not run",
+      "to": "Pass",
+      "source": "qa-ui-deep-results.json"
+    },
+    {
+      "id": "T-12",
+      "from": "Not run",
+      "to": "Pass",
+      "source": "qa-ui-deep-results.json"
+    },
+    {
+      "id": "T-13",
+      "from": "Not run",
+      "to": "Pass",
+      "source": "qa-ui-deep-results.json"
+    },
+    {
+      "id": "T-14",
+      "from": "Not run",
+      "to": "Pass",
+      "source": "qa-ui-deep-results.json"
+    },
+    {
+      "id": "T-15",
+      "from": "Not run",
+      "to": "Pass",
+      "source": "qa-ui-deep-results.json"
+    },
+    {
+      "id": "T-16",
+      "from": "Not run",
+      "to": "Pass",
+      "source": "qa-ui-deep-results.json"
+    },
+    {
+      "id": "T-17",
+      "from": "Not run",
+      "to": "Pass",
+      "source": "qa-ui-deep-results.json"
+    },
+    {
+      "id": "T-18",
+      "from": "Not run",
+      "to": "Pass",
+      "source": "qa-ui-deep-results.json"
+    },
+    {
+      "id": "T-19",
+      "from": "Not run",
+      "to": "Pass",
+      "source": "qa-ui-deep-results.json"
+    },
+    {
+      "id": "T-20",
+      "from": "Not run",
+      "to": "Pass",
+      "source": "qa-ui-deep-results.json"
+    },
+    {
+      "id": "T-21",
+      "from": "Not run",
+      "to": "Pass",
+      "source": "qa-ui-deep-results.json"
+    },
+    {
+      "id": "T-22",
+      "from": "Not run",
+      "to": "Pass",
+      "source": "qa-ui-deep-results.json"
+    },
+    {
+      "id": "T-23",
+      "from": "Not run",
+      "to": "Pass",
+      "source": "qa-ui-deep-results.json"
+    },
+    {
+      "id": "ST-02",
+      "from": "Not run",
+      "to": "Pass",
+      "source": "qa-ui-deep-results.json"
+    },
+    {
+      "id": "ST-03",
+      "from": "Not run",
+      "to": "Pass",
+      "source": "qa-ui-deep-results.json"
+    },
+    {
+      "id": "ST-04",
+      "from": "Not run",
+      "to": "Pass",
+      "source": "qa-ui-deep-results.json"
+    },
+    {
+      "id": "ST-05",
+      "from": "Not run",
+      "to": "Pass",
+      "source": "qa-ui-deep-results.json"
+    },
+    {
+      "id": "ST-06",
+      "from": "Not run",
+      "to": "Pass",
+      "source": "qa-ui-deep-results.json"
+    },
+    {
+      "id": "ST-07",
+      "from": "Not run",
+      "to": "Pass",
+      "source": "qa-ui-deep-results.json"
+    },
+    {
+      "id": "ST-08",
+      "from": "Not run",
+      "to": "Pass",
+      "source": "qa-ui-deep-results.json"
+    },
+    {
+      "id": "ST-09",
+      "from": "Not run",
+      "to": "Pass",
+      "source": "qa-ui-deep-results.json"
+    },
+    {
+      "id": "ST-10",
+      "from": "Not run",
+      "to": "Pass",
+      "source": "qa-ui-deep-results.json"
+    },
+    {
+      "id": "ST-11",
+      "from": "Not run",
+      "to": "Pass",
+      "source": "qa-ui-deep-results.json"
+    },
+    {
+      "id": "ST-12",
+      "from": "Not run",
+      "to": "Pass",
+      "source": "qa-ui-deep-results.json"
+    },
+    {
+      "id": "ST-13",
+      "from": "Not run",
+      "to": "Pass",
+      "source": "qa-ui-deep-results.json"
+    },
+    {
+      "id": "ST-14",
+      "from": "Not run",
+      "to": "Pass",
+      "source": "qa-ui-deep-results.json"
+    },
+    {
+      "id": "ST-15",
+      "from": "Not run",
+      "to": "Pass",
+      "source": "qa-ui-deep-results.json"
+    },
+    {
+      "id": "ST-16",
+      "from": "Not run",
+      "to": "Pass",
+      "source": "qa-ui-deep-results.json"
+    },
+    {
+      "id": "ST-17",
+      "from": "Not run",
+      "to": "Pass",
+      "source": "qa-ui-deep-results.json"
+    },
+    {
+      "id": "ST-18",
+      "from": "Not run",
+      "to": "Blocked",
+      "source": "qa-ui-deep-results.json"
+    },
+    {
+      "id": "ST-19",
+      "from": "Not run",
+      "to": "Pass",
+      "source": "qa-ui-deep-results.json"
+    },
+    {
+      "id": "P-02",
+      "from": "Not run",
+      "to": "Pass",
+      "source": "qa-ui-deep-results.json"
+    },
+    {
+      "id": "P-03",
+      "from": "Not run",
+      "to": "Pass",
+      "source": "qa-ui-deep-results.json"
+    },
+    {
+      "id": "P-04",
+      "from": "Not run",
+      "to": "Pass",
+      "source": "qa-ui-deep-results.json"
+    },
+    {
+      "id": "P-05",
+      "from": "Not run",
+      "to": "Pass",
+      "source": "qa-ui-deep-results.json"
+    },
+    {
+      "id": "P-06",
+      "from": "Not run",
+      "to": "Pass",
+      "source": "qa-ui-deep-results.json"
+    },
+    {
+      "id": "P-07",
+      "from": "Not run",
+      "to": "Pass",
+      "source": "qa-ui-deep-results.json"
+    },
+    {
+      "id": "P-08",
+      "from": "Not run",
+      "to": "Pass",
+      "source": "qa-ui-deep-results.json"
+    },
+    {
+      "id": "P-09",
+      "from": "Not run",
+      "to": "Pass",
+      "source": "qa-ui-deep-results.json"
+    },
+    {
+      "id": "P-10",
+      "from": "Not run",
+      "to": "Pass",
+      "source": "qa-ui-deep-results.json"
+    },
+    {
+      "id": "P-11",
+      "from": "Not run",
+      "to": "Pass",
+      "source": "qa-ui-deep-results.json"
+    },
+    {
+      "id": "P-12",
+      "from": "Not run",
+      "to": "Pass",
+      "source": "qa-ui-deep-results.json"
+    },
+    {
+      "id": "P-13",
+      "from": "Not run",
+      "to": "Pass",
+      "source": "qa-ui-deep-results.json"
+    },
+    {
+      "id": "P-14",
+      "from": "Not run",
+      "to": "Pass",
+      "source": "qa-ui-deep-results.json"
+    },
+    {
+      "id": "P-15",
+      "from": "Not run",
+      "to": "Pass",
+      "source": "qa-ui-deep-results.json"
+    },
+    {
+      "id": "P-16",
+      "from": "Not run",
+      "to": "Pass",
+      "source": "qa-ui-deep-results.json"
+    },
+    {
+      "id": "P-17",
+      "from": "Not run",
+      "to": "Blocked",
+      "source": "qa-ui-deep-results.json"
+    },
+    {
+      "id": "AC-03",
+      "from": "Not run",
+      "to": "Pass",
+      "source": "qa-ui-deep-results.json"
+    },
+    {
+      "id": "AC-04",
+      "from": "Not run",
+      "to": "Pass",
+      "source": "qa-ui-deep-results.json"
+    },
+    {
+      "id": "AC-05",
+      "from": "Not run",
+      "to": "Pass",
+      "source": "qa-ui-deep-results.json"
+    },
+    {
+      "id": "AC-06",
+      "from": "Not run",
+      "to": "Pass",
+      "source": "qa-ui-deep-results.json"
+    },
+    {
+      "id": "AC-07",
+      "from": "Not run",
+      "to": "Pass",
+      "source": "qa-ui-deep-results.json"
+    },
+    {
+      "id": "AC-08",
+      "from": "Not run",
+      "to": "Pass",
+      "source": "qa-ui-deep-results.json"
+    },
+    {
+      "id": "AC-09",
+      "from": "Not run",
+      "to": "Pass",
+      "source": "qa-ui-deep-results.json"
+    },
+    {
+      "id": "AC-10",
+      "from": "Not run",
+      "to": "Pass",
+      "source": "qa-ui-deep-results.json"
+    },
+    {
+      "id": "AC-11",
+      "from": "Not run",
+      "to": "Pass",
+      "source": "qa-ui-deep-results.json"
+    },
+    {
+      "id": "AC-12",
+      "from": "Not run",
+      "to": "Pass",
+      "source": "qa-ui-deep-results.json"
+    },
+    {
+      "id": "AC-14",
+      "from": "Not run",
+      "to": "Pass",
+      "source": "qa-ui-deep-results.json"
+    },
+    {
+      "id": "GD-02",
+      "from": "Not run",
+      "to": "Pass",
+      "source": "qa-ui-deep-results.json"
+    },
+    {
+      "id": "GD-03",
+      "from": "Not run",
+      "to": "Pass",
+      "source": "qa-ui-deep-results.json"
+    },
+    {
+      "id": "GD-04",
+      "from": "Not run",
+      "to": "Pass",
+      "source": "qa-ui-deep-results.json"
+    },
+    {
+      "id": "GD-05",
+      "from": "Not run",
+      "to": "Pass",
+      "source": "qa-ui-deep-results.json"
+    },
+    {
+      "id": "GD-06",
+      "from": "Not run",
+      "to": "Pass",
+      "source": "qa-ui-deep-results.json"
+    },
+    {
+      "id": "GD-07",
+      "from": "Not run",
+      "to": "Pass",
+      "source": "qa-ui-deep-results.json"
+    },
+    {
+      "id": "W-02",
+      "from": "Not run",
+      "to": "Pass",
+      "source": "qa-ui-deep-results.json"
+    },
+    {
+      "id": "W-03",
+      "from": "Not run",
+      "to": "Pass",
+      "source": "qa-ui-deep-results.json"
+    },
+    {
+      "id": "W-04",
+      "from": "Not run",
+      "to": "Pass",
+      "source": "qa-ui-deep-results.json"
+    },
+    {
+      "id": "W-05",
+      "from": "Not run",
+      "to": "Pass",
+      "source": "qa-ui-deep-results.json"
+    },
+    {
+      "id": "W-06",
+      "from": "Not run",
+      "to": "Pass",
+      "source": "qa-ui-deep-results.json"
+    },
+    {
+      "id": "W-07",
+      "from": "Not run",
+      "to": "Pass",
+      "source": "qa-ui-deep-results.json"
+    },
+    {
+      "id": "W-08",
+      "from": "Not run",
+      "to": "Pass",
+      "source": "qa-ui-deep-results.json"
+    },
+    {
+      "id": "L-02",
+      "from": "Not run",
+      "to": "Pass",
+      "source": "qa-ui-deep-results.json"
+    },
+    {
+      "id": "L-03",
+      "from": "Not run",
+      "to": "Pass",
+      "source": "qa-ui-deep-results.json"
+    },
+    {
+      "id": "L-04",
+      "from": "Not run",
+      "to": "Pass",
+      "source": "qa-ui-deep-results.json"
+    },
+    {
+      "id": "L-05",
+      "from": "Not run",
+      "to": "Pass",
+      "source": "qa-fix-recheck.json"
+    },
+    {
+      "id": "L-06",
+      "from": "Not run",
+      "to": "Pass",
+      "source": "qa-ui-deep-results.json"
+    },
+    {
+      "id": "DR-04",
+      "from": "Not run",
+      "to": "Pass",
+      "source": "qa-ui-deep-results.json"
+    },
+    {
+      "id": "DR-05",
+      "from": "Not run",
+      "to": "Pass",
+      "source": "qa-ui-deep-results.json"
+    }
+  ],
+  "failRows": []
+}

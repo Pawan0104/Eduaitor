@@ -613,10 +613,14 @@ export function MenuStylePicker({ className = "" }) {
     const onKey = (e) => {
       if (e.key === "Escape") setOpen(false);
     };
+    // Prevent background scroll while sheet is open
+    const prevOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
     document.addEventListener("mousedown", onDoc);
     document.addEventListener("touchstart", onDoc, { passive: true });
     document.addEventListener("keydown", onKey);
     return () => {
+      document.body.style.overflow = prevOverflow;
       document.removeEventListener("mousedown", onDoc);
       document.removeEventListener("touchstart", onDoc);
       document.removeEventListener("keydown", onKey);
@@ -637,18 +641,18 @@ export function MenuStylePicker({ className = "" }) {
       <button
         type="button"
         onClick={() => setOpen((v) => !v)}
-        aria-haspopup="listbox"
+        aria-haspopup="dialog"
         aria-expanded={open}
         aria-label={t("menu.style", "Menu style")}
         title={t("menu.style", "Menu style")}
-        className="group flex h-9 items-center gap-1.5 rounded-xl border px-2 pl-2.5
+        className="flex h-9 w-9 items-center justify-center rounded-xl border
           transition active:scale-[0.97]
           border-[rgb(var(--border))] bg-[rgb(var(--surface))]
           hover:border-[rgba(var(--primary),0.35)]
           hover:bg-[rgba(var(--primary),0.06)]"
       >
         <span
-          className="flex h-6 w-6 items-center justify-center rounded-lg text-white shadow-sm"
+          className="flex h-6 w-6 items-center justify-center rounded-lg text-white"
           style={{
             background:
               "linear-gradient(135deg, rgb(var(--primary)) 0%, rgb(var(--sidebar)) 100%)",
@@ -656,90 +660,112 @@ export function MenuStylePicker({ className = "" }) {
         >
           <FaThLarge size={10} />
         </span>
-        <span className="max-w-[4.5rem] truncate text-left text-[11px] font-bold leading-tight text-[rgb(var(--text))]">
-          {t(`menuStyle.${activeOpt.id}`, activeOpt.label)}
-        </span>
-        <FaChevronDown
-          size={9}
-          className={`opacity-45 transition-transform duration-200 ${
-            open ? "rotate-180" : ""
-          }`}
-          style={{ color: "rgb(var(--text-muted))" }}
-        />
       </button>
 
       {open && (
         <div
-          role="listbox"
-          aria-label={t("menu.style", "Menu style")}
-          className="absolute right-0 top-[calc(100%+0.4rem)] z-50 w-[min(18.5rem,calc(100vw-1rem))]
-            overflow-hidden rounded-2xl border border-[rgb(var(--border))]
-            bg-[rgb(var(--surface))] shadow-[0_12px_40px_rgba(0,0,0,0.14)]"
+          className="fixed inset-0 z-[80] flex items-end sm:items-center justify-center p-3"
+          style={{
+            background: "rgba(15, 23, 42, 0.45)",
+            paddingTop: "max(0.75rem, env(safe-area-inset-top))",
+            paddingBottom: "max(0.75rem, env(safe-area-inset-bottom))",
+          }}
+          role="presentation"
+          onClick={() => setOpen(false)}
         >
           <div
-            className="border-b border-[rgb(var(--border))] px-3.5 py-2.5"
-            style={{
-              background:
-                "linear-gradient(135deg, rgba(var(--primary),0.10) 0%, transparent 70%)",
-            }}
+            role="listbox"
+            aria-label={t("menu.style", "Menu style")}
+            onClick={(e) => e.stopPropagation()}
+            className="w-full max-w-sm max-h-[min(85dvh,32rem)] overflow-y-auto
+              rounded-2xl border border-[rgb(var(--border))]
+              bg-[rgb(var(--surface))] shadow-xl"
           >
-            <p className="text-[12px] font-extrabold text-[rgb(var(--text))]">
-              {t("menu.style", "Menu style")}
-            </p>
-            <p className="mt-0.5 text-[10.5px] font-medium text-[rgb(var(--text-muted))]">
-              {t("menu.styleHint", "Choose how modules look on your menu")}
-            </p>
-          </div>
-
-          <div className="grid grid-cols-1 gap-1.5 p-2">
-            {MENU_STYLE_OPTIONS.map((opt) => {
-              const active = value === opt.id;
-              return (
+            <div
+              className="sticky top-0 z-10 border-b border-[rgb(var(--border))] px-3.5 py-2.5
+                bg-[rgb(var(--surface))]"
+              style={{
+                background:
+                  "linear-gradient(135deg, rgba(var(--primary),0.10) 0%, rgb(var(--surface)) 70%)",
+              }}
+            >
+              <div className="flex items-start justify-between gap-2">
+                <div className="min-w-0">
+                  <p className="text-[12px] font-extrabold text-[rgb(var(--text))]">
+                    {t("menu.style", "Menu style")}
+                  </p>
+                  <p className="mt-0.5 text-[10.5px] font-medium text-[rgb(var(--text-muted))]">
+                    {t(
+                      "menu.styleHint",
+                      "Choose how modules look on your menu",
+                    )}
+                  </p>
+                  <p className="mt-1 text-[10px] font-semibold text-[rgb(var(--primary))] truncate">
+                    {t(`menuStyle.${activeOpt.id}`, activeOpt.label)}
+                  </p>
+                </div>
                 <button
-                  key={opt.id}
                   type="button"
-                  role="option"
-                  aria-selected={active}
-                  onClick={() => pick(opt.id)}
-                  className={`flex items-center gap-3 rounded-xl border px-2.5 py-2 text-left transition
-                    active:scale-[0.99]
-                    ${
-                      active
-                        ? "border-[rgba(var(--primary),0.45)] bg-[rgba(var(--primary),0.08)] shadow-sm"
-                        : "border-transparent hover:bg-[rgba(var(--primary),0.05)]"
-                    }`}
+                  onClick={() => setOpen(false)}
+                  className="shrink-0 w-8 h-8 rounded-lg border border-[rgb(var(--border))]
+                    flex items-center justify-center text-[rgb(var(--text))]"
+                  aria-label={t("common.close", "Close")}
                 >
-                  <div
-                    className={`flex shrink-0 items-center justify-center rounded-xl border px-1.5 py-1
-                      ${
-                        active
-                          ? "border-[rgba(var(--primary),0.35)] bg-[rgb(var(--surface))]"
-                          : "border-[rgb(var(--border))] bg-[rgba(var(--bg),0.65)]"
-                      }`}
-                  >
-                    <MenuStylePreview id={opt.id} active={active} />
-                  </div>
-                  <div className="min-w-0 flex-1">
-                    <p className="truncate text-[12px] font-extrabold text-[rgb(var(--text))]">
-                      {t(`menuStyle.${opt.id}`, opt.label)}
-                    </p>
-                    <p className="truncate text-[10px] font-medium text-[rgb(var(--text-muted))]">
-                      {t(`menuStyle.${opt.id}Desc`, opt.label)}
-                    </p>
-                  </div>
-                  <span
-                    className={`flex h-5 w-5 shrink-0 items-center justify-center rounded-full transition
-                      ${
-                        active
-                          ? "bg-[rgb(var(--primary))] text-white"
-                          : "border border-[rgb(var(--border))] text-transparent"
-                      }`}
-                  >
-                    <FaCheck size={9} />
-                  </span>
+                  <FaTimes size={12} />
                 </button>
-              );
-            })}
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 gap-1.5 p-2">
+              {MENU_STYLE_OPTIONS.map((opt) => {
+                const active = value === opt.id;
+                return (
+                  <button
+                    key={opt.id}
+                    type="button"
+                    role="option"
+                    aria-selected={active}
+                    onClick={() => pick(opt.id)}
+                    className={`flex items-center gap-3 rounded-xl border px-2.5 py-2 text-left transition
+                      active:scale-[0.99]
+                      ${
+                        active
+                          ? "border-[rgba(var(--primary),0.45)] bg-[rgba(var(--primary),0.08)]"
+                          : "border-transparent hover:bg-[rgba(var(--primary),0.05)]"
+                      }`}
+                  >
+                    <div
+                      className={`flex shrink-0 items-center justify-center rounded-xl border px-1.5 py-1
+                        ${
+                          active
+                            ? "border-[rgba(var(--primary),0.35)] bg-[rgb(var(--surface))]"
+                            : "border-[rgb(var(--border))] bg-[rgba(var(--bg),0.65)]"
+                        }`}
+                    >
+                      <MenuStylePreview id={opt.id} active={active} />
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <p className="truncate text-[12px] font-extrabold text-[rgb(var(--text))]">
+                        {t(`menuStyle.${opt.id}`, opt.label)}
+                      </p>
+                      <p className="truncate text-[10px] font-medium text-[rgb(var(--text-muted))]">
+                        {t(`menuStyle.${opt.id}Desc`, opt.label)}
+                      </p>
+                    </div>
+                    <span
+                      className={`flex h-5 w-5 shrink-0 items-center justify-center rounded-full transition
+                        ${
+                          active
+                            ? "bg-[rgb(var(--primary))] text-white"
+                            : "border border-[rgb(var(--border))] text-transparent"
+                        }`}
+                    >
+                      <FaCheck size={9} />
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
           </div>
         </div>
       )}

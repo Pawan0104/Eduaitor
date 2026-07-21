@@ -29,6 +29,8 @@ export const createSchool = async (req, res, next) => {
       admin_password,
       status,
       subscribed_modules,
+      razorpayKeyId,
+      razorpayKeySecret,
     } = req.body;
 
     // ── 1. PARSE MODULES ──────────────────────────────

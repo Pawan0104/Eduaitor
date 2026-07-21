@@ -17,10 +17,13 @@ import TermManagement from "../components/TermManagement";
 import ImportSyllabusCatalog from "../components/ImportSyllabusCatalog";
 import ChapterPdfViewer from "../components/ChapterPdfViewer";
 import { useNavigate } from "react-router-dom";
+import { useAuth } from "../context/AuthContext";
 
 function Syllabus() {
   const API = import.meta.env.VITE_API_URL;
   const navigate = useNavigate();
+  const { user } = useAuth();
+  const isTeacher = user?.role === "teacher_admin";
   const pdfInputRef = useRef(null);
 
   // ==================== STATE ====================
@@ -56,7 +59,10 @@ function Syllabus() {
   useEffect(() => {
     const fetchClasses = async () => {
       try {
-        const res = await axios.get(`${API}/classes/all`, {
+        const url = isTeacher
+          ? `${API}/classes/teacher/my-classes`
+          : `${API}/classes/all`;
+        const res = await axios.get(url, {
           withCredentials: true,
         });
         setClasses(res.data.classes || []);
@@ -65,7 +71,7 @@ function Syllabus() {
       }
     };
     fetchClasses();
-  }, []);
+  }, [API, isTeacher]);
 
   useEffect(() => {
     if (!selectedClass) {
@@ -80,13 +86,27 @@ function Syllabus() {
       return;
     }
 
-    const allSubjects = selected.details.flatMap((detail) =>
-      (detail.subjectTeachers || []).map((st) => st.subjectId),
-    );
+    const allSubjects = selected.details.flatMap((detail) => {
+      const isClassTeacher =
+        isTeacher &&
+        String(detail.teacherId?._id || detail.teacherId) ===
+          String(user?.teacher_id);
+
+      return (detail.subjectTeachers || [])
+        .filter((st) => {
+          if (!isTeacher) return true;
+          if (isClassTeacher) return true;
+          const tid = st.teacherId?._id || st.teacherId;
+          return String(tid) === String(user?.teacher_id);
+        })
+        .map((st) => st.subjectId);
+    });
 
     // ✅ remove duplicates
     const uniqueSubjects = Array.from(
-      new Map(allSubjects.map((sub) => [sub._id, sub])).values(),
+      new Map(
+        allSubjects.filter(Boolean).map((sub) => [sub._id || sub, sub]),
+      ).values(),
     );
 
     setSubjects(uniqueSubjects);
@@ -95,7 +115,7 @@ function Syllabus() {
     setSelectedSubject("");
     setChapters([]);
     setTopics({});
-  }, [selectedClass, classes]);
+  }, [selectedClass, classes, isTeacher, user?.teacher_id]);
 
   useEffect(() => {
     if (selectedSubject && selectedClass) {

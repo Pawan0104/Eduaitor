@@ -38,6 +38,7 @@ const emptyForm = {
   gender: "",
   bloodGroup: "",
   admissionDate: "",
+  studentId: "",
 
   fatherName: "",
   fatherMobile: "",
@@ -498,6 +499,7 @@ const StudentManagement = () => {
           gender: student.gender || "",
           bloodGroup: student.bloodGroup || "",
           admissionDate: toDateInput(student.admissionDate),
+          studentId: student.studentId || "",
           fatherName: student.fatherName || "",
           fatherMobile: student.fatherMobile || "",
           fatherEmail: student.fatherEmail || "",
@@ -546,6 +548,22 @@ const StudentManagement = () => {
   const handleChange = (e) => {
     const { name, value } = e.target;
 
+    // Keep mobile numbers as digits only (type=tel) so 10-digit regex works reliably
+    const mobileFields = ["fatherMobile", "motherMobile", "guardianMobile"];
+    let nextValue = value;
+    if (mobileFields.includes(name)) {
+      nextValue = String(value || "")
+        .replace(/\D/g, "")
+        .slice(0, 10);
+    }
+
+    if (name === "discountValue") {
+      // Allow empty or a non-negative number (including decimals)
+      if (value !== "" && Number.isNaN(Number(value))) return;
+      if (value !== "" && Number(value) < 0) return;
+      nextValue = value;
+    }
+
     if (name === "dob") {
       const today = new Date();
       today.setHours(0, 0, 0, 0);
@@ -582,7 +600,7 @@ const StudentManagement = () => {
 
     setForm((prev) => ({
       ...prev,
-      [name]: value,
+      [name]: nextValue,
       ...(name === "classId" && {
         sectionId: "",
         transport: "",
@@ -616,8 +634,35 @@ const StudentManagement = () => {
 
     if (!file) return;
 
+    const photoFields = new Set([
+      "studentPhoto",
+      "fatherPhoto",
+      "motherPhoto",
+      "guardianPhoto",
+    ]);
+    const isPhoto =
+      photoFields.has(name) ||
+      (name.startsWith("extraDocument_") && file.type.startsWith("image/"));
+    const allowedPhoto = ["image/jpeg", "image/jpg", "image/png", "image/webp"];
+    const allowedDoc = [...allowedPhoto, "application/pdf"];
+    const allowed = photoFields.has(name) ? allowedPhoto : allowedDoc;
+    const extOk = photoFields.has(name)
+      ? /\.(jpe?g|png|webp)$/i.test(file.name)
+      : /\.(jpe?g|png|webp|pdf)$/i.test(file.name);
+
+    if (!allowed.includes(file.type) && !extOk) {
+      toast.error(
+        photoFields.has(name)
+          ? "Invalid file type. Profile photos must be JPG, PNG, or WEBP."
+          : "Invalid file type. Use JPG, PNG, WEBP, or PDF only.",
+      );
+      e.target.value = "";
+      return;
+    }
+
     if (file.size > 2 * 1024 * 1024) {
       toast.error("File must be less than 2MB");
+      e.target.value = "";
       return;
     }
     if (errors[name]) {
@@ -626,6 +671,14 @@ const StudentManagement = () => {
         delete newErrors[name];
         return newErrors;
       });
+    }
+
+    if (name === "studentPhoto") {
+      toast.success("Profile photo selected. Save the form to update.");
+    } else if (isPhoto || name.includes("Photo")) {
+      toast.success("Photo selected. Save the form to update.");
+    } else {
+      toast.success("Document selected. Save the form to update.");
     }
 
     if (name.startsWith("extraDocument_")) {
@@ -716,8 +769,16 @@ const StudentManagement = () => {
       if (!form.motherName?.trim()) errors.push("Mother name required");
       if (!form.motherMobile?.trim()) errors.push("Mother mobile required");
       if (!form.address?.trim()) errors.push("Address required");
-      if (form.fatherMobile && !/^\d{10}$/.test(form.fatherMobile))
+      if (form.fatherMobile && !/^\d{10}$/.test(String(form.fatherMobile)))
         errors.push("Invalid Father Mobile Number");
+      if (form.motherMobile && !/^\d{10}$/.test(String(form.motherMobile)))
+        errors.push("Invalid Mother Mobile Number");
+      // Emails are optional — validate format only when filled
+      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/i;
+      if (form.fatherEmail?.trim() && !emailRegex.test(form.fatherEmail.trim()))
+        errors.push("Invalid Father Email");
+      if (form.motherEmail?.trim() && !emailRegex.test(form.motherEmail.trim()))
+        errors.push("Invalid Mother Email");
     }
 
     if (step === 4) {
@@ -801,7 +862,13 @@ const StudentManagement = () => {
         )
           errorMap.fatherMobile = err;
         if (lowerErr.includes("mother name")) errorMap.motherName = err;
-        if (lowerErr.includes("mother mobile")) errorMap.motherMobile = err;
+        if (
+          lowerErr.includes("mother mobile") ||
+          lowerErr.includes("invalid mother mobile")
+        )
+          errorMap.motherMobile = err;
+        if (lowerErr.includes("father email")) errorMap.fatherEmail = err;
+        if (lowerErr.includes("mother email")) errorMap.motherEmail = err;
         if (lowerErr.includes("address")) errorMap.address = err;
 
         // Step 3 - FIXED CASE SENSITIVITY
@@ -892,7 +959,6 @@ const forbidden = [
         "__v",
         "createdAt",
         "updatedAt",
-        "studentId",
         "documents",
         "useTransport",
         "studentCredentials",
@@ -948,8 +1014,8 @@ const forbidden = [
         await axios.put(`${API}/students/${id}`, data, {
           withCredentials: true,
         });
-        toast.success("Student Updated Successfully");
-        navigate(`${basePath}/students`);
+        toast.success("Student updated successfully. Profile refreshed.");
+        navigate(`${basePath}/student-view/${id}`, { replace: true });
       } else {
         const res = await axios.post(`${API}/students`, data, {
           withCredentials: true,
@@ -1120,6 +1186,23 @@ const forbidden = [
             {step === 1 && (
               <div className="grid md:grid-cols-2 gap-6">
                 <Input
+                  label="Admission Number"
+                  placeholder={
+                    isEdit
+                      ? "Admission number"
+                      : "Leave blank to auto-generate (e.g. STU0001)"
+                  }
+                  name="studentId"
+                  value={form.studentId}
+                  onChange={handleChange}
+                  error={errors.studentId}
+                />
+                <div className="md:col-span-2 -mt-2 mb-1 text-xs text-[rgb(var(--text-muted))]">
+                  {isEdit
+                    ? "This is the student admission number (unique per school)."
+                    : "Optional. If left blank, the system assigns the next STU#### number. Duplicates are not allowed."}
+                </div>
+                <Input
                   label="First Name *"
                   placeholder="Enter first name"
                   name="firstName"
@@ -1185,17 +1268,20 @@ const forbidden = [
                 />
                 <Input
                   label="Father Mobile *"
-                  placeholder="Enter mobile number"
+                  placeholder="10-digit mobile number"
                   name="fatherMobile"
-                  type="number"
+                  type="tel"
+                  inputMode="numeric"
+                  maxLength={10}
                   value={form.fatherMobile}
                   onChange={handleChange}
                   error={errors.fatherMobile}
                 />
                 <Input
-                  label="Father Email *"
-                  placeholder="Enter email"
+                  label="Father Email"
+                  placeholder="Enter email (optional)"
                   name="fatherEmail"
+                  type="email"
                   value={form.fatherEmail}
                   onChange={handleChange}
                   error={errors.fatherEmail}
@@ -1211,17 +1297,20 @@ const forbidden = [
                 />
                 <Input
                   label="Mother Mobile *"
-                  placeholder="Enter mobile number"
+                  placeholder="10-digit mobile number"
                   name="motherMobile"
-                  type="number"
+                  type="tel"
+                  inputMode="numeric"
+                  maxLength={10}
                   value={form.motherMobile}
                   onChange={handleChange}
                   error={errors.motherMobile}
                 />
                 <Input
-                  label="Mother Email *"
-                  placeholder="Enter email"
+                  label="Mother Email"
+                  placeholder="Enter email (optional)"
                   name="motherEmail"
+                  type="email"
                   value={form.motherEmail}
                   onChange={handleChange}
                   error={errors.motherEmail}
@@ -1236,8 +1325,11 @@ const forbidden = [
                 />
                 <Input
                   label="Guardian Mobile"
-                  placeholder="Enter mobile number"
+                  placeholder="10-digit mobile number"
                   name="guardianMobile"
+                  type="tel"
+                  inputMode="numeric"
+                  maxLength={10}
                   value={form.guardianMobile}
                   onChange={handleChange}
                 />
@@ -1439,7 +1531,7 @@ const forbidden = [
 
                 {form.classId && sections.length > 0 && (
                   <Select
-                    label="Section"
+                    label="Section *"
                     name="sectionId"
                     value={form.sectionId}
                     options={sections}
@@ -1449,7 +1541,7 @@ const forbidden = [
                 )}
 
                 <Input
-                  label="Roll Number"
+                  label="Roll Number *"
                   name="rollNo"
                   value={form.rollNo}
                   onChange={handleChange}
@@ -1669,8 +1761,12 @@ const forbidden = [
 
                 <Input
                   label="Discount Value"
-                  placeholder="Enter here"
+                  placeholder="Enter amount or %"
                   name="discountValue"
+                  type="number"
+                  inputMode="decimal"
+                  min="0"
+                  step="any"
                   value={form.discountValue}
                   onChange={handleChange}
                   disabled={!form.discountType}
@@ -1830,19 +1926,67 @@ const Select = ({ label, error, options, ...props }) => (
 );
 /* FILE */
 
+const PHOTO_FIELD_NAMES = new Set([
+  "studentPhoto",
+  "fatherPhoto",
+  "motherPhoto",
+  "guardianPhoto",
+]);
+
 const File = ({ label, name, onChange, existingUrl, error }) => {
-  console.log(error);
   const [preview, setPreview] = useState(existingUrl || null);
+  const [localFile, setLocalFile] = useState(false);
+  const isPhotoField = PHOTO_FIELD_NAMES.has(name);
+  const accept = isPhotoField
+    ? "image/jpeg,image/png,image/webp,.jpg,.jpeg,.png,.webp"
+    : "image/jpeg,image/png,image/webp,application/pdf,.jpg,.jpeg,.png,.webp,.pdf";
+
+  useEffect(() => {
+    // When edit form loads docs async, show existing URL (unless user picked a new file)
+    if (!localFile) {
+      setPreview(existingUrl || null);
+    }
+  }, [existingUrl, localFile]);
 
   const handlePreview = (e) => {
     const file = e.target.files[0];
     if (!file) return;
+
+    const allowed = isPhotoField
+      ? ["image/jpeg", "image/jpg", "image/png", "image/webp"]
+      : [
+          "image/jpeg",
+          "image/jpg",
+          "image/png",
+          "image/webp",
+          "application/pdf",
+        ];
+    const extOk = isPhotoField
+      ? /\.(jpe?g|png|webp)$/i.test(file.name)
+      : /\.(jpe?g|png|webp|pdf)$/i.test(file.name);
+
+    if (!allowed.includes(file.type) && !extOk) {
+      toast.error(
+        isPhotoField
+          ? "Invalid file type. Profile photos must be JPG, PNG, or WEBP."
+          : "Invalid file type. Use JPG, PNG, WEBP, or PDF only.",
+      );
+      e.target.value = "";
+      return;
+    }
+
+    if (file.size > 2 * 1024 * 1024) {
+      toast.error("File must be less than 2MB");
+      e.target.value = "";
+      return;
+    }
 
     if (preview && preview.startsWith("blob:")) {
       URL.revokeObjectURL(preview);
     }
 
     const objectUrl = URL.createObjectURL(file);
+    setLocalFile(true);
     setPreview(objectUrl);
     onChange(e);
   };
@@ -1855,6 +1999,12 @@ const File = ({ label, name, onChange, existingUrl, error }) => {
     };
   }, [preview]);
 
+  const isImage =
+    preview &&
+    (preview.startsWith("blob:") ||
+      /\.(png|jpe?g|gif|webp|bmp|svg)(\?|$)/i.test(preview) ||
+      /\/image\/upload\//i.test(preview));
+
   return (
     <div className="border rounded-xl p-4 text-[rgb(var(--text))]">
       <label
@@ -1866,20 +2016,38 @@ const File = ({ label, name, onChange, existingUrl, error }) => {
       <input
         type="file"
         name={name}
+        accept={accept}
         onChange={handlePreview}
         className="w-full border px-3 py-2 rounded-lg"
       />
+      <p className="text-[10px] text-slate-500 mt-1">
+        {isPhotoField
+          ? "Accepted: JPG, PNG, WEBP (max 2MB)"
+          : "Accepted: JPG, PNG, WEBP, PDF (max 2MB)"}
+      </p>
 
       {error && (
         <span className="text-xs text-red-500 font-medium">{error}</span>
       )}
 
-      {preview && (
+      {preview && isImage && (
         <img
+          key={preview}
           src={preview}
           alt="preview"
-          className="mt-3 h-24 rounded-lg object-cover"
+          className="mt-3 h-24 rounded-lg object-cover border border-[rgb(var(--border))]"
         />
+      )}
+
+      {preview && !isImage && (
+        <a
+          href={preview}
+          target="_blank"
+          rel="noreferrer"
+          className="mt-3 inline-flex text-sm font-semibold text-[rgb(var(--primary))] underline"
+        >
+          View uploaded document
+        </a>
       )}
     </div>
   );
@@ -2033,6 +2201,7 @@ const ReviewStep = ({
       </div>
 
       <Section title="Student details" headerClass="">
+        <Field label="Admission number" value={form.studentId || "(auto on save)"} />
         <Field label="First name" value={form.firstName} />
         <Field label="Last name" value={form.lastName} />
         <Field label="Date of birth" value={form.dob} />

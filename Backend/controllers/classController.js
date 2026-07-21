@@ -7,6 +7,49 @@ import {
   removeTeacherFromClassGroups,
 } from "../utils/groupSync.js";
 
+/**
+ * Classes a teacher may access: assignedClasses ∪ class-teacher ∪ subject-teacher.
+ */
+export const resolveTeacherAccessibleClassIds = async (schoolId, teacherId) => {
+  if (!schoolId || !teacherId) return [];
+
+  const teacherObjId = new mongoose.Types.ObjectId(teacherId);
+  const schoolObjId = new mongoose.Types.ObjectId(schoolId);
+
+  const teacher = await Teacher.findById(teacherObjId).select("assignedClasses");
+  if (!teacher) return [];
+
+  const classesFromDetails = await Class.find({
+    schoolId: schoolObjId,
+    $or: [
+      { "details.teacherId": teacherObjId },
+      { "details.subjectTeachers.teacherId": teacherObjId },
+    ],
+  }).select("_id");
+
+  return [
+    ...new Set([
+      ...(teacher.assignedClasses || []).map((id) => id.toString()),
+      ...classesFromDetails.map((c) => c._id.toString()),
+    ]),
+  ];
+};
+
+const teacherScopedClassFilter = async (req) => {
+  const schoolId = req.user?.school_id;
+  const filter = { schoolId };
+
+  if (req.user?.role === "teacher_admin" && req.user?.teacher_id) {
+    const ids = await resolveTeacherAccessibleClassIds(
+      schoolId,
+      req.user.teacher_id,
+    );
+    filter._id = { $in: ids };
+  }
+
+  return filter;
+};
+
 /* ── CREATE CLASS ── */
 export const createClass = async (req, res) => {
   try {
@@ -139,7 +182,9 @@ export const getClasses = async (req, res) => {
       });
     }
 
-    const classes = await Class.find({ schoolId })
+    const filter = await teacherScopedClassFilter(req);
+
+    const classes = await Class.find(filter)
       .populate({
         path: "details.sectionId",
         select: "name status",
@@ -189,6 +234,19 @@ export const getClassById = async (req, res) => {
         message: "Class not found",
       });
 
+    if (req.user?.role === "teacher_admin" && req.user?.teacher_id) {
+      const allowed = await resolveTeacherAccessibleClassIds(
+        schoolId,
+        req.user.teacher_id,
+      );
+      if (!allowed.includes(String(cls._id))) {
+        return res.status(403).json({
+          success: false,
+          message: "You are not assigned to this class",
+        });
+      }
+    }
+
     res.json({ success: true, class: cls });
   } catch (err) {
     res.status(500).json({ success: false, message: err.message });
@@ -211,10 +269,10 @@ export const getClassesFlat = async (req, res) => {
         message: "schoolId is required",
       });
 
-    const classes = await Class.find({
-      schoolId,
-      status: "Active",
-    })
+    const filter = await teacherScopedClassFilter(req);
+    filter.status = "Active";
+
+    const classes = await Class.find(filter)
       .populate("details.sectionId", "name status")
       .sort({ name: 1 });
 
@@ -443,36 +501,14 @@ export const getTeacherClasses = async (req, res) => {
         .json({ success: false, message: "Missing credentials" });
     }
 
-    const teacherObjId = new mongoose.Types.ObjectId(rawTeacherId);
-    const schoolObjId = new mongoose.Types.ObjectId(schoolId);
-
-    // Get teacher's assignedClasses
-    const teacher =
-      await Teacher.findById(teacherObjId).select("assignedClasses");
-
-    if (!teacher) {
-      return res
-        .status(404)
-        .json({ success: false, message: "Teacher not found" });
-    }
-
-    // Also find classes where teacher appears in details
-    const classesFromDetails = await Class.find({
-      schoolId: schoolObjId,
-      $or: [
-        { "details.teacherId": teacherObjId },
-        { "details.subjectTeachers.teacherId": teacherObjId },
-      ],
-    }).select("_id");
-
-    const allClassIds = new Set([
-      ...(teacher.assignedClasses || []).map((id) => id.toString()),
-      ...classesFromDetails.map((c) => c._id.toString()),
-    ]);
+    const allClassIds = await resolveTeacherAccessibleClassIds(
+      schoolId,
+      rawTeacherId,
+    );
 
     const classes = await Class.find({
-      _id: { $in: [...allClassIds] },
-      schoolId: schoolObjId,
+      _id: { $in: allClassIds },
+      schoolId,
     })
       .populate("details.sectionId", "name status")
       .populate("details.teacherId", "fullName")

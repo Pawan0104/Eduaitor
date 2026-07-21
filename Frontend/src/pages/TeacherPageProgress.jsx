@@ -59,7 +59,7 @@ export default function TeacherPageProgress() {
 
   const loadClasses = async () => {
     try {
-      const res = await axios.get(`${API}/classes/all`, {
+      const res = await axios.get(`${API}/classes/teacher/my-classes`, {
         withCredentials: true,
       });
       setClasses(res.data.classes || res.data.data || []);

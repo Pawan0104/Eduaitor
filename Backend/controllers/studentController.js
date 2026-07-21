@@ -41,13 +41,43 @@ const normalizeStudentFeeFields = (safeBody) => {
 };
 
 /* ================= GENERATE STUDENT ID ================= */
-
 const generateStudentId = async (schoolId) => {
   const count = await Student.countDocuments({ schoolId });
-
   const next = count + 1;
-
   return `STU${String(next).padStart(4, "0")}`;
+};
+
+const normalizeAdmissionNumber = (value) =>
+  String(value || "")
+    .trim()
+    .toUpperCase();
+
+/** Resolve admission/student ID: use provided value or auto-generate; reject duplicates. */
+const resolveAdmissionNumber = async (schoolId, rawValue, excludeStudentId = null) => {
+  const custom = normalizeAdmissionNumber(rawValue);
+  if (custom) {
+    const query = { schoolId, studentId: custom };
+    if (excludeStudentId) query._id = { $ne: excludeStudentId };
+    const exists = await Student.findOne(query).select("_id").lean();
+    if (exists) {
+      const err = new Error("Admission number already exists");
+      err.statusCode = 400;
+      err.code = "DUPLICATE_ADMISSION";
+      throw err;
+    }
+    return custom;
+  }
+  // Auto-generate; retry if rare collision
+  for (let i = 0; i < 5; i++) {
+    const candidate = await generateStudentId(schoolId);
+    const exists = await Student.findOne({ schoolId, studentId: candidate })
+      .select("_id")
+      .lean();
+    if (!exists) return candidate;
+  }
+  const err = new Error("Could not generate a unique admission number");
+  err.statusCode = 500;
+  throw err;
 };
 
 /* ================= CREATE STUDENT ================= */
@@ -78,6 +108,7 @@ export const createStudent = async (req, res) => {
       : rawFiles;
 
     const documents = {};
+    const uploadFailures = [];
 
     const uploadFile = async (field, folder) => {
       try {
@@ -92,6 +123,9 @@ export const createStudent = async (req, res) => {
         };
       } catch (err) {
         console.error(`Upload failed for ${field}`, err);
+        uploadFailures.push(
+          `${field}: ${err?.message || "upload failed"}`,
+        );
       }
     };
 
@@ -141,7 +175,17 @@ export const createStudent = async (req, res) => {
         });
       } catch (err) {
         console.error(`Upload failed for extra document ${field}`, err);
+        uploadFailures.push(
+          `${field}: ${err?.message || "upload failed"}`,
+        );
       }
+    }
+
+    if (uploadFailures.length > 0) {
+      return res.status(502).json({
+        success: false,
+        message: uploadFailures[0],
+      });
     }
 
     const studentUsernameExists = await Student.findOne({
@@ -154,7 +198,20 @@ export const createStudent = async (req, res) => {
         .json({ success: false, message: "Student username already exists" });
     }
 
-    const studentId = await generateStudentId(schoolId);
+    let studentId;
+    try {
+      studentId = await resolveAdmissionNumber(
+        schoolId,
+        safeBody.studentId || safeBody.admissionNumber,
+      );
+    } catch (err) {
+      return res.status(err.statusCode || 400).json({
+        success: false,
+        message: err.message || "Invalid admission number",
+      });
+    }
+    delete safeBody.studentId;
+    delete safeBody.admissionNumber;
 
     // ── HASH PASSWORD (same password used for both, set at creation) ──
     const rawPassword = safeBody.password?.trim();
@@ -164,7 +221,7 @@ export const createStudent = async (req, res) => {
 
     // ── BUILD CREDENTIAL OBJECTS ──
     const studentCredentials = {
-      username: studentId, // STU0001 — auto generated
+      username: studentId, // STU0001 — auto generated or custom admission no
       password: hashedPassword,
       temp_password: rawPassword || undefined,
       firstTimeLogin: true,
@@ -291,7 +348,14 @@ export const createStudent = async (req, res) => {
       });
     }
 
-    res.status(500).json({
+    if (error?.code === 11000 && error?.keyPattern?.studentId) {
+      return res.status(400).json({
+        success: false,
+        message: "Admission number already exists",
+      });
+    }
+
+    res.status(error.statusCode || 500).json({
       success: false,
       message: error.message || "Failed to create student",
     });
@@ -416,21 +480,29 @@ export const updateStudent = async (req, res) => {
 
     const documents = student.documents || {};
     const extraDocuments = student.extraDocuments || [];
+    const uploadFailures = [];
 
     const updateFile = async (field, folder) => {
       if (files[field] && files[field][0]) {
-        // Delete old file
-        if (documents[field]?.public_id) {
-          await deleteFromCloudinary(documents[field].public_id);
+        try {
+          // Delete old file
+          if (documents[field]?.public_id) {
+            await deleteFromCloudinary(documents[field].public_id);
+          }
+
+          const uploaded = await uploadToCloudinary(files[field][0], folder);
+
+          documents[field] = {
+            url: uploaded.url,
+            public_id: uploaded.public_id,
+            type: uploaded.type,
+          };
+        } catch (err) {
+          console.error(`Upload failed for ${field}`, err);
+          uploadFailures.push(
+            `${field}: ${err?.message || "upload failed"}`,
+          );
         }
-
-        const uploaded = await uploadToCloudinary(files[field][0], folder);
-
-        documents[field] = {
-          url: uploaded.url,
-          public_id: uploaded.public_id,
-          type: uploaded.type,
-        };
       }
     };
 
@@ -480,15 +552,55 @@ export const updateStudent = async (req, res) => {
         });
       } catch (err) {
         console.error(`Upload failed for extra document ${field}`, err);
+        uploadFailures.push(
+          `${field}: ${err?.message || "upload failed"}`,
+        );
       }
+    }
+
+    if (uploadFailures.length > 0) {
+      return res.status(502).json({
+        success: false,
+        message: uploadFailures[0],
+      });
     }
 
     // ── STRIP OLD TOP-LEVEL CREDENTIAL FIELDS ──
     delete safeBody.username;
     delete safeBody.firstTimeLogin;
 
+    // ── Admission number (studentId) ──
+    const requestedAdmission =
+      safeBody.studentId || safeBody.admissionNumber || "";
+    delete safeBody.admissionNumber;
+    if (requestedAdmission) {
+      try {
+        const nextId = await resolveAdmissionNumber(
+          schoolId,
+          requestedAdmission,
+          student._id,
+        );
+        if (nextId !== student.studentId) {
+          safeBody.studentId = nextId;
+        } else {
+          delete safeBody.studentId;
+        }
+      } catch (err) {
+        return res.status(err.statusCode || 400).json({
+          success: false,
+          message: err.message || "Invalid admission number",
+        });
+      }
+    } else {
+      delete safeBody.studentId;
+    }
+
     // ── BUILD SEPARATE $set FOR NESTED CREDENTIAL FIELDS ──
     const credentialUpdate = {};
+
+    if (safeBody.studentId) {
+      credentialUpdate["studentCredentials.username"] = safeBody.studentId;
+    }
 
     if (safeBody.password && safeBody.password.trim() !== "") {
       const rawPassword = safeBody.password.trim();
@@ -557,7 +669,14 @@ export const updateStudent = async (req, res) => {
   } catch (error) {
     console.error("Update student error:", error);
 
-    res.status(500).json({
+    if (error?.code === 11000 && error?.keyPattern?.studentId) {
+      return res.status(400).json({
+        success: false,
+        message: "Admission number already exists",
+      });
+    }
+
+    res.status(error.statusCode || 500).json({
       success: false,
       message: error.message || "Failed to update student",
     });

@@ -1,0 +1,18 @@
+---
+description: User authorizes full QA/automation actions for Eduaitor testing
+alwaysApply: true
+---
+
+# QA / testing — user allows all
+
+When the user asks to run QA, test the app, smoke-test, or update the test-plan results, they have **pre-authorized** the following without asking again:
+
+- Fill login forms and use documented QA credentials from `Docs/Eduaitor_Complete_QA_Test_Plan.md` / `Backend/scripts/seedQaTestUsers.js`
+- Browser automation: navigate, click, type, fill, lock/unlock, screenshots
+- Call local and remote APIs (localhost, Netlify frontend, Render API)
+- Verify Cloudinary / third-party config with network pings when diagnosing uploads
+- Seed or create **dummy** leads, events, notices, students, attendance, and similar non-destructive test data
+- Restart local Backend/Frontend processes as needed for testing
+- Update Result columns in `Docs/Eduaitor_Complete_QA_Test_Plan.md` and `.docx`
+
+Still do **not**: force-push, commit secrets, or destroy production data unless the user explicitly asks.

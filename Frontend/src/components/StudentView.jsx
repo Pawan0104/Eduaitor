@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import axios from "axios";
 import { useParams, useNavigate } from "react-router-dom";
 import { toast } from "react-toastify";
@@ -7,6 +7,18 @@ import { useAuth } from "../context/AuthContext";
 
 const API = import.meta.env.VITE_API_URL;
 
+const DOCUMENT_ENTRIES = [
+  { key: "studentPhoto", label: "Student Photo" },
+  { key: "fatherPhoto", label: "Father Photo" },
+  { key: "motherPhoto", label: "Mother Photo" },
+  { key: "guardianPhoto", label: "Guardian Photo" },
+  { key: "birthCertificate", label: "Birth Certificate" },
+  { key: "transferCertificate", label: "Transfer Certificate" },
+  { key: "studentAadhar", label: "Student Aadhar" },
+  { key: "fatherAadhar", label: "Father Aadhar" },
+  { key: "motherAadhar", label: "Mother Aadhar" },
+];
+
 const StudentView = () => {
   const { user } = useAuth();
   const { id } = useParams();
@@ -14,54 +26,68 @@ const StudentView = () => {
 
   const [student, setStudent] = useState(null);
   const [loading, setLoading] = useState(true);
-  const [randomImg, setRandomImg] = useState(null);
+  const [photoBroken, setPhotoBroken] = useState(false);
 
-  const fetchStudent = async () => {
+  const fetchStudent = useCallback(async () => {
     try {
       const res = await axios.get(`${API}/students/${id}`, {
         withCredentials: true,
       });
       setStudent(res.data.data);
+      setPhotoBroken(false);
     } catch {
       toast.error("Failed to load student");
+      setStudent(null);
     } finally {
       setLoading(false);
     }
-  };
-
-  useEffect(() => {
-    fetchStudent();
   }, [id]);
 
-  const getRandomStudentImage = (gender) => {
-    const randomIndex = Math.floor(Math.random() * 100);
-
-    if (gender?.toLowerCase() === "female") {
-      return `https://randomuser.me/api/portraits/women/${randomIndex}.jpg`;
-    }
-
-    return `https://randomuser.me/api/portraits/men/${randomIndex}.jpg`;
-  };
   useEffect(() => {
-    if (student?.gender) {
-      setRandomImg(getRandomStudentImage(student.gender));
-    }
-  }, [student]);
+    setLoading(true);
+    fetchStudent();
+  }, [fetchStudent]);
+
+  // Refetch when returning from Edit so changes show immediately
+  useEffect(() => {
+    const onFocus = () => fetchStudent();
+    window.addEventListener("focus", onFocus);
+    return () => window.removeEventListener("focus", onFocus);
+  }, [fetchStudent]);
 
   if (loading) return <Loader />;
   if (!student) return <Empty />;
 
-  const docs = student.documents || {};
+  const docsRaw = student.documents;
+  const docs =
+    docsRaw && typeof docsRaw.toObject === "function"
+      ? docsRaw.toObject()
+      : docsRaw || {};
+  const extraDocs = Array.isArray(student.extraDocuments)
+    ? student.extraDocuments
+    : [];
   const studentCreds = student.studentCredentials || {};
   const parentCreds = student.parentCredentials || {};
+  const canViewDocuments = [
+    "school_admin",
+    "staff_admin",
+    "teacher_admin",
+  ].includes(user?.role);
+
+  const photoUrl = docs.studentPhoto?.url || "";
+  const initials =
+    `${student.firstName?.[0] || ""}${student.lastName?.[0] || ""}`.toUpperCase() ||
+    "?";
+
+  const uploadedCount =
+    DOCUMENT_ENTRIES.filter((d) => docs[d.key]?.url).length +
+    extraDocs.filter((d) => d?.url).length;
 
   return (
     <div className=" min-h-screen">
-      {/* /*HEADER */}
       <button
         onClick={() => {
           if (!user?.role) return;
-
           navigate(
             user.role === "teacher_admin"
               ? "/teacher/students"
@@ -73,7 +99,7 @@ const StudentView = () => {
         <FaArrowLeft />
         Back to Students
       </button>
-      {/* TOP BANNER */}
+
       <div className="bg-[rgb(var(--surface))] px-6 py-5 sm:px-8 border-b-[rgb(var(--border))]">
         <div className="flex items-center justify-between">
           <div>
@@ -98,7 +124,9 @@ const StudentView = () => {
             </button>
             {user?.role === "school_admin" && (
               <button
-                onClick={() => navigate(`/school/student-manage/${student._id}`)}
+                onClick={() =>
+                  navigate(`/school/student-manage/${student._id}`)
+                }
                 className="px-4 py-2 bg-[rgb(var(--primary))] text-[rgb(var(--text))] rounded-lg text-sm font-medium  transition"
               >
                 Edit Student
@@ -109,16 +137,20 @@ const StudentView = () => {
       </div>
 
       <div className="px-4 sm:px-6 lg:px-8 py-6 max-w-7xl mx-auto">
-        {/* PROFILE CARD */}
         <div className="bg-[rgb(var(--surface))] rounded-2xl border border-gray-100 shadow-sm p-6 mb-6 flex flex-col sm:flex-row gap-6 items-center sm:items-start text-[rgb(var(--text))]">
-          <img
-            src={docs.studentPhoto?.url || randomImg || undefined}
-            onError={(e) => {
-              e.target.src = getRandomStudentImage(student?.gender);
-            }}
-            alt="student"
-            className="w-24 h-24 rounded-full object-cover ring-4 ring-indigo-100 shrink-0"
-          />
+          {photoUrl && !photoBroken ? (
+            <img
+              key={photoUrl}
+              src={photoUrl}
+              onError={() => setPhotoBroken(true)}
+              alt="student"
+              className="w-24 h-24 rounded-full object-cover ring-4 ring-indigo-100 shrink-0"
+            />
+          ) : (
+            <div className="w-24 h-24 rounded-full ring-4 ring-indigo-100 shrink-0 flex items-center justify-center bg-indigo-100 text-indigo-700 text-2xl font-bold">
+              {initials}
+            </div>
+          )}
           <div className="flex-1 text-center sm:text-left">
             <h2 className="text-xl font-semibold">
               {student.firstName} {student.lastName}
@@ -149,7 +181,6 @@ const StudentView = () => {
             </div>
           </div>
 
-          {/* Quick stats */}
           <div className="flex sm:flex-col gap-4 sm:gap-3 text-center sm:text-right shrink-0">
             <div>
               <p className="text-xs text-[rgb(var(--text))] uppercase tracking-wide">
@@ -170,7 +201,6 @@ const StudentView = () => {
           </div>
         </div>
 
-        {/* FEE SUMMARY STRIP */}
         {user?.role === "school_admin" && (
           <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-6">
             <StatCard
@@ -202,9 +232,7 @@ const StudentView = () => {
           </div>
         )}
 
-        {/* MAIN GRID */}
         <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4 mb-4 ">
-          {/* Student Details */}
           <Section title="Student Details" icon="👤">
             <Row label="First Name" value={student.firstName} />
             <Row label="Last Name" value={student.lastName} />
@@ -217,8 +245,9 @@ const StudentView = () => {
             />
           </Section>
 
-          {/* Class Details */}
-          {user?.role === "school_admin" && (
+          {(user?.role === "school_admin" ||
+            user?.role === "staff_admin" ||
+            user?.role === "teacher_admin") && (
             <Section title="Class Details" icon="🏫">
               <Row label="Class" value={student.classId?.name} />
               <Row label="Section" value={student.sectionId?.name} />
@@ -227,21 +256,12 @@ const StudentView = () => {
             </Section>
           )}
 
-          {/* Documents */}
-          {user?.role === "school_admin" && (
-            <Section title="Documents" icon="📄">
-              <DocRow label="Birth Certificate" file={docs.birthCertificate} />
-              <DocRow
-                label="Transfer Certificate"
-                file={docs.transferCertificate}
-              />
-              <DocRow label="Student Aadhar" file={docs.studentAadhar} />
-              <DocRow label="Father Aadhar" file={docs.fatherAadhar} />
-              <DocRow label="Mother Aadhar" file={docs.motherAadhar} />
-            </Section>
-          )}
+          <Section title="Previous School" icon="📚">
+            <Row label="School Name" value={student.previousSchoolName} />
+            <Row label="Class" value={student.previousSchoolClass} />
+            <Row label="Result" value={student.previousSchoolResult} />
+          </Section>
 
-          {/* Father Details */}
           <Section title="Father Details" icon="👨">
             <Row label="Name" value={student.fatherName} />
             <Row label="Mobile" value={student.fatherMobile} />
@@ -250,13 +270,13 @@ const StudentView = () => {
               <div className="pt-2">
                 <img
                   src={docs.fatherPhoto.url}
+                  alt="Father"
                   className="w-12 h-12 rounded-full object-cover ring-2 ring-gray-100"
                 />
               </div>
             )}
           </Section>
 
-          {/* Mother Details */}
           <Section title="Mother Details" icon="👩">
             <Row label="Name" value={student.motherName} />
             <Row label="Mobile" value={student.motherMobile} />
@@ -265,13 +285,13 @@ const StudentView = () => {
               <div className="pt-2">
                 <img
                   src={docs.motherPhoto.url}
+                  alt="Mother"
                   className="w-12 h-12 rounded-full object-cover ring-2 ring-gray-100"
                 />
               </div>
             )}
           </Section>
 
-          {/* Guardian Details */}
           {user?.role === "school_admin" && (
             <Section title="Guardian Details" icon="🧑">
               <Row label="Guardian Name" value={student.guardianName} />
@@ -282,7 +302,43 @@ const StudentView = () => {
           )}
         </div>
 
-        {/* LOGIN CREDENTIALS — dev-visible, full width */}
+        {/* Documents — full width so TC / PDF / downloads are obvious */}
+        {canViewDocuments && (
+          <div className="mb-4">
+            <Section
+              title={`Documents${uploadedCount ? ` (${uploadedCount})` : ""}`}
+              icon="📄"
+            >
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                {DOCUMENT_ENTRIES.map((item) => (
+                  <DocRow
+                    key={item.key}
+                    label={item.label}
+                    file={docs[item.key]}
+                  />
+                ))}
+                {extraDocs.map((doc, idx) => (
+                  <DocRow
+                    key={doc.fieldName || doc.label || idx}
+                    label={
+                      doc.label ||
+                      doc.fieldName ||
+                      `Extra document ${idx + 1}`
+                    }
+                    file={doc}
+                  />
+                ))}
+              </div>
+              {uploadedCount === 0 && (
+                <p className="text-xs text-[rgb(var(--text-muted))] pt-2">
+                  No documents uploaded yet. Use Edit Student → Documents to
+                  upload photos, TC, Aadhaar, and certificates.
+                </p>
+              )}
+            </Section>
+          </div>
+        )}
+
         {user?.role === "school_admin" && (
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <CredentialsCard
@@ -327,23 +383,70 @@ const Row = ({ label, value }) => (
   </div>
 );
 
-const DocRow = ({ label, file }) => (
-  <div className="flex justify-between gap-3 py-0.5">
-    <span className="text-[rgb(var(--text-muted))]">{label}</span>
-    {file?.url ? (
-      <a
-        href={file.url}
-        target="_blank"
-        rel="noreferrer"
-        className="text-indigo-600 font-medium hover:underline text-sm"
-      >
-        View ↗
-      </a>
-    ) : (
-      <span className="text-gray-300 text-sm">Not uploaded</span>
-    )}
-  </div>
-);
+const DocRow = ({ label, file }) => {
+  const url = file?.url || "";
+  const type = (file?.type || "").toLowerCase();
+  const isPdf =
+    type === "application/pdf" || /\.pdf(\?|$)/i.test(url);
+  const isImage =
+    url &&
+    !isPdf &&
+    (/\.(png|jpe?g|gif|webp|bmp|svg)(\?|$)/i.test(url) ||
+      /\/image\/upload\//i.test(url) ||
+      type.startsWith("image/"));
+
+  return (
+    <div className="flex items-start justify-between gap-3 p-3 rounded-xl border border-[rgb(var(--border))] bg-[rgb(var(--bg))]/30">
+      <div className="min-w-0 flex-1">
+        <p className="text-[rgb(var(--text-muted))] text-xs mb-1">{label}</p>
+        {url ? (
+          <div className="flex flex-wrap gap-2 mt-0.5">
+            <a
+              href={url}
+              target="_blank"
+              rel="noreferrer"
+              className="text-indigo-600 font-medium hover:underline text-sm"
+            >
+              {isPdf ? "Preview PDF" : "View"} ↗
+            </a>
+            <a
+              href={url}
+              download
+              target="_blank"
+              rel="noreferrer"
+              className="text-emerald-700 font-medium hover:underline text-sm"
+            >
+              Download
+            </a>
+          </div>
+        ) : (
+          <span className="text-[rgb(var(--text-muted))] text-sm opacity-60">
+            Not uploaded
+          </span>
+        )}
+      </div>
+      {url && isImage && (
+        <a href={url} target="_blank" rel="noreferrer" className="shrink-0">
+          <img
+            src={url}
+            alt={label}
+            className="w-14 h-14 rounded-lg object-cover border border-[rgb(var(--border))]"
+          />
+        </a>
+      )}
+      {url && isPdf && (
+        <a
+          href={url}
+          target="_blank"
+          rel="noreferrer"
+          className="shrink-0 w-14 h-14 rounded-lg border border-[rgb(var(--border))] bg-rose-50 text-rose-700 flex flex-col items-center justify-center text-[10px] font-bold"
+        >
+          PDF
+        </a>
+      )}
+    </div>
+  );
+};
 
 const StatCard = ({ label, value, color }) => (
   <div className={`rounded-xl p-4 ${color}`}>
@@ -352,11 +455,6 @@ const StatCard = ({ label, value, color }) => (
   </div>
 );
 
-// Dev-only credentials panel. Shows username, temp (plaintext) password, and
-// first-login status for either the student or parent credential set.
-// NOTE: this surfaces the temp_password field on purpose for local/dev use —
-// pull this card (or gate it behind an env flag) before shipping to production,
-// since it exposes a readable password straight from the API response.
 const CredentialsCard = ({ title, icon, creds }) => (
   <div className="bg-[rgb(var(--surface))] rounded-2xl border border-gray-100 shadow-sm p-5">
     <div className="flex items-center gap-2 mb-4">

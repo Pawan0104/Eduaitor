@@ -1,0 +1,24 @@
+{
+  "results": [
+    {
+      "id": "SA-06",
+      "status": "Pass",
+      "notes": "School created (minimal body) HTTP 201 id=6a5f816bd4836ec44fa74e47"
+    },
+    {
+      "id": "SC-112",
+      "status": "Pass",
+      "notes": "Bus created without route HTTP 200 id=6a5f816bd4836ec44fa74e48 (DEF-005 E11000 dup-key fix confirmed; note: this endpoint returns 200 on create, not 201, consistent with other create routes in this codebase)"
+    },
+    {
+      "id": "L-05",
+      "status": "Pass",
+      "notes": "Fee history correctly denied for librarian HTTP 403: You do not have permission to access the 'fees' module."
+    },
+    {
+      "id": "T-25",
+      "status": "Pass",
+      "notes": "Teacher GET fee-structure correctly denied HTTP 403: Access denied"
+    }
+  ]
+}

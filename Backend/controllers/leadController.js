@@ -5,6 +5,32 @@ import Teacher from "../models/teacher.js";
 
 const ALLOWED_LEAD_STATUSES = ["active", "processing", "admitted", "cancelled"];
 
+const generateLeadNumber = async (schoolId) => {
+  const count = await Lead.countDocuments({ schoolId });
+  for (let i = 0; i < 10; i++) {
+    const candidate = `LEAD${String(count + 1 + i).padStart(4, "0")}`;
+    const exists = await Lead.findOne({ schoolId, leadNumber: candidate })
+      .select("_id")
+      .lean();
+    if (!exists) return candidate;
+  }
+  return `LEAD${Date.now().toString().slice(-8)}`;
+};
+
+/** Backfill null leadNumbers so unique index (schoolId + leadNumber) doesn't block creates */
+const backfillMissingLeadNumbers = async (schoolId) => {
+  const missing = await Lead.find({
+    schoolId,
+    $or: [{ leadNumber: null }, { leadNumber: { $exists: false } }, { leadNumber: "" }],
+  })
+    .select("_id")
+    .lean();
+  for (let i = 0; i < missing.length; i++) {
+    const leadNumber = await generateLeadNumber(schoolId);
+    await Lead.updateOne({ _id: missing[i]._id }, { $set: { leadNumber } });
+  }
+};
+
 const resolveActor = (user = {}) => ({
   userId: user._id || user.id || user.staff_id || user.teacher_id || user.school_id,
   name: user.name || user.email || "Unknown User",
@@ -193,12 +219,16 @@ export const createLead = async (req, res) => {
       return res.status(400).json({ success: false, message: "Selected assignee is not available" });
     }
 
+    await backfillMissingLeadNumbers(schoolId);
+    const leadNumber = await generateLeadNumber(schoolId);
+
     const lead = await Lead.create({
       studentName: studentName.trim(),
       parentName: parentName.trim(),
       parentMobile: parentMobile.trim(),
       parentEmail: parentEmail?.trim() || "",
       previousSchoolName: previousSchoolName?.trim() || "",
+      leadNumber,
       assignedTo: {
         userId: assignee.userId,
         userType: assignee.userType,

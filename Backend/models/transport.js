@@ -102,13 +102,11 @@ const busSchema = new mongoose.Schema(
     driver: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "Driver",
-      default: null,
     },
 
     route: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "TransportRoute",
-      default: null,
     },
 
     status: {

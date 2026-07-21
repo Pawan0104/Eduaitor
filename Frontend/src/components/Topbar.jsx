@@ -264,12 +264,14 @@ const Topbar = ({ menuPath = "/" }) => {
       </div>
 
       {/* RIGHT */}
-      <div className="flex items-center gap-1.5 sm:gap-3 shrink-0">
+      <div className="flex items-center gap-1 sm:gap-3 shrink-0 min-w-0">
         {/* Menu grid styles are for mobile hub layouts only */}
-        <div className="lg:hidden">
+        <div className="lg:hidden shrink-0">
           <MenuStylePicker />
         </div>
-        <LanguageSwitcher />
+        <div className="shrink-0">
+          <LanguageSwitcher />
+        </div>
 
         <div className="hidden lg:block text-right">
           <p className="text-sm font-semibold text-[rgb(var(--text))]">

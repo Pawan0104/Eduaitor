@@ -11,24 +11,36 @@ import {
   testMySchoolRazorpay,
 } from "../controllers/schoolController.js";
 import upload from "../middlewares/upload.js";
-import { authMiddleware } from "../auth/auth.js";
+import { authMiddleware, requireRoles } from "../auth/auth.js";
 
 const router = express.Router();
 
-/* ROUTES */
+const superAdminOnly = [authMiddleware, requireRoles("super_admin")];
 
-router.post("/", upload.single("school_logo"), createSchool);
+/* ROUTES — platform school management is Super Admin only */
 
-router.get("/", getSchools);
+router.post(
+  "/",
+  ...superAdminOnly,
+  upload.single("school_logo"),
+  createSchool,
+);
+
+router.get("/", ...superAdminOnly, getSchools);
 
 router.get("/me/razorpay", authMiddleware, getMySchoolRazorpay);
 router.put("/me/razorpay", authMiddleware, updateMySchoolRazorpay);
 router.post("/me/razorpay/test", authMiddleware, testMySchoolRazorpay);
 
-router.get("/:id", getSchool);
+router.get("/:id", ...superAdminOnly, getSchool);
 
-router.put("/:id", upload.single("school_logo"), updateSchool);
+router.put(
+  "/:id",
+  ...superAdminOnly,
+  upload.single("school_logo"),
+  updateSchool,
+);
 
-router.delete("/:id", deleteSchool);
+router.delete("/:id", ...superAdminOnly, deleteSchool);
 
 export default router;

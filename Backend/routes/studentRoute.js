@@ -1,5 +1,5 @@
 import express from "express";
-import upload from "../middlewares/upload.js";
+import upload, { handleUploadError } from "../middlewares/upload.js";
 import { authMiddleware } from "../auth/auth.js";
 import {
   createStudent,
@@ -18,6 +18,13 @@ import {
 
 const router = express.Router();
 
+const withUpload = (req, res, next) => {
+  upload.any()(req, res, (err) => {
+    if (err) return handleUploadError(err, req, res, next);
+    next();
+  });
+};
+
 /* SUPER ADMIN ROUTES */
 router.get("/all/admin", authMiddleware, getAllStudents);
 
@@ -31,23 +38,13 @@ router.post(
 );
 
 /* STUDENT ROUTES */
-router.post(
-  "/",
-  authMiddleware,
-  upload.any(),
-  createStudent,
-);
+router.post("/", authMiddleware, withUpload, createStudent);
 
 router.get("/", authMiddleware, getStudents);
 
 router.get("/teacher/my-students", authMiddleware, getStudentsByTeacher);
 
-router.put(
-  "/:id",
-  authMiddleware,
-  upload.any(),
-  updateStudent,
-);
+router.put("/:id", authMiddleware, withUpload, updateStudent);
 
 router.get("/:id", authMiddleware, getStudent);
 

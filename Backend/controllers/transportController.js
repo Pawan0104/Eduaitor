@@ -40,9 +40,9 @@ const serverError = (res, err) => {
 const missingSchoolId = (res) =>
   res.status(400).json({ success: false, message: "school_id is required" });
 
-// Safe ObjectId resolver — returns ObjectId if valid string, else null
+// Safe ObjectId resolver — omit field when unset so sparse unique indexes work
 const resolveId = (val) =>
-  val && mongoose.isValidObjectId(val) ? toId(val) : null;
+  val && mongoose.isValidObjectId(val) ? toId(val) : undefined;
 
 const TRIP_EVENTS = [
   "pickup",

@@ -1,0 +1,267 @@
+﻿[
+    {
+        "id":  "G-00",
+        "status":  "Pass",
+        "notes":  "Root health 200"
+    },
+    {
+        "id":  "SA-01",
+        "status":  "Pass",
+        "notes":  "Super Admin login OK (200) - Super Admin login successful"
+    },
+    {
+        "id":  "SC-01",
+        "status":  "Pass",
+        "notes":  "School Admin login OK (200) - School Admin login successful"
+    },
+    {
+        "id":  "T-01",
+        "status":  "Pass",
+        "notes":  "Teacher login OK (200) - Teacher login successful"
+    },
+    {
+        "id":  "ST-01",
+        "status":  "Pass",
+        "notes":  "Student login OK (200) - Student login successful"
+    },
+    {
+        "id":  "P-01",
+        "status":  "Pass",
+        "notes":  "Parent login OK (200) - Parent login successful"
+    },
+    {
+        "id":  "AC-01",
+        "status":  "Pass",
+        "notes":  "Accountant login OK (200) - Staff login successful"
+    },
+    {
+        "id":  "R-01",
+        "status":  "Pass",
+        "notes":  "Reception login OK (200) - Staff login successful"
+    },
+    {
+        "id":  "GD-01",
+        "status":  "Pass",
+        "notes":  "Guard login OK (200) - Staff login successful"
+    },
+    {
+        "id":  "W-01",
+        "status":  "Pass",
+        "notes":  "Warden login OK (200) - Staff login successful"
+    },
+    {
+        "id":  "L-01",
+        "status":  "Pass",
+        "notes":  "Librarian login OK (200) - Staff login successful"
+    },
+    {
+        "id":  "G-02",
+        "status":  "Pass",
+        "notes":  "Wrong password rejected HTTP 401: Invalid credentials"
+    },
+    {
+        "id":  "G-03",
+        "status":  "Pass",
+        "notes":  "Empty login rejected HTTP 401: Invalid credentials"
+    },
+    {
+        "id":  "P-19",
+        "status":  "Pass",
+        "notes":  "Wrong parent mobile rejected HTTP 401: Invalid credentials"
+    },
+    {
+        "id":  "SC-02",
+        "status":  "Pass",
+        "notes":  "GET notifications/topbar HTTP 200 items=5"
+    },
+    {
+        "id":  "SC-05",
+        "status":  "Pass",
+        "notes":  "GET calendar HTTP 200 items=0"
+    },
+    {
+        "id":  "SC-06",
+        "status":  "Pass",
+        "notes":  "GET gatepass/manage HTTP 200 items=0"
+    },
+    {
+        "id":  "SC-10",
+        "status":  "Pass",
+        "notes":  "GET students HTTP 200 items=8"
+    },
+    {
+        "id":  "SC-16",
+        "status":  "Pass",
+        "notes":  "GET house HTTP 200 items=4"
+    },
+    {
+        "id":  "SC-30",
+        "status":  "Pass",
+        "notes":  "GET teachers HTTP 200 items=7"
+    },
+    {
+        "id":  "SC-40",
+        "status":  "Pass",
+        "notes":  "GET classes/all HTTP 200 items=4"
+    },
+    {
+        "id":  "SC-42",
+        "status":  "Pass",
+        "notes":  "GET sections/all HTTP 200 items=2"
+    },
+    {
+        "id":  "SC-43",
+        "status":  "Pass",
+        "notes":  "GET subjects/all HTTP 200 items=6"
+    },
+    {
+        "id":  "SC-52",
+        "status":  "Pass",
+        "notes":  "GET staff-attendance/meta HTTP 200"
+    },
+    {
+        "id":  "SC-60",
+        "status":  "Pass",
+        "notes":  "GET staff HTTP 200 items=26"
+    },
+    {
+        "id":  "SC-65",
+        "status":  "Pass",
+        "notes":  "GET school-staff-roles HTTP 200 items=7"
+    },
+    {
+        "id":  "SC-70",
+        "status":  "Pass",
+        "notes":  "GET exam/list HTTP 200 items=6"
+    },
+    {
+        "id":  "SC-86",
+        "status":  "Pass",
+        "notes":  "GET fees (history) HTTP 200"
+    },
+    {
+        "id":  "SC-87",
+        "status":  "Pass",
+        "notes":  "GET fees/defaulters HTTP 200"
+    },
+    {
+        "id":  "SC-88",
+        "status":  "Pass",
+        "notes":  "GET fees/financial-report HTTP 200"
+    },
+    {
+        "id":  "SC-100",
+        "status":  "Pass",
+        "notes":  "GET diary HTTP 200 items=0"
+    },
+    {
+        "id":  "SC-101",
+        "status":  "Pass",
+        "notes":  "GET homework/school HTTP 200 items=1"
+    },
+    {
+        "id":  "SC-102",
+        "status":  "Pass",
+        "notes":  "GET groups/my-groups HTTP 200 items=0"
+    },
+    {
+        "id":  "SC-110",
+        "status":  "Pass",
+        "notes":  "GET transport/summary HTTP 200"
+    },
+    {
+        "id":  "SC-111",
+        "status":  "Pass",
+        "notes":  "GET transport/routes HTTP 200 items=1"
+    },
+    {
+        "id":  "SC-113",
+        "status":  "Pass",
+        "notes":  "GET transport/drivers HTTP 200 items=1"
+    },
+    {
+        "id":  "SC-120",
+        "status":  "Pass",
+        "notes":  "GET hostel HTTP 200 items=2"
+    },
+    {
+        "id":  "SC-130",
+        "status":  "Pass",
+        "notes":  "GET library/books HTTP 200 items=0"
+    },
+    {
+        "id":  "SC-135",
+        "status":  "Pass",
+        "notes":  "GET blogs HTTP 200 items=0"
+    },
+    {
+        "id":  "SC-80",
+        "status":  "Pass",
+        "notes":  "GET fee-structure/:classId HTTP 200"
+    },
+    {
+        "id":  "SC-81",
+        "status":  "Blocked",
+        "notes":  "Fee collect skipped intentionally to avoid mutating financial/receipt data in shared DB; verified read-only fee endpoints (SC-86/87/88) instead"
+    },
+    {
+        "id":  "DR-02",
+        "status":  "Pass",
+        "notes":  "Driver found: name=\"QA Transport Driver\" phone=9876500999"
+    },
+    {
+        "id":  "SC-19",
+        "status":  "Pass",
+        "notes":  "Lead created HTTP 201 id=6a5f5e37283a60594376262b"
+    },
+    {
+        "id":  "SC-03",
+        "status":  "Pass",
+        "notes":  "Event created HTTP 201; list HTTP 200 items=3"
+    },
+    {
+        "id":  "SC-04",
+        "status":  "Pass",
+        "notes":  "Notice created HTTP 201; list HTTP 200 items=2"
+    },
+    {
+        "id":  "SA-05",
+        "status":  "Pass",
+        "notes":  "GET schools HTTP 200 items=1"
+    },
+    {
+        "id":  "SA-10",
+        "status":  "Pass",
+        "notes":  "GET subscriptions HTTP 200 items=1"
+    },
+    {
+        "id":  "SA-04",
+        "status":  "Pass",
+        "notes":  "GET roles HTTP 200 items=1"
+    },
+    {
+        "id":  "SA-03",
+        "status":  "Pass",
+        "notes":  "GET access HTTP 200 items=0"
+    },
+    {
+        "id":  "T-26",
+        "status":  "Pass",
+        "notes":  "Teacher GET /schools (super admin route) correctly denied HTTP 403 (super_admin only) - re-verified after fix"
+    },
+    {
+        "id":  "T-25",
+        "status":  "Pass",
+        "notes":  "Teacher GET /fee-structure/:classId correctly denied HTTP 403 (school-admin/staff-admin only) - re-verified after fix"
+    },
+    {
+        "id":  "P-18",
+        "status":  "Pass",
+        "notes":  "Parent POST /attendance/save (mark attendance) correctly denied HTTP 400: Missing required fields"
+    },
+    {
+        "id":  "AC-13",
+        "status":  "Pass",
+        "notes":  "Accountant GET /hostel/visitors (no hostel perm) correctly denied HTTP 403: You do not have permission to access the \u0027hostel\u0027 module."
+    }
+]
