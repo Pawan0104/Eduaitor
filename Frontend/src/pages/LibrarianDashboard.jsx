@@ -12,8 +12,13 @@ import {
   FaLayerGroup,
   FaPlus,
 } from "react-icons/fa";
+import { FiSettings } from "react-icons/fi";
 import { useNavigate } from "react-router-dom";
 import UpComingNotifications from "../components/UpComingNotifications";
+import RoleCampusDashboard from "../components/dashboards/RoleCampusDashboard";
+import DashboardLayoutPicker, {
+  useDashboardLayout,
+} from "../components/dashboards/DashboardLayoutPicker";
 
 // Update this to wherever your full LibraryManagement page is routed
 const LIBRARY_MANAGEMENT_ROUTE = "/staff/library";
@@ -22,6 +27,8 @@ const LibrarianDashboard = () => {
   const API = import.meta.env.VITE_API_URL;
   const navigate = useNavigate();
   const isMobile = window.innerWidth <= 768;
+  const [layout, setLayout] = useDashboardLayout();
+  const [settingsOpen, setSettingsOpen] = useState(false);
 
   const [loading, setLoading] = useState(true);
   const [books, setBooks] = useState([]);
@@ -137,6 +144,56 @@ const LibrarianDashboard = () => {
     },
   ];
 
+  const campusSummaries = [
+    {
+      title: "Catalog",
+      tone: "blue",
+      path: LIBRARY_MANAGEMENT_ROUTE,
+      rows: [
+        ["Titles", totalTitles],
+        ["Available", availableCopies],
+        ["Total Copies", totalCopies],
+      ],
+    },
+    {
+      title: "Issues",
+      tone: "green",
+      path: LIBRARY_MANAGEMENT_ROUTE,
+      rows: [
+        ["Active", summary.totalIssued],
+        ["Returned", summary.returned],
+        ["Overdue", summary.overdue],
+      ],
+    },
+    {
+      title: "Fines",
+      tone: "orange",
+      path: LIBRARY_MANAGEMENT_ROUTE,
+      rows: [
+        ["Pending Fine", `Rs ${summary.pendingFine || 0}`],
+        ["Low Stock", lowStockBooks.length],
+        ["Categories", topCategories.length],
+      ],
+    },
+    {
+      title: "Follow-up",
+      tone: "red",
+      path: LIBRARY_MANAGEMENT_ROUTE,
+      rows: [
+        ["Overdue Books", overdueIssues.length],
+        ["Recent Issues", recentIssues.length],
+        ["Status", loading ? "Loading" : "Ready"],
+      ],
+    },
+  ];
+
+  const campusModules = [
+    { label: "Manage Library", path: LIBRARY_MANAGEMENT_ROUTE, icon: FaBook },
+    { label: "Issues", path: LIBRARY_MANAGEMENT_ROUTE, icon: FaBookOpen },
+    { label: "Categories", path: LIBRARY_MANAGEMENT_ROUTE, icon: FaLayerGroup },
+    { label: "Fines", path: LIBRARY_MANAGEMENT_ROUTE, icon: FaCoins },
+  ];
+
   return (
     <div className="min-h-screen text-[rgb(var(--text))] p-4 sm:p-6 lg:p-8">
       <ToastContainer />
@@ -165,19 +222,69 @@ const LibrarianDashboard = () => {
               Here's what's happening in your library today.
             </p>
           </div>
-          <button
-            onClick={() => navigate(LIBRARY_MANAGEMENT_ROUTE)}
-            className="flex w-full items-center justify-center gap-2 rounded-xl bg-[rgb(var(--primary))] px-4 py-2.5 text-sm font-bold text-white shadow-sm sm:w-auto"
-          >
-            <FaPlus size={12} />
-            Manage Library
-          </button>
+          <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row">
+            <button
+              type="button"
+              onClick={() => setSettingsOpen((v) => !v)}
+              className="flex w-full items-center justify-center gap-2 rounded-xl border border-[rgb(var(--border))] bg-[rgb(var(--bg))] px-4 py-2.5 text-sm font-bold text-[rgb(var(--text))] sm:w-auto"
+            >
+              <FiSettings size={14} />
+              Dashboard Settings
+            </button>
+            <button
+              onClick={() => navigate(LIBRARY_MANAGEMENT_ROUTE)}
+              className="flex w-full items-center justify-center gap-2 rounded-xl bg-[rgb(var(--primary))] px-4 py-2.5 text-sm font-bold text-white shadow-sm sm:w-auto"
+            >
+              <FaPlus size={12} />
+              Manage Library
+            </button>
+          </div>
         </div>
+        {settingsOpen && (
+          <div className="mt-5 border-t border-[rgb(var(--border))] pt-5">
+            <DashboardLayoutPicker layout={layout} onLayoutChange={setLayout} />
+          </div>
+        )}
       </div>
 
-<div className="mt-2">
-<UpComingNotifications />
-</div>
+      <div className="mt-2">
+        <UpComingNotifications />
+      </div>
+
+      {layout === "campus" ? (
+        <div className="mx-auto mt-6 max-w-7xl">
+          <RoleCampusDashboard
+            roleLabel="Librarian"
+            profilePath="/staff/id-card"
+            menuPath="/staff/dashboard"
+            summaries={campusSummaries}
+            modules={campusModules}
+            showStatBars
+            showFeeTrend={false}
+            showNotices={false}
+            showEvents={false}
+            statBarsTitle="Library Snapshot"
+            statBars={[
+              { label: "Titles", value: totalTitles, color: "bg-sky-500" },
+              {
+                label: "Available",
+                value: availableCopies,
+                color: "bg-emerald-500",
+              },
+              {
+                label: "Issued",
+                value: summary.totalIssued,
+                color: "bg-amber-500",
+              },
+              {
+                label: "Overdue",
+                value: summary.overdue,
+                color: "bg-rose-500",
+              },
+            ]}
+          />
+        </div>
+      ) : (
       <div className="mx-auto max-w-7xl mt-6 space-y-6">
         {/* Stat cards */}
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
@@ -277,6 +384,7 @@ const LibrarianDashboard = () => {
           </div>
         </div>
       </div>
+      )}
     </div>
   );
 };

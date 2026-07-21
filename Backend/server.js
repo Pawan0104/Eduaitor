@@ -209,7 +209,7 @@ app.get("/api/auth/me", authMiddleware, async (req, res) => {
           role: req.user.role,
           school_id: req.user.school_id,
           name: req.user.name,
-          school_name: school?.name,
+          school_name: school?.school_name || school?.name,
           school_logo: school?.school_logo,
           _id: req.user._id,
           subscribed_modules, // ← added

@@ -11,7 +11,7 @@ import { HelmetProvider } from "react-helmet-async";
 import { initNativeShell } from "./utils/initNativeShell.js";
 import AppUpdatePrompt from "./components/AppUpdatePrompt.jsx";
 
-initNativeShell();
+initNativeShell().catch(() => {});
 
 createRoot(document.getElementById("root")).render(
   <BrowserRouter>

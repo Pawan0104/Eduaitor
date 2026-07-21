@@ -1,31 +1,36 @@
 ﻿{
-    "appId":  "com.eduaitor.app",
-    "appName":  "Eduaitor",
-    "webDir":  "dist",
-    "server":  {
-                   "url":  "https://admineduaitor.netlify.app",
-                   "cleartext":  false,
-                   "androidScheme":  "https",
-                   "allowNavigation":  [
-                                           "admineduaitor.netlify.app",
-                                           "*.netlify.app",
-                                           "eduaitor-api.onrender.com"
-                                       ]
-               },
-    "android":  {
-                    "allowMixedContent":  false,
-                    "backgroundColor":  "#0f172a"
-                },
-    "plugins":  {
-                    "SplashScreen":  {
-                                         "launchAutoHide":  true,
-                                         "backgroundColor":  "#0f172a",
-                                         "showSpinner":  false
-                                     },
-                    "StatusBar":  {
-                                      "overlaysWebView":  false,
-                                      "style":  "LIGHT",
-                                      "backgroundColor":  "#ffffff"
-                                  }
-                }
+  "appId": "com.eduaitor.app",
+  "appName": "Eduaitor",
+  "webDir": "dist",
+  "server": {
+    "url": "https://admineduaitor.netlify.app",
+    "cleartext": false,
+    "androidScheme": "https",
+    "allowNavigation": [
+      "admineduaitor.netlify.app",
+      "*.netlify.app",
+      "eduaitor-api.onrender.com"
+    ]
+  },
+  "android": {
+    "allowMixedContent": false,
+    "backgroundColor": "#05080f"
+  },
+  "plugins": {
+    "SplashScreen": {
+      "launchShowDuration": 0,
+      "launchAutoHide": false,
+      "backgroundColor": "#05080f",
+      "androidSplashResourceName": "splash",
+      "androidScaleType": "CENTER_CROP",
+      "showSpinner": false,
+      "splashFullScreen": true,
+      "splashImmersive": true
+    },
+    "StatusBar": {
+      "overlaysWebView": false,
+      "style": "LIGHT",
+      "backgroundColor": "#ffffff"
+    }
+  }
 }

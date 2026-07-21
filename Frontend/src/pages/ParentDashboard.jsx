@@ -27,6 +27,10 @@ import { toast } from "react-toastify";
 import UpComingNotifications from "../components/UpComingNotifications";
 import { useTx } from "../components/DashboardI18n";
 import { useLanguage } from "../context/LanguageContext";
+import RoleCampusDashboard from "../components/dashboards/RoleCampusDashboard";
+import DashboardLayoutPicker, {
+  useDashboardLayout,
+} from "../components/dashboards/DashboardLayoutPicker";
 
 const API = import.meta.env.VITE_API_URL;
 
@@ -76,6 +80,7 @@ const ParentDashboard = () => {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [layout, setLayout] = useDashboardLayout();
   const [visibility, setVisibility] = useState(() => {
     const saved = localStorage.getItem(settingsKey);
     return saved ? JSON.parse(saved) : defaultVisibility;
@@ -288,6 +293,60 @@ const ParentDashboard = () => {
     },
   ];
 
+  const campusModules = [
+    { label: "Attendance", path: "/parent/attendance", icon: FiCheckSquare },
+    { label: "Assignments", path: "/parent/assignments", icon: FaClipboardList },
+    { label: "Fees", path: "/parent/fees", icon: FiFileText },
+    { label: "Transport", path: "/parent/transport", icon: FaBus },
+    { label: "Syllabus", path: "/parent/syllabus-books", icon: FaBookOpen },
+    { label: "Notices", path: "/parent/notice", icon: FiBell },
+    { label: "Events", path: "/parent/event", icon: FiCalendar },
+    { label: "ID Card", path: "/parent/id-card", icon: FaUserGraduate },
+  ];
+
+  const campusSummaries = [
+    {
+      title: "Fees",
+      tone: "orange",
+      path: "/parent/fees",
+      rows: [
+        ["Due", `₹${metrics.totalDue.toLocaleString()}`],
+        ["Paid", `₹${metrics.totalPaid.toLocaleString()}`],
+        ["Total", `₹${metrics.finalFee.toLocaleString()}`],
+      ],
+    },
+    {
+      title: "Assignments",
+      tone: "blue",
+      path: "/parent/assignments",
+      rows: [
+        ["Total", metrics.totalAssignments],
+        ["Pending", metrics.pendingAssignments],
+        ["Overdue", metrics.overdueAssignments],
+      ],
+    },
+    {
+      title: "Library",
+      tone: "violet",
+      path: "/parent/student",
+      rows: [
+        ["Active Books", metrics.activeBooks],
+        ["Overdue", metrics.overdueBooks],
+        ["Fine", `₹${metrics.totalFine}`],
+      ],
+    },
+    {
+      title: "Transport",
+      tone: "green",
+      path: "/parent/transport",
+      rows: [
+        ["Status", metrics.transportAssigned ? "Assigned" : "Not Assigned"],
+        ["Route", metrics.transportStatus || "—"],
+        ["Events", metrics.upcomingEvents],
+      ],
+    },
+  ];
+
   if (loading) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-[rgb(var(--surface))] p-8">
@@ -349,6 +408,8 @@ const ParentDashboard = () => {
           {settingsOpen && (
             <DashboardSettingsControl
               visibility={visibility}
+              layout={layout}
+              onLayoutChange={setLayout}
               onToggle={(key) =>
                 setVisibility((cur) => ({ ...cur, [key]: !cur[key] }))
               }
@@ -360,6 +421,42 @@ const ParentDashboard = () => {
 
       <div className="mx-auto max-w-7xl space-y-6 px-4 py-6 sm:px-6 lg:px-8 text-[rgb(var(--text))] bg-[rgb(var(--bg))]">
         <UpComingNotifications />
+        {layout === "campus" ? (
+          <RoleCampusDashboard
+            roleLabel="Parent"
+            subtitle={
+              metrics.studentName
+                ? `${metrics.studentName}${metrics.className ? ` · ${metrics.className}` : ""}${metrics.sectionName ? ` · ${metrics.sectionName}` : ""}`
+                : ""
+            }
+            profilePath="/parent/student"
+            menuPath="/parent/dashboard"
+            summaries={campusSummaries}
+            modules={campusModules}
+            showModules
+            showStatBars
+            showNotices={visibility.notices !== false}
+            showEvents
+            statBarsTitle="Academics Snapshot"
+            statBars={[
+              { label: "Pending", value: metrics.pendingAssignments, color: "bg-sky-500" },
+              { label: "Submitted", value: metrics.submittedAssignments, color: "bg-emerald-500" },
+              { label: "Overdue", value: metrics.overdueAssignments, color: "bg-rose-500" },
+              { label: "Books", value: metrics.activeBooks, color: "bg-violet-500" },
+            ]}
+            notices={latestNotices.map((n) => ({
+              id: n._id,
+              title: n.title,
+              meta: n.audience || "All",
+            }))}
+            events={upcomingEventsList.map((e) => ({
+              id: e._id,
+              title: e.title,
+              meta: e.location || "Campus",
+            }))}
+          />
+        ) : (
+        <>
         {/* Top Stats */}
         <section className="grid grid-cols-2 gap-4 sm:grid-cols-2 xl:grid-cols-4">
           <StatCard
@@ -873,6 +970,8 @@ const ParentDashboard = () => {
             )}
           </SectionCard>
         )}
+        </>
+        )}
       </div>
     </div>
   );
@@ -880,7 +979,13 @@ const ParentDashboard = () => {
 
 /* ─── Sub-components ──────────────────────────────────────────────────────── */
 
-const DashboardSettingsControl = ({ visibility, onToggle, onReset }) => {
+const DashboardSettingsControl = ({
+  visibility,
+  onToggle,
+  onReset,
+  layout,
+  onLayoutChange,
+}) => {
   const controls = [
     ["transport", "Transport"],
     ["fees", "Fees"],
@@ -893,7 +998,8 @@ const DashboardSettingsControl = ({ visibility, onToggle, onReset }) => {
   ];
   return (
     <div className="mt-5 rounded-3xl border border-slate-200 bg-[rgb(var(--surface))] p-5">
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+      <DashboardLayoutPicker layout={layout} onLayoutChange={onLayoutChange} />
+      <div className="flex flex-col gap-3 border-t border-slate-200 pt-5 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h2 className="text-base font-black text-[rgb(var(--text))]">
             Dashboard Content Control

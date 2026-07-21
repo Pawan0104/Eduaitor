@@ -27,6 +27,10 @@ import { FaArrowLeft } from "react-icons/fa";
 import CreateNotification from "../components/CreateNotification";
 import UpcomingNotifications from "../components/UpComingNotifications";
 import { Tx, useTx } from "../components/DashboardI18n";
+import SchoolCampusDashboard from "../components/dashboards/SchoolCampusDashboard";
+import DashboardLayoutPicker, {
+  useDashboardLayout,
+} from "../components/dashboards/DashboardLayoutPicker";
 
 const API = import.meta.env.VITE_API_URL;
 const settingsKey = "schoolDashboardVisibility";
@@ -98,6 +102,7 @@ const SchoolDashboard = () => {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [layout, setLayout] = useDashboardLayout();
   const [visibility, setVisibility] = useState(() => {
     const saved = localStorage.getItem(settingsKey);
     return saved ? JSON.parse(saved) : defaultVisibility;
@@ -434,8 +439,9 @@ const SchoolDashboard = () => {
                 School Dashboard
               </h1>
               <p className="mt-2 max-w-3xl text-sm text-[rgb(var(--text-muted))]">
-                Monitor reports, fee health, attendance, notices, events, and
-                daily action points from one control center.
+                {layout === "campus"
+                  ? "Campus layout — profile, colorful summaries, module grid, and charts. Switch back anytime in Dashboard Settings."
+                  : "Monitor reports, fee health, attendance, notices, events, and daily action points from one control center."}
               </p>
             </div>
             <div className="flex flex-col gap-3 sm:flex-row">
@@ -460,16 +466,18 @@ const SchoolDashboard = () => {
 
           {settingsOpen && (
             <DashboardSettingsControl
-            visibility={visibility}
-            onToggle={(key) =>
+              visibility={visibility}
+              layout={layout}
+              onLayoutChange={setLayout}
+              onToggle={(key) =>
                 setVisibility((current) => ({
                   ...current,
                   [key]: !current[key],
                 }))
               }
               onReset={() => setVisibility(defaultVisibility)}
-              />
-            )}
+            />
+          )}
         </div>
       </div>
 
@@ -477,8 +485,18 @@ const SchoolDashboard = () => {
 
       {/* ─── Body ───────────────────────────────────────────────────────────── */}
       <div className="mx-auto max-w-7xl space-y-6 px-4 py-6 sm:px-6 lg:px-8">
+        <UpcomingNotifications />
 
-            <UpcomingNotifications />
+        {layout === "campus" ? (
+          <SchoolCampusDashboard
+            metrics={metrics}
+            dashboard={dashboard}
+            feeTrend={feeTrend}
+            visibility={visibility}
+            formatCurrency={formatCurrency}
+          />
+        ) : (
+          <>
         {/* Stat row */}
         <section className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
           <StatCard
@@ -769,8 +787,8 @@ const SchoolDashboard = () => {
             </SectionCard>
           )}
         </div>
-
-       
+          </>
+        )}
       </div>
     </div>
   );
@@ -778,20 +796,28 @@ const SchoolDashboard = () => {
 
 // ─── Sub-components ──────────────────────────────────────────────────────────
 
-const DashboardSettingsControl = ({ visibility, onToggle, onReset }) => {
+const DashboardSettingsControl = ({
+  visibility,
+  onToggle,
+  onReset,
+  layout,
+  onLayoutChange,
+}) => {
   const controls = [
-    ["highlights",   "Highlights"     ],
-    ["reports",      "Reports"        ],
-    ["feeTrends",    "Fee Trends"     ],
-    ["attendance",   "Attendance"     ],
-    ["quickActions", "Quick Actions"  ],
-    ["notices",      "Latest Notices" ],
-    ["events",       "Upcoming Events"],
+    ["highlights", "Highlights"],
+    ["reports", "Reports"],
+    ["feeTrends", "Fee Trends"],
+    ["attendance", "Attendance"],
+    ["quickActions", "Quick Actions"],
+    ["notices", "Latest Notices"],
+    ["events", "Upcoming Events"],
   ];
 
   return (
     <div className="mt-5 rounded-3xl border border-[rgb(var(--border))] bg-[rgb(var(--bg))] p-5">
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+      <DashboardLayoutPicker layout={layout} onLayoutChange={onLayoutChange} />
+
+      <div className="mt-2 flex flex-col gap-3 border-t border-[rgb(var(--border))] pt-5 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h2 className="text-base font-black text-[rgb(var(--text))]">
             Dashboard Content Control
