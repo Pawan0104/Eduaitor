@@ -50,9 +50,10 @@ const API = import.meta.env.VITE_API_URL;
 // default = soft tinted primary
 const IconBadge = ({ icon, variant = "default" }) => {
   const styles = {
-    active: "bg-[rgb(var(--primary))] text-white shadow-sm",
+    active:
+      "bg-[rgb(var(--sidebar-active))] text-[rgb(var(--sidebar))] shadow-sm",
     locked: "bg-[rgba(var(--text-muted),0.15)] text-[rgb(var(--text-muted))]",
-    default: "bg-[rgba(var(--primary),0.08)] text-[rgb(var(--primary))]",
+    default: "bg-[rgba(var(--sidebar-active),0.14)] text-[rgb(var(--sidebar-active))]",
   };
   return (
     <span
@@ -840,7 +841,7 @@ const Sidebar = ({ closeSidebar }) => {
         />
       )}
 
-      <aside className="h-full w-full bg-[rgb(var(--sidebar))] border-r border-[rgb(var(--border))] flex flex-col shadow-sm">
+      <aside className="h-full w-full bg-[rgb(var(--sidebar))] border-r border-[rgb(var(--border))] flex flex-col shadow-sm text-[rgb(var(--sidebar-text))]">
         {/* MENU */}
         <div className="flex-1 overflow-y-auto px-2 py-2">
           {finalMenu.map((item, index) => {
@@ -866,8 +867,8 @@ const Sidebar = ({ closeSidebar }) => {
                         !isSubscribed
                           ? "opacity-50 cursor-not-allowed"
                           : isParentActive
-                            ? "bg-[rgba(var(--primary),0.08)] cursor-pointer"
-                            : "cursor-pointer hover:bg-[rgba(var(--primary),0.06)]"
+                            ? "bg-[rgba(var(--sidebar-active),0.14)] cursor-pointer"
+                            : "cursor-pointer hover:bg-[rgba(var(--sidebar-active),0.08)]"
                       }`}
                   >
                     <div className="flex items-center gap-3 min-w-0">
@@ -875,7 +876,7 @@ const Sidebar = ({ closeSidebar }) => {
                       <span
                         className={`font-medium text-sm truncate ${
                           isParentActive && isSubscribed
-                            ? "text-[rgb(var(--primary))]"
+                            ? "text-[rgb(var(--sidebar-active))] font-semibold"
                             : "text-[rgb(var(--sidebar-text))]"
                         }`}
                       >
@@ -885,23 +886,23 @@ const Sidebar = ({ closeSidebar }) => {
                     {!isSubscribed ? (
                       <FaLock
                         size={10}
-                        className="text-[rgb(var(--text-muted))] shrink-0"
+                        className="text-[rgb(var(--sidebar-text))] opacity-70 shrink-0"
                       />
                     ) : isOpen ? (
                       <FaChevronDown
                         size={10}
-                        className="text-[rgb(var(--text-muted))] shrink-0"
+                        className="text-[rgb(var(--sidebar-text))] opacity-70 shrink-0"
                       />
                     ) : (
                       <FaChevronRight
                         size={10}
-                        className="text-[rgb(var(--text-muted))] shrink-0"
+                        className="text-[rgb(var(--sidebar-text))] opacity-70 shrink-0"
                       />
                     )}
                   </div>
 
                   {isOpen && isSubscribed && (
-                    <div className="ml-6 my-1 border-l border-[rgb(var(--border))]">
+                    <div className="ml-6 my-1 border-l border-[rgba(var(--sidebar-text),0.25)]">
                       {item.children
                         .filter(
                           (child) => !child.module || hasModule(child.module),
@@ -915,8 +916,8 @@ const Sidebar = ({ closeSidebar }) => {
                             className={`ml-3 mr-2 px-3 py-2.5 rounded-xl text-sm cursor-pointer transition-all
                               ${
                                 isActive
-                                  ? "text-[rgb(var(--primary))] font-semibold bg-[rgba(var(--primary),0.08)]"
-                                  : "text-[rgb(var(--text-muted))] hover:text-[rgb(var(--text))] hover:bg-[rgba(var(--primary),0.05)]"
+                                  ? "text-[rgb(var(--sidebar-active))] font-semibold bg-[rgba(var(--sidebar-active),0.12)]"
+                                  : "text-[rgb(var(--sidebar-text))] opacity-85 hover:opacity-100 hover:bg-[rgba(var(--sidebar-active),0.08)]"
                               }`}
                           >
                             {tn(child.name)}
@@ -946,8 +947,8 @@ const Sidebar = ({ closeSidebar }) => {
                     !isSubscribed
                       ? "opacity-50 cursor-not-allowed"
                       : isActive
-                        ? "bg-[rgba(var(--primary),0.08)] cursor-pointer"
-                        : "cursor-pointer hover:bg-[rgba(var(--primary),0.06)]"
+                        ? "bg-[rgba(var(--sidebar-active),0.14)] cursor-pointer"
+                        : "cursor-pointer hover:bg-[rgba(var(--sidebar-active),0.08)]"
                   }`}
               >
                 <div className="flex items-center gap-3 min-w-0">
@@ -955,7 +956,7 @@ const Sidebar = ({ closeSidebar }) => {
                   <span
                     className={`font-medium text-sm truncate ${
                       isActive && isSubscribed
-                        ? "text-[rgb(var(--primary))]"
+                        ? "text-[rgb(var(--sidebar-active))] font-semibold"
                         : "text-[rgb(var(--sidebar-text))]"
                     }`}
                   >
@@ -965,7 +966,7 @@ const Sidebar = ({ closeSidebar }) => {
                 {!isSubscribed && (
                   <FaLock
                     size={10}
-                    className="text-[rgb(var(--text-muted))] shrink-0"
+                    className="text-[rgb(var(--sidebar-text))] opacity-70 shrink-0"
                   />
                 )}
               </div>
@@ -974,10 +975,10 @@ const Sidebar = ({ closeSidebar }) => {
         </div>
 
         {/* LOGOUT */}
-        <div className="p-3 border-t border-[rgb(var(--border))] bg-[rgb(var(--sidebar))]">
+        <div className="p-3 border-t border-[rgba(var(--sidebar-text),0.2)] bg-[rgb(var(--sidebar))]">
           <button
             onClick={logout}
-            className="flex items-center gap-3 w-full px-3 py-2.5 rounded-2xl text-[rgb(var(--text-muted))] hover:bg-red-500/10 hover:text-red-500 transition-all"
+            className="flex items-center gap-3 w-full px-3 py-2.5 rounded-2xl text-[rgb(var(--sidebar-text))] hover:bg-red-500/10 hover:text-red-400 transition-all"
           >
             <IconBadge icon={<FaSignOutAlt />} variant="default" />
             <span className="font-medium text-sm">{t("common.logout")}</span>

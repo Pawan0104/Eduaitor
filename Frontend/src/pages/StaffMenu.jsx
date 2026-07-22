@@ -33,6 +33,7 @@ import {
 } from "../components/RoleMenuShell";
 import { COLOR_MAP as TEACHER_COLORS } from "./TeacherMenu";
 import { clearSessionKeepPrefs } from "../utils/clearSessionKeepPrefs";
+import { applyTheme, getTheme } from "../utils/theme";
 
 const COLOR_MAP = {
   ...TEACHER_COLORS,
@@ -56,11 +57,11 @@ export default function StaffMenu() {
 
   useEffect(() => {
     const saved = localStorage.getItem("theme") || "theme-light";
-    document.documentElement.className = saved;
+    applyTheme(saved);
     setIsDark(saved === "theme-dark");
     const onStorage = () => {
       const t = localStorage.getItem("theme") || "theme-light";
-      document.documentElement.className = t;
+      applyTheme(t);
       setIsDark(t === "theme-dark");
     };
     window.addEventListener("storage", onStorage);

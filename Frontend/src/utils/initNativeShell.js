@@ -98,7 +98,9 @@ export async function initNativeShell() {
 
     try {
       const theme = document.documentElement.className || "";
-      const dark = theme.includes("theme-dark");
+      const dark =
+        theme.includes("theme-dark") ||
+        document.documentElement.classList.contains("theme-dark");
       await StatusBar.setStyle({ style: dark ? Style.Dark : Style.Light });
     } catch {
       // ignore

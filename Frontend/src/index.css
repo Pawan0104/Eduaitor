@@ -34,16 +34,17 @@
 .theme-light {
   --primary: 91 61 245;
   --primary-light: 124 92 255;
+  --on-primary: 255 255 255;
 
   --sidebar: 255 255 255;
-  --sidebar-text: 75 85 99;
+  --sidebar-text: 55 65 81;
   --sidebar-active: 91 61 245;
 
   --bg: 248 249 253;
   --surface: 255 255 255;
 
   --text: 17 24 39;
-  --text-muted: 107 114 128;
+  --text-muted: 75 85 99;
 
   --accent: 124 92 255;
 
@@ -56,18 +57,19 @@
 }
 
 .theme-dark {
-  --primary: 139 92 246;
-  --primary-light: 167 139 250;
+  --primary: 167 139 250;
+  --primary-light: 196 181 253;
+  --on-primary: 15 23 42;
 
   --sidebar: 17 24 39;
-  --sidebar-text: 203 213 225;
+  --sidebar-text: 226 232 240;
   --sidebar-active: 255 255 255;
 
   --bg: 15 23 42;
   --surface: 30 41 59;
 
   --text: 248 250 252;
-  --text-muted: 148 163 184;
+  --text-muted: 203 213 225;
 
   --accent: 167 139 250;
 
@@ -82,16 +84,17 @@
 .theme-blue {
   --primary: 37 99 235;
   --primary-light: 59 130 246;
+  --on-primary: 255 255 255;
 
   --sidebar: 255 255 255;
-  --sidebar-text: 75 85 99;
+  --sidebar-text: 55 65 81;
   --sidebar-active: 37 99 235;
 
   --bg: 245 249 255;
   --surface: 255 255 255;
 
   --text: 17 24 39;
-  --text-muted: 107 114 128;
+  --text-muted: 71 85 105;
 
   --accent: 59 130 246;
 
@@ -102,16 +105,17 @@
 .theme-green {
   --primary: 5 150 105;
   --primary-light: 16 185 129;
+  --on-primary: 255 255 255;
 
   --sidebar: 255 255 255;
-  --sidebar-text: 75 85 99;
+  --sidebar-text: 55 65 81;
   --sidebar-active: 5 150 105;
 
   --bg: 245 253 250;
   --surface: 255 255 255;
 
   --text: 17 24 39;
-  --text-muted: 107 114 128;
+  --text-muted: 71 85 105;
 
   --accent: 16 185 129;
 
@@ -128,6 +132,15 @@ body,
 body {
   background: rgb(var(--bg));
   color: rgb(var(--text));
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
+}
+
+/* Readable filled primary buttons across skins */
+.btn-primary,
+button.login-submit:not(:disabled) {
+  color: rgb(var(--on-primary, 255 255 255));
 }
 
 /* Sticky top chrome: extend bar under status icons, keep controls below them */
@@ -147,6 +160,67 @@ body {
   padding-top: env(safe-area-inset-top, 0px);
 }
 
+/* ---------- Mobile app shell ---------- */
+@media (max-width: 1023px) {
+  .app-shell {
+    /* Native-like: no rubber-band on outer shell */
+    overscroll-behavior: none;
+  }
+
+  .app-topbar {
+    background: color-mix(in srgb, rgb(var(--surface)) 92%, transparent);
+    backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
+    box-shadow: 0 1px 0 rgb(var(--border)), 0 8px 24px rgba(15, 23, 42, 0.04);
+  }
+
+  .app-main {
+    -webkit-overflow-scrolling: touch;
+    overscroll-behavior-y: contain;
+  }
+
+  .app-main-pad {
+    max-width: 40rem;
+    margin-left: auto;
+    margin-right: auto;
+  }
+
+  .app-bottom-dock {
+    /* Keep content clear of floating dock */
+  }
+}
+
+.app-greeting {
+  background: linear-gradient(
+    135deg,
+    rgb(var(--primary)) 0%,
+    rgb(var(--primary-light)) 100%
+  );
+  box-shadow: 0 12px 28px rgba(15, 23, 42, 0.12);
+}
+
+html[data-skin="campus"] .app-greeting {
+  background: linear-gradient(145deg, #0b1f3a 0%, #1e3a5f 55%, #0b1f3a 100%);
+}
+
+html[data-skin="forest"] .app-greeting {
+  background: linear-gradient(145deg, #0f3d2e 0%, #166534 55%, #0f3d2e 100%);
+}
+
+/* Soft wave under mobile greeting (Campus / Forest) */
+html[data-skin="campus"] .skin-wave-header::after,
+html[data-skin="forest"] .skin-wave-header::after {
+  content: "";
+  position: absolute;
+  left: -12%;
+  right: -12%;
+  bottom: -2px;
+  height: 22px;
+  background: rgb(var(--bg));
+  border-radius: 50% 50% 0 0 / 100% 100% 0 0;
+  pointer-events: none;
+}
+
 .card {
   background: rgb(var(--surface));
   border: 1px solid rgb(var(--border));
@@ -164,4 +238,179 @@ body {
   transform: translateY(-2px);
   box-shadow:
     0 8px 24px rgba(0,0,0,.08);
+}
+
+/* =====================================================
+   GLOBAL UI SKINS (data-skin on <html>)
+   Totally different looks — login + all role screens
+===================================================== */
+
+html[data-skin="campus"] {
+  /* Action blue — readable as text and as filled button with white label */
+  --primary: 29 78 216;
+  --primary-light: 37 99 235;
+  --on-primary: 255 255 255;
+
+  --sidebar: 11 31 58;
+  --sidebar-text: 226 232 240;
+  --sidebar-active: 245 197 24;
+
+  --bg: 241 245 249;
+  --surface: 255 255 255;
+
+  --text: 15 23 42;
+  --text-muted: 71 85 105;
+
+  --accent: 245 197 24;
+
+  --border: 203 213 225;
+  --border-strong: 148 163 184;
+
+  --success: 22 163 74;
+  --warning: 217 119 6;
+  --danger: 220 38 38;
+}
+
+html[data-skin="campus"].theme-dark {
+  --primary: 96 165 250;
+  --primary-light: 147 197 253;
+  --on-primary: 15 23 42;
+  --bg: 8 15 28;
+  --surface: 15 28 48;
+  --text: 248 250 252;
+  --text-muted: 186 200 220;
+  --border: 30 58 95;
+  --border-strong: 51 65 85;
+  --sidebar: 6 12 24;
+  --sidebar-text: 226 232 240;
+}
+
+html[data-skin="forest"] {
+  --primary: 4 120 87;
+  --primary-light: 16 185 129;
+  --on-primary: 255 255 255;
+
+  --sidebar: 15 61 46;
+  --sidebar-text: 236 253 245;
+  --sidebar-active: 52 211 153;
+
+  --bg: 240 253 244;
+  --surface: 255 255 255;
+
+  --text: 6 32 24;
+  --text-muted: 55 85 70;
+
+  --accent: 52 211 153;
+
+  --border: 167 243 208;
+  --border-strong: 110 231 183;
+
+  --success: 5 150 105;
+  --warning: 217 119 6;
+  --danger: 220 38 38;
+}
+
+html[data-skin="forest"].theme-dark {
+  --primary: 52 211 153;
+  --primary-light: 110 231 183;
+  --on-primary: 6 32 24;
+  --bg: 6 24 18;
+  --surface: 12 40 30;
+  --text: 236 253 245;
+  --text-muted: 167 243 208;
+  --border: 22 70 52;
+  --border-strong: 30 90 68;
+  --sidebar: 8 36 28;
+  --sidebar-text: 236 253 245;
+}
+
+/* Card geometry per skin */
+html[data-skin="campus"] .card {
+  border-radius: 18px;
+  box-shadow: 0 4px 18px rgba(11, 31, 58, 0.06);
+}
+
+html[data-skin="forest"] .card {
+  border-radius: 20px;
+  box-shadow: 0 6px 20px rgba(15, 61, 46, 0.07);
+}
+
+/* Login shell — driven by skin tokens */
+.login-shell {
+  min-height: 100dvh;
+  background: rgb(var(--primary));
+}
+
+html[data-skin="classic"] .login-shell {
+  background: #4f46e5;
+}
+
+html[data-skin="campus"] .login-shell {
+  background: #0b1f3a;
+}
+
+html[data-skin="forest"] .login-shell {
+  background: #0f3d2e;
+}
+
+.login-brand-panel {
+  min-height: 100dvh;
+  background: linear-gradient(
+    145deg,
+    rgb(var(--bg)) 0%,
+    color-mix(in srgb, rgb(var(--primary)) 12%, rgb(var(--bg))) 55%,
+    rgb(var(--bg)) 100%
+  );
+}
+
+.login-form-panel {
+  min-height: 100%;
+  background: linear-gradient(
+    160deg,
+    rgb(var(--primary)) 0%,
+    rgb(var(--primary-light)) 55%,
+    color-mix(in srgb, rgb(var(--accent)) 35%, rgb(var(--primary))) 100%
+  );
+}
+
+html[data-skin="classic"] .login-form-panel {
+  background: linear-gradient(160deg, #4f46e5 0%, #7c3aed 50%, #4338ca 100%);
+}
+
+html[data-skin="campus"] .login-form-panel {
+  background: linear-gradient(160deg, #0b1f3a 0%, #16355c 55%, #0b1f3a 100%);
+}
+
+html[data-skin="forest"] .login-form-panel {
+  background: linear-gradient(160deg, #0f3d2e 0%, #166534 55%, #0f3d2e 100%);
+}
+
+.login-card {
+  background: rgb(var(--surface));
+  border: 1px solid rgb(var(--border));
+  border-radius: 1.25rem;
+  box-shadow: 0 20px 50px rgba(0, 0, 0, 0.18);
+}
+
+.login-submit {
+  background: linear-gradient(
+    90deg,
+    rgb(var(--primary)) 0%,
+    rgb(var(--primary-light)) 100%
+  );
+}
+
+html[data-skin="classic"] .login-submit {
+  background: linear-gradient(90deg, #a855f7 0%, #6366f1 100%);
+  color: #ffffff;
+}
+
+html[data-skin="campus"] .login-submit {
+  background: linear-gradient(90deg, #f5c518 0%, #eab308 100%);
+  color: #0b1f3a;
+}
+
+html[data-skin="forest"] .login-submit {
+  background: linear-gradient(90deg, #34d399 0%, #059669 100%);
+  color: #052e1c;
 }

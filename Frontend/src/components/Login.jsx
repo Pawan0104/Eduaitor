@@ -4,7 +4,6 @@ import { useState, useEffect } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import {
   FaUserShield,
-  FaArrowLeft,
   FaLock,
   FaEye,
   FaEyeSlash,
@@ -27,7 +26,6 @@ export default function Login() {
   const { t } = useLanguage();
 
   useEffect(() => {
-    // Push a dummy entry so back has nowhere protected to go
     window.history.pushState(null, "", window.location.href);
 
     const handlePopState = () => {
@@ -61,46 +59,43 @@ export default function Login() {
       if (res.data?.token) setAuthToken(res.data.token);
 
       const role = res.data.data.role;
-      const loginAs = res.data.data.loginAs; // "student" or "parent"
+      const loginAs = res.data.data.loginAs;
       const isFirstTime = res.data.data.firstTimeLogin;
 
       if (role === "student_admin" && isFirstTime) {
-        await fetchUser(); // need user in context for /change-password ProtectedRoute
+        await fetchUser();
         toast.info(t("login.changePassword"));
         navigate("/change-password", { replace: true });
         return;
       }
 
-      // For all other roles, fetchUser then navigate
       await fetchUser();
 
       if (role === "super_admin") {
         if (isMobile) {
           navigate(from, { replace: true });
-          navigate("/admin/menu"); // mobile page
+          navigate("/admin/menu");
         } else {
-          navigate("/admin/dashboard"); // desktop page
+          navigate("/admin/dashboard");
         }
         toast.success(t("login.success"));
-      } 
-      else if (role === "school_admin") {
+      } else if (role === "school_admin") {
         if (isMobile) {
           navigate(from, { replace: true });
-          navigate("/school/menu"); // mobile page
+          navigate("/school/menu");
         } else {
-          navigate("/school/dashboard"); // desktop page
+          navigate("/school/dashboard");
         }
         toast.success(t("login.success"));
       } else if (role === "teacher_admin") {
         if (isMobile) {
           navigate(from, { replace: true });
-          navigate("/teacher/menu"); // mobile page
+          navigate("/teacher/menu");
         } else {
-          navigate("/teacher/dashboard"); // desktop page
+          navigate("/teacher/dashboard");
         }
         toast.success(t("login.success"));
-      } 
-      else if (role === "student_admin") {
+      } else if (role === "student_admin") {
         if (isFirstTime) {
           await fetchUser();
           toast.info(t("login.changePassword"));
@@ -148,56 +143,48 @@ export default function Login() {
     }
   };
 
-  /* ================= UI ================= */
-
   return (
-    <div className="app-safe-top min-h-screen grid md:grid-cols-2">
-      {/* LEFT PANEL */}
-      <div className="hidden md:flex flex-col justify-center items-center bg-linear-to-br from-[#e6edf8] via-[#d7e2f5] to-[#eef1fb]  text-white p-12">
-       <img className="h-44" src={logo} alt="" />
+    <div className="app-safe-top login-shell grid min-h-dvh md:grid-cols-2">
+      <div className="login-brand-panel hidden min-h-dvh flex-col items-center justify-center p-12 md:flex">
+        <img className="h-44" src={logo} alt="Eduaitor" />
+        <p className="mt-4 text-sm font-semibold text-[rgb(var(--text-muted))]">
+          {t("brand.tagline", "Smarter Schools. Stronger Students.")}
+        </p>
       </div>
 
-      {/* RIGHT PANEL */}
-      <div className="flex items-center justify-center bg-linear-to-br from-indigo-600 via-purple-600 to-indigo-700 p-6">
-        <div className="w-full max-w-md bg-white backdrop-blur-xl shadow-xl rounded-2xl p-8 border border-white/40">
+      <div className="login-form-panel flex min-h-[calc(100dvh-env(safe-area-inset-top,0px))] items-center justify-center p-6 md:min-h-dvh">
+        <div className="login-card w-full max-w-md p-8">
           <LanguageSwitcher variant="login" />
 
-          {/* HEADER */}
-          <div className="text-center mb-8">
-            <FaUserShield className="mx-auto text-4xl text-indigo-500 mb-3" />
-
-            <h2 className="text-3xl font-bold text-gray-700 mb-2">
+          <div className="mb-8 text-center">
+            <FaUserShield className="mx-auto mb-3 text-4xl text-[rgb(var(--primary))]" />
+            <h2 className="mb-2 text-3xl font-bold text-[rgb(var(--text))]">
               {t("login.title")}
             </h2>
-
-            <p className="text-gray-500 text-sm">{t("login.subtitle")}</p>
+            <p className="text-sm text-[rgb(var(--text-muted))]">
+              {t("login.subtitle")}
+            </p>
           </div>
 
-          {/* ERROR */}
           {error && (
-            <p className="text-red-500 text-sm text-center mb-4">{error}</p>
+            <p className="mb-4 text-center text-sm text-red-500">{error}</p>
           )}
 
-          {/* FORM */}
           <form onSubmit={handleSubmit} className="space-y-5">
-            {/* EMAIL */}
             <div className="relative">
-              <FaUserShield className="absolute left-4 top-4 text-gray-400" />
-
+              <FaUserShield className="pointer-events-none absolute top-1/2 left-4 z-10 -translate-y-1/2 text-[rgb(var(--text-muted))]" />
               <input
                 name="email"
                 placeholder={t("login.emailPlaceholder")}
                 value={form.email}
                 onChange={handleChange}
                 required
-                className="w-full pl-11 pr-4 py-3 rounded-xl border border-gray-200 focus:ring-2 focus:ring-indigo-400 outline-none"
+                className="input !pl-12"
               />
             </div>
 
-            {/* PASSWORD */}
             <div className="relative">
-              <FaLock className="absolute left-4 top-4 text-gray-400" />
-
+              <FaLock className="pointer-events-none absolute top-1/2 left-4 z-10 -translate-y-1/2 text-[rgb(var(--text-muted))]" />
               <input
                 type={showPassword ? "text" : "password"}
                 name="password"
@@ -205,31 +192,30 @@ export default function Login() {
                 value={form.password}
                 onChange={handleChange}
                 required
-                className="w-full pl-11 pr-10 py-3 rounded-xl border border-gray-200 focus:ring-2 focus:ring-indigo-400 outline-none"
+                className="input !pl-12 !pr-12"
               />
-
-              <div
+              <button
+                type="button"
                 onClick={() => setShowPassword(!showPassword)}
-                className="absolute right-4 top-4 cursor-pointer text-gray-400"
+                className="absolute top-1/2 right-3 z-10 -translate-y-1/2 cursor-pointer p-1 text-[rgb(var(--text-muted))]"
+                aria-label={showPassword ? "Hide password" : "Show password"}
               >
                 {showPassword ? <FaEyeSlash /> : <FaEye />}
-              </div>
+              </button>
             </div>
 
-            {/* BUTTON */}
             <button
               type="submit"
               disabled={loading}
-              className={`w-full py-3 rounded-xl text-white font-semibold transition shadow-md
-              ${
+              className={`w-full py-3 rounded-xl font-semibold shadow-md transition ${
                 loading
-                  ? "bg-gray-400 cursor-not-allowed"
-                  : "bg-linear-to-r from-purple-500 to-indigo-500 hover:opacity-90"
+                  ? "cursor-not-allowed bg-gray-400 text-white"
+                  : "login-submit hover:opacity-90"
               }`}
             >
               {loading ? (
                 <div className="flex items-center justify-center gap-2">
-                  <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                  <div className="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent" />
                   {t("login.loggingIn")}
                 </div>
               ) : (

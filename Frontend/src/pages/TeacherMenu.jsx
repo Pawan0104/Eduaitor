@@ -32,6 +32,7 @@ import {
   useMenuExitGuard,
 } from "../components/RoleMenuShell";
 import { clearSessionKeepPrefs } from "../utils/clearSessionKeepPrefs";
+import { applyTheme, getTheme } from "../utils/theme";
 
 export const COLOR_MAP = {
   Dashboard: { bg: "#FFF7ED", icon: "#F97316", dot: "#FED7AA" },
@@ -79,11 +80,11 @@ export default function TeacherMenu() {
 
   useEffect(() => {
     const saved = localStorage.getItem("theme") || "theme-light";
-    document.documentElement.className = saved;
+    applyTheme(saved);
     setIsDark(saved === "theme-dark");
     const onStorage = () => {
       const t = localStorage.getItem("theme") || "theme-light";
-      document.documentElement.className = t;
+      applyTheme(t);
       setIsDark(t === "theme-dark");
     };
     window.addEventListener("storage", onStorage);

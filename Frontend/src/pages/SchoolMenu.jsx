@@ -32,6 +32,7 @@ import BlogFeed from "../components/BlogFeed";
 import UpComingNotifications from "../components/UpComingNotifications";
 import { ModuleGrid, useMenuExitGuard } from "../components/RoleMenuShell";
 import { clearSessionKeepPrefs } from "../utils/clearSessionKeepPrefs";
+import { applyTheme, getTheme } from "../utils/theme";
 
 /* ─── Color map ─────────────────────────────────────────────── */
 export const COLOR_MAP = {
@@ -373,12 +374,12 @@ export default function SchoolMenu() {
   // ── Read + apply saved theme on mount ───────────────────────
   useEffect(() => {
     const saved = localStorage.getItem("theme") || "theme-light";
-    document.documentElement.className = saved;
+    applyTheme(saved);
     setIsDark(saved === "theme-dark");
 
     const onStorage = () => {
       const themeName = localStorage.getItem("theme") || "theme-light";
-      document.documentElement.className = themeName;
+      applyTheme(themeName);
       setIsDark(themeName === "theme-dark");
     };
     window.addEventListener("storage", onStorage);

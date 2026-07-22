@@ -168,17 +168,17 @@ const AdminLayout = () => {
   );
 
   return (
-    <div className="h-screen bg-[rgb(var(--bg))] overflow-hidden flex flex-col">
+    <div className="app-shell h-screen bg-[rgb(var(--bg))] overflow-hidden flex flex-col">
       <Topbar menuPath={menuPath} />
 
-      <div className="flex flex-1 overflow-hidden">
+      <div className="flex flex-1 overflow-hidden min-h-0">
         {/* Desktop Sidebar only — mobile uses Menu hub + bottom nav */}
         <aside className="hidden lg:flex w-70 shrink-0">
           <Sidebar />
         </aside>
 
-        <main className="flex-1 overflow-y-auto">
-          <div className="px-3 sm:px-4 md:px-6 lg:px-8 py-4 lg:py-6 pb-24 lg:pb-8">
+        <main className="app-main flex-1 overflow-y-auto overscroll-y-contain">
+          <div className="app-main-pad px-3 sm:px-4 md:px-6 lg:px-8 py-3 lg:py-6 pb-[calc(5.75rem+env(safe-area-inset-bottom))] lg:pb-8">
             <DomI18n className="max-w-400 mx-auto">
               <Outlet />
             </DomI18n>

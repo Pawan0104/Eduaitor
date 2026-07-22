@@ -6,6 +6,7 @@ export function clearSessionKeepPrefs() {
   const savedDashLayout =
     localStorage.getItem("dashboardLayout") ||
     localStorage.getItem("schoolDashboardLayout");
+  const savedUiSkin = localStorage.getItem("uiSkin");
   localStorage.clear();
   sessionStorage.clear();
   if (savedLang) localStorage.setItem("app_lang", savedLang);
@@ -15,4 +16,5 @@ export function clearSessionKeepPrefs() {
     localStorage.setItem("dashboardLayout", savedDashLayout);
     localStorage.setItem("schoolDashboardLayout", savedDashLayout);
   }
+  if (savedUiSkin) localStorage.setItem("uiSkin", savedUiSkin);
 }

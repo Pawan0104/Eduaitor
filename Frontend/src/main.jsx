@@ -9,8 +9,12 @@ import { AuthProvider } from "./context/AuthContext.jsx";
 import { LanguageProvider } from "./context/LanguageContext.jsx";
 import { HelmetProvider } from "react-helmet-async";
 import { initNativeShell } from "./utils/initNativeShell.js";
+import { initTheme } from "./utils/theme.js";
+import { initUiSkin } from "./utils/uiSkin.js";
 import AppUpdatePrompt from "./components/AppUpdatePrompt.jsx";
 
+initTheme();
+initUiSkin();
 initNativeShell().catch(() => {});
 
 createRoot(document.getElementById("root")).render(

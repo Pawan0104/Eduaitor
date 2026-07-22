@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="en">
+<html lang="en" data-skin="classic" class="theme-light">
   <head>
     <meta charset="UTF-8" />
     <link rel="icon" type="image/png" href="/app-icon.png" />
@@ -16,6 +16,39 @@
         background: #05080f;
       }
     </style>
+    <script>
+      (function () {
+        try {
+          var skin = localStorage.getItem("uiSkin");
+          if (!skin) {
+            skin =
+              localStorage.getItem("dashboardLayout") === "campus"
+                ? "campus"
+                : "classic";
+          }
+          if (skin !== "classic" && skin !== "campus" && skin !== "forest") {
+            skin = "classic";
+          }
+          document.documentElement.setAttribute("data-skin", skin);
+          var theme = localStorage.getItem("theme") || "theme-light";
+          if (
+            theme !== "theme-light" &&
+            theme !== "theme-dark" &&
+            theme !== "theme-blue" &&
+            theme !== "theme-green"
+          ) {
+            theme = "theme-light";
+          }
+          document.documentElement.classList.remove(
+            "theme-light",
+            "theme-dark",
+            "theme-blue",
+            "theme-green",
+          );
+          document.documentElement.classList.add(theme);
+        } catch (e) {}
+      })();
+    </script>
   </head>
   <body>
     <div id="root"></div>

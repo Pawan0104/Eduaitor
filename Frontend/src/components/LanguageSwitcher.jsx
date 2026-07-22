@@ -1,4 +1,3 @@
-import { FaGlobe } from "react-icons/fa";
 import { useLanguage } from "../context/LanguageContext";
 import { SUPPORTED_LANGS } from "../i18n/translations";
 
@@ -11,9 +10,8 @@ const LanguageSwitcher = ({ variant = "header" }) => {
 
   if (variant === "login") {
     return (
-      <div className="flex items-center justify-center gap-2 mb-6">
-        <FaGlobe className="text-indigo-500" size={14} />
-        <div className="inline-flex rounded-full border border-indigo-200 bg-indigo-50 p-0.5">
+      <div className="mb-6 flex items-center justify-center gap-2">
+        <div className="inline-flex rounded-full border border-[rgb(var(--border))] bg-[rgb(var(--bg))] p-0.5">
           {SUPPORTED_LANGS.map((item) => {
             const active = lang === item.code;
             return (
@@ -21,10 +19,10 @@ const LanguageSwitcher = ({ variant = "header" }) => {
                 key={item.code}
                 type="button"
                 onClick={() => setLang(item.code)}
-                className={`px-3 py-1 text-xs font-semibold rounded-full transition ${
+                className={`rounded-full px-3 py-1 text-xs font-semibold transition ${
                   active
-                    ? "bg-indigo-600 text-white shadow"
-                    : "text-indigo-700 hover:bg-indigo-100"
+                    ? "bg-[rgb(var(--primary))] text-[rgb(var(--on-primary,255_255_255))] shadow"
+                    : "text-[rgb(var(--text))] hover:bg-[rgba(var(--primary),0.08)]"
                 }`}
               >
                 {t(item.labelKey)}
@@ -41,10 +39,6 @@ const LanguageSwitcher = ({ variant = "header" }) => {
       className="inline-flex items-center rounded-xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))] p-0.5"
       title={t("lang.switch")}
     >
-      <FaGlobe
-        className="ml-2 mr-1 text-[rgb(var(--text-muted))] hidden sm:block"
-        size={12}
-      />
       {SUPPORTED_LANGS.map((item) => {
         const active = lang === item.code;
         return (
@@ -52,9 +46,9 @@ const LanguageSwitcher = ({ variant = "header" }) => {
             key={item.code}
             type="button"
             onClick={() => setLang(item.code)}
-            className={`min-w-9 px-2.5 py-1.5 text-xs font-bold rounded-lg transition ${
+            className={`min-w-8 px-2 py-1.5 text-[11px] font-bold rounded-lg transition sm:min-w-9 sm:px-2.5 sm:text-xs ${
               active
-                ? "bg-[rgb(var(--primary))] text-white shadow-sm"
+                ? "bg-[rgb(var(--primary))] text-[rgb(var(--on-primary,255_255_255))] shadow-sm"
                 : "text-[rgb(var(--text))] hover:bg-[rgba(var(--primary),0.08)]"
             }`}
             aria-pressed={active}

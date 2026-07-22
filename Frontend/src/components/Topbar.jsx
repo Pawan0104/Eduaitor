@@ -8,7 +8,9 @@ import axios from "axios";
 import { toast } from "react-toastify";
 import LanguageSwitcher from "./LanguageSwitcher";
 import { MenuStylePicker } from "./RoleMenuShell";
+import DesignSkinPicker from "./DesignSkinPicker";
 import { clearSessionKeepPrefs } from "../utils/clearSessionKeepPrefs";
+import { applyTheme, getTheme } from "../utils/theme";
 
 const TYPE_COLORS = {
   general: { bg: "bg-slate-100", text: "text-slate-600", dot: "bg-slate-400" },
@@ -52,7 +54,6 @@ const Topbar = ({ menuPath = "/" }) => {
   const [openDropdown, setOpenDropdown] = useState(false);
   const [notifications, setNotifications] = useState([]);
   const [openNotif, setOpenNotif] = useState(false);
-  const [theme, setTheme] = useState("");
 
   const { user } = useAuth();
   const { t, locale } = useLanguage();
@@ -162,11 +163,7 @@ const Topbar = ({ menuPath = "/" }) => {
   };
 
   useEffect(() => {
-    const saved = localStorage.getItem("theme");
-    if (saved) {
-      setTheme(saved);
-      document.documentElement.className = saved;
-    }
+    applyTheme(getTheme());
   }, []);
 
   useEffect(() => {
@@ -206,17 +203,17 @@ const Topbar = ({ menuPath = "/" }) => {
   }, [openDropdown, openNotif]);
 
   return (
-    <header className="app-topbar box-border bg-[rgb(var(--sidebar))] backdrop-blur border-b border-[rgb(var(--border-strong))] flex items-center justify-between px-3 sm:px-5 sticky top-0 z-30 shadow-md">
+    <header className="app-topbar box-border sticky top-0 z-30 flex items-center justify-between border-b border-[rgb(var(--border))] bg-[rgb(var(--surface))] px-2.5 text-[rgb(var(--text))] sm:px-5">
       {/* LEFT */}
-      <div className="flex items-center gap-2 sm:gap-3 min-w-0">
+      <div className="flex min-w-0 items-center gap-1.5 sm:gap-3">
         {/* Mobile: back (when nested) + Menu hub — desktop uses permanent sidebar */}
         {canGoBack && (
           <button
             type="button"
             onClick={() => navigate(-1)}
-            className="lg:hidden shrink-0 w-9 h-9 flex items-center justify-center rounded-xl
-              bg-[rgb(var(--surface))] border border-[rgb(var(--border))]
-              text-[rgb(var(--text))] active:scale-95 transition"
+            className="lg:hidden flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl
+              border border-[rgb(var(--border))] bg-[rgb(var(--bg))]
+              text-[rgb(var(--text))] transition active:scale-95"
             aria-label="Back"
           >
             <FaChevronLeft size={14} />
@@ -226,35 +223,35 @@ const Topbar = ({ menuPath = "/" }) => {
           <button
             type="button"
             onClick={() => navigate(menuPath)}
-            className={`lg:hidden shrink-0 w-9 h-9 flex items-center justify-center rounded-xl
-              border active:scale-95 transition
+            className={`lg:hidden flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl
+              border transition active:scale-95
               ${
                 onMenuHub
-                  ? "bg-[rgb(var(--primary))] text-white border-transparent"
-                  : "bg-[rgb(var(--surface))] border-[rgb(var(--border))] text-[rgb(var(--primary))]"
+                  ? "border-transparent bg-[rgb(var(--primary))] text-[rgb(var(--on-primary,255_255_255))] shadow-sm"
+                  : "border-[rgb(var(--border))] bg-[rgb(var(--bg))] text-[rgb(var(--primary))]"
               }`}
             aria-label="All modules"
           >
             <FaThLarge size={14} />
           </button>
         )}
-        <div className="flex items-center gap-2 sm:gap-2.5 min-w-0 pl-0.5 sm:pl-2">
+        <div className="flex min-w-0 items-center gap-2 pl-0.5 sm:gap-2.5 sm:pl-2">
           {user?.school_logo ? (
             <img
               src={user.school_logo}
               alt="School Logo"
-              className="h-8 lg:h-10 w-auto max-w-28 lg:max-w-35 rounded-lg object-contain"
+              className="h-8 w-auto max-w-24 rounded-lg object-contain lg:h-10 lg:max-w-35"
             />
           ) : (
             <>
-              <div className="w-8 h-8 lg:w-10 lg:h-10 rounded-xl bg-[rgb(var(--primary))] flex items-center justify-center text-base lg:text-lg shadow shrink-0">
+              <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-2xl bg-[rgb(var(--primary))] text-base shadow lg:h-10 lg:w-10 lg:text-lg">
                 🎓
               </div>
               <div className="min-w-0">
-                <h1 className="text-sm lg:text-base font-bold text-[rgb(var(--text))] truncate">
-                  EduAltor
+                <h1 className="truncate text-sm font-bold text-[rgb(var(--text))] lg:text-base">
+                  Eduaitor
                 </h1>
-                <p className="hidden lg:block text-[11px] opacity-50 text-[rgb(var(--text))]">
+                <p className="hidden text-[11px] text-[rgb(var(--text-muted))] lg:block">
                   {t("brand.tagline")}
                 </p>
               </div>
@@ -264,8 +261,7 @@ const Topbar = ({ menuPath = "/" }) => {
       </div>
 
       {/* RIGHT */}
-      <div className="flex items-center gap-1 sm:gap-3 shrink-0 min-w-0">
-        {/* Menu grid styles are for mobile hub layouts only */}
+      <div className="flex shrink-0 items-center gap-1 sm:gap-2.5">
         <div className="lg:hidden shrink-0">
           <MenuStylePicker />
         </div>
@@ -448,80 +444,25 @@ const Topbar = ({ menuPath = "/" }) => {
           {openDropdown && (
             <div
               onClick={(e) => e.stopPropagation()}
-              className="card absolute right-0 mt-3 w-56 overflow-hidden"
+              className="card absolute right-0 mt-3 w-72 overflow-hidden z-50"
               style={{ animation: "notifSlide 0.18s ease-out" }}
             >
-              <div className="px-5 py-4 bg-linear-to-b from-[rgba(var(--primary),0.06)] to-transparent">
+              <div className="px-4 py-4 bg-linear-to-b from-[rgba(var(--primary),0.06)] to-transparent">
                 <p className="text-sm font-bold tracking-tight text-[rgb(var(--text))]">
                   {name}
                 </p>
-                <p className="text-[10px] font-medium opacity-60 uppercase tracking-widest text-[rgb(var(--text))]">
+                <p className="text-[10px] font-medium uppercase tracking-widest text-[rgb(var(--text-muted))]">
                   {loginAs
                     ? loginAs.toUpperCase()
                     : role.replace("_", " ").toUpperCase()}
                 </p>
               </div>
 
-              <div className="px-5 py-4">
-                <div className="flex justify-between items-center mb-3">
-                  <span className="text-[11px] font-bold text-[rgb(var(--text))] opacity-40 uppercase">
-                    {t("common.appearance")}
-                  </span>
-                  <span className="text-[10px] px-2 py-0.5 rounded-full bg-orange-500/10 text-orange-500 font-bold capitalize">
-                    {theme.replace("theme-", "")}
-                  </span>
-                </div>
-                <div className="flex items-center justify-between bg-black/5 p-2 rounded-xl">
-                  {[
-                    {
-                      id: "theme-light",
-                      color: "bg-white",
-                      border: "border-gray-200",
-                    },
-                    {
-                      id: "theme-dark",
-                      color: "bg-slate-800",
-                      border: "border-slate-700",
-                    },
-                    {
-                      id: "theme-blue",
-                      color: "bg-blue-500",
-                      border: "border-blue-400",
-                    },
-                    {
-                      id: "theme-green",
-                      color: "bg-emerald-500",
-                      border: "border-emerald-400",
-                    },
-                  ].map((opt) => (
-                    <button
-                      key={opt.id}
-                      onClick={() => {
-                        setTheme(opt.id);
-                        document.documentElement.className = opt.id;
-                        localStorage.setItem("theme", opt.id);
-                      }}
-                      className="relative group w-8 h-8 flex items-center justify-center"
-                    >
-                      {theme === opt.id && (
-                        <span className="absolute inset-0 rounded-full bg-orange-500/20 animate-pulse scale-125" />
-                      )}
-                      <div
-                        className={`
-                        w-6 h-6 rounded-full ${opt.color} ${opt.border} border shadow-sm
-                        transition-all transform group-hover:scale-110 group-active:scale-90
-                        ${
-                          theme === opt.id
-                            ? "ring-2 ring-orange-500 ring-offset-2 ring-offset-[rgb(var(--bg))]"
-                            : "opacity-80 hover:opacity-100"
-                        }`}
-                      />
-                    </button>
-                  ))}
-                </div>
+              <div className="px-3 pb-3">
+                <DesignSkinPicker variant="inline" />
               </div>
 
-              <div className="p-2">
+              <div className="p-2 border-t border-[rgb(var(--border))]">
                 <button
                   onClick={logout}
                   className="group w-full flex items-center justify-center gap-2 px-4 py-2.5 text-sm font-medium text-[rgb(var(--text))] hover:bg-red-500 hover:text-white rounded-xl transition-all"

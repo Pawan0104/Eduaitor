@@ -65,30 +65,35 @@ export function GreetingHeader({ name, role, loginAs }) {
 
   const rawRole = (loginAs ? loginAs : role || "").replace(/_/g, " ");
   const displayRole = rawRole ? t(`role.${rawRole}`, tn(rawRole)) : "";
+  const initials = String(name || "U")
+    .split(/\s+/)
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((p) => p[0]?.toUpperCase())
+    .join("");
 
   return (
-    <div
-      className="rounded-2xl px-5 py-5 relative overflow-hidden"
-      style={{
-        background:
-          "linear-gradient(135deg, rgb(var(--primary)) 0%, rgb(var(--sidebar)) 85%)",
-      }}
-    >
-      <div
-        className="absolute -top-8 -right-6 w-28 h-28 rounded-full opacity-15 pointer-events-none"
-        style={{ background: "#fff" }}
-      />
-      {displayRole && (
-        <p className="relative text-white/75 text-[11px] font-bold uppercase tracking-wide mb-1">
-          {displayRole}
-        </p>
-      )}
-      <h1 className="relative text-white text-xl font-extrabold mb-1 capitalize">
-        {t("menu.welcome", "Welcome")}, {name}
-      </h1>
-      <p className="relative text-white/80 text-[12.5px] font-semibold">
-        {dateStr}
-      </p>
+    <div className="app-greeting skin-wave-header relative overflow-hidden rounded-[1.35rem] px-5 pb-7 pt-5">
+      <div className="pointer-events-none absolute -right-8 -top-10 h-36 w-36 rounded-full bg-white/15" />
+      <div className="pointer-events-none absolute -bottom-6 left-10 h-20 w-20 rounded-full bg-white/10" />
+      <div className="relative flex items-center gap-3.5">
+        <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-white/20 text-lg font-black text-white ring-2 ring-white/30 backdrop-blur-sm">
+          {initials || "U"}
+        </div>
+        <div className="min-w-0 flex-1">
+          {displayRole && (
+            <p className="mb-0.5 text-[11px] font-bold uppercase tracking-wide text-white/80">
+              {displayRole}
+            </p>
+          )}
+          <h1 className="truncate text-xl font-extrabold capitalize leading-tight text-white">
+            {t("menu.welcome", "Welcome")}, {name}
+          </h1>
+          <p className="mt-0.5 text-[12.5px] font-semibold text-white/85">
+            {dateStr}
+          </p>
+        </div>
+      </div>
     </div>
   );
 }
@@ -764,9 +769,9 @@ export function MenuStylePicker({ className = "" }) {
         aria-expanded={open}
         aria-label={t("menu.style", "Menu style")}
         title={t("menu.style", "Menu style")}
-        className="flex h-9 w-9 items-center justify-center rounded-xl border
+        className="flex h-9 w-9 items-center justify-center rounded-2xl border
           transition active:scale-[0.97]
-          border-[rgb(var(--border))] bg-[rgb(var(--surface))]
+          border-[rgb(var(--border))] bg-[rgb(var(--bg))]
           hover:border-[rgba(var(--primary),0.35)]
           hover:bg-[rgba(var(--primary),0.06)]"
       >
@@ -880,40 +885,38 @@ export function ModuleGrid({
         </span>
       </div>
 
-      {menu.length > 8 && (
-        <div
-          className="flex items-center gap-2 rounded-2xl px-3.5 h-11 border"
-          style={{
-            background: "rgb(var(--surface))",
-            borderColor: "rgb(var(--border))",
-          }}
-        >
-          <FaSearch
-            size={13}
-            className="shrink-0"
-            style={{ color: "rgb(var(--text-muted))" }}
-          />
-          <input
-            value={query}
-            onChange={(e) => setQuery(e.target.value)}
-            placeholder={t("menu.searchModules", "Search modules…")}
-            className="flex-1 bg-transparent outline-none text-[13.5px] font-semibold
-              placeholder:font-medium"
-            style={{ color: "rgb(var(--text))" }}
-          />
-          {query && (
-            <button
-              type="button"
-              onClick={() => setQuery("")}
-              className="w-7 h-7 rounded-lg flex items-center justify-center active:scale-95"
-              style={{ background: "rgb(var(--bg))" }}
-              aria-label={t("common.close", "Close")}
-            >
-              <FaTimes size={10} style={{ color: "rgb(var(--text-muted))" }} />
-            </button>
-          )}
-        </div>
-      )}
+      <div
+        className="flex h-12 items-center gap-2.5 rounded-2xl border px-3.5 shadow-sm"
+        style={{
+          background: "rgb(var(--surface))",
+          borderColor: "rgb(var(--border))",
+        }}
+      >
+        <FaSearch
+          size={14}
+          className="shrink-0"
+          style={{ color: "rgb(var(--text-muted))" }}
+        />
+        <input
+          value={query}
+          onChange={(e) => setQuery(e.target.value)}
+          placeholder={t("menu.searchModules", "Search modules…")}
+          className="flex-1 bg-transparent text-[14px] font-semibold outline-none
+            placeholder:font-medium placeholder:text-[rgb(var(--text-muted))]"
+          style={{ color: "rgb(var(--text))" }}
+        />
+        {query && (
+          <button
+            type="button"
+            onClick={() => setQuery("")}
+            className="flex h-8 w-8 items-center justify-center rounded-xl active:scale-95"
+            style={{ background: "rgb(var(--bg))" }}
+            aria-label={t("common.close", "Close")}
+          >
+            <FaTimes size={11} style={{ color: "rgb(var(--text-muted))" }} />
+          </button>
+        )}
+      </div>
 
       {filtered.length === 0 ? (
         <div

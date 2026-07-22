@@ -20,6 +20,7 @@ import {
   useMenuExitGuard,
 } from "../components/RoleMenuShell";
 import { clearSessionKeepPrefs } from "../utils/clearSessionKeepPrefs";
+import { applyTheme, getTheme } from "../utils/theme";
 
 /* ─── Color map ─────────────────────────────────────────────── */
 const COLOR_MAP = {
@@ -255,13 +256,13 @@ export default function SuperAdminMenu() {
   useEffect(() => {
     const saved = localStorage.getItem("theme") || "theme-light"; // ← fallback
     if (saved) {
-      document.documentElement.className = saved;
+      applyTheme(saved);
       setIsDark(saved === "theme-dark");
     }
     // Re-check when storage changes (e.g. Topbar changed it in another tab)
     const onStorage = () => {
       const t = localStorage.getItem("theme") || "";
-      document.documentElement.className = t;
+      applyTheme(t);
       setIsDark(t === "theme-dark");
     };
     window.addEventListener("storage", onStorage);
