@@ -3,6 +3,7 @@ import { useLocation } from "react-router-dom";
 import { useLanguage } from "../context/LanguageContext";
 import { translations } from "../i18n/translations";
 import { PHRASE_HI } from "../i18n/phraseHi";
+import { HI_TO_EN, hindiToEnglish } from "../i18n/hiToEn";
 
 const SKIP_TAGS = new Set([
   "SCRIPT",
@@ -29,14 +30,19 @@ const EN_STRINGS = (() => {
   return set;
 })();
 
-/** Multi-word phrases sorted longest-first for in-string replace. */
+/** Keep partial replace list small — full dictionary scan freezes large pages. */
 const MULTI_PHRASES = [...EN_STRINGS]
-  .filter((p) => p.length >= 5 && (/\s/.test(p) || p.length >= 8))
-  .sort((a, b) => b.length - a.length);
+  .filter((p) => p.length >= 8 && /\s/.test(p))
+  .sort((a, b) => b.length - a.length)
+  .slice(0, 120);
+
+const MULTI_HI = Object.keys(HI_TO_EN)
+  .filter((p) => p.length >= 8 && /\s/.test(p))
+  .sort((a, b) => b.length - a.length)
+  .slice(0, 120);
 
 const escapeRe = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 
-/** Collapse JSX line-breaks / extra spaces so dictionary matches work. */
 export const norm = (s) => String(s || "").replace(/\s+/g, " ").trim();
 
 export function canTranslate(text) {
@@ -49,26 +55,34 @@ export function canTranslate(text) {
   if (translations.en?.[s] != null) return true;
   if (translations.en?.[`nav.${s}`] != null) return true;
   if (PHRASE_HI[s] != null) return true;
+  if (HI_TO_EN[s] != null) return true;
   return false;
 }
 
-function translateDeep(text, tx) {
+function resolveEnglishSource(text) {
+  const n = norm(text);
+  if (!n) return null;
+  if (EN_STRINGS.has(n) || PHRASE_HI[n] != null) return n;
+  if (translations.en?.[n] != null || translations.en?.[`nav.${n}`] != null) {
+    return n;
+  }
+  return hindiToEnglish(n);
+}
+
+function restoreEnglishDeep(text) {
   const normalized = norm(text);
   if (!normalized) return text;
 
-  if (canTranslate(normalized)) {
-    const out = tx(normalized);
-    if (out === normalized) return text;
-    return out;
-  }
+  const whole = resolveEnglishSource(normalized);
+  if (whole) return whole;
 
-  // Partial: replace known multi-word / long phrases inside longer copy
   let result = normalized;
   let changed = false;
-  for (const phrase of MULTI_PHRASES) {
-    if (!result.includes(phrase)) continue;
-    const re = new RegExp(`(?<![A-Za-z])${escapeRe(phrase)}(?![A-Za-z])`, "g");
-    const next = result.replace(re, () => tx(phrase));
+  for (const hiPhrase of MULTI_HI) {
+    if (!result.includes(hiPhrase)) continue;
+    const en = HI_TO_EN[hiPhrase];
+    if (!en) continue;
+    const next = result.split(hiPhrase).join(en);
     if (next !== result) {
       result = next;
       changed = true;
@@ -77,24 +91,63 @@ function translateDeep(text, tx) {
   return changed ? result : text;
 }
 
+function translateDeep(englishSrc, tx) {
+  const src = norm(englishSrc);
+  if (!src) return englishSrc;
+
+  if (canTranslate(src) || EN_STRINGS.has(src)) {
+    return tx(src);
+  }
+
+  // Partial replace only for short-ish strings (avoid O(phrases×nodes) blowups)
+  if (src.length > 160) return englishSrc;
+
+  let result = src;
+  let changed = false;
+  for (const phrase of MULTI_PHRASES) {
+    if (!result.includes(phrase)) continue;
+    const next = result.split(phrase).join(tx(phrase));
+    if (next !== result) {
+      result = next;
+      changed = true;
+    }
+  }
+  return changed ? result : englishSrc;
+}
+
+function captureEnglishSource(normalized) {
+  const resolved = resolveEnglishSource(normalized);
+  if (resolved) return resolved;
+
+  if (
+    normalized.length <= 160 &&
+    (MULTI_PHRASES.some((p) => normalized.includes(p)) ||
+      MULTI_HI.some((p) => normalized.includes(p)))
+  ) {
+    return norm(restoreEnglishDeep(normalized));
+  }
+  return null;
+}
+
 function applyText(node, tx) {
   const raw = node.textContent;
   if (!raw || !raw.trim()) return;
 
-  // Prefer original English source if we already captured it
+  const normalized = norm(raw);
   let src = node.__i18nSrc;
+  const resolved = resolveEnglishSource(normalized);
+
   if (src == null) {
-    const normalized = norm(raw);
-    const hasPhrase =
-      canTranslate(normalized) ||
-      MULTI_PHRASES.some((p) => normalized.includes(p));
-    if (!hasPhrase) return;
-    src = normalized;
+    src = captureEnglishSource(normalized);
+    if (!src) return;
+    node.__i18nSrc = src;
+  } else if (resolved && resolved !== src && EN_STRINGS.has(resolved)) {
+    src = resolved;
     node.__i18nSrc = src;
   }
 
   const translated = translateDeep(src, tx);
-  if (norm(raw) !== norm(translated) || raw !== translated) {
+  if (norm(raw) !== norm(translated)) {
     node.textContent = translated;
   }
 }
@@ -105,16 +158,19 @@ function applyAttrs(el, tx) {
     const current = el.getAttribute(attr);
     if (!current?.trim()) continue;
     const key = `__i18nAttr_${attr}`;
+    const normalized = norm(current);
     let src = el[key];
+    const resolved = resolveEnglishSource(normalized);
+
     if (src == null) {
-      const normalized = norm(current);
-      const hasPhrase =
-        canTranslate(normalized) ||
-        MULTI_PHRASES.some((p) => normalized.includes(p));
-      if (!hasPhrase) continue;
-      src = normalized;
+      src = captureEnglishSource(normalized);
+      if (!src) continue;
+      el[key] = src;
+    } else if (resolved && resolved !== src && EN_STRINGS.has(resolved)) {
+      src = resolved;
       el[key] = src;
     }
+
     const translated = translateDeep(src, tx);
     if (norm(current) !== norm(translated)) el.setAttribute(attr, translated);
   }
@@ -150,53 +206,54 @@ function walk(node, tx) {
 
 /**
  * Auto-translates dictionary / phrase-map strings inside page content.
+ * Keeps English originals on nodes so EN↔HI toggles fully reverse.
  */
 export default function DomI18n({ children, className = "" }) {
   const { lang, tx } = useLanguage();
   const location = useLocation();
   const ref = useRef(null);
   const txRef = useRef(tx);
+  const applyingRef = useRef(false);
   txRef.current = tx;
 
   useEffect(() => {
     const root = ref.current;
     if (!root) return;
 
-    // Drop cached English sources so a language switch always re-resolves
-    const clearCache = (node) => {
-      if (!node) return;
-      if (node.nodeType === Node.TEXT_NODE) {
-        delete node.__i18nSrc;
-        return;
-      }
-      if (node.nodeType !== Node.ELEMENT_NODE) return;
-      for (const attr of ATTRS) delete node[`__i18nAttr_${attr}`];
-      const kids = node.childNodes;
-      for (let i = 0; i < kids.length; i++) clearCache(kids[i]);
-    };
-    clearCache(root);
-
     let timer = null;
-    let raf = null;
     const run = () => {
       timer = null;
-      walk(root, txRef.current);
-      // Second pass after React paint settles
-      if (raf) cancelAnimationFrame(raf);
-      raf = requestAnimationFrame(() => walk(root, txRef.current));
+      if (applyingRef.current) return;
+      applyingRef.current = true;
+      try {
+        walk(root, txRef.current);
+      } finally {
+        queueMicrotask(() => {
+          applyingRef.current = false;
+        });
+      }
     };
     const schedule = () => {
+      if (applyingRef.current) return;
       if (timer != null) return;
-      timer = window.setTimeout(run, 30);
+      timer = window.setTimeout(run, 80);
     };
 
+    // Always run once on lang/route change (restores English or applies Hindi)
     run();
+
+    // Only observe while Hindi is active — English mode must not keep rewriting DOM
+    if (lang !== "hi") {
+      return () => {
+        if (timer != null) window.clearTimeout(timer);
+        applyingRef.current = false;
+      };
+    }
 
     const mo = new MutationObserver(schedule);
     mo.observe(root, {
       childList: true,
       subtree: true,
-      characterData: true,
       attributes: true,
       attributeFilter: ATTRS,
     });
@@ -204,7 +261,7 @@ export default function DomI18n({ children, className = "" }) {
     return () => {
       mo.disconnect();
       if (timer != null) window.clearTimeout(timer);
-      if (raf) cancelAnimationFrame(raf);
+      applyingRef.current = false;
     };
   }, [lang, location.pathname, location.search]);
 

@@ -10,6 +10,8 @@ import {
 import { MdOutlineClass } from "react-icons/md";
 import { FaClock } from "react-icons/fa";
 import { useNavigate } from "react-router-dom";
+import { useAuth } from "../context/AuthContext";
+import BulkTimetableUpload from "../components/BulkTimetableUpload";
 
 const API = import.meta.env.VITE_API_URL;
 
@@ -38,7 +40,12 @@ export default function ReadTimetable({
   showClassSelector = true,
 }) {
   const navigate = useNavigate();
+  const { user } = useAuth();
   const isMobile = window.innerWidth <= 768;
+  const canUpload =
+    user?.role === "teacher_admin" ||
+    user?.role === "school_admin" ||
+    user?.role === "staff_admin";
 
   const [classes, setClasses] = useState([]);
   const [subjects, setSubjects] = useState([]);
@@ -159,6 +166,10 @@ export default function ReadTimetable({
         <h1 className="text-2xl font-bold text-[rgb(var(--text))]">Timetable</h1>
         <p className="text-sm text-[rgb(var(--text))] mt-0.5">View your class schedule</p>
       </div>
+
+      {canUpload && (
+        <BulkTimetableUpload onComplete={() => classId && fetchTimetable()} />
+      )}
 
       {/* ── Class Selector (optional) ── */}
       {showClassSelector && (

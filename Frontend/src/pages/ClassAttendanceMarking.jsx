@@ -3,6 +3,7 @@ import axios from "axios";
 import { toast } from "react-toastify";
 import { FaArrowLeft, FaChevronDown, FaChevronUp } from "react-icons/fa";
 import { useNavigate } from "react-router-dom";
+import UserAvatar from "../components/UserAvatar";
 
 const API = import.meta.env.VITE_API_URL;
 
@@ -488,10 +489,19 @@ export default function ClassAttendanceMarking() {
                                 {student.rollNo ?? String(idx + 1).padStart(2, "0")}
                               </span>
                             </td>
-                            <td className="px-5 py-3.5">
-                              <span className="font-semibold text-[rgb(var(--text))]">{student.firstName}</span>
-                              {student.lastName && <span className="text-[rgb(var(--text))] ml-1">{student.lastName}</span>}
-                            </td>
+                              <td className="px-5 py-3.5">
+                                <div className="flex items-center gap-2.5 min-w-0">
+                                  <UserAvatar
+                                    name={`${student.firstName || ""} ${student.lastName || ""}`}
+                                    photoUrl={student.documents?.studentPhoto?.url}
+                                    size="sm"
+                                  />
+                                  <div className="min-w-0">
+                                    <span className="font-semibold text-[rgb(var(--text))]">{student.firstName}</span>
+                                    {student.lastName && <span className="text-[rgb(var(--text))] ml-1">{student.lastName}</span>}
+                                  </div>
+                                </div>
+                              </td>
                             <td className="px-5 py-3.5"><StatusBadge status={status} /></td>
                             <td className="px-5 py-3.5">
                               <StatusSelector studentId={student._id} current={status} onChange={markStudent} />
@@ -510,6 +520,11 @@ export default function ClassAttendanceMarking() {
                     const cfg    = STATUS[status];
                     return (
                       <div key={student._id} className="flex items-center gap-3 px-4 py-3.5">
+                        <UserAvatar
+                          name={`${student.firstName || ""} ${student.lastName || ""}`}
+                          photoUrl={student.documents?.studentPhoto?.url}
+                          size="md"
+                        />
                         <div className="flex-1 min-w-0">
                           <div className="flex items-center gap-2 mb-0.5">
                             <span className="text-[10px] font-mono font-semibold text-[rgb(var(--text))] px-1.5 py-0.5 rounded bg-[rgb(var(--bg))]">

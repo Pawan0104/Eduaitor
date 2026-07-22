@@ -1,16 +1,13 @@
 import React, { useState, useEffect, useCallback } from "react";
 import { useParams,useNavigate  } from "react-router-dom";
 import axios from "axios";
+import UserAvatar from "../components/UserAvatar";
 
 const MONTHS = [
   "January","February","March","April","May","June",
   "July","August","September","October","November","December",
 ];
 const DAYS = ["Sunday","Monday","Tuesday","Wednesday","Thursday","Friday","Saturday"];
-
-function getInitials(name = "") {
-  return name.split(" ").map((w) => w[0]).join("").toUpperCase().slice(0, 2) || "?";
-}
 
 function formatDate(dateStr) {
   return new Date(dateStr).toLocaleDateString("en-IN", {
@@ -208,12 +205,11 @@ function StudentAttendanceDetail({}) {
 
       {/* Student card */}
       <div className="bg-[rgb(var(--surface))] border border-[rgb(var(--border))] rounded-xl p-4 flex items-center gap-4 mb-5">
-        <div
-          className="w-12 h-12 rounded-full flex items-center justify-center font-medium text-sm shrink-0"
-          style={{ background: "#E6F1FB", color: "#0C447C" }}
-        >
-          {student ? getInitials(student.name) : "?"}
-        </div>
+        <UserAvatar
+          name={student?.name}
+          photoUrl={student?.photo_url}
+          size="lg"
+        />
         <div className="flex-1 min-w-0">
           <p className="font-medium text-base mb-0.5 truncate">
             {student?.name || "—"}

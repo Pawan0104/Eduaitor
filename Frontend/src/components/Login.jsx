@@ -22,7 +22,7 @@ export default function Login() {
   const navigate = useNavigate();
   const location = useLocation();
   const from = location.state?.from?.pathname || "/dashboard";
-  const { fetchUser } = useAuth();
+  const { fetchUser, setUser } = useAuth();
   const { t } = useLanguage();
 
   useEffect(() => {
@@ -61,6 +61,9 @@ export default function Login() {
       const role = res.data.data.role;
       const loginAs = res.data.data.loginAs;
       const isFirstTime = res.data.data.firstTimeLogin;
+
+      // Seed session immediately (school logo available before /auth/me)
+      if (res.data?.data) setUser(res.data.data);
 
       if (role === "student_admin" && isFirstTime) {
         await fetchUser();

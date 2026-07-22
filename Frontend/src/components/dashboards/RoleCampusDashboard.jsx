@@ -1,6 +1,7 @@
 import { useNavigate } from "react-router-dom";
 import { FiUser } from "react-icons/fi";
 import { useAuth } from "../../context/AuthContext";
+import UserAvatar from "../UserAvatar";
 
 const toneStyles = {
   blue: "border-blue-200 bg-blue-600 text-white",
@@ -58,14 +59,6 @@ export default function RoleCampusDashboard({
   const navigate = useNavigate();
   const { user } = useAuth();
   const displayName = user?.name || user?.email || user?.username || roleLabel;
-  const initials =
-    String(displayName)
-      .split(/\s+/)
-      .filter(Boolean)
-      .slice(0, 2)
-      .map((p) => p[0]?.toUpperCase())
-      .join("") || "U";
-
   const resolvedProfile = profilePath || menuPath || "/";
   const resolvedMenu = menuPath || profilePath || "/";
   const statMax = Math.max(...statBars.map((b) => Number(b.value) || 0), 1);
@@ -74,17 +67,12 @@ export default function RoleCampusDashboard({
     <div className="space-y-5">
       <section className="grid gap-4 xl:grid-cols-[260px_1fr]">
         <article className="flex flex-col items-center rounded-3xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))] p-6 text-center shadow-sm">
-          {user?.school_logo ? (
-            <img
-              src={user.school_logo}
-              alt=""
-              className="h-24 w-24 rounded-full object-cover ring-4 ring-slate-100"
-            />
-          ) : (
-            <div className="flex h-24 w-24 items-center justify-center rounded-full bg-slate-800 text-2xl font-black text-white ring-4 ring-slate-100">
-              {initials}
-            </div>
-          )}
+          <UserAvatar
+            name={displayName}
+            photoUrl={user?.photo_url}
+            size="2xl"
+            className="ring-4 ring-[rgba(var(--primary),0.15)]"
+          />
           <h2 className="mt-4 text-xl font-black text-[rgb(var(--text))]">
             {displayName}
           </h2>

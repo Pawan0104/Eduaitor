@@ -62,7 +62,7 @@ export const loginUser = async (req, res) => {
 
     if (teacher && (await bcrypt.compare(password, teacher.password))) {
       const school = await School.findById(teacher.schoolId).select(
-        "subscribed_modules admin_email school_name",
+        "subscribed_modules admin_email school_name school_logo",
       );
 
       const moduleCtx = {
@@ -102,10 +102,13 @@ export const loginUser = async (req, res) => {
           name: teacher.fullName,
           email: teacher.email,
           school_id: teacher.schoolId,
+          school_name: school?.school_name || null,
+          school_logo: school?.school_logo || null,
           customRoleId: teacher.customRoleId || null,
           customRoleName,
           permissions: teacher.permissions || [],
           subscribed_modules,
+          photo_url: teacher.photo?.url || null,
         },
       });
     }
@@ -129,7 +132,7 @@ export const loginUser = async (req, res) => {
       if (passwordMatch) {
         const school = await School.findById(
           studentByStudentCreds.schoolId,
-        ).select("subscribed_modules");
+        ).select("subscribed_modules school_name school_logo");
         const subscribed_modules = school?.subscribed_modules || [];
 
         const token = generateToken({
@@ -154,9 +157,13 @@ export const loginUser = async (req, res) => {
             name: `${studentByStudentCreds.firstName} ${studentByStudentCreds.lastName}`,
             username: studentByStudentCreds.studentCredentials.username,
             school_id: studentByStudentCreds.schoolId,
+            school_name: school?.school_name || null,
+            school_logo: school?.school_logo || null,
             firstTimeLogin:
               studentByStudentCreds.studentCredentials.firstTimeLogin,
             subscribed_modules,
+            photo_url:
+              studentByStudentCreds.documents?.studentPhoto?.url || null,
           },
         });
       }
@@ -172,7 +179,7 @@ export const loginUser = async (req, res) => {
       if (passwordMatch) {
         const school = await School.findById(
           studentByParentCreds.schoolId,
-        ).select("subscribed_modules");
+        ).select("subscribed_modules school_name school_logo");
         const subscribed_modules = school?.subscribed_modules || [];
 
         const token = generateToken({
@@ -197,9 +204,13 @@ export const loginUser = async (req, res) => {
             name: `${studentByParentCreds.firstName} ${studentByParentCreds.lastName}`,
             username: studentByParentCreds.parentCredentials.username,
             school_id: studentByParentCreds.schoolId,
+            school_name: school?.school_name || null,
+            school_logo: school?.school_logo || null,
             firstTimeLogin:
               studentByParentCreds.parentCredentials.firstTimeLogin,
             subscribed_modules,
+            photo_url:
+              studentByParentCreds.documents?.studentPhoto?.url || null,
           },
         });
       }
@@ -225,7 +236,7 @@ export const loginUser = async (req, res) => {
 
       // fetch school modules — for sidebar disable logic
       const staffSchool = await School.findById(staff.schoolId).select(
-        "subscribed_modules",
+        "subscribed_modules school_name school_logo",
       );
 
       const subscribed_modules = staffSchool?.subscribed_modules || [];
@@ -250,12 +261,15 @@ export const loginUser = async (req, res) => {
           name: staff.fullName,
           email: staff.email,
           school_id: staff.schoolId,
+          school_name: staffSchool?.school_name || null,
+          school_logo: staffSchool?.school_logo || null,
           staffRole: staff.staffRole,
           staffRoleCustom: staff.staffRoleCustom,
           customRoleId: staff.customRoleId || null,
           firstTimeLogin: staff.firstTimeLogin,
           permissions: staff.permissions, // ← staff personal module access
           subscribed_modules, // ← school level modules for sidebar
+          photo_url: staff.photo?.url || null,
         },
       });
     }
@@ -298,7 +312,9 @@ export const loginUser = async (req, res) => {
         role: "school_admin",
         school_id: school._id,
         school_name: school.school_name,
+        school_logo: school.school_logo || null,
         email: school.admin_email,
+        name: school.school_name,
         subscribed_modules,
       },
     });

@@ -220,7 +220,7 @@ app.get("/api/auth/me", authMiddleware, async (req, res) => {
     /* ---------- TEACHER ADMIN ---------- */
     if (req.user.role === "teacher_admin") {
       const teacherMember = await Teacher.findById(req.user.teacher_id)
-        .select("permissions status customRoleId")
+        .select("permissions status customRoleId photo")
         .populate("customRoleId", "name");
 
       if (!teacherMember) {
@@ -238,8 +238,9 @@ app.get("/api/auth/me", authMiddleware, async (req, res) => {
           school_id: req.user.school_id,
           teacher_id: req.user.teacher_id,
           name: req.user.name,
-          school_name: school?.name || school?.school_name,
+          school_name: school?.school_name || school?.name,
           school_logo: school?.school_logo,
+          photo_url: teacherMember.photo?.url || null,
           _id: req.user._id,
           customRoleId:
             teacherMember.customRoleId?._id ||
@@ -259,7 +260,7 @@ app.get("/api/auth/me", authMiddleware, async (req, res) => {
       // so if school admin updates permissions, takes effect on next refresh
       const staffMember = await Staff.findById(req.user.staff_id)
         .select(
-          "permissions status staffRole staffRoleCustom firstTimeLogin customRoleId",
+          "permissions status staffRole staffRoleCustom firstTimeLogin customRoleId photo",
         )
         .populate("customRoleId", "name");
 
@@ -289,6 +290,7 @@ app.get("/api/auth/me", authMiddleware, async (req, res) => {
           subscribed_modules, // ← already fetched above
           school_name: school?.school_name,
           school_logo: school?.school_logo,
+          photo_url: staffMember.photo?.url || null,
         },
       });
     }
@@ -313,7 +315,7 @@ app.get("/api/auth/me", authMiddleware, async (req, res) => {
       }
 
       const studentDoc = await Student.findById(req.user.student_id).select(
-        "studentCredentials parentCredentials schoolId firstName lastName",
+        "studentCredentials parentCredentials schoolId firstName lastName documents.studentPhoto",
       );
 
       if (!studentDoc) {
@@ -340,8 +342,9 @@ app.get("/api/auth/me", authMiddleware, async (req, res) => {
           _id: req.user._id,
           firstTimeLogin: creds?.firstTimeLogin ?? false,
           subscribed_modules,
-          school_name: school?.name,
+          school_name: school?.school_name || school?.name,
           school_logo: school?.school_logo,
+          photo_url: studentDoc.documents?.studentPhoto?.url || null,
         },
       });
     }

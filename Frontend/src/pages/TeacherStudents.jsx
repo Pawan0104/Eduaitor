@@ -6,6 +6,7 @@ import { PiChartPieSliceBold } from "react-icons/pi";
 import { useNavigate } from "react-router-dom";
 import { toast } from "react-toastify";
 import MessageButton from "../components/MessageButton";
+import UserAvatar from "../components/UserAvatar";
 
 const API = import.meta.env.VITE_API_URL;
 
@@ -149,7 +150,16 @@ const TeacherStudents = () => {
                     className="border-t border-[rgb(var(--border))] hover:bg-[rgb(var(--bg))] transition-colors"
                   >
                     <td className="p-3 font-medium text-[rgb(var(--text))]">
-                      {student.firstName} {student.lastName}
+                      <div className="flex items-center gap-2.5 min-w-0">
+                        <UserAvatar
+                          name={`${student.firstName || ""} ${student.lastName || ""}`}
+                          photoUrl={student.documents?.studentPhoto?.url}
+                          size="sm"
+                        />
+                        <span className="truncate">
+                          {student.firstName} {student.lastName}
+                        </span>
+                      </div>
                     </td>
                     <td className="p-3 text-[rgb(var(--text-muted))]">{student.classId?.name || "-"}</td>
                     <td className="p-3 text-[rgb(var(--text-muted))]">{student.fatherName}</td>

@@ -9,6 +9,8 @@ import { toast } from "react-toastify";
 import LanguageSwitcher from "./LanguageSwitcher";
 import { MenuStylePicker } from "./RoleMenuShell";
 import DesignSkinPicker from "./DesignSkinPicker";
+import UserAvatar from "./UserAvatar";
+import BrandMark from "./BrandMark";
 import { clearSessionKeepPrefs } from "../utils/clearSessionKeepPrefs";
 import { applyTheme, getTheme } from "../utils/theme";
 
@@ -37,16 +39,6 @@ const timeAgo = (dateStr) => {
   const h = Math.floor(m / 60);
   if (h < 24) return `${h}h ago`;
   return `${Math.floor(h / 24)}d ago`;
-};
-
-const getInitials = (name) => {
-  if (!name) return "U";
-  return name
-    .split(" ")
-    .map((n) => n[0])
-    .join("")
-    .toUpperCase()
-    .slice(0, 2);
 };
 
 const Topbar = ({ menuPath = "/" }) => {
@@ -236,27 +228,7 @@ const Topbar = ({ menuPath = "/" }) => {
           </button>
         )}
         <div className="flex min-w-0 items-center gap-2 pl-0.5 sm:gap-2.5 sm:pl-2">
-          {user?.school_logo ? (
-            <img
-              src={user.school_logo}
-              alt="School Logo"
-              className="h-8 w-auto max-w-24 rounded-lg object-contain lg:h-10 lg:max-w-35"
-            />
-          ) : (
-            <>
-              <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-2xl bg-[rgb(var(--primary))] text-base shadow lg:h-10 lg:w-10 lg:text-lg">
-                🎓
-              </div>
-              <div className="min-w-0">
-                <h1 className="truncate text-sm font-bold text-[rgb(var(--text))] lg:text-base">
-                  Eduaitor
-                </h1>
-                <p className="hidden text-[11px] text-[rgb(var(--text-muted))] lg:block">
-                  {t("brand.tagline")}
-                </p>
-              </div>
-            </>
-          )}
+          <BrandMark user={user} />
         </div>
       </div>
 
@@ -436,9 +408,12 @@ const Topbar = ({ menuPath = "/" }) => {
                 {loginAs ? loginAs : role.replace("_", " ")}
               </p>
             </div>
-            <div className="w-9 h-9 lg:w-10 lg:h-10 rounded-full bg-[rgb(var(--primary))] text-white flex items-center justify-center text-xs lg:text-sm font-bold shadow">
-              {getInitials(name)}
-            </div>
+            <UserAvatar
+              name={name}
+              photoUrl={user?.photo_url}
+              size="md"
+              className="lg:h-10 lg:w-10"
+            />
           </div>
 
           {openDropdown && (
@@ -447,15 +422,23 @@ const Topbar = ({ menuPath = "/" }) => {
               className="card absolute right-0 mt-3 w-72 overflow-hidden z-50"
               style={{ animation: "notifSlide 0.18s ease-out" }}
             >
-              <div className="px-4 py-4 bg-linear-to-b from-[rgba(var(--primary),0.06)] to-transparent">
-                <p className="text-sm font-bold tracking-tight text-[rgb(var(--text))]">
-                  {name}
-                </p>
-                <p className="text-[10px] font-medium uppercase tracking-widest text-[rgb(var(--text-muted))]">
-                  {loginAs
-                    ? loginAs.toUpperCase()
-                    : role.replace("_", " ").toUpperCase()}
-                </p>
+              <div className="flex items-center gap-3 px-4 py-4 bg-linear-to-b from-[rgba(var(--primary),0.06)] to-transparent">
+                <UserAvatar
+                  name={name}
+                  photoUrl={user?.photo_url}
+                  size="lg"
+                  className="ring-2 ring-[rgba(var(--primary),0.2)]"
+                />
+                <div className="min-w-0">
+                  <p className="truncate text-sm font-bold tracking-tight text-[rgb(var(--text))]">
+                    {name}
+                  </p>
+                  <p className="text-[10px] font-medium uppercase tracking-widest text-[rgb(var(--text-muted))]">
+                    {loginAs
+                      ? loginAs.toUpperCase()
+                      : role.replace("_", " ").toUpperCase()}
+                  </p>
+                </div>
               </div>
 
               <div className="px-3 pb-3">

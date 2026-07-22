@@ -104,8 +104,16 @@ const SchoolDashboard = () => {
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [layout, setLayout] = useDashboardLayout();
   const [visibility, setVisibility] = useState(() => {
-    const saved = localStorage.getItem(settingsKey);
-    return saved ? JSON.parse(saved) : defaultVisibility;
+    try {
+      const saved = localStorage.getItem(settingsKey);
+      if (!saved) return defaultVisibility;
+      const parsed = JSON.parse(saved);
+      return parsed && typeof parsed === "object"
+        ? { ...defaultVisibility, ...parsed }
+        : defaultVisibility;
+    } catch {
+      return defaultVisibility;
+    }
   });
   const [dashboard, setDashboard] = useState({
     students: [],

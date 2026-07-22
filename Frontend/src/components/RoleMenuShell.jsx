@@ -9,6 +9,8 @@ import {
   FaTimes,
 } from "react-icons/fa";
 import { useLanguage } from "../context/LanguageContext";
+import { useAuth } from "../context/AuthContext";
+import UserAvatar from "./UserAvatar";
 
 export const DEFAULT_COLOR = { bg: "#F3F4F6", icon: "#6B7280", dot: "#E5E7EB" };
 
@@ -47,6 +49,7 @@ export function useMenuExitGuard(setShowExit) {
 
 export function GreetingHeader({ name, role, loginAs }) {
   const { t, tn, locale } = useLanguage();
+  const { user } = useAuth();
   const [dateStr, setDateStr] = useState("");
 
   useEffect(() => {
@@ -65,21 +68,19 @@ export function GreetingHeader({ name, role, loginAs }) {
 
   const rawRole = (loginAs ? loginAs : role || "").replace(/_/g, " ");
   const displayRole = rawRole ? t(`role.${rawRole}`, tn(rawRole)) : "";
-  const initials = String(name || "U")
-    .split(/\s+/)
-    .filter(Boolean)
-    .slice(0, 2)
-    .map((p) => p[0]?.toUpperCase())
-    .join("");
 
   return (
     <div className="app-greeting skin-wave-header relative overflow-hidden rounded-[1.35rem] px-5 pb-7 pt-5">
       <div className="pointer-events-none absolute -right-8 -top-10 h-36 w-36 rounded-full bg-white/15" />
       <div className="pointer-events-none absolute -bottom-6 left-10 h-20 w-20 rounded-full bg-white/10" />
       <div className="relative flex items-center gap-3.5">
-        <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-white/20 text-lg font-black text-white ring-2 ring-white/30 backdrop-blur-sm">
-          {initials || "U"}
-        </div>
+        <UserAvatar
+          name={name}
+          photoUrl={user?.photo_url}
+          size="lg"
+          rounded="2xl"
+          className="ring-2 ring-white/50"
+        />
         <div className="min-w-0 flex-1">
           {displayRole && (
             <p className="mb-0.5 text-[11px] font-bold uppercase tracking-wide text-white/80">

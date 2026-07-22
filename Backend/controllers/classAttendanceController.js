@@ -437,7 +437,7 @@ export const getClassAttendanceReport = async (req, res) => {
         ...baseMatch,
         date: { $gte: dayStart, $lte: dayEnd },
       })
-        .populate("studentId", "firstName lastName rollNo")
+        .populate("studentId", "firstName lastName rollNo documents.studentPhoto")
         .lean();
 
       // Name search filter (post-populate)
@@ -483,6 +483,7 @@ export const getClassAttendanceReport = async (req, res) => {
         $project: {
           name:        { $concat: ["$student.firstName", " ", { $ifNull: ["$student.lastName", ""] }] },
           rollNumber:  "$student.rollNo",
+          photo_url:   "$student.documents.studentPhoto.url",
           present:     1,
           absent:      1,
           late:        1,
@@ -538,7 +539,7 @@ export const getStudentClassAttendanceDetail = async (req, res) => {
 
     // Fetch the student to get classId + sectionId for auth check
     const student = await Student.findById(studentId)
-      .select("firstName lastName rollNo classId sectionId")
+      .select("firstName lastName rollNo classId sectionId documents.studentPhoto")
       .populate("classId", "name")
       .populate("sectionId", "name")
       .lean();
@@ -581,6 +582,7 @@ export const getStudentClassAttendanceDetail = async (req, res) => {
         rollNumber:  student.rollNo,
         className:   student.classId?.name   ?? "—",
         sectionName: student.sectionId?.name ?? "—",
+        photo_url:   student.documents?.studentPhoto?.url || null,
       },
       summary: { present, absent, late, total, percentage },
       records,
@@ -686,7 +688,7 @@ export const getTodaySnapshot = async (req, res) => {
       sectionId: assignedSectionId,
       schoolId,
     })
-      .select("firstName lastName rollNo")
+      .select("firstName lastName rollNo documents.studentPhoto")
       .sort({ rollNo: 1 })
       .lean();
 

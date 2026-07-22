@@ -5,6 +5,7 @@ import { useAuth } from "../context/AuthContext";
 import { useLanguage } from "../context/LanguageContext";
 import { clearSessionKeepPrefs } from "../utils/clearSessionKeepPrefs";
 import DesignSkinPicker from "./DesignSkinPicker";
+import UserAvatar from "./UserAvatar";
 
 /**
  * Bottom sheet shown from the "Profile" tab of BottomNav.
@@ -19,16 +20,6 @@ const ProfileSheet = ({ onClose }) => {
   const name = user?.name || user?.school_name || "User";
   const role = user?.role || "User";
   const loginAs = user?.loginAs;
-
-  const getInitials = (n) => {
-    if (!n) return "U";
-    return n
-      .split(" ")
-      .map((p) => p[0])
-      .join("")
-      .toUpperCase()
-      .slice(0, 2);
-  };
 
   const logout = async () => {
     try {
@@ -55,9 +46,12 @@ const ProfileSheet = ({ onClose }) => {
         <div className="mx-auto mb-5 h-1.5 w-11 rounded-full bg-[rgb(var(--border-strong))]" />
 
         <div className="mb-5 flex items-center gap-3 rounded-2xl bg-[rgba(var(--primary),0.08)] p-3.5">
-          <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-[rgb(var(--primary))] text-sm font-bold text-[rgb(var(--on-primary,255_255_255))] shadow">
-            {getInitials(name)}
-          </div>
+          <UserAvatar
+            name={name}
+            photoUrl={user?.photo_url}
+            size="lg"
+            rounded="2xl"
+          />
           <div className="min-w-0">
             <p className="truncate text-sm font-bold text-[rgb(var(--text))]">
               {name}

@@ -12,6 +12,7 @@ import { initNativeShell } from "./utils/initNativeShell.js";
 import { initTheme } from "./utils/theme.js";
 import { initUiSkin } from "./utils/uiSkin.js";
 import AppUpdatePrompt from "./components/AppUpdatePrompt.jsx";
+import ErrorBoundary from "./components/ErrorBoundary.jsx";
 
 initTheme();
 initUiSkin();
@@ -20,15 +21,17 @@ initNativeShell().catch(() => {});
 createRoot(document.getElementById("root")).render(
   <BrowserRouter>
     <StrictMode>
-      <LanguageProvider>
-        <AuthProvider>
-          <HelmetProvider>
-            <App />
-            <AppUpdatePrompt />
-          </HelmetProvider>
-        </AuthProvider>
-        <ToastContainer position="top-right" autoClose={2000} />
-      </LanguageProvider>
+      <ErrorBoundary>
+        <LanguageProvider>
+          <AuthProvider>
+            <HelmetProvider>
+              <App />
+              <AppUpdatePrompt />
+            </HelmetProvider>
+          </AuthProvider>
+          <ToastContainer position="top-right" autoClose={2000} />
+        </LanguageProvider>
+      </ErrorBoundary>
     </StrictMode>
   </BrowserRouter>,
 );

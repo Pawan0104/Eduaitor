@@ -86,7 +86,7 @@ export const getStudentsByClassAndSection = async (req, res) => {
         .json({ success: false, message: "Invalid classId or sectionId" });
     }
     const students = await Student.find({ classId, sectionId, schoolId })
-      .select("firstName lastName rollNo")
+      .select("firstName lastName rollNo documents.studentPhoto")
       .sort({ rollNo: 1 });
 
     res.status(200).json({ success: true, students });
@@ -411,7 +411,7 @@ export const getStudentAttendanceReport = async (req, res) => {
         ...baseMatch,
         date: { $gte: start, $lte: end },
       })
-        .populate("studentId", "firstName lastName rollNo")
+        .populate("studentId", "firstName lastName rollNo documents.studentPhoto")
         .lean();
 
       console.log("DAILY RESULT:", data.length);
@@ -454,6 +454,7 @@ export const getStudentAttendanceReport = async (req, res) => {
         $project: {
           name: "$student.firstName",
           rollNumber: "$student.rollNo",
+          photo_url: "$student.documents.studentPhoto.url",
           present: 1,
           absent: 1,
           late: 1,
@@ -518,6 +519,7 @@ export const getParentAttendanceReport = async (req, res) => {
           rollNumber:  student.rollNo,
           className:   student.classId?.name   ?? "—",
           sectionName: student.sectionId?.name ?? "—",
+          photo_url:   student.documents?.studentPhoto?.url || null,
         },
         subjects: populatedSubjects,
       });

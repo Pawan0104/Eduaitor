@@ -8,6 +8,7 @@ import { toast } from "react-toastify";
 import { FiTrash2 } from "react-icons/fi";
 import * as XLSX from "xlsx";
 import MessageButton from "../components/MessageButton";
+import UserAvatar from "../components/UserAvatar";
 
 const API = import.meta.env.VITE_API_URL;
 
@@ -370,7 +371,16 @@ const Students = () => {
                       {student.studentId || "—"}
                     </td>
                     <td className="p-3 font-medium">
-                      {student.firstName} {student.lastName}
+                      <div className="flex items-center gap-2.5 min-w-0">
+                        <UserAvatar
+                          name={`${student.firstName || ""} ${student.lastName || ""}`}
+                          photoUrl={student.documents?.studentPhoto?.url}
+                          size="sm"
+                        />
+                        <span className="truncate">
+                          {student.firstName} {student.lastName}
+                        </span>
+                      </div>
                     </td>
 
                     <td className="p-3">{student.classId?.name || "-"}</td>

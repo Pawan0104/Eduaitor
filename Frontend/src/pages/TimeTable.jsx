@@ -17,6 +17,7 @@ import {
 } from "react-icons/fa";
 import { MdOutlineClass } from "react-icons/md";
 import { FiX } from "react-icons/fi";
+import BulkTimetableUpload from "../components/BulkTimetableUpload";
 
 const API = import.meta.env.VITE_API_URL;
 
@@ -248,12 +249,16 @@ export default function TimeTable() {
         </div>
       )}
       {/* ── Header ── */}
-      <div>
-        <h1 className="text-2xl font-bold text-[rgb(var(--text))]">Timetable</h1>
-        <p className="text-sm text-[rgb(var(--text))] mt-0.5">
-          Create and manage class timetables
-        </p>
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+        <div>
+          <h1 className="text-2xl font-bold text-[rgb(var(--text))]">Timetable</h1>
+          <p className="text-sm text-[rgb(var(--text))] mt-0.5">
+            Create and manage class timetables
+          </p>
+        </div>
       </div>
+
+      <BulkTimetableUpload onComplete={() => classId && fetchTimetable()} />
 
       {/* ── Control Bar ── */}
       <div className="bg-[rgb(var(--surface))] text-[rgb(var(--text))] rounded-2xl border border-gray-100 shadow-sm p-4 sm:p-5">

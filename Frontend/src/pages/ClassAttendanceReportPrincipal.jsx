@@ -3,6 +3,7 @@ import axios from "axios";
 import { toast } from "react-toastify";
 import { useNavigate } from "react-router-dom";
 import { FaArrowLeft, FaSearch, FaTimes, FaChevronRight } from "react-icons/fa";
+import UserAvatar from "../components/UserAvatar";
 
 const API = import.meta.env.VITE_API_URL;
 
@@ -80,7 +81,7 @@ function SummaryBar({ data, type }) {
 }
 
 function DailyRow({ record, onClick }) {
-  const { firstName, lastName, rollNo } = record.studentId ?? {};
+  const { firstName, lastName, rollNo, documents } = record.studentId ?? {};
   const fullName = firstName ? `${firstName} ${lastName ?? ""}`.trim() : "—";
   const st = record.status ?? "Present";
   return (
@@ -88,9 +89,11 @@ function DailyRow({ record, onClick }) {
       className="flex items-center justify-between py-3 border-b border-slate-100 last:border-0
         hover:bg-[rgb(var(--bg))] cursor-pointer transition-colors px-1 rounded-lg -mx-1">
       <div className="flex items-center gap-3">
-        <div className="w-9 h-9 rounded-full bg-[rgb(var(--primary))] flex items-center justify-center text-sm font-bold text-white shrink-0">
-          {(firstName ?? "?")[0].toUpperCase()}
-        </div>
+        <UserAvatar
+          name={fullName}
+          photoUrl={documents?.studentPhoto?.url}
+          size="sm"
+        />
         <div>
           <p className="text-sm font-semibold text-[rgb(var(--text))] leading-tight">{fullName}</p>
           <p className="text-xs text-[rgb(var(--text))]">Roll {rollNo ?? "—"}</p>
@@ -105,16 +108,14 @@ function DailyRow({ record, onClick }) {
 }
 
 function MonthlyRow({ record, onClick }) {
-  const { name, rollNumber, present=0, absent=0, late=0, total=0, percentage=0 } = record;
+  const { name, rollNumber, present=0, absent=0, late=0, total=0, percentage=0, photo_url } = record;
   return (
     <div onClick={onClick}
       className="py-3 border-b border-slate-100 last:border-0
         hover:bg-[rgb(var(--bg))] cursor-pointer transition-colors px-1 rounded-lg -mx-1">
       <div className="flex items-center justify-between mb-2">
         <div className="flex items-center gap-3">
-          <div className="w-9 h-9 rounded-full bg-[rgb(var(--primary))] flex items-center justify-center text-sm font-bold text-white shrink-0">
-            {(name ?? "?")[0].toUpperCase()}
-          </div>
+          <UserAvatar name={name} photoUrl={photo_url} size="sm" />
           <div>
             <p className="text-sm font-semibold text-[rgb(var(--text))] leading-tight">{name ?? "—"}</p>
             <p className="text-xs text-[rgb(var(--text))]">Roll {rollNumber ?? "—"}</p>

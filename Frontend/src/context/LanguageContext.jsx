@@ -1,6 +1,7 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react";
 import { translations } from "../i18n/translations";
 import { PHRASE_HI } from "../i18n/phraseHi";
+import { hindiToEnglish } from "../i18n/hiToEn";
 
 const LanguageContext = createContext(null);
 const STORAGE_KEY = "app_lang";
@@ -87,16 +88,22 @@ export const LanguageProvider = ({ children }) => {
       const str = String(text).replace(/\s+/g, " ").trim();
       if (!str) return fallback ?? "";
 
-      // Direct phrase table (covers most hardcoded UI + long descriptions)
-      if (lang === "hi" && PHRASE_HI[str] != null) return PHRASE_HI[str];
-      if (lang === "en" && PHRASE_HI[str] != null) return str;
+      // If caller already passed Hindi (e.g. after EN→HI→EN), restore English first
+      const english = hindiToEnglish(str) || str;
 
-      if (translations[lang]?.[str] != null) return translations[lang][str];
-      if (translations.en?.[str] != null) return t(str);
-      const navHit = translations[lang]?.[`nav.${str}`];
+      // Direct phrase table (covers most hardcoded UI + long descriptions)
+      if (lang === "hi" && PHRASE_HI[english] != null) return PHRASE_HI[english];
+      if (lang === "en") {
+        if (PHRASE_HI[english] != null) return english;
+        if (hindiToEnglish(str)) return english;
+      }
+
+      if (translations[lang]?.[english] != null) return translations[lang][english];
+      if (translations.en?.[english] != null) return t(english);
+      const navHit = translations[lang]?.[`nav.${english}`];
       if (navHit != null) return navHit;
-      if (translations.en?.[`nav.${str}`] != null) return tn(str);
-      const key = EN_VALUE_TO_KEY.get(str);
+      if (translations.en?.[`nav.${english}`] != null) return tn(english);
+      const key = EN_VALUE_TO_KEY.get(english);
       if (key) {
         if (String(key).startsWith("__phrase__:")) {
           const en = key.slice("__phrase__:".length);
@@ -104,7 +111,7 @@ export const LanguageProvider = ({ children }) => {
         }
         return t(key);
       }
-      return fallback ?? str;
+      return fallback ?? (lang === "en" ? english : str);
     },
     [lang, t, tn]
   );

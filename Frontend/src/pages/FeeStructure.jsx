@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import axios from "axios";
 import { toast } from "react-toastify";
-import { FaArrowLeft } from "react-icons/fa";
+import { FaArrowLeft, FaEdit, FaTrash } from "react-icons/fa";
 import { useNavigate } from "react-router-dom";
 
 const FeeStructure = () => {
@@ -265,8 +265,9 @@ const FeeStructure = () => {
           {/* Add Component button — only visible when a class is selected */}
           {selectedClass && (
             <button
+              type="button"
               onClick={openAdd}
-              className="flex items-center gap-2 px-4 py-2 text-[rgb(var(--text))] bg-[rgb(var(--primary))] text-sm font-semibold rounded-lg transition-colors cursor-pointer whitespace-nowrap"
+              className="flex items-center gap-2 px-4 py-2 text-white bg-[rgb(var(--primary))] text-sm font-semibold rounded-lg transition-colors cursor-pointer whitespace-nowrap hover:opacity-90"
             >
               <span className="text-base leading-none">+</span> Add Component
             </button>
@@ -448,21 +449,22 @@ const FeeStructure = () => {
 
                     {/* Row actions: Edit and Delete */}
                     <td className="px-4 py-3">
-                      <div className="flex gap-1.5 justify-end">
-                        {/* Edit — opens modal pre-filled with this fee's data */}
+                      <div className="flex gap-2 justify-end">
                         <button
+                          type="button"
                           onClick={() => openEdit(fee)}
-                          className="flex items-center gap-1 px-2.5 py-1 text-[11px] font-semibold rounded-md text-[rgb(var(--text))] bg-[rgb(var(--surface))] transition-colors cursor-pointer"
+                          className="inline-flex items-center gap-1.5 rounded-lg bg-sky-600 px-3 py-1.5 text-[11px] font-bold text-white shadow-sm transition hover:bg-sky-700"
                         >
-                          ✏️ Edit
+                          <FaEdit size={11} />
+                          Edit
                         </button>
-
-                        {/* Delete — confirms then calls DELETE API */}
                         <button
+                          type="button"
                           onClick={() => handleDelete(fee._id)}
-                          className="flex items-center gap-1 px-2.5 py-1 text-[11px] font-semibold rounded-md text-[rgb(var(--text))] bg-[rgb(var(--surface))] transition-colors cursor-pointer"
+                          className="inline-flex items-center gap-1.5 rounded-lg bg-rose-600 px-3 py-1.5 text-[11px] font-bold text-white shadow-sm transition hover:bg-rose-700"
                         >
-                          🗑 Delete
+                          <FaTrash size={11} />
+                          Delete
                         </button>
                       </div>
                     </td>

@@ -3,6 +3,7 @@ import axios from "axios";
 import { toast } from "react-toastify";
 import { useNavigate } from "react-router-dom";
 import { FaArrowLeft, FaChevronLeft, FaChevronRight, FaTimes } from "react-icons/fa";
+import UserAvatar from "../components/UserAvatar";
 
 const API = import.meta.env.VITE_API_URL;
 const TAB_KEY = "attendance_tab_preference";
@@ -635,10 +636,13 @@ export default function AttendanceParent() {
           </div>
         ) : student && (
           <div className="flex items-center gap-3 mb-5">
-            <div className="w-12 h-12 rounded-2xl flex items-center justify-center text-lg font-black
-              text-white shadow-sm shrink-0 bg-[rgb(var(--primary))]">
-              {student.name?.[0]?.toUpperCase() ?? "S"}
-            </div>
+            <UserAvatar
+              name={student.name}
+              photoUrl={student.photo_url}
+              size="lg"
+              rounded="2xl"
+              className="shadow-sm"
+            />
             <div>
               <h1 className="text-lg font-bold text-[rgb(var(--text))] leading-tight">{student.name}</h1>
               <p className="text-xs text-[rgb(var(--text))] mt-0.5">
