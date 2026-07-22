@@ -15,6 +15,7 @@
 
 ::-webkit-scrollbar {
   width: 6px;
+  height: 6px;
 }
 
 ::-webkit-scrollbar-thumb {
@@ -24,6 +25,36 @@
 
 ::-webkit-scrollbar-track {
   background: transparent;
+}
+
+/* ---------- RESPONSIVE DATA TABLES ----------
+   Cards that wrap a table with overflow-hidden clip
+   Edit/Delete (and other) action columns on narrow screens.
+   Prefer horizontal scroll and keep a usable min table width.
+*/
+.overflow-hidden:has(> table) {
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior-x: contain;
+}
+
+.overflow-hidden:has(> table) > table {
+  min-width: 640px;
+}
+
+.table-x-scroll {
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior-x: contain;
+}
+
+.table-x-scroll > table {
+  min-width: 640px;
+}
+
+/* Same treatment for existing overflow-x-auto table wrappers */
+.overflow-x-auto:has(> table) > table:not([class*="min-w"]) {
+  min-width: 640px;
 }
 
 /* =====================================================

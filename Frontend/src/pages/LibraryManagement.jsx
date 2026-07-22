@@ -840,6 +840,7 @@ const IssueTable = ({ records, mode, onReturn }) => {
       </div>
 
       <div className="hidden lg:block rounded-2xl border border-slate-200 text-[rgb(var(--text))] bg-[rgb(var(--surface))] shadow-sm overflow-hidden">
+        <div className="table-x-scroll">
         <table className="w-full text-sm">
           {/* HEADER */}
           <thead className="text-xs uppercase tracking-wide">
@@ -940,6 +941,7 @@ const IssueTable = ({ records, mode, onReturn }) => {
             })}
           </tbody>
         </table>
+        </div>
       </div>
     </div>
   );

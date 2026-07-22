@@ -184,7 +184,7 @@ const RoleManagement = () => {
 
       {/* Table */}
       <div className="bg-[rgb(var(--surface))] rounded-xl shadow overflow-hidden">
-
+        <div className="table-x-scroll">
         <table className="w-full">
 
           <thead className="bg-[rgb(var(--surface))]">
@@ -232,6 +232,7 @@ const RoleManagement = () => {
           </tbody>
 
         </table>
+        </div>
 
       </div>
 

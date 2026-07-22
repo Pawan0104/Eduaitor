@@ -276,6 +276,7 @@ const AccessControl = () => {
       {/* TABLE */}
 
       <div className="bg-[rgb(var(--surface))] rounded-xl shadow overflow-hidden">
+        <div className="table-x-scroll">
         <table className="w-full">
           <thead className="bg-[rgb(var(--surface))]">
             <tr>
@@ -316,6 +317,7 @@ const AccessControl = () => {
             ))}
           </tbody>
         </table>
+        </div>
       </div>
 
       {/* MODAL */}

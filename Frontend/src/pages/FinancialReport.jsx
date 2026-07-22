@@ -531,6 +531,7 @@ export default function FinancialReport() {
                       </div>
                     )}
 
+                    <div className="table-x-scroll">
                     <table className="w-full text-sm">
                       <thead>
                         <tr className="text-left text-xs uppercase tracking-wider text-[rgb(var(--text-light))] border-b">
@@ -576,6 +577,7 @@ export default function FinancialReport() {
                         )}
                       </tbody>
                     </table>
+                    </div>
                   </div>
                 )}
               </>
@@ -584,7 +586,7 @@ export default function FinancialReport() {
 
           <div className="rounded-2xl border bg-[rgb(var(--surface))] p-4 overflow-x-auto">
             <h2 className="font-bold text-sm mb-3">Recent payments</h2>
-            <table className="w-full text-sm">
+            <table className="w-full text-sm min-w-[640px]">
               <thead>
                 <tr className="text-left text-xs uppercase tracking-wider text-[rgb(var(--text-light))] border-b">
                   <th className="py-2">Receipt</th>

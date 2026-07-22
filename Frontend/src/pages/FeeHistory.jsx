@@ -444,6 +444,7 @@ function FeeHistory() {
 
         {/* ── Table — desktop ── */}
         <div className="hidden md:block bg-[rgb(var(--surface))] border border-stone-200 rounded-xl overflow-hidden shadow-sm">
+          <div className="table-x-scroll">
           <table className="w-full text-sm">
             <thead>
               <tr className=" border-b border-stone-200">
@@ -539,6 +540,7 @@ function FeeHistory() {
               )}
             </tbody>
           </table>
+          </div>
         </div>
 
         {/* ── Cards — mobile ── */}

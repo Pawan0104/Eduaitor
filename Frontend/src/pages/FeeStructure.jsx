@@ -220,7 +220,7 @@ const FeeStructure = () => {
           PAGE WRAPPER — full width, small padding
           No max-width so it fills the right panel
       ══════════════════════════════════════════ */}
-      <div className="w-full text-[rgb(var(--text))] bg-[rgb(var(--bg))] min-h-screen p-8">
+      <div className="w-full text-[rgb(var(--text))] bg-[rgb(var(--bg))] min-h-screen p-4 sm:p-6 md:p-8">
         {/* 🔙 BACK BUTTON */}
         {isMobile && (
           <div className="px-4 pt-4">
@@ -385,111 +385,108 @@ const FeeStructure = () => {
 
           {/* ── State 4: Populated fee table ── */}
           {feeData && feeCount > 0 && (
-            <table className="w-full border-collapse">
-              {/* Table header */}
-              <thead>
-                <tr className="text-[rgb(var(--text))] bg-[rgb(var(--surface))] border-b">
-                  <th className="px-4 py-2.5 text-left text-[9px] font-bold  uppercase  w-10">
-                    #
-                  </th>
-                  <th className="px-4 py-2.5 text-left text-[9px] font-bold  uppercase ">
-                    Component
-                  </th>
-                  <th className="px-4 py-2.5 text-left text-[9px] font-bold  uppercase ">
-                    Type
-                  </th>
-                  <th className="px-4 py-2.5 text-right text-[9px] font-bold  uppercase ">
-                    Amount
-                  </th>
-                  <th className="px-4 py-2.5 text-right text-[9px] font-bold  uppercase ">
-                    Actions
-                  </th>
-                </tr>
-              </thead>
+            <div className="table-x-scroll">
+              <table className="w-full min-w-[640px] border-collapse">
+                {/* Table header */}
+                <thead>
+                  <tr className="text-[rgb(var(--text))] bg-[rgb(var(--surface))] border-b">
+                    <th className="px-4 py-2.5 text-left text-[9px] font-bold  uppercase  w-10">
+                      #
+                    </th>
+                    <th className="px-4 py-2.5 text-left text-[9px] font-bold  uppercase ">
+                      Component
+                    </th>
+                    <th className="px-4 py-2.5 text-left text-[9px] font-bold  uppercase ">
+                      Type
+                    </th>
+                    <th className="px-4 py-2.5 text-right text-[9px] font-bold  uppercase ">
+                      Amount
+                    </th>
+                    <th className="px-4 py-2.5 text-right text-[9px] font-bold  uppercase whitespace-nowrap">
+                      Actions
+                    </th>
+                  </tr>
+                </thead>
 
-              {/* Fee rows — each fee component gets its own row */}
-              <tbody>
-                {feeData.fees.map((fee, i) => (
-                  <tr
-                    key={fee._id}
-                    className="border text-[rgb(var(--text))]"
-                  >
-                    {/* Serial number */}
-                    <td
-                      className="px-4 py-3 text-[rgb(var(--text))] text-xs font-semibold"
-    
+                {/* Fee rows — each fee component gets its own row */}
+                <tbody>
+                  {feeData.fees.map((fee, i) => (
+                    <tr
+                      key={fee._id}
+                      className="border text-[rgb(var(--text))]"
                     >
-                      {String(i + 1).padStart(2, "0")}
-                    </td>
+                      {/* Serial number */}
+                      <td className="px-4 py-3 text-[rgb(var(--text))] text-xs font-semibold">
+                        {String(i + 1).padStart(2, "0")}
+                      </td>
 
-                    {/* Fee component name */}
-                    <td className="px-4 py-3 text-sm font-semibold text-[rgb(var(--text))]">
-                      {fee.name}
-                    </td>
+                      {/* Fee component name */}
+                      <td className="px-4 py-3 text-sm font-semibold text-[rgb(var(--text))]">
+                        {fee.name}
+                      </td>
 
-                    {/* Mandatory / Optional badge */}
-                    <td className="px-4 py-3">
-                      {fee.isOptional ? (
-                        <span className="inline-block text-[9px] font-bold tracking-wider uppercase px-2 py-0.5 rounded bg-[#e8f5e9] text-[#2e7d32]">
-                          Optional
-                        </span>
-                      ) : (
-                        <span className="inline-block text-[9px] font-bold tracking-wider uppercase px-2 py-0.5 rounded bg-[#fde8e8] text-[#c0392b]">
-                          Mandatory
-                        </span>
-                      )}
-                    </td>
+                      {/* Mandatory / Optional badge */}
+                      <td className="px-4 py-3">
+                        {fee.isOptional ? (
+                          <span className="inline-block text-[9px] font-bold tracking-wider uppercase px-2 py-0.5 rounded bg-[#e8f5e9] text-[#2e7d32]">
+                            Optional
+                          </span>
+                        ) : (
+                          <span className="inline-block text-[9px] font-bold tracking-wider uppercase px-2 py-0.5 rounded bg-[#fde8e8] text-[#c0392b]">
+                            Mandatory
+                          </span>
+                        )}
+                      </td>
 
-                    {/* Formatted INR amount */}
+                      {/* Formatted INR amount */}
+                      <td className="px-4 py-3 text-right font-semibold text-sm whitespace-nowrap">
+                        {fmt(fee.amount)}
+                      </td>
+
+                      {/* Row actions: Edit and Delete */}
+                      <td className="px-4 py-3">
+                        <div className="flex gap-2 justify-end whitespace-nowrap">
+                          <button
+                            type="button"
+                            onClick={() => openEdit(fee)}
+                            className="inline-flex shrink-0 items-center gap-1.5 rounded-lg bg-sky-600 px-3 py-1.5 text-[11px] font-bold text-white shadow-sm transition hover:bg-sky-700"
+                          >
+                            <FaEdit size={11} />
+                            Edit
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => handleDelete(fee._id)}
+                            className="inline-flex shrink-0 items-center gap-1.5 rounded-lg bg-rose-600 px-3 py-1.5 text-[11px] font-bold text-white shadow-sm transition hover:bg-rose-700"
+                          >
+                            <FaTrash size={11} />
+                            Delete
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+
+                {/* Grand total footer — always shown when table has rows */}
+                <tfoot>
+                  <tr className="bg-[rgb(var(--surface))]">
                     <td
-                      className="px-4 py-3 text-right font-semibold  text-sm"
+                      colSpan={3}
+                      className="px-4 py-3 text-[11px] font-bold tracking-widest uppercase  text-[rgb(var(--primary))]"
                     >
-                      {fmt(fee.amount)}
+                      Total Fees
                     </td>
-
-                    {/* Row actions: Edit and Delete */}
-                    <td className="px-4 py-3">
-                      <div className="flex gap-2 justify-end">
-                        <button
-                          type="button"
-                          onClick={() => openEdit(fee)}
-                          className="inline-flex items-center gap-1.5 rounded-lg bg-sky-600 px-3 py-1.5 text-[11px] font-bold text-white shadow-sm transition hover:bg-sky-700"
-                        >
-                          <FaEdit size={11} />
-                          Edit
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => handleDelete(fee._id)}
-                          className="inline-flex items-center gap-1.5 rounded-lg bg-rose-600 px-3 py-1.5 text-[11px] font-bold text-white shadow-sm transition hover:bg-rose-700"
-                        >
-                          <FaTrash size={11} />
-                          Delete
-                        </button>
-                      </div>
+                    <td
+                      colSpan={2}
+                      className="px-4 py-3 text-right text-lg font-bold text-[rgb(var(--primary))] whitespace-nowrap"
+                    >
+                      {fmt(totalAll)}
                     </td>
                   </tr>
-                ))}
-              </tbody>
-
-              {/* Grand total footer — always shown when table has rows */}
-              <tfoot>
-                <tr className="bg-[rgb(var(--surface))]">
-                  <td
-                    colSpan={3}
-                    className="px-4 py-3 text-[11px] font-bold tracking-widest uppercase  text-[rgb(var(--primary))]"
-                  >
-                    Total Fees
-                  </td>
-                  <td
-                    colSpan={2}
-                    className="px-4 py-3 text-right text-lg font-bold text-[rgb(var(--primary))]"
-                  >
-                    {fmt(totalAll)}
-                  </td>
-                </tr>
-              </tfoot>
-            </table>
+                </tfoot>
+              </table>
+            </div>
           )}
         </div>
         {/* end fee card */}

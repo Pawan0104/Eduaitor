@@ -317,6 +317,7 @@ function ExamCreate() {
       <div className="max-w-7xl mx-auto">
         {/* Desktop Table - Hidden on Mobile */}
         <div className="hidden md:block text-[rgb(var(--text))] bg-[rgb(var(--surface))]  rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
+          <div className="table-x-scroll">
           <table className="w-full text-left">
             <thead className=" border-b border-slate-200">
               <tr className=" text-[10px] font-black uppercase tracking-widest">
@@ -402,6 +403,7 @@ function ExamCreate() {
               ))}
             </tbody>
           </table>
+          </div>
         </div>
 
         {/* Mobile Cards - Shown only on Mobile */}
