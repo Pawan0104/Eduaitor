@@ -271,6 +271,52 @@ html[data-skin="forest"] .skin-wave-header::after {
     0 8px 24px rgba(0,0,0,.08);
 }
 
+/* Mobile menu hub — raised sheet with frequent modules */
+.menu-uplift-card {
+  background: rgb(var(--surface));
+  border-color: rgb(var(--border));
+  box-shadow:
+    0 -4px 24px rgba(15, 23, 42, 0.06),
+    0 12px 40px rgba(15, 23, 42, 0.1),
+    0 2px 0 rgba(255, 255, 255, 0.65) inset;
+}
+
+html.theme-dark .menu-uplift-card,
+.theme-dark .menu-uplift-card {
+  box-shadow:
+    0 -4px 24px rgba(0, 0, 0, 0.35),
+    0 16px 40px rgba(0, 0, 0, 0.45),
+    0 1px 0 rgba(255, 255, 255, 0.06) inset;
+}
+
+/* Student home — soft blue header + Frequent Activities card */
+.student-home-header {
+  background: linear-gradient(160deg, #5b7cfa 0%, #6d8dff 45%, #7b9bff 100%);
+  box-shadow: 0 14px 32px rgba(91, 124, 250, 0.28);
+}
+
+html[data-skin="campus"] .student-home-header {
+  background: linear-gradient(160deg, #1e3a8a 0%, #2563eb 55%, #3b82f6 100%);
+}
+
+html[data-skin="forest"] .student-home-header {
+  background: linear-gradient(160deg, #14532d 0%, #16a34a 55%, #22c55e 100%);
+}
+
+.student-activities-card {
+  background: rgb(var(--surface));
+  border-color: rgb(var(--border));
+  box-shadow:
+    0 18px 40px rgba(15, 23, 42, 0.12),
+    0 2px 0 rgba(255, 255, 255, 0.8) inset;
+}
+
+.student-home-page {
+  background:
+    radial-gradient(120% 60% at 50% -10%, rgba(109, 141, 255, 0.18), transparent 55%),
+    rgb(var(--bg));
+}
+
 /* =====================================================
    GLOBAL UI SKINS (data-skin on <html>)
    Totally different looks — login + all role screens

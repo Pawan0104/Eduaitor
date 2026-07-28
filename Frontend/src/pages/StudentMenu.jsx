@@ -22,30 +22,28 @@ import { useAuth } from "../context/AuthContext";
 import axios from "axios";
 import BlogFeed from "../components/BlogFeed";
 import UpComingNotifications from "../components/UpComingNotifications";
-import {
-  GreetingHeader,
-  ExitPopup,
-  ModuleGrid,
-  useMenuExitGuard,
-} from "../components/RoleMenuShell";
+import { ExitPopup, useMenuExitGuard } from "../components/RoleMenuShell";
+import StudentHomeHub, {
+  StudentGreetingHeader,
+} from "../components/StudentHomeHub";
 import { clearSessionKeepPrefs } from "../utils/clearSessionKeepPrefs";
-import { applyTheme, getTheme } from "../utils/theme";
+import { applyTheme } from "../utils/theme";
 
 export const COLOR_MAP = {
-  Dashboard: { bg: "#FFF7ED", icon: "#F97316", dot: "#FED7AA" },
-  Attendance: { bg: "#FFF1F2", icon: "#F43F5E", dot: "#FFD5DB" },
-  Timetable: { bg: "#EFF6FF", icon: "#6366F1", dot: "#C7D2FE" },
-  Assignment: { bg: "#F8FAFC", icon: "#64748B", dot: "#CBD5E1" },
-  "Exam Results": { bg: "#FFF7ED", icon: "#EF4444", dot: "#FEE2E2" },
+  Dashboard: { bg: "#EEF2FF", icon: "#6366F1", dot: "#C7D2FE" },
+  Attendance: { bg: "#EEF6FF", icon: "#3B82F6", dot: "#BFDBFE" },
+  Timetable: { bg: "#F3E8FF", icon: "#9333EA", dot: "#E9D5FF" },
+  Assignment: { bg: "#ECFDF5", icon: "#10B981", dot: "#A7F3D0" },
+  "Exam Results": { bg: "#FEF2F2", icon: "#EF4444", dot: "#FECACA" },
   "My ID Card": { bg: "#ECFDF5", icon: "#059669", dot: "#A7F3D0" },
   Diary: { bg: "#FDF4FF", icon: "#C026D3", dot: "#F5D0FE" },
-  Homework: { bg: "#FFFBEB", icon: "#D97706", dot: "#FDE68A" },
+  Homework: { bg: "#FFF7ED", icon: "#F97316", dot: "#FED7AA" },
   "Daily learning": { bg: "#EEF2FF", icon: "#4F46E5", dot: "#C7D2FE" },
-  "Syllabus Books": { bg: "#F0FDF4", icon: "#10B981", dot: "#A7F3D0" },
+  "Syllabus Books": { bg: "#F0FDF4", icon: "#16A34A", dot: "#BBF7D0" },
   Library: { bg: "#F0FDFA", icon: "#0D9488", dot: "#99F6E4" },
-  Group: { bg: "#F0FDF4", icon: "#22C55E", dot: "#BBF7D0" },
-  Notices: { bg: "#FFF7ED", icon: "#EA580C", dot: "#FED7AA" },
-  Events: { bg: "#FFF1F2", icon: "#E11D48", dot: "#FECDD3" },
+  Group: { bg: "#EFF6FF", icon: "#2563EB", dot: "#BFDBFE" },
+  Notices: { bg: "#FFF1F2", icon: "#E11D48", dot: "#FECDD3" },
+  Events: { bg: "#FFF7ED", icon: "#EA580C", dot: "#FED7AA" },
   Calendar: { bg: "#EFF6FF", icon: "#0EA5E9", dot: "#BAE6FD" },
   Blogs: { bg: "#F0FDFA", icon: "#0D9488", dot: "#99F6E4" },
   "Help / Support": { bg: "#FFFBEB", icon: "#D97706", dot: "#FDE68A" },
@@ -113,22 +111,23 @@ export default function StudentMenu() {
     { name: "Help / Support", icon: <FaHeadset />, path: "/student/help" },
   ];
 
+  const displayName = user?.name || user?.school_name || "Student";
+
   return (
-    <div className="min-h-screen font-nunito" style={{ background: "rgb(var(--bg))" }}>
-      <div className="flex flex-col gap-3">
-        <GreetingHeader
-          name={user?.name || user?.school_name || "User"}
-          role={user?.role || "User"}
-          loginAs={user?.loginAs}
-        />
-        <UpComingNotifications />
-        <ModuleGrid
+    <div
+      className="student-home-page min-h-screen font-nunito"
+      style={{ background: "rgb(var(--bg))" }}
+    >
+      <div className="flex flex-col gap-4">
+        <StudentGreetingHeader name={displayName} />
+        <StudentHomeHub
           menu={menu}
           colorMap={COLOR_MAP}
           openItem={openItem}
           setOpenItem={setOpenItem}
           isDark={isDark}
         />
+        <UpComingNotifications />
       </div>
       <BlogFeed />
       {showExit && (

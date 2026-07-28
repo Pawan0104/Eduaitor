@@ -169,7 +169,6 @@ export default function TeacherMenu() {
           role={user?.role || "User"}
           loginAs={user?.loginAs}
         />
-        <UpComingNotifications />
         <ModuleGrid
           menu={menu}
           colorMap={COLOR_MAP}
@@ -177,6 +176,7 @@ export default function TeacherMenu() {
           setOpenItem={setOpenItem}
           isDark={isDark}
         />
+        <UpComingNotifications />
       </div>
       <BlogFeed />
       {showExit && (

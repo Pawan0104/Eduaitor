@@ -116,7 +116,6 @@ export default function ParentMenu() {
           role={user?.role || "User"}
           loginAs={user?.loginAs}
         />
-        <UpComingNotifications />
         <ModuleGrid
           menu={menu}
           colorMap={COLOR_MAP}
@@ -124,6 +123,7 @@ export default function ParentMenu() {
           setOpenItem={setOpenItem}
           isDark={isDark}
         />
+        <UpComingNotifications />
       </div>
       <BlogFeed />
       {showExit && (

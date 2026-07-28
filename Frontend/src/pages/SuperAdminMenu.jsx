@@ -336,7 +336,6 @@ export default function SuperAdminMenu() {
           role={user?.role || "User"}
           loginAs={user?.loginAs}
         />
-        <UpComingNotifications />
         <ModuleGrid
           menu={menu}
           colorMap={COLOR_MAP}
@@ -344,6 +343,7 @@ export default function SuperAdminMenu() {
           setOpenItem={setOpenItem}
           isDark={isDark}
         />
+        <UpComingNotifications />
       </div>
 
       {showExit && (

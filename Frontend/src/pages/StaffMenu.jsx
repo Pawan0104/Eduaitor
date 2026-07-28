@@ -214,7 +214,6 @@ export default function StaffMenu() {
           role={user?.role || "User"}
           loginAs={user?.loginAs}
         />
-        <UpComingNotifications />
         <ModuleGrid
           menu={menu}
           colorMap={COLOR_MAP}
@@ -222,6 +221,7 @@ export default function StaffMenu() {
           setOpenItem={setOpenItem}
           isDark={isDark}
         />
+        <UpComingNotifications />
       </div>
       <BlogFeed />
       {showExit && (

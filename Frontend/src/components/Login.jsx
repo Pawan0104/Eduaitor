@@ -12,6 +12,25 @@ import { toast } from "react-toastify";
 import logo from "/eduaitor.png";
 import LanguageSwitcher from "./LanguageSwitcher";
 import api, { setAuthToken } from "../config/axios";
+import { getMenuPath } from "./AdminLayout";
+
+function homePathForRole(role, loginAs, mobile) {
+  if (mobile) return getMenuPath(role, loginAs);
+  switch (role) {
+    case "super_admin":
+      return "/admin/dashboard";
+    case "school_admin":
+      return "/school/dashboard";
+    case "teacher_admin":
+      return "/teacher/dashboard";
+    case "staff_admin":
+      return "/staff/dashboard";
+    case "student_admin":
+      return loginAs === "parent" ? "/parent/dashboard" : "/student/dashboard";
+    default:
+      return "/admin/login";
+  }
+}
 
 export default function Login() {
   const [form, setForm] = useState({ email: "", password: "" });
@@ -21,7 +40,6 @@ export default function Login() {
 
   const navigate = useNavigate();
   const location = useLocation();
-  const from = location.state?.from?.pathname || "/dashboard";
   const { fetchUser, setUser } = useAuth();
   const { t } = useLanguage();
 
@@ -74,56 +92,18 @@ export default function Login() {
 
       await fetchUser();
 
-      if (role === "super_admin") {
-        if (isMobile) {
-          navigate(from, { replace: true });
-          navigate("/admin/menu");
-        } else {
-          navigate("/admin/dashboard");
-        }
-        toast.success(t("login.success"));
-      } else if (role === "school_admin") {
-        if (isMobile) {
-          navigate(from, { replace: true });
-          navigate("/school/menu");
-        } else {
-          navigate("/school/dashboard");
-        }
-        toast.success(t("login.success"));
-      } else if (role === "teacher_admin") {
-        if (isMobile) {
-          navigate(from, { replace: true });
-          navigate("/teacher/menu");
-        } else {
-          navigate("/teacher/dashboard");
-        }
-        toast.success(t("login.success"));
-      } else if (role === "student_admin") {
-        if (isFirstTime) {
-          await fetchUser();
-          toast.info(t("login.changePassword"));
-          navigate("/change-password", { replace: true });
-          return;
-        }
+      const intended = location.state?.from?.pathname;
+      const safeIntended =
+        intended &&
+        intended !== "/dashboard" &&
+        intended !== "/admin/login" &&
+        !intended.endsWith("/login")
+          ? intended
+          : null;
 
-        await fetchUser();
-
-        if (loginAs === "student") {
-          navigate(isMobile ? "/student/menu" : "/student/dashboard", {
-            replace: true,
-          });
-        } else {
-          navigate(isMobile ? "/parent/menu" : "/parent/dashboard", {
-            replace: true,
-          });
-        }
-        toast.success(t("login.success"));
-      } else if (role === "staff_admin") {
-        navigate(isMobile ? "/staff/menu" : "/staff/dashboard", {
-          replace: true,
-        });
-        toast.success(t("login.success"));
-      }
+      const dest = safeIntended || homePathForRole(role, loginAs, isMobile);
+      navigate(dest, { replace: true });
+      toast.success(t("login.success"));
     } catch (error) {
       const rawMsg = String(error?.message || "");
       const isNetwork =

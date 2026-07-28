@@ -4,6 +4,7 @@ import { useNavigate } from "react-router-dom";
 import {
   FaCheck,
   FaChevronDown,
+  FaChevronUp,
   FaSearch,
   FaThLarge,
   FaTimes,
@@ -13,6 +14,68 @@ import { useAuth } from "../context/AuthContext";
 import UserAvatar from "./UserAvatar";
 
 export const DEFAULT_COLOR = { bg: "#F3F4F6", icon: "#6B7280", dot: "#E5E7EB" };
+
+const FREQUENT_KEY = "menuFrequentClicks";
+const FREQUENT_LIMIT = 6;
+
+function getFrequentScores() {
+  try {
+    return JSON.parse(localStorage.getItem(FREQUENT_KEY) || "{}") || {};
+  } catch {
+    return {};
+  }
+}
+
+function recordMenuUse(name) {
+  if (!name) return;
+  try {
+    const scores = getFrequentScores();
+    scores[name] = (scores[name] || 0) + 1;
+    localStorage.setItem(FREQUENT_KEY, JSON.stringify(scores));
+    window.dispatchEvent(new Event("menuFrequentChange"));
+  } catch {
+    /* ignore */
+  }
+}
+
+/** Prefer most-used modules; fill remaining slots from menu order. */
+function pickFrequentItems(menu, limit = FREQUENT_LIMIT) {
+  const scores = getFrequentScores();
+  const ranked = [...menu].sort(
+    (a, b) => (scores[b.name] || 0) - (scores[a.name] || 0),
+  );
+  const picked = [];
+  const seen = new Set();
+
+  for (const item of ranked) {
+    if (picked.length >= limit) break;
+    if ((scores[item.name] || 0) > 0) {
+      picked.push(item);
+      seen.add(item.name);
+    }
+  }
+  for (const item of menu) {
+    if (picked.length >= limit) break;
+    if (!seen.has(item.name)) {
+      picked.push(item);
+      seen.add(item.name);
+    }
+  }
+  return picked;
+}
+
+function useIsMobileLayout() {
+  const [mobile, setMobile] = useState(() =>
+    typeof window !== "undefined" ? window.innerWidth < 1024 : true,
+  );
+  useEffect(() => {
+    const apply = () => setMobile(window.innerWidth < 1024);
+    apply();
+    window.addEventListener("resize", apply);
+    return () => window.removeEventListener("resize", apply);
+  }, []);
+  return mobile;
+}
 
 /** Align with Tailwind `lg` / bottom-nav shell (1024px). */
 export const isAppMobile = () =>
@@ -70,7 +133,7 @@ export function GreetingHeader({ name, role, loginAs }) {
   const displayRole = rawRole ? t(`role.${rawRole}`, tn(rawRole)) : "";
 
   return (
-    <div className="app-greeting skin-wave-header relative overflow-hidden rounded-[1.35rem] px-5 pb-7 pt-5">
+    <div className="app-greeting skin-wave-header relative overflow-hidden rounded-[1.35rem] px-5 pb-11 pt-5 lg:pb-7">
       <div className="pointer-events-none absolute -right-8 -top-10 h-36 w-36 rounded-full bg-white/15" />
       <div className="pointer-events-none absolute -bottom-6 left-10 h-20 w-20 rounded-full bg-white/10" />
       <div className="relative flex items-center gap-3.5">
@@ -186,6 +249,7 @@ function AccordionPanel({ isOpen, children }) {
 }
 
 export const MENU_STYLE_OPTIONS = [
+  { id: "3d", label: "3D icons" },
   { id: "glass", label: "Glass chip" },
   { id: "solid", label: "Solid icon" },
   { id: "soft", label: "Soft stack" },
@@ -203,7 +267,7 @@ export function getSavedMenuStyle() {
   } catch {
     /* ignore */
   }
-  return "glass";
+  return "3d";
 }
 
 export function setSavedMenuStyle(id) {
@@ -238,7 +302,11 @@ function MenuCard({ item, color, globalIdx, isOpen, onToggle, styleId }) {
   const label = tn(item.name);
   const delay = { animationDelay: `${Math.min(globalIdx, 16) * 35}ms` };
 
-  const onClick = () => (hasChildren ? onToggle() : navigate(item.path));
+  const onClick = () => {
+    recordMenuUse(item.name);
+    if (hasChildren) onToggle();
+    else navigate(item.path);
+  };
 
   const openCue = hasChildren && (
     <span
@@ -274,12 +342,17 @@ function MenuCard({ item, color, globalIdx, isOpen, onToggle, styleId }) {
         }}
       >
         <div
-          className="relative flex items-center justify-center shrink-0 rounded-xl text-[20px] text-white"
+          className="menu-icon-3d relative flex items-center justify-center shrink-0 rounded-xl text-[20px] text-white"
           style={{
             width: 44,
             height: 44,
-            background: color.icon,
-            boxShadow: `0 6px 14px -8px ${color.icon}`,
+            background: `linear-gradient(145deg, color-mix(in srgb, ${color.icon} 88%, #fff), ${color.icon} 55%, color-mix(in srgb, ${color.icon} 70%, #000))`,
+            boxShadow: `
+              inset 0 1px 1px rgba(255,255,255,0.45),
+              inset 0 -2px 3px rgba(0,0,0,0.2),
+              0 6px 0 color-mix(in srgb, ${color.icon} 55%, #000),
+              0 10px 16px -6px rgba(0,0,0,0.35)
+            `,
           }}
         >
           {item.icon}
@@ -323,7 +396,26 @@ function MenuCard({ item, color, globalIdx, isOpen, onToggle, styleId }) {
   let iconClass =
     "relative flex items-center justify-center shrink-0 transition-transform duration-200 group-active:scale-90";
 
-  if (styleId === "solid") {
+  if (styleId === "3d") {
+    iconClass += " menu-icon-3d rounded-[22px] text-white";
+    iconWrapStyle = {
+      width: 68,
+      height: 68,
+      fontSize: 28,
+      background: `linear-gradient(145deg,
+        color-mix(in srgb, ${color.icon} 78%, #ffffff) 0%,
+        ${color.icon} 48%,
+        color-mix(in srgb, ${color.icon} 62%, #000000) 100%)`,
+      boxShadow: `
+        inset 0 2px 3px rgba(255,255,255,0.55),
+        inset 0 -3px 5px rgba(0,0,0,0.22),
+        0 8px 0 color-mix(in srgb, ${color.icon} 48%, #0f172a),
+        0 14px 22px -8px rgba(15,23,42,0.4),
+        0 0 0 1px color-mix(in srgb, ${color.icon} 35%, transparent)
+      `,
+      transform: isOpen ? "translateY(2px)" : "translateY(0)",
+    };
+  } else if (styleId === "solid") {
     iconClass += " rounded-[20px] text-white";
     iconWrapStyle = {
       width: 68,
@@ -352,7 +444,7 @@ function MenuCard({ item, color, globalIdx, isOpen, onToggle, styleId }) {
       background: "transparent",
     };
   } else {
-    /* glass (default) */
+    /* glass (default fallback) */
     iconClass += " rounded-full";
     iconWrapStyle = {
       width: 72,
@@ -392,12 +484,18 @@ function MenuCard({ item, color, globalIdx, isOpen, onToggle, styleId }) {
           style={{ background: color.icon }}
         />
       )}
+      {styleId === "3d" && (
+        <span
+          className="pointer-events-none absolute top-[52px] left-1/2 -translate-x-1/2 w-12 h-3 rounded-full blur-[6px] opacity-40"
+          style={{ background: color.icon }}
+        />
+      )}
       <div className={iconClass} style={iconWrapStyle}>
-        {item.icon}
+        <span className="relative z-[1] drop-shadow-sm">{item.icon}</span>
         {hasChildren && <FolderBadge count={item.children.length} color={color} />}
       </div>
       <p
-        className="relative mt-3 m-0 text-[13px] font-extrabold text-center leading-snug line-clamp-2 w-full tracking-tight"
+        className="relative mt-3.5 m-0 text-[13px] font-extrabold text-center leading-snug line-clamp-2 w-full tracking-tight"
         style={{ color: "rgb(var(--text))" }}
       >
         {label}
@@ -457,7 +555,10 @@ function ChildList({ children, color, parentName, onClose }) {
           <button
             key={child.name}
             type="button"
-            onClick={() => navigate(child.path)}
+            onClick={() => {
+              recordMenuUse(parentName);
+              navigate(child.path);
+            }}
             className="flex items-center gap-3 rounded-xl px-3 py-3 text-left
               active:scale-[0.98] transition-transform
               hover:bg-[rgba(var(--primary),0.05)]"
@@ -577,6 +678,23 @@ function MenuStylePreview({ id, active }) {
               style={{ background: accent }}
             />
           </span>
+        ))}
+      </div>
+    );
+  }
+
+  if (id === "3d") {
+    return (
+      <div className="grid h-9 w-11 grid-cols-2 gap-1 place-content-center">
+        {[0, 1, 2, 3].map((i) => (
+          <span
+            key={i}
+            className="h-3 w-3 rounded-md"
+            style={{
+              background: `linear-gradient(145deg, ${accent}, ${soft})`,
+              boxShadow: `0 1.5px 0 color-mix(in srgb, ${accent} 70%, #000)`,
+            }}
+          />
         ))}
       </div>
     );
@@ -793,7 +911,8 @@ export function MenuStylePicker({ className = "" }) {
 
 /**
  * Shared app-style module grid for role menu hubs.
- * Style picker + 2/3-col grid (or list) with search + folder expand.
+ * Mobile: uplifted card with frequent modules + View all.
+ * Desktop: full searchable grid.
  */
 export function ModuleGrid({
   menu,
@@ -801,10 +920,14 @@ export function ModuleGrid({
   openItem,
   setOpenItem,
   isDark: _isDark,
+  expandAll = false,
 }) {
   const { t } = useLanguage();
+  const isMobile = useIsMobileLayout();
   const [query, setQuery] = useState("");
+  const [showAll, setShowAll] = useState(expandAll);
   const [styleId, setStyleId] = useState(getSavedMenuStyle);
+  const [freqTick, setFreqTick] = useState(0);
   const cols = useGridColumns(styleId);
   const folderRef = useRef(null);
 
@@ -814,6 +937,26 @@ export function ModuleGrid({
     return () => window.removeEventListener(MENU_STYLE_EVENT, onChange);
   }, []);
 
+  useEffect(() => {
+    const onFreq = () => setFreqTick((n) => n + 1);
+    window.addEventListener("menuFrequentChange", onFreq);
+    return () => window.removeEventListener("menuFrequentChange", onFreq);
+  }, []);
+
+  // Searching always expands the full list
+  useEffect(() => {
+    if (query.trim()) setShowAll(true);
+  }, [query]);
+
+  const frequent = useMemo(
+    () => pickFrequentItems(menu, FREQUENT_LIMIT),
+    [menu, freqTick],
+  );
+  const frequentNames = useMemo(
+    () => new Set(frequent.map((i) => i.name)),
+    [frequent],
+  );
+
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
     if (!q) return menu;
@@ -822,6 +965,24 @@ export function ModuleGrid({
       return item.children?.some((c) => c.name.toLowerCase().includes(q));
     });
   }, [menu, query]);
+
+  const restItems = useMemo(() => {
+    if (!isMobile || showAll) {
+      // When expanded with no search: show modules not already in frequent
+      if (isMobile && showAll && !query.trim()) {
+        return filtered.filter((i) => !frequentNames.has(i.name));
+      }
+      return filtered;
+    }
+    return [];
+  }, [filtered, frequentNames, isMobile, showAll, query]);
+
+  const displayItems = useMemo(() => {
+    if (!isMobile) return filtered;
+    if (!showAll) return frequent;
+    if (query.trim()) return filtered;
+    return [...frequent, ...restItems];
+  }, [isMobile, showAll, frequent, restItems, filtered, query]);
 
   // When searching, auto-expand matching folders that have child hits
   useEffect(() => {
@@ -835,36 +996,285 @@ export function ModuleGrid({
     if (folderHit) setOpenItem(folderHit.name);
   }, [query, filtered, setOpenItem]);
 
-  const openIndex = filtered.findIndex(
+  const openIndex = displayItems.findIndex(
     (i) => i.name === openItem && i.children,
   );
-  const openItemData = openIndex >= 0 ? filtered[openIndex] : null;
+  const openItemData = openIndex >= 0 ? displayItems[openIndex] : null;
   const openColor = openItemData
     ? colorMap[openItemData.name] ?? DEFAULT_COLOR
     : DEFAULT_COLOR;
 
-  // Insert folder panel after the last tile in the open item's row
   const insertAfter =
     openIndex >= 0
       ? Math.min(
-          filtered.length - 1,
+          displayItems.length - 1,
           Math.floor(openIndex / cols) * cols + (cols - 1),
         )
       : -1;
 
   useEffect(() => {
     if (!openItemData || !folderRef.current) return;
-    const t = setTimeout(() => {
+    const timer = setTimeout(() => {
       folderRef.current?.scrollIntoView({ behavior: "smooth", block: "nearest" });
     }, 80);
-    return () => clearTimeout(t);
+    return () => clearTimeout(timer);
   }, [openItemData?.name]);
 
+  const effectiveStyle =
+    isMobile && styleId !== "list" ? "3d" : styleId;
+
   const gridClass =
-    styleId === "list"
+    effectiveStyle === "list"
       ? "grid grid-cols-1 min-[520px]:grid-cols-2 gap-2.5"
       : "grid grid-cols-2 min-[380px]:grid-cols-3 gap-3.5 sm:gap-4";
 
+  const renderGrid = (items, idxOffset = 0) => {
+    if (items.length === 0) return null;
+    const openIdx = items.findIndex((i) => i.name === openItem && i.children);
+    const insertAt =
+      openIdx >= 0
+        ? Math.min(
+            items.length - 1,
+            Math.floor(openIdx / cols) * cols + (cols - 1),
+          )
+        : -1;
+
+    return (
+      <div className={gridClass}>
+        {items.map((item, idx) => {
+          const color = colorMap[item.name] ?? DEFAULT_COLOR;
+          const isOpen = openItem === item.name;
+          return (
+            <React.Fragment key={item.name}>
+              <MenuCard
+                item={item}
+                color={color}
+                globalIdx={idxOffset + idx}
+                isOpen={isOpen}
+                styleId={effectiveStyle}
+                onToggle={() => setOpenItem(isOpen ? null : item.name)}
+              />
+              {idx === insertAt && openItemData && items.some((i) => i.name === openItemData.name) && (
+                <div ref={folderRef} className="col-span-full">
+                  <AccordionPanel isOpen={Boolean(openItemData)}>
+                    <ChildList
+                      children={openItemData.children}
+                      color={openColor}
+                      parentName={openItemData.name}
+                      onClose={() => setOpenItem(null)}
+                    />
+                  </AccordionPanel>
+                </div>
+              )}
+            </React.Fragment>
+          );
+        })}
+      </div>
+    );
+  };
+
+  const searchBar = (
+    <div
+      className="flex h-12 items-center gap-2.5 rounded-2xl border px-3.5 shadow-sm"
+      style={{
+        background: "rgb(var(--bg))",
+        borderColor: "rgb(var(--border))",
+      }}
+    >
+      <FaSearch
+        size={14}
+        className="shrink-0"
+        style={{ color: "rgb(var(--text-muted))" }}
+      />
+      <input
+        value={query}
+        onChange={(e) => setQuery(e.target.value)}
+        placeholder={t("menu.searchModules", "Search modules…")}
+        className="flex-1 bg-transparent text-[14px] font-semibold outline-none
+          placeholder:font-medium placeholder:text-[rgb(var(--text-muted))]"
+        style={{ color: "rgb(var(--text))" }}
+      />
+      {query && (
+        <button
+          type="button"
+          onClick={() => setQuery("")}
+          className="flex h-8 w-8 items-center justify-center rounded-xl active:scale-95"
+          style={{ background: "rgb(var(--surface))" }}
+          aria-label={t("common.close", "Close")}
+        >
+          <FaTimes size={11} style={{ color: "rgb(var(--text-muted))" }} />
+        </button>
+      )}
+    </div>
+  );
+
+  const emptyState = (
+    <div
+      className="rounded-2xl border px-4 py-10 text-center"
+      style={{
+        background: "rgb(var(--bg))",
+        borderColor: "rgb(var(--border))",
+      }}
+    >
+      <p className="text-sm font-bold" style={{ color: "rgb(var(--text))" }}>
+        {t("menu.noneFound", "No modules found")}
+      </p>
+      <p className="text-xs mt-1" style={{ color: "rgb(var(--text-muted))" }}>
+        {t("menu.trySearch", "Try a different search term")}
+      </p>
+    </div>
+  );
+
+  const animStyle = (
+    <style>{`
+      @keyframes menuTileIn {
+        from { opacity: 0; transform: translateY(8px) scale(0.96); }
+        to   { opacity: 1; transform: translateY(0) scale(1); }
+      }
+      .menu-tile-enter {
+        animation: menuTileIn 0.32s cubic-bezier(0.22, 1, 0.36, 1) both;
+      }
+      .menu-icon-3d {
+        transition: transform 0.18s ease, box-shadow 0.18s ease;
+      }
+      .group:active .menu-icon-3d {
+        transform: translateY(4px) !important;
+        box-shadow:
+          inset 0 2px 3px rgba(255,255,255,0.4),
+          inset 0 -2px 4px rgba(0,0,0,0.25),
+          0 3px 0 color-mix(in srgb, currentColor 40%, #0f172a),
+          0 6px 12px -6px rgba(15,23,42,0.35) !important;
+      }
+      @media (prefers-reduced-motion: reduce) {
+        .menu-tile-enter { animation: none; }
+      }
+    `}</style>
+  );
+
+  /* ── Mobile: uplifted card with frequent + View all ── */
+  if (isMobile) {
+    const searching = Boolean(query.trim());
+
+    return (
+      <div className="relative z-10 -mt-7 flex flex-col lg:mt-0">
+        <div className="menu-uplift-card flex flex-col gap-4 rounded-[1.75rem] border px-4 pb-5 pt-5 sm:px-5">
+          {!searching && (
+            <>
+              <div className="flex items-center justify-between gap-2 px-0.5">
+                <div>
+                  <h2
+                    className="text-[13px] font-extrabold uppercase tracking-wide"
+                    style={{ color: "rgb(var(--text-muted))" }}
+                  >
+                    {t("menu.frequent", "Frequently used")}
+                  </h2>
+                  <p
+                    className="mt-0.5 text-[11px] font-semibold"
+                    style={{ color: "rgb(var(--text-muted))" }}
+                  >
+                    {t("menu.frequentHint", "Your most opened modules")}
+                  </p>
+                </div>
+                <span
+                  className="text-[11px] font-bold tabular-nums px-2 py-0.5 rounded-full shrink-0"
+                  style={{
+                    color: "rgb(var(--primary))",
+                    background: "rgba(var(--primary),0.1)",
+                  }}
+                >
+                  {frequent.length}
+                </span>
+              </div>
+
+              {renderGrid(frequent, 0)}
+            </>
+          )}
+
+          {!showAll ? (
+            <button
+              type="button"
+              onClick={() => setShowAll(true)}
+              className="flex w-full items-center justify-center gap-2 rounded-2xl border px-4 py-3.5
+                text-[13.5px] font-extrabold active:scale-[0.98] transition-transform"
+              style={{
+                color: "rgb(var(--primary))",
+                background:
+                  "color-mix(in srgb, rgb(var(--primary)) 8%, rgb(var(--surface)))",
+                borderColor:
+                  "color-mix(in srgb, rgb(var(--primary)) 28%, rgb(var(--border)))",
+                boxShadow: "0 8px 20px -14px rgba(var(--primary), 0.55)",
+              }}
+            >
+              {t("menu.viewAll", "View all modules")}
+              <span
+                className="rounded-full px-2 py-0.5 text-[11px] font-bold tabular-nums"
+                style={{
+                  background: "rgba(var(--primary),0.12)",
+                }}
+              >
+                {menu.length}
+              </span>
+              <FaChevronDown size={11} />
+            </button>
+          ) : (
+            <div
+              className={`flex flex-col gap-3 ${searching ? "" : "border-t pt-4"}`}
+              style={{ borderColor: "rgb(var(--border))" }}
+            >
+              <div className="flex items-center justify-between px-0.5 gap-2">
+                <h2
+                  className="text-[13px] font-extrabold uppercase tracking-wide"
+                  style={{ color: "rgb(var(--text-muted))" }}
+                >
+                  {t("menu.allModules", "All modules")}
+                </h2>
+                <span
+                  className="text-[11px] font-bold tabular-nums px-2 py-0.5 rounded-full"
+                  style={{
+                    color: "rgb(var(--primary))",
+                    background: "rgba(var(--primary),0.1)",
+                  }}
+                >
+                  {filtered.length}
+                  {filtered.length !== menu.length ? ` / ${menu.length}` : ""}
+                </span>
+              </div>
+
+              {searchBar}
+
+              {filtered.length === 0
+                ? emptyState
+                : searching
+                  ? renderGrid(filtered, 0)
+                  : renderGrid(restItems, frequent.length)}
+
+              <button
+                type="button"
+                onClick={() => {
+                  setShowAll(false);
+                  setQuery("");
+                  setOpenItem(null);
+                }}
+                className="flex w-full items-center justify-center gap-2 rounded-2xl border px-4 py-3
+                  text-[13px] font-bold active:scale-[0.98] transition-transform"
+                style={{
+                  color: "rgb(var(--text-muted))",
+                  background: "rgb(var(--bg))",
+                  borderColor: "rgb(var(--border))",
+                }}
+              >
+                {t("menu.showLess", "Show less")}
+                <FaChevronUp size={11} />
+              </button>
+            </div>
+          )}
+        </div>
+        {animStyle}
+      </div>
+    );
+  }
+
+  /* ── Desktop: full searchable grid ── */
   return (
     <div className="flex flex-col gap-3">
       <div className="flex items-center justify-between px-0.5 gap-2">
@@ -886,66 +1296,13 @@ export function ModuleGrid({
         </span>
       </div>
 
-      <div
-        className="flex h-12 items-center gap-2.5 rounded-2xl border px-3.5 shadow-sm"
-        style={{
-          background: "rgb(var(--surface))",
-          borderColor: "rgb(var(--border))",
-        }}
-      >
-        <FaSearch
-          size={14}
-          className="shrink-0"
-          style={{ color: "rgb(var(--text-muted))" }}
-        />
-        <input
-          value={query}
-          onChange={(e) => setQuery(e.target.value)}
-          placeholder={t("menu.searchModules", "Search modules…")}
-          className="flex-1 bg-transparent text-[14px] font-semibold outline-none
-            placeholder:font-medium placeholder:text-[rgb(var(--text-muted))]"
-          style={{ color: "rgb(var(--text))" }}
-        />
-        {query && (
-          <button
-            type="button"
-            onClick={() => setQuery("")}
-            className="flex h-8 w-8 items-center justify-center rounded-xl active:scale-95"
-            style={{ background: "rgb(var(--bg))" }}
-            aria-label={t("common.close", "Close")}
-          >
-            <FaTimes size={11} style={{ color: "rgb(var(--text-muted))" }} />
-          </button>
-        )}
-      </div>
+      {searchBar}
 
-      {filtered.length === 0 ? (
-        <div
-          className="rounded-2xl border px-4 py-10 text-center"
-          style={{
-            background: "rgb(var(--surface))",
-            borderColor: "rgb(var(--border))",
-          }}
-        >
-          <p
-            className="text-sm font-bold"
-            style={{ color: "rgb(var(--text))" }}
-          >
-            {t("menu.noneFound", "No modules found")}
-          </p>
-          <p
-            className="text-xs mt-1"
-            style={{ color: "rgb(var(--text-muted))" }}
-          >
-            {t("menu.trySearch", "Try a different search term")}
-          </p>
-        </div>
-      ) : (
+      {filtered.length === 0 ? emptyState : (
         <div className={gridClass}>
-          {filtered.map((item, idx) => {
+          {displayItems.map((item, idx) => {
             const color = colorMap[item.name] ?? DEFAULT_COLOR;
             const isOpen = openItem === item.name;
-
             return (
               <React.Fragment key={item.name}>
                 <MenuCard
@@ -953,7 +1310,7 @@ export function ModuleGrid({
                   color={color}
                   globalIdx={idx}
                   isOpen={isOpen}
-                  styleId={styleId}
+                  styleId={effectiveStyle}
                   onToggle={() => setOpenItem(isOpen ? null : item.name)}
                 />
                 {idx === insertAfter && (
@@ -975,19 +1332,7 @@ export function ModuleGrid({
           })}
         </div>
       )}
-
-      <style>{`
-        @keyframes menuTileIn {
-          from { opacity: 0; transform: translateY(8px) scale(0.96); }
-          to   { opacity: 1; transform: translateY(0) scale(1); }
-        }
-        .menu-tile-enter {
-          animation: menuTileIn 0.32s cubic-bezier(0.22, 1, 0.36, 1) both;
-        }
-        @media (prefers-reduced-motion: reduce) {
-          .menu-tile-enter { animation: none; }
-        }
-      `}</style>
+      {animStyle}
     </div>
   );
 }

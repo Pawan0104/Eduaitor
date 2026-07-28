@@ -117,7 +117,7 @@ function GreetingHeader({ name, role, loginAs }) {
 
   return (
     <div
-      className="rounded-[20px] px-5 py-5 mb-1 relative overflow-hidden"
+      className="app-greeting skin-wave-header relative overflow-hidden rounded-[1.35rem] px-5 pb-11 pt-5 mb-1 lg:pb-7"
       style={{
         background:
           "linear-gradient(135deg, rgb(var(--sidebar)) 0%, rgb(var(--primary)) 10%)",
@@ -566,7 +566,6 @@ export default function SchoolMenu() {
           role={greetingRole}
           loginAs={greetingLoginAs}
         />
-        <UpComingNotifications />
         <ModuleGrid
           menu={menu}
           colorMap={COLOR_MAP}
@@ -574,6 +573,7 @@ export default function SchoolMenu() {
           setOpenItem={setOpenItem}
           isDark={isDark}
         />
+        <UpComingNotifications />
       </div>
 
       <BlogFeed />
