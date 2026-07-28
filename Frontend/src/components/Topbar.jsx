@@ -197,9 +197,8 @@ const Topbar = ({ menuPath = "/" }) => {
 
   return (
     <header className="app-topbar box-border sticky top-0 z-30 flex items-center justify-between border-b border-[rgb(var(--border))] bg-[rgb(var(--surface))] px-2.5 text-[rgb(var(--text))] sm:px-5">
-      {/* LEFT */}
+      {/* LEFT: back + (mobile) child switcher | (desktop) home + school */}
       <div className="flex min-w-0 items-center gap-1.5 sm:gap-3">
-        {/* Mobile: back (when nested). Home is always available (incl. desktop / fullscreen). */}
         {canGoBack && (
           <button
             type="button"
@@ -212,13 +211,25 @@ const Topbar = ({ menuPath = "/" }) => {
             <FaChevronLeft size={14} />
           </button>
         )}
+
+        {/* Mobile: child switcher on the left, same row as bell/profile */}
+        {loginAs === "parent" && (
+          <div className="lg:hidden min-w-0">
+            <ParentChildSwitcher
+              variant="compact"
+              className="max-w-[11rem] sm:max-w-[13rem]"
+              menuAlign="left"
+            />
+          </div>
+        )}
+
         {menuPath && (
           <button
             type="button"
             onClick={() => navigate(menuPath)}
-            className={`flex h-10 shrink-0 items-center justify-center gap-2 rounded-2xl
+            className={`hidden lg:flex h-10 shrink-0 items-center justify-center gap-2 rounded-2xl
               border transition active:scale-95
-              ${onMenuHub ? "w-10 px-0" : "w-10 px-0 lg:w-auto lg:px-3"}
+              ${onMenuHub ? "w-10 px-0" : "lg:w-auto lg:px-3"}
               ${
                 onMenuHub
                   ? "border-transparent bg-[rgb(var(--primary))] text-[rgb(var(--on-primary,255_255_255))] shadow-sm"
@@ -238,7 +249,7 @@ const Topbar = ({ menuPath = "/" }) => {
         <button
           type="button"
           onClick={() => menuPath && navigate(menuPath)}
-          className="flex min-w-0 items-center gap-2 pl-0.5 text-left sm:gap-2.5 sm:pl-2"
+          className="hidden lg:flex min-w-0 items-center gap-2 pl-0.5 text-left sm:gap-2.5 sm:pl-2"
           aria-label={t("nav.home", "Home")}
           disabled={!menuPath}
         >
@@ -254,6 +265,16 @@ const Topbar = ({ menuPath = "/" }) => {
           </p>
           <p className="text-xs opacity-60 text-[rgb(var(--text))]">{time.d}</p>
         </div>
+
+        {/* Desktop: child switcher beside profile */}
+        {loginAs === "parent" && (
+          <div className="hidden lg:block">
+            <ParentChildSwitcher
+              variant="compact"
+              className="max-w-[12rem]"
+            />
+          </div>
+        )}
 
         {/* ── BELL + DROPDOWN ───────────────────────────────────────────── */}
         <div className="relative">
@@ -397,14 +418,6 @@ const Topbar = ({ menuPath = "/" }) => {
             </div>
           )}
         </div>
-
-        {/* Parent: child switcher directly beside profile */}
-        {loginAs === "parent" && (
-          <ParentChildSwitcher
-            variant="compact"
-            className="max-w-[9.5rem] sm:max-w-[12rem]"
-          />
-        )}
 
         {/* ── USER DROPDOWN ─────────────────────────────────────────────── */}
         <div className="relative">

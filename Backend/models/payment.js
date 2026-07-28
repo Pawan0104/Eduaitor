@@ -1,31 +1,40 @@
 import mongoose from "mongoose";
-const paymentSchema = new mongoose.Schema({
-    studentId: { type: mongoose.Schema.Types.ObjectId, ref: 'Student', required: true },
-    // 1. Remove 'unique: true' from here
-    receiptNo: { type: String, required: true }, 
+const paymentSchema = new mongoose.Schema(
+  {
+    studentId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "Student",
+      required: true,
+    },
+    receiptNo: { type: String, required: true },
     amountPaid: { type: Number, required: true },
-    paymentMode: { type: String, enum: ['Cash', 'UPI', 'Cheque', 'Online'], required: true },
+    paymentMode: {
+      type: String,
+      enum: ["Cash", "UPI", "Cheque", "Online"],
+      required: true,
+    },
     paidDate: { type: Date, default: Date.now },
     remarks: { type: String },
+    /** Fee periods covered by this payment, e.g. ["Q1","Q2"] or ["M4"] */
+    periodKeys: { type: [String], default: [] },
     /** UPI reference number (UTR) — required when paymentMode is UPI */
     utr: { type: String, trim: true, default: "" },
     /** Manual / gateway transaction reference for Online payments */
     transactionId: { type: String, trim: true, default: "" },
     schoolId: {
-        type: mongoose.Schema.Types.ObjectId,
-        ref: 'School',
-        required: true
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "School",
+      required: true,
     },
     razorpayOrderId: { type: String },
     razorpayPaymentId: { type: String },
     razorpaySignature: { type: String },
-}, {
-    // This tells Mongoose to auto-build indexes properly when the app boots up
-    autoIndex: true 
-});
+  },
+  {
+    autoIndex: true,
+  },
+);
 
-// 2. Add this COMPOUND index at the bottom
-// This allows RCP-1 for School A and RCP-1 for School B
 paymentSchema.index({ receiptNo: 1, schoolId: 1 }, { unique: true });
 
 export default mongoose.model("Payment", paymentSchema);

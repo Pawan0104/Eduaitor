@@ -539,7 +539,8 @@ export default function ParentFee({ studentId, token }) {
   const [activeTab, setActiveTab] = useState("summary");
   const [payAmount, setPayAmount] = useState("");
   const [paying, setPaying] = useState(false);
-  const [devCheckout, setDevCheckout] = useState(null); // { orderId, amountRupees }
+  const [devCheckout, setDevCheckout] = useState(null); // { orderId, amountRupees, periodKeys }
+  const [selectedPeriods, setSelectedPeriods] = useState([]);
   const navigate = useNavigate();
   const isMobile = window.innerWidth <= 768;
 
@@ -553,6 +554,14 @@ export default function ParentFee({ studentId, token }) {
         withCredentials: true,
       });
       setFeeData(res.data);
+      const installments = Array.isArray(res.data?.installments)
+        ? res.data.installments
+        : [];
+      const unpaidKeys = installments
+        .filter((i) => i.status !== "paid" && Number(i.dueAmount) > 0)
+        .map((i) => i.key);
+      // Default: select first unpaid period (or none if annually already covered)
+      setSelectedPeriods(unpaidKeys.length ? [unpaidKeys[0]] : []);
       const due = Math.max(
         0,
         Number(res.data?.balanceDue) ||
@@ -574,13 +583,14 @@ export default function ParentFee({ studentId, token }) {
     fetchFeeDetails();
   }, []);
 
-  const verifyPayment = async (payload, amount) => {
+  const verifyPayment = async (payload, amount, periodKeys = []) => {
     const verifyRes = await axios.post(
       `${API}/fees/razorpay/verify`,
       {
         ...payload,
         studentId: feeData?.student?._id,
         amountPaid: amount,
+        periodKeys,
       },
       { withCredentials: true },
     );
@@ -605,6 +615,7 @@ export default function ParentFee({ studentId, token }) {
           signature: "local_test_signature",
         },
         Number(devCheckout.amountRupees),
+        devCheckout.periodKeys || [],
       );
       setDevCheckout(null);
     } catch (err) {
@@ -617,21 +628,57 @@ export default function ParentFee({ studentId, token }) {
   };
 
   const handleOnlinePay = async () => {
-    const amount = Number(payAmount);
-    const due = Math.max(
-      0,
-      Number(feeData?.balanceDue) ||
-        Number(feeData?.totalDue) ||
-        Number(feeData?.finalFee) - Number(feeData?.totalPaid) ||
+    const installments = Array.isArray(feeData?.installments)
+      ? feeData.installments
+      : [];
+    const useInstallments =
+      installments.length > 0 &&
+      String(feeData?.feeFrequency || "annually") !== "annually";
+
+    let amount = 0;
+    let periodKeys = [];
+
+    if (useInstallments) {
+      if (!selectedPeriods.length) {
+        toast.error("Select at least one fee period to pay");
+        return;
+      }
+      const selectedRows = installments.filter((i) =>
+        selectedPeriods.includes(i.key),
+      );
+      const invalid = selectedRows.find(
+        (i) => i.status === "paid" || Number(i.dueAmount) <= 0,
+      );
+      if (invalid) {
+        toast.error(`${invalid.label} is already paid`);
+        return;
+      }
+      amount =
+        Math.round(
+          selectedRows.reduce((s, i) => s + Number(i.dueAmount || 0), 0) * 100,
+        ) / 100;
+      periodKeys = selectedRows.map((i) => i.key);
+    } else {
+      amount = Number(payAmount);
+      const due = Math.max(
         0,
-    );
+        Number(feeData?.balanceDue) ||
+          Number(feeData?.totalDue) ||
+          Number(feeData?.finalFee) - Number(feeData?.totalPaid) ||
+          0,
+      );
+      if (!amount || amount <= 0) {
+        toast.error("Enter a valid payment amount");
+        return;
+      }
+      if (due > 0 && amount > due) {
+        toast.error("Amount cannot be more than remaining fee");
+        return;
+      }
+    }
 
     if (!amount || amount <= 0) {
-      toast.error("Enter a valid payment amount");
-      return;
-    }
-    if (due > 0 && amount > due) {
-      toast.error("Amount cannot be more than remaining fee");
+      toast.error("Nothing to pay for the selected periods");
       return;
     }
 
@@ -643,6 +690,7 @@ export default function ParentFee({ studentId, token }) {
         {
           studentId: feeData?.student?._id,
           amount,
+          periodKeys,
         },
         { withCredentials: true },
       );
@@ -653,12 +701,16 @@ export default function ParentFee({ studentId, token }) {
         return;
       }
 
+      const payKeys = data.periodKeys?.length ? data.periodKeys : periodKeys;
+      const payAmountRupees = Number(data.amountRupees) || amount;
+
       // Development gateway: open mock Razorpay screen with OK button
       if (data.mock) {
         setDevCheckout({
           orderId: data.orderId,
-          amountRupees: amount,
+          amountRupees: payAmountRupees,
           studentName: feeData?.student?.name || "Student",
+          periodKeys: payKeys,
         });
         setPaying(false);
         return;
@@ -676,7 +728,9 @@ export default function ParentFee({ studentId, token }) {
         amount: data.amount,
         currency: data.currency || "INR",
         name: "School Fee Payment",
-        description: `Fee payment for ${feeData?.student?.name || "student"}`,
+        description: `Fee payment for ${feeData?.student?.name || "student"}${
+          payKeys.length ? ` (${payKeys.join(", ")})` : ""
+        }`,
         order_id: data.orderId,
         prefill: {
           name: feeData?.student?.name || "",
@@ -689,7 +743,8 @@ export default function ParentFee({ studentId, token }) {
                 paymentId: response.razorpay_payment_id,
                 signature: response.razorpay_signature,
               },
-              amount,
+              payAmountRupees,
+              payKeys,
             );
           } catch (err) {
             toast.error(
@@ -774,6 +829,8 @@ export default function ParentFee({ studentId, token }) {
     totalDue,
     paidPercent,
     payments,
+    feeFrequency,
+    installments = [],
   } = feeData;
 
   const remainingDue = Math.max(
@@ -783,6 +840,34 @@ export default function ParentFee({ studentId, token }) {
       Number(finalFee) - Number(totalPaid) ||
       0,
   );
+
+  const useInstallments =
+    Array.isArray(installments) &&
+    installments.length > 0 &&
+    String(feeFrequency || "annually") !== "annually";
+
+  const selectedPayTotal = useInstallments
+    ? Math.round(
+        installments
+          .filter((i) => selectedPeriods.includes(i.key))
+          .reduce((s, i) => s + Number(i.dueAmount || 0), 0) * 100,
+      ) / 100
+    : Number(payAmount) || 0;
+
+  const togglePeriod = (key, disabled) => {
+    if (disabled) return;
+    setSelectedPeriods((prev) =>
+      prev.includes(key) ? prev.filter((k) => k !== key) : [...prev, key],
+    );
+  };
+
+  const selectAllUnpaid = () => {
+    setSelectedPeriods(
+      installments
+        .filter((i) => i.status !== "paid" && Number(i.dueAmount) > 0)
+        .map((i) => i.key),
+    );
+  };
 
   const discountSub =
     discountAmount > 0
@@ -862,7 +947,9 @@ export default function ParentFee({ studentId, token }) {
               </p>
               <p className="text-xs text-[rgb(var(--text))] mt-0.5">
                 {remainingDue > 0
-                  ? "Pay remaining fees online via UPI / Card / NetBanking."
+                  ? useInstallments
+                    ? `School bills ${String(feeFrequency).replace("-", " ")} — select periods to pay.`
+                    : "Pay remaining fees online via UPI / Card / NetBanking."
                   : "No pending dues right now. You can still open payment history below."}
               </p>
             </div>
@@ -874,29 +961,104 @@ export default function ParentFee({ studentId, token }) {
           </div>
 
           {remainingDue > 0 ? (
-            <div className="flex flex-col sm:flex-row gap-3">
-              <div className="flex-1">
-                <label className="block text-xs font-medium text-[rgb(var(--text))] mb-1">
-                  Amount (₹)
-                </label>
-                <input
-                  type="number"
-                  min="1"
-                  max={remainingDue}
-                  value={payAmount}
-                  onChange={(e) => setPayAmount(e.target.value)}
-                  className="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm bg-[rgb(var(--surface))] text-[rgb(var(--text))]"
-                  placeholder="Enter amount"
-                />
+            <div className="space-y-3">
+              {useInstallments && (
+                <div className="rounded-xl border border-slate-200 overflow-hidden">
+                  <div className="flex items-center justify-between gap-2 px-3 py-2 bg-[rgba(var(--primary),0.05)] border-b border-slate-200">
+                    <p className="text-[11px] font-extrabold uppercase tracking-wide text-[rgb(var(--text-muted))]">
+                      {String(feeFrequency).replace("-", " ")} installments
+                    </p>
+                    <button
+                      type="button"
+                      onClick={selectAllUnpaid}
+                      className="text-[11px] font-bold text-indigo-600 hover:underline"
+                    >
+                      Select all unpaid
+                    </button>
+                  </div>
+                  <ul className="divide-y divide-slate-100">
+                    {installments.map((row) => {
+                      const paid = row.status === "paid" || Number(row.dueAmount) <= 0;
+                      const checked = selectedPeriods.includes(row.key);
+                      return (
+                        <li key={row.key}>
+                          <label
+                            className={`flex cursor-pointer items-center gap-3 px-3 py-2.5 ${
+                              paid ? "opacity-55 cursor-default" : "hover:bg-[rgba(var(--primary),0.04)]"
+                            }`}
+                          >
+                            <input
+                              type="checkbox"
+                              className="h-4 w-4 rounded border-slate-300 text-indigo-600"
+                              checked={paid ? true : checked}
+                              disabled={paid}
+                              onChange={() => togglePeriod(row.key, paid)}
+                            />
+                            <span className="min-w-0 flex-1">
+                              <span className="block text-sm font-semibold text-[rgb(var(--text))]">
+                                {row.label}
+                              </span>
+                              <span className="block text-[11px] text-[rgb(var(--text-muted))]">
+                                {paid
+                                  ? "Paid"
+                                  : row.status === "partial"
+                                    ? `Partial · due ${fmtINR(row.dueAmount)}`
+                                    : `Due ${fmtINR(row.dueAmount)}`}
+                              </span>
+                            </span>
+                            <span className="shrink-0 text-sm font-bold text-[rgb(var(--text))]">
+                              {fmtINR(row.amount)}
+                            </span>
+                          </label>
+                        </li>
+                      );
+                    })}
+                  </ul>
+                </div>
+              )}
+
+              <div className="flex flex-col sm:flex-row gap-3">
+                {!useInstallments && (
+                  <div className="flex-1">
+                    <label className="block text-xs font-medium text-[rgb(var(--text))] mb-1">
+                      Amount (₹)
+                    </label>
+                    <input
+                      type="number"
+                      min="1"
+                      max={remainingDue}
+                      value={payAmount}
+                      onChange={(e) => setPayAmount(e.target.value)}
+                      className="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm bg-[rgb(var(--surface))] text-[rgb(var(--text))]"
+                      placeholder="Enter amount"
+                    />
+                  </div>
+                )}
+                {useInstallments && (
+                  <div className="flex-1 flex items-center rounded-xl border border-slate-200 px-3 py-2.5">
+                    <div>
+                      <p className="text-[10px] font-bold uppercase tracking-wide text-[rgb(var(--text-muted))]">
+                        Paying now
+                      </p>
+                      <p className="text-base font-extrabold text-indigo-600">
+                        {fmtINR(selectedPayTotal)}
+                      </p>
+                    </div>
+                  </div>
+                )}
+                <button
+                  type="button"
+                  onClick={handleOnlinePay}
+                  disabled={paying || (useInstallments && selectedPayTotal <= 0)}
+                  className="sm:self-end px-5 py-2.5 rounded-xl bg-indigo-600 text-white text-sm font-semibold hover:bg-indigo-700 disabled:opacity-60"
+                >
+                  {paying
+                    ? "Processing…"
+                    : useInstallments
+                      ? `Pay ${fmtINR(selectedPayTotal)}`
+                      : "Pay Fee"}
+                </button>
               </div>
-              <button
-                type="button"
-                onClick={handleOnlinePay}
-                disabled={paying}
-                className="sm:self-end px-5 py-2.5 rounded-xl bg-indigo-600 text-white text-sm font-semibold hover:bg-indigo-700 disabled:opacity-60"
-              >
-                {paying ? "Processing…" : "Pay Fee"}
-              </button>
             </div>
           ) : (
             <button

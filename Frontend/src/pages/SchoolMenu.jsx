@@ -28,6 +28,7 @@ import { toast } from "react-toastify";
 import { useAuth } from "../context/AuthContext";
 import { useLanguage } from "../context/LanguageContext";
 import axios from "axios";
+import { SchoolHomeStrip } from "../components/RoleMenuShell";
 import BlogFeed from "../components/BlogFeed";
 import { ModuleGrid, useMenuExitGuard } from "../components/RoleMenuShell";
 import { clearSessionKeepPrefs } from "../utils/clearSessionKeepPrefs";
@@ -115,13 +116,15 @@ function GreetingHeader({ name, role, loginAs }) {
   const displayRole = (loginAs ? loginAs : role || "").replace("_", " ");
 
   return (
-    <div
-      className="app-greeting skin-wave-header relative overflow-hidden rounded-[1.35rem] px-5 pb-11 pt-5 mb-1 lg:pb-7"
-      style={{
-        background:
-          "linear-gradient(135deg, rgb(var(--sidebar)) 0%, rgb(var(--primary)) 10%)",
-      }}
-    >
+    <div className="flex flex-col gap-2.5 mb-1">
+      <SchoolHomeStrip />
+      <div
+        className="app-greeting skin-wave-header relative overflow-hidden rounded-[1.35rem] px-5 pb-11 pt-5 lg:pb-7"
+        style={{
+          background:
+            "linear-gradient(135deg, rgb(var(--sidebar)) 0%, rgb(var(--primary)) 10%)",
+        }}
+      >
       {/* Decorative dot */}
       <div
         className="absolute -top-6 -right-6 w-24 h-24 rounded-full opacity-10 pointer-events-none"
@@ -152,6 +155,7 @@ function GreetingHeader({ name, role, loginAs }) {
       <p className="relative text-white/80 text-[12.5px] font-semibold">
         {dateStr}
       </p>
+      </div>
     </div>
   );
 }

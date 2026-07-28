@@ -12,8 +12,68 @@ import {
 import { useLanguage } from "../context/LanguageContext";
 import { useAuth } from "../context/AuthContext";
 import UserAvatar from "./UserAvatar";
+import BrandMark from "./BrandMark";
 import UrgentActions from "./UrgentActions";
 import { getMenuIconMeta } from "../utils/menuIcons";
+
+function resolveMenuPath(role, loginAs) {
+  switch (role) {
+    case "super_admin":
+      return "/admin/menu";
+    case "school_admin":
+      return "/school/menu";
+    case "teacher_admin":
+      return "/teacher/menu";
+    case "staff_admin":
+      return "/staff/menu";
+    case "student_admin":
+      return loginAs === "parent" ? "/parent/menu" : "/student/menu";
+    default:
+      return "/";
+  }
+}
+
+/** Mobile strip: Home + school name — sits above Welcome / student greeting */
+export function SchoolHomeStrip({ className = "" }) {
+  const navigate = useNavigate();
+  const { user } = useAuth();
+  const { t } = useLanguage();
+  const menuPath = resolveMenuPath(user?.role, user?.loginAs);
+
+  return (
+    <div
+      className={`lg:hidden flex items-center gap-2.5 rounded-[1.15rem] border px-3 py-2.5 ${className}`}
+      style={{
+        background: "rgb(var(--surface))",
+        borderColor: "rgb(var(--border))",
+        boxShadow: "0 6px 18px rgba(15,23,42,0.05)",
+      }}
+    >
+      <button
+        type="button"
+        onClick={() => menuPath && navigate(menuPath)}
+        className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl border transition active:scale-95"
+        style={{
+          borderColor: "transparent",
+          background: "rgb(var(--primary))",
+          color: "rgb(var(--on-primary, 255 255 255))",
+        }}
+        aria-label={t("nav.home", "Home")}
+        title={t("nav.home", "Home")}
+      >
+        <FaThLarge size={14} />
+      </button>
+      <button
+        type="button"
+        onClick={() => menuPath && navigate(menuPath)}
+        className="min-w-0 flex-1 text-left"
+        aria-label={t("nav.home", "Home")}
+      >
+        <BrandMark user={user} />
+      </button>
+    </div>
+  );
+}
 
 export const DEFAULT_COLOR = { bg: "#F3F4F6", icon: "#6B7280", dot: "#E5E7EB" };
 
@@ -135,29 +195,32 @@ export function GreetingHeader({ name, role, loginAs }) {
   const displayRole = rawRole ? t(`role.${rawRole}`, tn(rawRole)) : "";
 
   return (
-    <div className="app-greeting skin-wave-header relative overflow-hidden rounded-[1.35rem] px-5 pb-11 pt-5 lg:pb-7">
-      <div className="pointer-events-none absolute -right-8 -top-10 h-36 w-36 rounded-full bg-white/15" />
-      <div className="pointer-events-none absolute -bottom-6 left-10 h-20 w-20 rounded-full bg-white/10" />
-      <div className="relative flex items-center gap-3.5">
-        <UserAvatar
-          name={name}
-          photoUrl={user?.photo_url}
-          size="lg"
-          rounded="2xl"
-          className="ring-2 ring-white/50"
-        />
-        <div className="min-w-0 flex-1">
-          {displayRole && (
-            <p className="mb-0.5 text-[11px] font-bold uppercase tracking-wide text-white/80">
-              {displayRole}
+    <div className="flex flex-col gap-2.5">
+      <SchoolHomeStrip />
+      <div className="app-greeting skin-wave-header relative overflow-hidden rounded-[1.35rem] px-5 pb-11 pt-5 lg:pb-7">
+        <div className="pointer-events-none absolute -right-8 -top-10 h-36 w-36 rounded-full bg-white/15" />
+        <div className="pointer-events-none absolute -bottom-6 left-10 h-20 w-20 rounded-full bg-white/10" />
+        <div className="relative flex items-center gap-3.5">
+          <UserAvatar
+            name={name}
+            photoUrl={user?.photo_url}
+            size="lg"
+            rounded="2xl"
+            className="ring-2 ring-white/50"
+          />
+          <div className="min-w-0 flex-1">
+            {displayRole && (
+              <p className="mb-0.5 text-[11px] font-bold uppercase tracking-wide text-white/80">
+                {displayRole}
+              </p>
+            )}
+            <h1 className="truncate text-xl font-extrabold capitalize leading-tight text-white">
+              {t("menu.welcome", "Welcome")}, {name}
+            </h1>
+            <p className="mt-0.5 text-[12.5px] font-semibold text-white/85">
+              {dateStr}
             </p>
-          )}
-          <h1 className="truncate text-xl font-extrabold capitalize leading-tight text-white">
-            {t("menu.welcome", "Welcome")}, {name}
-          </h1>
-          <p className="mt-0.5 text-[12.5px] font-semibold text-white/85">
-            {dateStr}
-          </p>
+          </div>
         </div>
       </div>
     </div>

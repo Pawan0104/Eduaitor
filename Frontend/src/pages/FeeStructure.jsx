@@ -23,6 +23,7 @@ const FeeStructure = () => {
   const [errors, setErrors] = useState({});
   // calculate amount for monthly wise drop down
   const [freqFilter, setFreqFilter] = useState("annually");
+  const [savingFreq, setSavingFreq] = useState(false);
 
   // for delete coinfirmation dialog state
   const [confirmId, setConfirmId] = useState(null); // which fee is pending deletion
@@ -63,8 +64,34 @@ const FeeStructure = () => {
         withCredentials: true,
       });
       setFeeData(data);
+      if (data?.frequency) setFreqFilter(data.frequency);
     } catch {
-      setFeeData({ fees: [] }); // graceful fallback — show empty state
+      setFeeData({ fees: [], frequency: "annually" });
+    }
+  };
+
+  const saveFrequency = async (nextFreq) => {
+    if (!selectedClass) return;
+    setFreqFilter(nextFreq);
+    setSavingFreq(true);
+    try {
+      const { data } = await axios.put(
+        `${API}/fee-structure/${selectedClass}/frequency`,
+        { frequency: nextFreq },
+        { withCredentials: true },
+      );
+      setFeeData((prev) =>
+        prev
+          ? { ...prev, frequency: data.frequency || nextFreq }
+          : { fees: [], frequency: data.frequency || nextFreq },
+      );
+      toast.success(
+        `Billing set to ${String(nextFreq).replace("-", " ")} — parents will see split installments`,
+      );
+    } catch (err) {
+      toast.error(err?.response?.data?.message || "Failed to save frequency");
+    } finally {
+      setSavingFreq(false);
     }
   };
 
@@ -274,22 +301,27 @@ const FeeStructure = () => {
           )}
         </div>
 
-        {/* Frequency selector — shown once a class is selected */}
+        {/* Frequency selector — saved to class fee structure (parents see installments) */}
         {selectedClass && (
           <div className="flex flex-col gap-1 mt-4 mb-3 ">
             <label className="text-[10px] font-bold tracking-widest uppercase ">
-              View As
+              Fee billing frequency
             </label>
             <select
               value={freqFilter}
-              onChange={(e) => setFreqFilter(e.target.value)}
+              disabled={savingFreq}
+              onChange={(e) => saveFrequency(e.target.value)}
               className="fs-select  rounded-lg px-3 py-2 text-sm  text-[rgb(var(--text))] bg-[rgb(var(--surface))] border cursor-pointer"
             >
-              <option value="annually">Annually</option>
-              <option value="half-yearly">Half Yearly</option>
-              <option value="quarterly">Quarterly</option>
-              <option value="monthly">Monthly</option>
+              <option value="annually">Annually (1 payment)</option>
+              <option value="half-yearly">Half Yearly (2 payments)</option>
+              <option value="quarterly">Quarterly (4 payments)</option>
+              <option value="monthly">Monthly (12 payments)</option>
             </select>
+            <p className="text-[11px] opacity-70">
+              Parents see this split automatically and can pay one or more periods.
+              {savingFreq ? " Saving…" : ""}
+            </p>
           </div>
         )}
 

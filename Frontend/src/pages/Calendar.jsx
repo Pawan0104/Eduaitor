@@ -188,6 +188,17 @@ export default function Calendar({ schoolId /* academicYearId */ }) {
     loadAll();
   }, [month, year]);
 
+  // Opening day popover must not jump scroll to top (mobile / .app-main)
+  useEffect(() => {
+    if (!popoverDay) return;
+    const main = document.querySelector(".app-main");
+    const y = main ? main.scrollTop : window.scrollY;
+    return () => {
+      if (main) main.scrollTop = y;
+      else window.scrollTo(0, y);
+    };
+  }, [popoverDay]);
+
   // ── Merged + filtered data ────────────────────────────────────────────────
 
   const allEvents = [
@@ -300,6 +311,7 @@ export default function Calendar({ schoolId /* academicYearId */ }) {
         </div>
         <div className="flex flex-wrap items-center gap-2">
           <button
+            type="button"
             onClick={loadAll}
             title="Refresh"
             className={`p-2.5 rounded-xl border border-gray-200  hover:shadow-sm transition ${loading ? "animate-spin" : ""}`}
@@ -307,6 +319,7 @@ export default function Calendar({ schoolId /* academicYearId */ }) {
             <FiRefreshCw size={15} />
           </button>
           <button
+            type="button"
             onClick={() => {
               setEditData(null);
               setPrefilledDate(null);
@@ -327,6 +340,7 @@ export default function Calendar({ schoolId /* academicYearId */ }) {
             <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 md:gap-10">
               <div className="flex items-center justify-between sm:justify-start gap-1.5 w-full sm:w-auto">
                 <button
+                  type="button"
                   onClick={() => changeMonth("prev")}
                   className="p-2 rounded-xl  transition"
                 >
@@ -336,12 +350,14 @@ export default function Calendar({ schoolId /* academicYearId */ }) {
                   {MONTHS[month]} {year}
                 </h2>
                 <button
+                  type="button"
                   onClick={() => changeMonth("next")}
                   className="p-2 rounded-xl  transition"
                 >
                   <FiChevronRight size={18} />
                 </button>
                 <button
+                  type="button"
                   onClick={goToday}
                   className="text-xs font-semibold px-2 py-1 rounded-lg bg-[rgb(var(--primary))]  transition"
                 >
@@ -388,6 +404,7 @@ export default function Calendar({ schoolId /* academicYearId */ }) {
             {/* Type filter pills */}
             <div className="flex flex-wrap gap-2 mt-4 pt-4 border-t border-gray-100">
               <button
+                type="button"
                 onClick={() => setActiveFilter("All")}
                 className={`text-xs font-semibold px-3 py-1.5 rounded-full border transition ${
                   activeFilter === "All"
@@ -409,6 +426,7 @@ export default function Calendar({ schoolId /* academicYearId */ }) {
                 return (
                   <button
                     key={t}
+                    type="button"
                     onClick={() => setActiveFilter(t)}
                     className={`text-xs font-semibold px-3 py-1.5 rounded-full border transition ${
                       active
@@ -462,6 +480,7 @@ export default function Calendar({ schoolId /* academicYearId */ }) {
                       ${isPopoverOpen ? "ring-2 ring-inset ring-bg[rgb(var(--surface))]" : ""}
                     `}
                     onClick={(e) => {
+                      e.preventDefault();
                       e.stopPropagation();
                       setPopoverDay(isPopoverOpen ? null : thisDate);
                       setPopoverRef(e.currentTarget);
@@ -1098,6 +1117,7 @@ function DayPopover({
         </div>
         <div className="flex gap-1.5">
           <button
+            type="button"
             onClick={onAdd}
             title="Add event on this day"
             className="w-7 h-7 bg-white/20 hover:bg-white/30 rounded-lg flex items-center justify-center  transition"
@@ -1105,6 +1125,7 @@ function DayPopover({
             <FiPlus size={14} />
           </button>
           <button
+            type="button"
             onClick={onClose}
             className="w-7 h-7 bg-white/20 hover:bg-white/30 rounded-lg flex items-center justify-center  transition"
           >
@@ -1119,6 +1140,7 @@ function DayPopover({
             <FiCalendar size={22} className=" mx-auto mb-2" />
             <p className="text-xs ">No events scheduled</p>
             <button
+              type="button"
               onClick={onAdd}
               className="mt-2 text-xs text-[rgb(var(--primary))] hover:underline font-medium"
             >

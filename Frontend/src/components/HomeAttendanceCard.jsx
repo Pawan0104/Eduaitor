@@ -121,6 +121,7 @@ export default function HomeAttendanceCard({ className = "" }) {
     percentage: 0,
   });
   const [loading, setLoading] = useState(true);
+  const [selectedDay, setSelectedDay] = useState(null);
 
   const role = user?.role;
   const loginAs = user?.loginAs;
@@ -438,7 +439,20 @@ export default function HomeAttendanceCard({ className = "" }) {
                     key={dateKey}
                     type="button"
                     disabled={isFuture}
-                    onClick={() => !isFuture && navigate(attPath)}
+                    onClick={(e) => {
+                      e.preventDefault();
+                      if (isFuture) return;
+                      setSelectedDay((prev) =>
+                        prev === day
+                          ? null
+                          : {
+                              day,
+                              kind,
+                              holidayTitle: holiday?.title || null,
+                              status: rawStatus || null,
+                            },
+                      );
+                    }}
                     title={
                       holiday
                         ? holiday.title
@@ -485,6 +499,32 @@ export default function HomeAttendanceCard({ className = "" }) {
                 </span>
               ))}
             </div>
+
+            {selectedDay && (
+              <div
+                className="mt-3 rounded-xl border px-3 py-2.5 text-center"
+                style={{
+                  borderColor: "rgb(var(--border))",
+                  background: "rgb(var(--bg))",
+                }}
+              >
+                <p
+                  className="text-[12px] font-extrabold"
+                  style={{ color: "rgb(var(--text))" }}
+                >
+                  {MONTHS[month - 1]} {selectedDay.day}
+                </p>
+                <p
+                  className="mt-0.5 text-[11px] font-semibold"
+                  style={{ color: "rgb(var(--text-muted))" }}
+                >
+                  {selectedDay.holidayTitle ||
+                    (selectedDay.kind
+                      ? STATUS[selectedDay.kind].label
+                      : t("home.noRecord", "No attendance marked"))}
+                </p>
+              </div>
+            )}
           </>
         )}
       </div>

@@ -57,7 +57,7 @@ export default function BrandMark({ user, compact = false }) {
           }`}
         />
         {schoolName && !compact && (
-          <div className="min-w-0 hidden md:block">
+          <div className="min-w-0">
             <h1 className="truncate text-sm font-bold text-[rgb(var(--text))] lg:text-base">
               {schoolName}
             </h1>

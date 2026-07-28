@@ -122,25 +122,53 @@ function SummaryCard({ summary }) {
 
 /* ─── Day detail popup / bottom sheet ─────────────────────── */
 function DayPopup({ day, year, month, activeTab, subjectRecords, classRecords, calendarEvents, subjects, onClose }) {
+  const dateKey = day
+    ? `${year}-${String(month).padStart(2, "0")}-${String(day).padStart(2, "0")}`
+    : "";
+  const dateLabel = day
+    ? new Date(year, month - 1, day).toLocaleDateString("en-IN", {
+        weekday: "long",
+        day: "numeric",
+        month: "long",
+        year: "numeric",
+      })
+    : "";
+
+  const daySubjectRecords = day
+    ? subjectRecords.filter((r) => toDateKey(r.date) === dateKey)
+    : [];
+  const dayClassRecord = day
+    ? classRecords.find((r) => toDateKey(r.date) === dateKey)
+    : null;
+  const dayEvents = day
+    ? calendarEvents.filter((e) => eventCoversDate(e, dateKey))
+    : [];
+
+  const hasAttendance =
+    activeTab === "subject" ? daySubjectRecords.length > 0 : !!dayClassRecord;
+  const hasEvents = dayEvents.length > 0;
+  const isEmpty = !hasAttendance && !hasEvents;
+
+  // Keep scroll position — opening a fixed sheet otherwise jumps the page to top on mobile
+  useEffect(() => {
+    if (!day) return undefined;
+    const main = document.querySelector(".app-main");
+    const y = main ? main.scrollTop : window.scrollY;
+    const prevOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    if (main) main.style.overflow = "hidden";
+    return () => {
+      document.body.style.overflow = prevOverflow;
+      if (main) {
+        main.style.overflow = "";
+        main.scrollTop = y;
+      } else {
+        window.scrollTo(0, y);
+      }
+    };
+  }, [day]);
+
   if (!day) return null;
-
-  const dateKey = `${year}-${String(month).padStart(2,"0")}-${String(day).padStart(2,"0")}`;
-  const dateLabel = new Date(year, month - 1, day).toLocaleDateString("en-IN", {
-    weekday: "long", day: "numeric", month: "long", year: "numeric",
-  });
-
-  // Subject-wise records for this day
-  const daySubjectRecords = subjectRecords.filter(r => toDateKey(r.date) === dateKey);
-
-  // Class attendance for this day
-  const dayClassRecord = classRecords.find(r => toDateKey(r.date) === dateKey);
-
-  // Calendar events for this day
-  const dayEvents = calendarEvents.filter(e => eventCoversDate(e, dateKey));
-
-  const hasAttendance = activeTab === "subject" ? daySubjectRecords.length > 0 : !!dayClassRecord;
-  const hasEvents     = dayEvents.length > 0;
-  const isEmpty       = !hasAttendance && !hasEvents;
 
   return (
     <>
@@ -183,6 +211,7 @@ function DayPopup({ day, year, month, activeTab, subjectRecords, classRecords, c
             </div>
           </div>
           <button
+            type="button"
             onClick={onClose}
             className="w-8 h-8 flex items-center justify-center rounded-full hover:bg-slate-100 text-[rgb(var(--text))] transition-colors shrink-0 ml-2"
           >
@@ -362,7 +391,12 @@ function CalendarGrid({ year, month, activeTab, subjectRecords, classRecords, ca
           return (
             <button
               key={dateKey}
-              onClick={() => !isFuture && onDayClick(day)}
+              type="button"
+              onClick={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                if (!isFuture) onDayClick(day);
+              }}
               disabled={isFuture}
               className={`
                 border-r border-b border-slate-100
@@ -616,6 +650,7 @@ export default function AttendanceParent() {
         {/* Back (mobile) */}
         {isMobile && (
           <button
+            type="button"
             onClick={() => navigate(-1)}
             className="flex items-center gap-2 px-3 py-1.5 mb-4 rounded-xl
               bg-[rgb(var(--surface))] shadow-sm border border-slate-100
@@ -658,6 +693,7 @@ export default function AttendanceParent() {
         {/* ── Month navigator ── */}
         <div className="flex items-center justify-between bg-[rgb(var(--surface))] rounded-xl border border-slate-200 px-3 py-2 mb-4">
           <button
+            type="button"
             onClick={prevMonth}
             className="w-8 h-8 flex items-center justify-center rounded-lg hover:bg-[rgb(var(--bg))] text-[rgb(var(--text))] transition-colors"
           >
@@ -667,6 +703,7 @@ export default function AttendanceParent() {
             <p className="text-sm font-bold text-[rgb(var(--text))]">{MONTHS[month - 1]} {year}</p>
           </div>
           <button
+            type="button"
             onClick={nextMonth}
             disabled={isCurrentMonth}
             className="w-8 h-8 flex items-center justify-center rounded-lg hover:bg-[rgb(var(--bg))] text-[rgb(var(--text))] transition-colors disabled:opacity-30 disabled:cursor-not-allowed"

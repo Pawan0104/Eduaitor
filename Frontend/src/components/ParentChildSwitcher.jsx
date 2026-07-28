@@ -13,6 +13,7 @@ import UserAvatar from "./UserAvatar";
 export default function ParentChildSwitcher({
   className = "",
   variant = "card", // "card" | "compact"
+  menuAlign = "right", // "left" | "right" — dropdown side for compact
 }) {
   const { user, switchChild, switchingChild } = useAuth();
   const { t } = useLanguage();
@@ -99,7 +100,9 @@ export default function ParentChildSwitcher({
               onClick={() => setOpen(false)}
             />
             <div
-              className="absolute right-0 z-50 mt-1.5 min-w-[15rem] max-w-[18rem] overflow-hidden rounded-2xl border shadow-lg"
+              className={`absolute z-50 mt-1.5 min-w-[15rem] max-w-[18rem] overflow-hidden rounded-2xl border shadow-lg ${
+                menuAlign === "left" ? "left-0" : "right-0"
+              }`}
               style={{
                 background: "rgb(var(--surface))",
                 borderColor: "rgb(var(--border))",

@@ -4,7 +4,7 @@ import { FaChevronDown, FaChevronUp, FaSearch, FaTimes } from "react-icons/fa";
 import { useAuth } from "../context/AuthContext";
 import { useLanguage } from "../context/LanguageContext";
 import UserAvatar from "./UserAvatar";
-import { ModuleGrid } from "./RoleMenuShell";
+import { ModuleGrid, SchoolHomeStrip } from "./RoleMenuShell";
 import { getMenuIconMeta } from "../utils/menuIcons";
 
 const FREQUENT_KEY = "menuFrequentClicks";
@@ -89,23 +89,26 @@ export function StudentGreetingHeader({ name }) {
   const greeting = dayPartGreeting(t);
 
   return (
-    <div className="student-home-header relative overflow-hidden rounded-[1.5rem] px-5 pb-14 pt-5">
-      <div className="pointer-events-none absolute -right-10 -top-12 h-40 w-40 rounded-full bg-white/20" />
-      <div className="pointer-events-none absolute -bottom-8 left-8 h-24 w-24 rounded-full bg-white/10" />
-      <div className="relative flex items-start justify-between gap-3">
-        <div className="min-w-0 flex-1 pt-1">
-          <h1 className="truncate text-[22px] font-extrabold leading-tight text-white">
-            {t("menu.hi", "Hi")}, {(name || "Student").toUpperCase()}
-          </h1>
-          <p className="mt-1 text-[14px] font-semibold text-white/90">{greeting}</p>
+    <div className="flex flex-col gap-2.5">
+      <SchoolHomeStrip />
+      <div className="student-home-header relative overflow-hidden rounded-[1.5rem] px-5 pb-14 pt-5">
+        <div className="pointer-events-none absolute -right-10 -top-12 h-40 w-40 rounded-full bg-white/20" />
+        <div className="pointer-events-none absolute -bottom-8 left-8 h-24 w-24 rounded-full bg-white/10" />
+        <div className="relative flex items-start justify-between gap-3">
+          <div className="min-w-0 flex-1 pt-1">
+            <h1 className="truncate text-[22px] font-extrabold leading-tight text-white">
+              {t("menu.hi", "Hi")}, {(name || "Student").toUpperCase()}
+            </h1>
+            <p className="mt-1 text-[14px] font-semibold text-white/90">{greeting}</p>
+          </div>
+          <UserAvatar
+            name={name}
+            photoUrl={user?.photo_url}
+            size="lg"
+            rounded="full"
+            className="ring-[3px] ring-white/60 shadow-lg"
+          />
         </div>
-        <UserAvatar
-          name={name}
-          photoUrl={user?.photo_url}
-          size="lg"
-          rounded="full"
-          className="ring-[3px] ring-white/60 shadow-lg"
-        />
       </div>
     </div>
   );

@@ -7,6 +7,11 @@ import Counter from "../models/receiptCounter.js";
 import School from "../models/school.js";
 import { createNotificationHelper } from "./notificationController.js";
 import Razorpay from "razorpay";
+import {
+  buildInstallments,
+  normalizeFeeFrequency,
+  resolveSelectedInstallments,
+} from "../utils/feeInstallments.js";
 
 /** Real Razorpay keys from dashboard. Missing/mock keys → development checkout. */
 const hasRealRazorpayKeys = (school) => {
@@ -41,18 +46,65 @@ export const getFeeStructures = async (req, res) => {
       return res.json({
         success: true,
         fees: [],
+        frequency: "annually",
       });
     }
 
     return res.json({
       success: true,
       fees: feeStructure.fees || [],
+      frequency: normalizeFeeFrequency(feeStructure.frequency),
+      _id: feeStructure._id,
     });
   } catch (err) {
     console.error(err);
     res.status(500).json({
       success: false,
       message: "Server error",
+    });
+  }
+};
+
+/** PUT /:classId/frequency — school sets billing frequency for the class */
+export const updateFeeFrequency = async (req, res) => {
+  try {
+    const schoolId = req.user?.school_id;
+    const { classId } = req.params;
+    const frequency = normalizeFeeFrequency(req.body?.frequency);
+
+    if (!schoolId || !classId) {
+      return res.status(400).json({
+        success: false,
+        message: "School ID and class ID are required",
+      });
+    }
+
+    const doc = await FeeStructure.findOneAndUpdate(
+      { class: classId, schoolId },
+      {
+        $set: { frequency },
+        $setOnInsert: { fees: [], schoolId, class: classId },
+      },
+      { new: true, upsert: true, runValidators: true },
+    );
+
+    // Reflect on students in this class so parent accounts pick it up
+    await Student.updateMany(
+      { schoolId, classId },
+      { $set: { feeFrequency: frequency } },
+    );
+
+    return res.json({
+      success: true,
+      message: `Fee frequency set to ${frequency}`,
+      frequency: normalizeFeeFrequency(doc.frequency),
+      fees: doc.fees || [],
+    });
+  } catch (err) {
+    console.error("updateFeeFrequency error:", err);
+    return res.status(500).json({
+      success: false,
+      message: err.message || "Server error",
     });
   }
 };
@@ -161,12 +213,15 @@ export const initiateRazorpayOrder = async (req, res) => {
       req.user?.loginAs === "parent" || req.user?.loginAs === "student"
         ? req.user.student_id
         : req.body.studentId;
-    const amount = Number(req.body.amount);
+    let amount = Number(req.body.amount);
+    const periodKeys = Array.isArray(req.body.periodKeys)
+      ? req.body.periodKeys
+      : [];
 
-    if (!studentId || !amount || amount <= 0 || !schoolId) {
+    if (!studentId || !schoolId) {
       return res.status(400).json({
         success: false,
-        message: "Student ID, a valid amount, and School ID are required",
+        message: "Student ID and School ID are required",
       });
     }
 
@@ -186,6 +241,30 @@ export const initiateRazorpayOrder = async (req, res) => {
       });
     }
 
+    let resolvedKeys = [];
+    if (periodKeys.length) {
+      const feeDetails = await buildStudentFeeResponse({ studentId, schoolId });
+      const resolved = resolveSelectedInstallments(
+        feeDetails?.installments,
+        periodKeys,
+      );
+      if (!resolved.ok) {
+        return res.status(400).json({
+          success: false,
+          message: resolved.message,
+        });
+      }
+      amount = resolved.amount;
+      resolvedKeys = resolved.periodKeys;
+    }
+
+    if (!amount || amount <= 0) {
+      return res.status(400).json({
+        success: false,
+        message: "A valid amount is required",
+      });
+    }
+
     // Development: no real Razorpay keys yet → mock checkout order
     if (!hasRealRazorpayKeys(school)) {
       const orderId = `order_local_${Date.now()}`;
@@ -199,6 +278,7 @@ export const initiateRazorpayOrder = async (req, res) => {
         key_id: "rzp_test_dev",
         studentId,
         amountRupees: amount,
+        periodKeys: resolvedKeys,
       });
     }
 
@@ -215,6 +295,7 @@ export const initiateRazorpayOrder = async (req, res) => {
       notes: {
         studentId: String(studentId),
         schoolId: String(schoolId),
+        periodKeys: resolvedKeys.join(","),
       },
     };
 
@@ -230,6 +311,7 @@ export const initiateRazorpayOrder = async (req, res) => {
       key_id: school.razorpayKeyId,
       studentId,
       amountRupees: amount,
+      periodKeys: resolvedKeys,
     });
   } catch (error) {
     console.error("Razorpay Order Initiation Error:", error);
@@ -252,6 +334,9 @@ export const verifyRazorpayPayment = async (req, res) => {
         ? req.user.student_id
         : req.body.studentId;
     const { orderId, paymentId, signature, amountPaid } = req.body;
+    const periodKeys = Array.isArray(req.body.periodKeys)
+      ? req.body.periodKeys
+      : [];
 
     if (
       !orderId ||
@@ -311,12 +396,34 @@ export const verifyRazorpayPayment = async (req, res) => {
       }
     }
 
+    let payAmount = Number(amountPaid);
+    let resolvedKeys = periodKeys;
+    let periodLabel = "";
+
+    if (periodKeys.length) {
+      const feeDetails = await buildStudentFeeResponse({ studentId, schoolId });
+      const resolved = resolveSelectedInstallments(
+        feeDetails?.installments,
+        periodKeys,
+      );
+      if (!resolved.ok) {
+        return res.status(400).json({
+          success: false,
+          message: resolved.message,
+        });
+      }
+      payAmount = resolved.amount;
+      resolvedKeys = resolved.periodKeys;
+      periodLabel = resolved.labels.join(", ");
+    }
+
     req.body.studentId = studentId;
     req.body.paymentMode = "Online";
+    req.body.periodKeys = resolvedKeys;
     req.body.remarks = isDevOrder
-      ? `Dev Gateway Payment - Order ID: ${orderId}, Payment ID: ${paymentId}`
-      : `Razorpay Payment - Order ID: ${orderId}, Payment ID: ${paymentId}`;
-    req.body.amountPaid = amountPaid;
+      ? `Dev Gateway Payment${periodLabel ? ` — ${periodLabel}` : ""} - Order ID: ${orderId}, Payment ID: ${paymentId}`
+      : `Razorpay Payment${periodLabel ? ` — ${periodLabel}` : ""} - Order ID: ${orderId}, Payment ID: ${paymentId}`;
+    req.body.amountPaid = payAmount;
     req.body.orderId = orderId;
     req.body.paymentId = paymentId;
     req.body.signature = signature;
@@ -335,22 +442,22 @@ export const verifyRazorpayPayment = async (req, res) => {
 // Renamed collectStudentFee to collectStudentFeeInternal for internal use
 const collectStudentFeeInternal = async (req, res) => {
   try {
-    const { studentId, amountPaid, paymentMode, remarks } = req.body;
+    const { studentId, paymentMode, remarks } = req.body;
+    let amountPaid = Number(req.body.amountPaid);
     const schoolId = req.user?.school_id;
     const utr = String(req.body.utr || "").trim();
     const transactionId = String(
       req.body.transactionId || req.body.paymentId || "",
     ).trim();
+    let periodKeys = Array.isArray(req.body.periodKeys)
+      ? req.body.periodKeys.map(String).filter(Boolean)
+      : [];
 
     if (!studentId || amountPaid === undefined || !paymentMode || !schoolId) {
       return res.status(400).json({
         message:
           "studentId, amountPaid, paymentMode, and schoolId are required",
       });
-    }
-    // 0. validate school
-    if (!schoolId) {
-      return res.status(400).json({ message: "School ID is required" });
     }
 
     if (paymentMode === "UPI" && !utr) {
@@ -372,37 +479,58 @@ const collectStudentFeeInternal = async (req, res) => {
       });
     }
 
-    // 1. Explicitly Convert to ObjectId 👈 CHANGE THIS
     const sId = new mongoose.Types.ObjectId(studentId);
     const schId = new mongoose.Types.ObjectId(schoolId);
 
-    // 2. Check student exists (Use the casted IDs)
     const student = await Student.findOne({ _id: sId, schoolId: schId });
     if (!student) {
       return res.status(404).json({ message: "Student not found" });
     }
 
-    // ... (Validation and Counter logic remains the same) ...
+    let periodRemark = "";
+    if (periodKeys.length) {
+      const feeDetails = await buildStudentFeeResponse({
+        studentId: sId,
+        schoolId: schId,
+      });
+      const resolved = resolveSelectedInstallments(
+        feeDetails?.installments,
+        periodKeys,
+      );
+      if (!resolved.ok) {
+        return res.status(400).json({
+          success: false,
+          message: resolved.message,
+        });
+      }
+      amountPaid = resolved.amount;
+      periodKeys = resolved.periodKeys;
+      periodRemark = resolved.labels.join(", ");
+    }
 
     const counterId = `receiptNo_${schoolId}`;
     const counter = await Counter.findOneAndUpdate(
       { _id: counterId },
       {
         $inc: { seq: 1 },
-        $setOnInsert: { schoolId: schId }, // Use casted ID
+        $setOnInsert: { schoolId: schId },
       },
       { returnDocument: "after", upsert: true, setDefaultsOnInsert: true },
     );
 
     const receiptId = `RCP-${counter.seq}`;
+    const finalRemarks =
+      remarks ||
+      (periodRemark ? `Fee payment — ${periodRemark}` : "") ||
+      "";
 
-    // 5. Create payment record WITH OBJECT IDs 👈 CHANGE THIS
     const newPayment = await Payment.create({
-      studentId: sId, // Use casted ID
-      schoolId: schId, // Use casted ID
+      studentId: sId,
+      schoolId: schId,
       amountPaid: Number(amountPaid),
       paymentMode,
-      remarks: remarks || "",
+      remarks: finalRemarks,
+      periodKeys,
       receiptNo: receiptId,
       paidDate: new Date(),
       utr: paymentMode === "UPI" ? utr : "",
@@ -415,7 +543,6 @@ const collectStudentFeeInternal = async (req, res) => {
       razorpaySignature: req.body.signature || null,
     });
 
-    // 6. Update student totals
     student.totalPaid = (Number(student.totalPaid) || 0) + Number(amountPaid);
     student.totalDue =
       Math.round(((Number(student.finalFee) || 0) - student.totalPaid) * 100) /
@@ -424,7 +551,9 @@ const collectStudentFeeInternal = async (req, res) => {
 
     await createNotificationHelper({
       title: `Fee Payment Received: ${amountPaid}`,
-      message: `fee collected from ${student.firstName} ${student.lastName} Amount: ${amountPaid}. Remaining Due: ${student.totalDue}`,
+      message: `fee collected from ${student.firstName} ${student.lastName} Amount: ${amountPaid}${
+        periodRemark ? ` (${periodRemark})` : ""
+      }. Remaining Due: ${student.totalDue}`,
       notificationType: "fee",
       targets: [{ type: "student", studentId: student._id }],
       schoolId,
@@ -1087,6 +1216,19 @@ const buildStudentFeeResponse = async ({ studentId, schoolId }) => {
     Number.isFinite(storedDue) ? storedDue : finalFee - totalPaid,
   );
 
+  const structureFrequency = normalizeFeeFrequency(feeStructure?.frequency);
+  const studentFrequency = student.feeFrequency
+    ? normalizeFeeFrequency(student.feeFrequency)
+    : null;
+  const feeFrequency = studentFrequency || structureFrequency;
+
+  const { installments, installmentCount, frequency } = buildInstallments({
+    finalFee,
+    frequency: feeFrequency,
+    payments,
+    totalPaid,
+  });
+
   return {
     success: true,
     student: {
@@ -1097,6 +1239,9 @@ const buildStudentFeeResponse = async ({ studentId, schoolId }) => {
       rollNo: student.rollNo || "",
     },
     feeStructure: breakdown,
+    feeFrequency: frequency,
+    installmentCount,
+    installments,
     finalFee,
     totalFee,
     totalFees: finalFee,

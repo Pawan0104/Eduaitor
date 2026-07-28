@@ -4,6 +4,7 @@ import {
   addFeeComponent,
   editFeeComponent,
   deleteFeeComponent,
+  updateFeeFrequency,
   collectStudentFee,
   AllStudentHistory,
   getAllDefaulter,
@@ -53,6 +54,7 @@ router.get("/defaulters", ...schoolOrStaffFees, getAllDefaulter);
 
 // Fee structure setup — school/staff with fees module only
 router.get("/:classId", ...schoolOrStaffFees, getFeeStructures);
+router.put("/:classId/frequency", ...schoolOrStaffFees, updateFeeFrequency);
 router.post("/:classId/fee", ...schoolOrStaffFees, addFeeComponent);
 router.put("/:classId/fee/:feeId", ...schoolOrStaffFees, editFeeComponent);
 router.delete("/:classId/fee/:feeId", ...schoolOrStaffFees, deleteFeeComponent);
