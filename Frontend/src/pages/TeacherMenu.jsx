@@ -23,7 +23,6 @@ import { toast } from "react-toastify";
 import { useAuth } from "../context/AuthContext";
 import axios from "axios";
 import BlogFeed from "../components/BlogFeed";
-import UpComingNotifications from "../components/UpComingNotifications";
 import { MdNotificationsActive } from "react-icons/md";
 import {
   GreetingHeader,
@@ -106,7 +105,8 @@ export default function TeacherMenu() {
   };
 
   const allMenu = [
-    { name: "Dashboard", icon: <FaTachometerAlt />, path: "/teacher/dashboard" },
+    // Dashboard disabled — welcome/menu hub covers the same actions
+    // { name: "Dashboard", icon: <FaTachometerAlt />, path: "/teacher/dashboard" },
     { name: "Notifications", icon: <MdNotificationsActive />, path: "/teacher/notification" },
     { name: "Students", icon: <FaUserGraduate />, path: "/teacher/students", module: "students" },
     {
@@ -176,7 +176,6 @@ export default function TeacherMenu() {
           setOpenItem={setOpenItem}
           isDark={isDark}
         />
-        <UpComingNotifications />
       </div>
       <BlogFeed />
       {showExit && (

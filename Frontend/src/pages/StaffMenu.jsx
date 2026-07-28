@@ -24,7 +24,6 @@ import { toast } from "react-toastify";
 import { useAuth } from "../context/AuthContext";
 import axios from "axios";
 import BlogFeed from "../components/BlogFeed";
-import UpComingNotifications from "../components/UpComingNotifications";
 import {
   GreetingHeader,
   ExitPopup,
@@ -84,7 +83,8 @@ export default function StaffMenu() {
 
   const menu = useMemo(() => {
     const all = [
-      { name: "Dashboard", icon: <FaTachometerAlt />, path: "/staff/dashboard" },
+      // Dashboard disabled — welcome/menu hub covers the same actions
+      // { name: "Dashboard", icon: <FaTachometerAlt />, path: "/staff/dashboard" },
       { name: "My ID Card", icon: <FaIdCard />, path: "/staff/id-card" },
       { name: "Notifications", icon: <FaBell />, path: "/staff/notification" },
       {
@@ -221,7 +221,6 @@ export default function StaffMenu() {
           setOpenItem={setOpenItem}
           isDark={isDark}
         />
-        <UpComingNotifications />
       </div>
       <BlogFeed />
       {showExit && (

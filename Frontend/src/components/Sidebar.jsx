@@ -23,6 +23,7 @@ import {
   FaHome,
   FaStore,
   FaHeadset,
+  FaThLarge,
 } from "react-icons/fa";
 import { FiUsers } from "react-icons/fi";
 import {
@@ -795,6 +796,31 @@ const Sidebar = ({ closeSidebar }) => {
       if (item.module === "staff") return true;
       return user?.permissions?.includes(item.module);
     });
+  }
+
+  // Dashboard disabled for now — welcome/menu hub already covers these actions
+  menu = menu.filter((item) => item.name !== "Dashboard");
+
+  const homePath =
+    role === "super_admin"
+      ? "/admin/menu"
+      : role === "school_admin"
+        ? "/school/menu"
+        : role === "teacher_admin"
+          ? "/teacher/menu"
+          : role === "staff_admin"
+            ? "/staff/menu"
+            : role === "student_admin"
+              ? user?.loginAs === "parent"
+                ? "/parent/menu"
+                : "/student/menu"
+              : null;
+
+  if (homePath && !menu.some((item) => item.path === homePath)) {
+    menu = [
+      { name: "Home", icon: <FaThLarge />, path: homePath },
+      ...menu,
+    ];
   }
 
   const toggleMenu = (name) => {

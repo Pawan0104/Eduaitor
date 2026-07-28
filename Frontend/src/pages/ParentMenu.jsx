@@ -21,7 +21,8 @@ import { toast } from "react-toastify";
 import { useAuth } from "../context/AuthContext";
 import axios from "axios";
 import BlogFeed from "../components/BlogFeed";
-import UpComingNotifications from "../components/UpComingNotifications";
+import HomeAttendanceCard from "../components/HomeAttendanceCard";
+import HomeFeeCard from "../components/HomeFeeCard";
 import {
   GreetingHeader,
   ExitPopup,
@@ -29,7 +30,7 @@ import {
   useMenuExitGuard,
 } from "../components/RoleMenuShell";
 import { clearSessionKeepPrefs } from "../utils/clearSessionKeepPrefs";
-import { applyTheme, getTheme } from "../utils/theme";
+import { applyTheme } from "../utils/theme";
 
 const COLOR_MAP = {
   Dashboard: { bg: "#FFF7ED", icon: "#F97316", dot: "#FED7AA" },
@@ -89,7 +90,8 @@ export default function ParentMenu() {
   };
 
   const menu = [
-    { name: "Dashboard", icon: <FaTachometerAlt />, path: "/parent/dashboard" },
+    // Dashboard disabled — welcome/menu hub covers the same actions
+    // { name: "Dashboard", icon: <FaTachometerAlt />, path: "/parent/dashboard" },
     { name: "My Child", icon: <FaUserGraduate />, path: "/parent/student" },
     { name: "Pay Fee", icon: <FaWallet />, path: "/parent/fees" },
     { name: "School Store", icon: <FaStore />, path: "/parent/store" },
@@ -123,7 +125,8 @@ export default function ParentMenu() {
           setOpenItem={setOpenItem}
           isDark={isDark}
         />
-        <UpComingNotifications />
+        <HomeAttendanceCard />
+        <HomeFeeCard />
       </div>
       <BlogFeed />
       {showExit && (

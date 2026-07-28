@@ -1,11 +1,12 @@
 import { createContext, useContext, useEffect, useState } from "react";
-import api, { clearAuthToken } from "../config/axios";
+import api, { clearAuthToken, setAuthToken } from "../config/axios";
 
 const AuthContext = createContext();
 
 export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [switchingChild, setSwitchingChild] = useState(false);
 
   const fetchUser = async () => {
     try {
@@ -19,12 +20,41 @@ export const AuthProvider = ({ children }) => {
     }
   };
 
+  const switchChild = async (studentId) => {
+    if (!studentId) return false;
+    setSwitchingChild(true);
+    try {
+      const res = await api.post("/auth/parent/switch-child", { studentId });
+      if (res.data?.token) setAuthToken(res.data.token);
+      if (res.data?.data) {
+        setUser(res.data.data);
+      } else {
+        await fetchUser();
+      }
+      return true;
+    } catch (err) {
+      console.error("switchChild failed:", err);
+      return false;
+    } finally {
+      setSwitchingChild(false);
+    }
+  };
+
   useEffect(() => {
     fetchUser();
   }, []);
 
   return (
-    <AuthContext.Provider value={{ user, setUser, loading, fetchUser }}>
+    <AuthContext.Provider
+      value={{
+        user,
+        setUser,
+        loading,
+        fetchUser,
+        switchChild,
+        switchingChild,
+      }}
+    >
       {children}
     </AuthContext.Provider>
   );

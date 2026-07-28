@@ -4,7 +4,6 @@ import ProtectedRoute from "./components/ProtectedRoute";
 import AdminLayout from "./components/AdminLayout";
 
 import SuperAdminMenu from "./pages/SuperAdminMenu";
-import Dashboard from "./pages/Dashboard";
 import PlatformAnalytics from "./pages/PlatformAnalytics";
 import AccessControl from "./pages/AccessControl";
 import RoleManagement from "./pages/RoleManagement";
@@ -18,7 +17,6 @@ import FeeReceipt from "./pages/FeeReceipt";
 import FinancialReport from "./pages/FinancialReport";
 
 import SchoolMenu from "./pages/SchoolMenu";
-import SchoolDashboard from "./pages/SchoolDashboard";
 import Students from "./pages/Students";
 import StudentManagement from "./pages/StudentManagement";
 import StudentView from "./components/StudentView";
@@ -72,7 +70,6 @@ import StaffAttendance from "./pages/StaffAttendance";
 import StaffMenu from "./pages/StaffMenu";
 
 import TeacherMenu from "./pages/TeacherMenu";
-import TeacherDashboard from "./pages/TeacherDashboard";
 import TeacherStudents from "./pages/TeacherStudents";
 import Assignment from "./pages/Assignment";
 import Attendance from "./pages/Attendance";
@@ -84,7 +81,6 @@ import TeacherExam from "./pages/TeacherExam";
 
 import StudentMenu from "./pages/StudentMenu";
 import ParentMenu from "./pages/ParentMenu";
-import ParentDashboard from "./pages/ParentDashboard";
 import ParentAssignment from "./pages/ParentAssignment";
 import ParentAssignmentResult from "./pages/ParentAssignmentResult";
 import TeacherCalendar from "./pages/TeacherCalendar";
@@ -109,7 +105,6 @@ import AttendanceWithTabs from "./pages/AttendanceWithTabs";
 import StudentAttendanceDetail from "./pages/StudentAttendanceDetail";
 import StaffManagement from "./pages/StaffManagement";
 import SchoolStaffRoles from "./pages/SchoolStaffRoles";
-import StaffDashboard from "./pages/StaffDashboard";
 import ParentGatepass from "./pages/ParentGatepass";
 import TeacherGatepass from "./pages/TeacherGatepass";
 import MessagesPage from "./pages/messagesingal/MessagePage";
@@ -117,7 +112,6 @@ import NewMessagePage from "./pages/messagesingal/NewMessagePage";
 import ChatPage from "./pages/messagesingal/ChatPage";
 import HelpSupport from "./pages/HelpSupport";
 import BulkStudentUpload from "./pages/BulkStudentUpload";
-import StudentDashboard from "./pages/StudentDashboard";
 import LeadManagement from "./pages/LeadManagement";
 
 // message files -
@@ -152,7 +146,7 @@ const App = () => {
           }
         >
           <Route path="menu" element={<SuperAdminMenu />} />
-          <Route path="dashboard" element={<Dashboard />} />
+          <Route path="dashboard" element={<Navigate to="/admin/menu" replace />} />
           <Route path="platform-analytics" element={<PlatformAnalytics />} />
           <Route path="access-control" element={<AccessControl />} />
           <Route path="roles" element={<RoleManagement />} />
@@ -166,7 +160,7 @@ const App = () => {
           <Route path="messages" element={<MessagesPage />} />
           <Route path="messages/:threadId" element={<ChatPage />} />
 
-          <Route path="*" element={<Navigate to="/admin/dashboard" />} />
+          <Route path="*" element={<Navigate to="/admin/menu" />} />
         </Route>
 
         <Route
@@ -178,7 +172,7 @@ const App = () => {
           }
         >
           <Route path="menu" element={<SchoolMenu />} />
-          <Route path="dashboard" element={<SchoolDashboard />} />
+          <Route path="dashboard" element={<Navigate to="/school/menu" replace />} />
           <Route path="notification" element={<NotificationPage />} />
           <Route path="students" element={<Students />} />
           <Route path="leads" element={<LeadManagement />} />
@@ -247,7 +241,7 @@ const App = () => {
           <Route path="messages/:threadId" element={<ChatPage />} />
           <Route path="help" element={<HelpSupport />} />
           <Route path="/school/gatepass" element={<TeacherGatepass />}  />
-          <Route path="*" element={<Navigate to="/school/dashboard" />} />
+          <Route path="*" element={<Navigate to="/school/menu" />} />
         </Route>
 
         <Route
@@ -259,7 +253,7 @@ const App = () => {
           }
         >
           <Route path="menu" element={<TeacherMenu />} />
-          <Route path="dashboard" element={<TeacherDashboard />} />
+          <Route path="dashboard" element={<Navigate to="/teacher/menu" replace />} />
           <Route path="notification" element={<NotificationPage />} />
           <Route path="students" element={<TeacherStudents />} />
           <Route path="student-view/:id" element={<StudentView />} />
@@ -300,7 +294,7 @@ const App = () => {
           <Route path="messages/:threadId" element={<ChatPage />} />
           <Route path="help" element={<HelpSupport />} />
 
-          <Route path="*" element={<Navigate to="/teacher/dashboard" />} />
+          <Route path="*" element={<Navigate to="/teacher/menu" />} />
         </Route>
 
         {/* ── PARENT ROUTES (loginAs === "parent") ── */}
@@ -316,7 +310,7 @@ const App = () => {
           }
         >
           <Route path="menu" element={<ParentMenu />} />
-          <Route path="dashboard" element={<ParentDashboard />} />
+          <Route path="dashboard" element={<Navigate to="/parent/menu" replace />} />
           <Route path="notification" element={<NotificationPage />} />
           <Route path="student" element={<MyChild />} /> {/* child profile */}
           <Route path="fees" element={<ParentFee />} />
@@ -340,7 +334,7 @@ const App = () => {
           <Route path="messages/new" element={<NewMessagePage />} />
           <Route path="messages/:threadId" element={<ChatPage />} />
           <Route path="help" element={<HelpSupport />} />
-          <Route path="*" element={<Navigate to="/parent/dashboard" />} />
+          <Route path="*" element={<Navigate to="/parent/menu" />} />
         </Route>
 
         {/* ── STUDENT ROUTES (loginAs === "student") ── */}
@@ -357,7 +351,7 @@ const App = () => {
         >
           <Route path="menu" element={<StudentMenu />} />
           {/* reuse or make StudentMenu */}
-          <Route path="dashboard" element={<StudentDashboard />} />
+          <Route path="dashboard" element={<Navigate to="/student/menu" replace />} />
           {/* reuse or make StudentDashboard */}
           <Route path="notification" element={<NotificationPage />} />
           <Route path="attendance" element={<AttendanceParent />} />
@@ -385,7 +379,7 @@ const App = () => {
           <Route path="messages/new" element={<NewMessagePage />} />
           <Route path="messages/:threadId" element={<ChatPage />} />
           <Route path="help" element={<HelpSupport />} />
-          <Route path="*" element={<Navigate to="/student/dashboard" />} />
+          <Route path="*" element={<Navigate to="/student/menu" />} />
         </Route>
 
         <Route
@@ -398,7 +392,7 @@ const App = () => {
         >
           {/* always accessible */}
           <Route path="menu" element={<StaffMenu />} />
-          <Route path="dashboard" element={<StaffDashboard />} />
+          <Route path="dashboard" element={<Navigate to="/staff/menu" replace />} />
           <Route path="notification" element={<NotificationPage />} />
           <Route path="notice" element={<Notice />} />
           <Route path="event" element={<Event />} />
@@ -448,7 +442,7 @@ const App = () => {
           <Route path="messages/new" element={<NewMessagePage />} />
           <Route path="messages/:threadId" element={<ChatPage />} />
 
-          <Route path="*" element={<Navigate to="/staff/dashboard" />} />
+          <Route path="*" element={<Navigate to="/staff/menu" />} />
         </Route>
 
         {/* Default redirect */}

@@ -2,6 +2,7 @@ import { Navigate, useLocation } from "react-router-dom";
 import { useAuth } from "../context/AuthContext.jsx";
 import { toast } from "react-toastify";
 import { useEffect, useRef } from "react";
+import { getMenuPath } from "./AdminLayout";
 
 const ProtectedRoute = ({ children, allowedRoles, requiredLoginAs }) => {
   const { user, loading } = useAuth();
@@ -32,31 +33,18 @@ const ProtectedRoute = ({ children, allowedRoles, requiredLoginAs }) => {
     return <Navigate to="/admin/login" state={{ from: location }} replace />;
 
   if (allowedRoles && !allowedRoles.includes(user.role)) {
-    if (user.role === "super_admin") {
-      return <Navigate to="/admin/dashboard" replace />;
-    }
-    if (user.role === "school_admin") {
-      return <Navigate to="/school/dashboard" replace />;
-    }
-    if (user.role === "teacher_admin") {
-      return <Navigate to="/teacher/dashboard" replace />;
-    }
-    if (user.role === "student_admin") {
-      const dest =
-        user.loginAs === "student" ? "/student/dashboard" : "/parent/dashboard";
-      return <Navigate to={dest} replace />;
-    }
-    if (user.role === "staff_admin")
-      return <Navigate to="/staff/dashboard" replace />;
+    return (
+      <Navigate to={getMenuPath(user.role, user.loginAs)} replace />
+    );
   }
 
   // ── loginAs guard — prevent parent accessing /student/* and vice versa
   if (requiredLoginAs && user.loginAs !== requiredLoginAs) {
-    const dest =
-      user.loginAs === "student" ? "/student/dashboard" : "/parent/dashboard";
-    return <Navigate to={dest} replace />;
+    return (
+      <Navigate to={getMenuPath(user.role, user.loginAs)} replace />
+    );
   }
-  
+
   return children;
 };
 

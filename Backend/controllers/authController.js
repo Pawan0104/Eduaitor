@@ -10,6 +10,11 @@ import {
   ensureDefaultSchoolModules,
 } from "../utils/schoolModules.js";
 import SchoolStaffRole from "../models/schoolStaffRole.js";
+import {
+  findChildrenByParentUsername,
+  normalizeParentUsername,
+  toChildSummary,
+} from "../utils/parentChildren.js";
 
 const generateToken = (payload) => {
   return jwt.sign(payload, process.env.JWT_SECRET, {
@@ -22,6 +27,46 @@ const cookieOptions = {
   secure: process.env.NODE_ENV === "production",
   sameSite: process.env.NODE_ENV === "production" ? "none" : "lax",
 };
+
+function buildParentSession(activeStudent, children, school, subscribed_modules) {
+  const parentUsername = normalizeParentUsername(
+    activeStudent.parentCredentials?.username,
+  );
+  const childSummaries = children.map(toChildSummary).filter(Boolean);
+  const name = `${activeStudent.firstName || ""} ${activeStudent.lastName || ""}`.trim();
+
+  const tokenPayload = {
+    role: "student_admin",
+    loginAs: "parent",
+    username: parentUsername,
+    parent_username: parentUsername,
+    school_id: activeStudent.schoolId,
+    student_id: activeStudent._id,
+    name,
+    _id: activeStudent._id,
+  };
+
+  return {
+    token: generateToken(tokenPayload),
+    data: {
+      role: "student_admin",
+      loginAs: "parent",
+      _id: activeStudent._id,
+      student_id: activeStudent._id,
+      name,
+      username: parentUsername,
+      parent_username: parentUsername,
+      school_id: activeStudent.schoolId,
+      school_name: school?.school_name || null,
+      school_logo: school?.school_logo || null,
+      firstTimeLogin: activeStudent.parentCredentials?.firstTimeLogin ?? false,
+      subscribed_modules,
+      photo_url: activeStudent.documents?.studentPhoto?.url || null,
+      children: childSummaries,
+      activeChildId: activeStudent._id,
+    },
+  };
+}
 
 export const loginUser = async (req, res) => {
   try {
@@ -118,10 +163,6 @@ export const loginUser = async (req, res) => {
       "studentCredentials.username": loginUsername,
     });
 
-    const studentByParentCreds = await Student.findOne({
-      "parentCredentials.username": loginUsername,
-    });
-
     // ── STUDENT LOGIN ──
     if (studentByStudentCreds) {
       const passwordMatch = await bcrypt.compare(
@@ -169,51 +210,58 @@ export const loginUser = async (req, res) => {
       }
     }
 
-    // ── PARENT LOGIN ──
-    if (studentByParentCreds) {
-      const passwordMatch = await bcrypt.compare(
-        password,
-        studentByParentCreds.parentCredentials.password,
+    // ── PARENT LOGIN (supports multiple children sharing father mobile) ──
+    const parentUsername = normalizeParentUsername(loginUsername);
+    const parentCandidates = parentUsername
+      ? await Student.find({
+          "parentCredentials.username": parentUsername,
+        })
+          .populate("classId", "name className")
+          .populate("sectionId", "name sectionName")
+          .select(
+            "firstName lastName rollNo studentId classId sectionId schoolId documents.studentPhoto parentCredentials",
+          )
+      : [];
+
+    let matchedParentStudent = null;
+    for (const candidate of parentCandidates) {
+      const hash = candidate.parentCredentials?.password;
+      if (!hash) continue;
+      if (await bcrypt.compare(password, hash)) {
+        matchedParentStudent = candidate;
+        break;
+      }
+    }
+
+    if (matchedParentStudent) {
+      const children = await findChildrenByParentUsername(
+        parentUsername,
+        matchedParentStudent.schoolId,
+      );
+      // Prefer matched student as active; fall back to first sibling
+      const active =
+        children.find(
+          (c) => String(c._id) === String(matchedParentStudent._id),
+        ) || children[0] || matchedParentStudent;
+
+      const school = await School.findById(active.schoolId).select(
+        "subscribed_modules school_name school_logo",
+      );
+      const subscribed_modules = school?.subscribed_modules || [];
+      const session = buildParentSession(
+        active,
+        children.length ? children : [active],
+        school,
+        subscribed_modules,
       );
 
-      if (passwordMatch) {
-        const school = await School.findById(
-          studentByParentCreds.schoolId,
-        ).select("subscribed_modules school_name school_logo");
-        const subscribed_modules = school?.subscribed_modules || [];
-
-        const token = generateToken({
-          role: "student_admin",
-          loginAs: "parent",
-          username: studentByParentCreds.parentCredentials.username,
-          school_id: studentByParentCreds.schoolId,
-          student_id: studentByParentCreds._id,
-          name: `${studentByParentCreds.firstName} ${studentByParentCreds.lastName}`,
-          _id: studentByParentCreds._id,
-        });
-
-        res.cookie("token", token, cookieOptions);
-        return res.json({
-          success: true,
-          token,
-          message: "Parent login successful",
-          data: {
-            role: "student_admin",
-            loginAs: "parent",
-            student_id: studentByParentCreds._id,
-            name: `${studentByParentCreds.firstName} ${studentByParentCreds.lastName}`,
-            username: studentByParentCreds.parentCredentials.username,
-            school_id: studentByParentCreds.schoolId,
-            school_name: school?.school_name || null,
-            school_logo: school?.school_logo || null,
-            firstTimeLogin:
-              studentByParentCreds.parentCredentials.firstTimeLogin,
-            subscribed_modules,
-            photo_url:
-              studentByParentCreds.documents?.studentPhoto?.url || null,
-          },
-        });
-      }
+      res.cookie("token", session.token, cookieOptions);
+      return res.json({
+        success: true,
+        token: session.token,
+        message: "Parent login successful",
+        data: session.data,
+      });
     }
 
     /* ------------------------ staff admin login ------------------- */
@@ -325,30 +373,127 @@ export const loginUser = async (req, res) => {
 };
 
 export const changePassWord = async (req, res) => {
-  const { newPassword } = req.body;
-  const hashed = await bcrypt.hash(newPassword, 10);
+  try {
+    const { newPassword } = req.body;
+    if (!newPassword || String(newPassword).length < 4) {
+      return res.status(400).json({ message: "Password too short" });
+    }
+    const hashed = await bcrypt.hash(newPassword, 10);
+    const loginAs = req.user.loginAs;
+    const studentId = req.user.student_id || req.user._id;
 
-  const loginAs = req.user.loginAs; // "student" or "parent" from JWT
+    if (loginAs === "student") {
+      await Student.findByIdAndUpdate(studentId, {
+        "studentCredentials.password": hashed,
+        "studentCredentials.temp_password": newPassword,
+        "studentCredentials.firstTimeLogin": false,
+      });
+    } else if (loginAs === "parent") {
+      const parentUsername = normalizeParentUsername(
+        req.user.parent_username || req.user.username,
+      );
+      const schoolId = req.user.school_id;
+      if (parentUsername && schoolId) {
+        await Student.updateMany(
+          {
+            schoolId,
+            "parentCredentials.username": parentUsername,
+          },
+          {
+            $set: {
+              "parentCredentials.password": hashed,
+              "parentCredentials.temp_password": newPassword,
+              "parentCredentials.firstTimeLogin": false,
+            },
+          },
+        );
+      } else {
+        await Student.findByIdAndUpdate(studentId, {
+          "parentCredentials.password": hashed,
+          "parentCredentials.temp_password": newPassword,
+          "parentCredentials.firstTimeLogin": false,
+        });
+      }
+    } else {
+      await Student.findByIdAndUpdate(studentId, {
+        password: hashed,
+        firstTimeLogin: false,
+      });
+    }
 
-  if (loginAs === "student") {
-    await Student.findByIdAndUpdate(req.user._id, {
-      "studentCredentials.password": hashed,
-      "studentCredentials.temp_password": newPassword,
-      "studentCredentials.firstTimeLogin": false,
-    });
-  } else if (loginAs === "parent") {
-    await Student.findByIdAndUpdate(req.user._id, {
-      "parentCredentials.password": hashed,
-      "parentCredentials.temp_password": newPassword,
-      "parentCredentials.firstTimeLogin": false,
-    });
-  } else {
-    // staff or other roles — keep existing logic
-    await Student.findByIdAndUpdate(req.user._id, {
-      password: hashed,
-      firstTimeLogin: false,
-    });
+    res.json({ message: "Password updated successfully" });
+  } catch (err) {
+    console.error("changePassWord error:", err);
+    res.status(500).json({ message: "Server error" });
   }
+};
 
-  res.json({ message: "Password updated successfully" });
+/** GET /auth/parent/children — list siblings for logged-in parent */
+export const getParentChildren = async (req, res) => {
+  try {
+    if (req.user?.role !== "student_admin" || req.user?.loginAs !== "parent") {
+      return res.status(403).json({ success: false, message: "Parents only" });
+    }
+    const parentUsername = normalizeParentUsername(
+      req.user.parent_username || req.user.username,
+    );
+    const children = await findChildrenByParentUsername(
+      parentUsername,
+      req.user.school_id,
+    );
+    return res.json({
+      success: true,
+      activeChildId: req.user.student_id,
+      children: children.map(toChildSummary),
+    });
+  } catch (err) {
+    console.error("getParentChildren error:", err);
+    return res.status(500).json({ success: false, message: "Server error" });
+  }
+};
+
+/** POST /auth/parent/switch-child { studentId } */
+export const switchParentChild = async (req, res) => {
+  try {
+    if (req.user?.role !== "student_admin" || req.user?.loginAs !== "parent") {
+      return res.status(403).json({ success: false, message: "Parents only" });
+    }
+
+    const studentId = req.body?.studentId;
+    if (!studentId || !mongoose.Types.ObjectId.isValid(studentId)) {
+      return res.status(400).json({ success: false, message: "Invalid studentId" });
+    }
+
+    const parentUsername = normalizeParentUsername(
+      req.user.parent_username || req.user.username,
+    );
+    const children = await findChildrenByParentUsername(
+      parentUsername,
+      req.user.school_id,
+    );
+    const active = children.find((c) => String(c._id) === String(studentId));
+    if (!active) {
+      return res.status(403).json({
+        success: false,
+        message: "That student is not linked to this parent account",
+      });
+    }
+
+    const school = await School.findById(active.schoolId).select(
+      "subscribed_modules school_name school_logo",
+    );
+    const subscribed_modules = school?.subscribed_modules || [];
+    const session = buildParentSession(active, children, school, subscribed_modules);
+
+    res.cookie("token", session.token, cookieOptions);
+    return res.json({
+      success: true,
+      token: session.token,
+      message: "Active child updated",
+      data: session.data,
+    });
+  } catch (err) {
+    console.error("switchParentChild error:", err);
+    return res.status(500).json({ success: false, message: "Server error" });
+  }
 };

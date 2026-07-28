@@ -151,9 +151,10 @@ studentSchema.index(
   { schoolId: 1, "studentCredentials.username": 1 },
   { unique: true, sparse: true },
 );
+// Non-unique: siblings may share the same father mobile / parent login
 studentSchema.index(
   { schoolId: 1, "parentCredentials.username": 1 },
-  { unique: true, sparse: true },
+  { sparse: true },
 );
 studentSchema.index(
   { schoolId: 1, convertedFromLeadId: 1 },

@@ -15,6 +15,10 @@ import {
   resolveSubscribedModules,
   ensureDefaultSchoolModules,
 } from "./utils/schoolModules.js";
+import {
+  findChildrenByParentUsername,
+  toChildSummary,
+} from "./utils/parentChildren.js";
 
 
 const __filename = fileURLToPath(import.meta.url);
@@ -314,9 +318,12 @@ app.get("/api/auth/me", authMiddleware, async (req, res) => {
           .json({ success: false, message: "Invalid session." });
       }
 
-      const studentDoc = await Student.findById(req.user.student_id).select(
-        "studentCredentials parentCredentials schoolId firstName lastName documents.studentPhoto",
-      );
+      const studentDoc = await Student.findById(req.user.student_id)
+        .populate("classId", "name className")
+        .populate("sectionId", "name sectionName")
+        .select(
+          "studentCredentials parentCredentials schoolId firstName lastName rollNo studentId classId sectionId documents.studentPhoto",
+        );
 
       if (!studentDoc) {
         return res
@@ -329,22 +336,45 @@ app.get("/api/auth/me", authMiddleware, async (req, res) => {
           ? studentDoc.studentCredentials
           : studentDoc.parentCredentials;
 
+      let children;
+      let activeChildId;
+      let parent_username;
+      if (loginAs === "parent") {
+        parent_username =
+          req.user.parent_username ||
+          req.user.username ||
+          studentDoc.parentCredentials?.username;
+        const siblingDocs = await findChildrenByParentUsername(
+          parent_username,
+          req.user.school_id,
+        );
+        children = siblingDocs.map(toChildSummary);
+        activeChildId = req.user.student_id;
+      }
+
       // school is already fetched above (from req.user.school_id)
       return res.json({
         success: true,
         user: {
           username: req.user.username,
+          parent_username: parent_username || undefined,
           role: req.user.role,
           loginAs,
           school_id: req.user.school_id,
           student_id: req.user.student_id,
-          name: req.user.name,
+          name:
+            loginAs === "parent"
+              ? `${studentDoc.firstName || ""} ${studentDoc.lastName || ""}`.trim()
+              : req.user.name,
           _id: req.user._id,
           firstTimeLogin: creds?.firstTimeLogin ?? false,
           subscribed_modules,
           school_name: school?.school_name || school?.name,
           school_logo: school?.school_logo,
           photo_url: studentDoc.documents?.studentPhoto?.url || null,
+          ...(loginAs === "parent"
+            ? { children, activeChildId }
+            : {}),
         },
       });
     }

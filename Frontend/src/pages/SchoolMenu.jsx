@@ -29,7 +29,6 @@ import { useAuth } from "../context/AuthContext";
 import { useLanguage } from "../context/LanguageContext";
 import axios from "axios";
 import BlogFeed from "../components/BlogFeed";
-import UpComingNotifications from "../components/UpComingNotifications";
 import { ModuleGrid, useMenuExitGuard } from "../components/RoleMenuShell";
 import { clearSessionKeepPrefs } from "../utils/clearSessionKeepPrefs";
 import { applyTheme, getTheme } from "../utils/theme";
@@ -404,11 +403,12 @@ export default function SchoolMenu() {
   const greetingLoginAs = user?.loginAs;
 
   const menu = [
-    {
-      name: "Dashboard",
-      icon: <FaTachometerAlt />,
-      path: "/school/dashboard",
-    },
+    // Dashboard disabled — welcome/menu hub covers the same actions
+    // {
+    //   name: "Dashboard",
+    //   icon: <FaTachometerAlt />,
+    //   path: "/school/dashboard",
+    // },
     {
       name: "Students",
       icon: <FaUserGraduate />,
@@ -573,7 +573,6 @@ export default function SchoolMenu() {
           setOpenItem={setOpenItem}
           isDark={isDark}
         />
-        <UpComingNotifications />
       </div>
 
       <BlogFeed />

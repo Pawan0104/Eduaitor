@@ -21,7 +21,8 @@ import { toast } from "react-toastify";
 import { useAuth } from "../context/AuthContext";
 import axios from "axios";
 import BlogFeed from "../components/BlogFeed";
-import UpComingNotifications from "../components/UpComingNotifications";
+import UrgentActions from "../components/UrgentActions";
+import HomeAttendanceCard from "../components/HomeAttendanceCard";
 import { ExitPopup, useMenuExitGuard } from "../components/RoleMenuShell";
 import StudentHomeHub, {
   StudentGreetingHeader,
@@ -85,7 +86,8 @@ export default function StudentMenu() {
   };
 
   const menu = [
-    { name: "Dashboard", icon: <FaTachometerAlt />, path: "/student/dashboard" },
+    // Dashboard disabled — welcome/menu hub covers the same actions
+    // { name: "Dashboard", icon: <FaTachometerAlt />, path: "/student/dashboard" },
     { name: "Attendance", icon: <FaClipboardCheck />, path: "/student/attendance" },
     { name: "Timetable", icon: <FaClock />, path: "/student/timetable" },
     {
@@ -127,7 +129,8 @@ export default function StudentMenu() {
           setOpenItem={setOpenItem}
           isDark={isDark}
         />
-        <UpComingNotifications />
+        <UrgentActions />
+        <HomeAttendanceCard />
       </div>
       <BlogFeed />
       {showExit && (

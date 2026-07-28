@@ -14,22 +14,8 @@ import LanguageSwitcher from "./LanguageSwitcher";
 import api, { setAuthToken } from "../config/axios";
 import { getMenuPath } from "./AdminLayout";
 
-function homePathForRole(role, loginAs, mobile) {
-  if (mobile) return getMenuPath(role, loginAs);
-  switch (role) {
-    case "super_admin":
-      return "/admin/dashboard";
-    case "school_admin":
-      return "/school/dashboard";
-    case "teacher_admin":
-      return "/teacher/dashboard";
-    case "staff_admin":
-      return "/staff/dashboard";
-    case "student_admin":
-      return loginAs === "parent" ? "/parent/dashboard" : "/student/dashboard";
-    default:
-      return "/admin/login";
-  }
+function homePathForRole(role, loginAs) {
+  return getMenuPath(role, loginAs) || "/admin/login";
 }
 
 export default function Login() {
@@ -57,8 +43,6 @@ export default function Login() {
   const handleChange = (e) => {
     setForm({ ...form, [e.target.name]: e.target.value });
   };
-
-  const isMobile = window.innerWidth < 1024;
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -101,7 +85,7 @@ export default function Login() {
           ? intended
           : null;
 
-      const dest = safeIntended || homePathForRole(role, loginAs, isMobile);
+      const dest = safeIntended || homePathForRole(role, loginAs);
       navigate(dest, { replace: true });
       toast.success(t("login.success"));
     } catch (error) {

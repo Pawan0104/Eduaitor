@@ -11,6 +11,7 @@ import { MenuStylePicker } from "./RoleMenuShell";
 import DesignSkinPicker from "./DesignSkinPicker";
 import UserAvatar from "./UserAvatar";
 import BrandMark from "./BrandMark";
+import ParentChildSwitcher from "./ParentChildSwitcher";
 import { clearSessionKeepPrefs } from "../utils/clearSessionKeepPrefs";
 import { applyTheme, getTheme } from "../utils/theme";
 
@@ -198,7 +199,7 @@ const Topbar = ({ menuPath = "/" }) => {
     <header className="app-topbar box-border sticky top-0 z-30 flex items-center justify-between border-b border-[rgb(var(--border))] bg-[rgb(var(--surface))] px-2.5 text-[rgb(var(--text))] sm:px-5">
       {/* LEFT */}
       <div className="flex min-w-0 items-center gap-1.5 sm:gap-3">
-        {/* Mobile: back (when nested) + Menu hub — desktop uses permanent sidebar */}
+        {/* Mobile: back (when nested). Home is always available (incl. desktop / fullscreen). */}
         {canGoBack && (
           <button
             type="button"
@@ -215,32 +216,38 @@ const Topbar = ({ menuPath = "/" }) => {
           <button
             type="button"
             onClick={() => navigate(menuPath)}
-            className={`lg:hidden flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl
+            className={`flex h-10 shrink-0 items-center justify-center gap-2 rounded-2xl
               border transition active:scale-95
+              ${onMenuHub ? "w-10 px-0" : "w-10 px-0 lg:w-auto lg:px-3"}
               ${
                 onMenuHub
                   ? "border-transparent bg-[rgb(var(--primary))] text-[rgb(var(--on-primary,255_255_255))] shadow-sm"
                   : "border-[rgb(var(--border))] bg-[rgb(var(--bg))] text-[rgb(var(--primary))]"
               }`}
-            aria-label="All modules"
+            aria-label={t("nav.home", "Home")}
+            title={t("nav.home", "Home")}
           >
             <FaThLarge size={14} />
+            {!onMenuHub && (
+              <span className="hidden text-[12px] font-extrabold lg:inline">
+                {t("nav.home", "Home")}
+              </span>
+            )}
           </button>
         )}
-        <div className="flex min-w-0 items-center gap-2 pl-0.5 sm:gap-2.5 sm:pl-2">
+        <button
+          type="button"
+          onClick={() => menuPath && navigate(menuPath)}
+          className="flex min-w-0 items-center gap-2 pl-0.5 text-left sm:gap-2.5 sm:pl-2"
+          aria-label={t("nav.home", "Home")}
+          disabled={!menuPath}
+        >
           <BrandMark user={user} />
-        </div>
+        </button>
       </div>
 
       {/* RIGHT */}
       <div className="flex shrink-0 items-center gap-1 sm:gap-2.5">
-        <div className="lg:hidden shrink-0">
-          <MenuStylePicker />
-        </div>
-        <div className="shrink-0">
-          <LanguageSwitcher />
-        </div>
-
         <div className="hidden lg:block text-right">
           <p className="text-sm font-semibold text-[rgb(var(--text))]">
             {time.t}
@@ -391,12 +398,31 @@ const Topbar = ({ menuPath = "/" }) => {
           )}
         </div>
 
+        {/* Parent: child switcher directly beside profile */}
+        {loginAs === "parent" && (
+          <ParentChildSwitcher
+            variant="compact"
+            className="max-w-[9.5rem] sm:max-w-[12rem]"
+          />
+        )}
+
         {/* ── USER DROPDOWN ─────────────────────────────────────────────── */}
         <div className="relative">
           <div
+            role="button"
+            tabIndex={0}
+            aria-label={t("common.profile", "Profile menu")}
+            aria-expanded={openDropdown}
             onClick={(e) => {
               e.stopPropagation();
               setOpenDropdown((v) => !v);
+            }}
+            onKeyDown={(e) => {
+              if (e.key === "Enter" || e.key === " ") {
+                e.preventDefault();
+                e.stopPropagation();
+                setOpenDropdown((v) => !v);
+              }
             }}
             className="flex items-center gap-3 cursor-pointer px-2 py-1.5 rounded-xl transition hover:bg-[rgba(var(--primary),0.06)]"
           >
@@ -419,10 +445,14 @@ const Topbar = ({ menuPath = "/" }) => {
           {openDropdown && (
             <div
               onClick={(e) => e.stopPropagation()}
-              className="card absolute right-0 mt-3 w-72 overflow-hidden z-50"
+              className="card fixed sm:absolute left-2 right-2 sm:left-auto sm:right-0
+                top-[calc(3.5rem+env(safe-area-inset-top,0px)+0.5rem)] sm:top-auto sm:mt-3
+                z-50 flex w-auto sm:w-72 flex-col overflow-hidden
+                max-h-[calc(100dvh-3.75rem-env(safe-area-inset-top,0px)-5.75rem-env(safe-area-inset-bottom,0px))]
+                sm:max-h-[min(28rem,calc(100dvh-5rem))]"
               style={{ animation: "notifSlide 0.18s ease-out" }}
             >
-              <div className="flex items-center gap-3 px-4 py-4 bg-linear-to-b from-[rgba(var(--primary),0.06)] to-transparent">
+              <div className="flex shrink-0 items-center gap-3 px-4 py-3.5 bg-linear-to-b from-[rgba(var(--primary),0.06)] to-transparent">
                 <UserAvatar
                   name={name}
                   photoUrl={user?.photo_url}
@@ -441,14 +471,43 @@ const Topbar = ({ menuPath = "/" }) => {
                 </div>
               </div>
 
-              <div className="px-3 pb-3">
-                <DesignSkinPicker variant="inline" />
+              <div className="min-h-0 flex-1 space-y-3 overflow-y-auto overscroll-contain px-3 py-1">
+                <div>
+                  <p className="mb-1.5 text-[10px] font-extrabold uppercase tracking-wide text-[rgb(var(--text-muted))]">
+                    {t("lang.switch", "Language")}
+                  </p>
+                  <LanguageSwitcher />
+                </div>
+
+                <div>
+                  <p className="mb-1.5 text-[10px] font-extrabold uppercase tracking-wide text-[rgb(var(--text-muted))]">
+                    {t("menu.style", "Menu icons")}
+                  </p>
+                  <MenuStylePicker className="w-full [&_button]:h-10 [&_button]:w-full [&_button]:justify-start" />
+                </div>
+
+                <div>
+                  <p className="mb-1.5 text-[10px] font-extrabold uppercase tracking-wide text-[rgb(var(--text-muted))]">
+                    {t("topbar.appDesign", "App design")}
+                  </p>
+                  <DesignSkinPicker
+                    variant="topbar"
+                    className="w-full [&_button]:h-10 [&_button]:w-full [&_button]:justify-start"
+                  />
+                </div>
               </div>
 
-              <div className="p-2 border-t border-[rgb(var(--border))]">
+              <div
+                className="shrink-0 border-t border-[rgb(var(--border))] bg-[rgb(var(--surface))] p-2"
+                style={{
+                  paddingBottom:
+                    "max(0.5rem, calc(env(safe-area-inset-bottom, 0px) * 0.25))",
+                }}
+              >
                 <button
+                  type="button"
                   onClick={logout}
-                  className="group w-full flex items-center justify-center gap-2 px-4 py-2.5 text-sm font-medium text-[rgb(var(--text))] hover:bg-red-500 hover:text-white rounded-xl transition-all"
+                  className="group flex w-full items-center justify-center gap-2 rounded-xl px-4 py-2.5 text-sm font-medium text-[rgb(var(--text))] transition-all hover:bg-red-500 hover:text-white"
                 >
                   <AiOutlineLogout />
                   {t("common.logout")}

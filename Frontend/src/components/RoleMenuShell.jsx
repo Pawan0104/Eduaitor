@@ -12,6 +12,8 @@ import {
 import { useLanguage } from "../context/LanguageContext";
 import { useAuth } from "../context/AuthContext";
 import UserAvatar from "./UserAvatar";
+import UrgentActions from "./UrgentActions";
+import { getMenuIconMeta } from "../utils/menuIcons";
 
 export const DEFAULT_COLOR = { bg: "#F3F4F6", icon: "#6B7280", dot: "#E5E7EB" };
 
@@ -249,12 +251,12 @@ function AccordionPanel({ isOpen, children }) {
 }
 
 export const MENU_STYLE_OPTIONS = [
-  { id: "3d", label: "3D icons" },
+  { id: "minimal", label: "Clean icons" },
+  { id: "3d", label: "Clean color" },
   { id: "glass", label: "Glass chip" },
   { id: "solid", label: "Solid icon" },
   { id: "soft", label: "Soft stack" },
   { id: "list", label: "List grid" },
-  { id: "minimal", label: "Minimal" },
 ];
 
 export const MENU_STYLE_KEY = "menuGridStyle";
@@ -267,7 +269,7 @@ export function getSavedMenuStyle() {
   } catch {
     /* ignore */
   }
-  return "3d";
+  return "minimal";
 }
 
 export function setSavedMenuStyle(id) {
@@ -299,6 +301,8 @@ function MenuCard({ item, color, globalIdx, isOpen, onToggle, styleId }) {
   const navigate = useNavigate();
   const { t, tn } = useLanguage();
   const hasChildren = Boolean(item.children);
+  const meta = getMenuIconMeta(item.name);
+  const emoji = meta.emoji;
   const label = tn(item.name);
   const delay = { animationDelay: `${Math.min(globalIdx, 16) * 35}ms` };
 
@@ -342,20 +346,10 @@ function MenuCard({ item, color, globalIdx, isOpen, onToggle, styleId }) {
         }}
       >
         <div
-          className="menu-icon-3d relative flex items-center justify-center shrink-0 rounded-xl text-[20px] text-white"
-          style={{
-            width: 44,
-            height: 44,
-            background: `linear-gradient(145deg, color-mix(in srgb, ${color.icon} 88%, #fff), ${color.icon} 55%, color-mix(in srgb, ${color.icon} 70%, #000))`,
-            boxShadow: `
-              inset 0 1px 1px rgba(255,255,255,0.45),
-              inset 0 -2px 3px rgba(0,0,0,0.2),
-              0 6px 0 color-mix(in srgb, ${color.icon} 55%, #000),
-              0 10px 16px -6px rgba(0,0,0,0.35)
-            `,
-          }}
+          className="relative flex items-center justify-center shrink-0 text-[26px] leading-none"
+          style={{ width: 40, height: 40 }}
         >
-          {item.icon}
+          <span aria-hidden>{emoji}</span>
         </div>
         <div className="min-w-0 flex-1">
           <p
@@ -391,36 +385,28 @@ function MenuCard({ item, color, globalIdx, isOpen, onToggle, styleId }) {
     );
   }
 
-  /* Shared vertical shell for icon styles */
+  /* Shared vertical shell for icon styles — glyph is always the shared emoji */
   let iconWrapStyle = {};
   let iconClass =
     "relative flex items-center justify-center shrink-0 transition-transform duration-200 group-active:scale-90";
 
-  if (styleId === "3d") {
-    iconClass += " menu-icon-3d rounded-[22px] text-white";
+  if (styleId === "3d" || styleId === "minimal") {
+    iconClass += " rounded-2xl";
     iconWrapStyle = {
-      width: 68,
-      height: 68,
-      fontSize: 28,
-      background: `linear-gradient(145deg,
-        color-mix(in srgb, ${color.icon} 78%, #ffffff) 0%,
-        ${color.icon} 48%,
-        color-mix(in srgb, ${color.icon} 62%, #000000) 100%)`,
-      boxShadow: `
-        inset 0 2px 3px rgba(255,255,255,0.55),
-        inset 0 -3px 5px rgba(0,0,0,0.22),
-        0 8px 0 color-mix(in srgb, ${color.icon} 48%, #0f172a),
-        0 14px 22px -8px rgba(15,23,42,0.4),
-        0 0 0 1px color-mix(in srgb, ${color.icon} 35%, transparent)
-      `,
-      transform: isOpen ? "translateY(2px)" : "translateY(0)",
+      width: 56,
+      height: 56,
+      fontSize: 32,
+      lineHeight: 1,
+      background: "transparent",
+      boxShadow: "none",
     };
   } else if (styleId === "solid") {
-    iconClass += " rounded-[20px] text-white";
+    iconClass += " rounded-[20px]";
     iconWrapStyle = {
       width: 68,
       height: 68,
-      fontSize: 28,
+      fontSize: 32,
+      lineHeight: 1,
       background: `linear-gradient(145deg, ${color.icon}, color-mix(in srgb, ${color.icon} 72%, #000))`,
       boxShadow: `0 12px 22px -12px ${color.icon}cc`,
     };
@@ -429,39 +415,20 @@ function MenuCard({ item, color, globalIdx, isOpen, onToggle, styleId }) {
     iconWrapStyle = {
       width: 68,
       height: 68,
-      fontSize: 28,
-      color: color.icon,
+      fontSize: 32,
+      lineHeight: 1,
       background: `linear-gradient(160deg, ${color.bg} 0%, color-mix(in srgb, ${color.icon} 22%, ${color.bg}) 100%)`,
       boxShadow: `inset 0 1px 0 rgba(255,255,255,0.55), 0 10px 18px -10px ${color.icon}aa`,
     };
-  } else if (styleId === "minimal") {
-    iconClass += " rounded-2xl";
+  } else {
+    iconClass += " rounded-full";
     iconWrapStyle = {
       width: 64,
       height: 64,
-      fontSize: 30,
-      color: color.icon,
+      fontSize: 32,
+      lineHeight: 1,
       background: "transparent",
-    };
-  } else {
-    /* glass (default fallback) */
-    iconClass += " rounded-full";
-    iconWrapStyle = {
-      width: 72,
-      height: 72,
-      fontSize: 28,
-      color: color.icon,
-      background: isOpen
-        ? `color-mix(in srgb, ${color.icon} 22%, rgba(255,255,255,0.35))`
-        : `color-mix(in srgb, ${color.icon} 14%, rgba(255,255,255,0.28))`,
-      border: `1.5px solid color-mix(in srgb, ${color.icon} 35%, rgba(255,255,255,0.55))`,
-      boxShadow: `
-        inset 0 1px 0 rgba(255,255,255,0.65),
-        0 8px 22px -12px ${color.icon}99,
-        0 0 0 6px color-mix(in srgb, ${color.icon} 8%, transparent)
-      `,
-      backdropFilter: "blur(14px)",
-      WebkitBackdropFilter: "blur(14px)",
+      boxShadow: "none",
     };
   }
 
@@ -471,7 +438,7 @@ function MenuCard({ item, color, globalIdx, isOpen, onToggle, styleId }) {
       onClick={onClick}
       className={[
         "group relative flex flex-col items-center justify-start w-full",
-        "min-h-[128px] px-2 pt-3 pb-3 select-none",
+        "min-h-[108px] px-2 pt-2.5 pb-2.5 select-none",
         "rounded-2xl transition-all duration-200",
         "active:scale-[0.94] focus:outline-none focus-visible:ring-2 focus-visible:ring-[rgb(var(--primary))]",
         "menu-tile-enter",
@@ -484,18 +451,14 @@ function MenuCard({ item, color, globalIdx, isOpen, onToggle, styleId }) {
           style={{ background: color.icon }}
         />
       )}
-      {styleId === "3d" && (
-        <span
-          className="pointer-events-none absolute top-[52px] left-1/2 -translate-x-1/2 w-12 h-3 rounded-full blur-[6px] opacity-40"
-          style={{ background: color.icon }}
-        />
-      )}
       <div className={iconClass} style={iconWrapStyle}>
-        <span className="relative z-[1] drop-shadow-sm">{item.icon}</span>
+        <span className="relative z-[1]" aria-hidden>
+          {emoji}
+        </span>
         {hasChildren && <FolderBadge count={item.children.length} color={color} />}
       </div>
       <p
-        className="relative mt-3.5 m-0 text-[13px] font-extrabold text-center leading-snug line-clamp-2 w-full tracking-tight"
+        className="relative mt-2.5 m-0 text-[13px] font-extrabold text-center leading-snug line-clamp-2 w-full tracking-tight"
         style={{ color: "rgb(var(--text))" }}
       >
         {label}
@@ -921,6 +884,7 @@ export function ModuleGrid({
   setOpenItem,
   isDark: _isDark,
   expandAll = false,
+  onCollapse,
 }) {
   const { t } = useLanguage();
   const isMobile = useIsMobileLayout();
@@ -942,6 +906,10 @@ export function ModuleGrid({
     window.addEventListener("menuFrequentChange", onFreq);
     return () => window.removeEventListener("menuFrequentChange", onFreq);
   }, []);
+
+  useEffect(() => {
+    if (expandAll) setShowAll(true);
+  }, [expandAll]);
 
   // Searching always expands the full list
   useEffect(() => {
@@ -1020,8 +988,11 @@ export function ModuleGrid({
     return () => clearTimeout(timer);
   }, [openItemData?.name]);
 
+  // Keep shared emoji glyphs; tile layout follows saved menu style
   const effectiveStyle =
-    isMobile && styleId !== "list" ? "3d" : styleId;
+    isMobile && styleId !== "list" && styleId !== "solid" && styleId !== "soft"
+      ? "minimal"
+      : styleId;
 
   const gridClass =
     effectiveStyle === "list"
@@ -1153,12 +1124,10 @@ export function ModuleGrid({
 
   /* ── Mobile: uplifted card with frequent + View all ── */
   if (isMobile) {
-    const searching = Boolean(query.trim());
-
     return (
       <div className="relative z-10 -mt-7 flex flex-col lg:mt-0">
         <div className="menu-uplift-card flex flex-col gap-4 rounded-[1.75rem] border px-4 pb-5 pt-5 sm:px-5">
-          {!searching && (
+          {!showAll ? (
             <>
               <div className="flex items-center justify-between gap-2 px-0.5">
                 <div>
@@ -1187,40 +1156,38 @@ export function ModuleGrid({
               </div>
 
               {renderGrid(frequent, 0)}
-            </>
-          )}
 
-          {!showAll ? (
-            <button
-              type="button"
-              onClick={() => setShowAll(true)}
-              className="flex w-full items-center justify-center gap-2 rounded-2xl border px-4 py-3.5
-                text-[13.5px] font-extrabold active:scale-[0.98] transition-transform"
-              style={{
-                color: "rgb(var(--primary))",
-                background:
-                  "color-mix(in srgb, rgb(var(--primary)) 8%, rgb(var(--surface)))",
-                borderColor:
-                  "color-mix(in srgb, rgb(var(--primary)) 28%, rgb(var(--border)))",
-                boxShadow: "0 8px 20px -14px rgba(var(--primary), 0.55)",
-              }}
-            >
-              {t("menu.viewAll", "View all modules")}
-              <span
-                className="rounded-full px-2 py-0.5 text-[11px] font-bold tabular-nums"
+              <button
+                type="button"
+                onClick={() => setShowAll(true)}
+                className="flex w-full items-center justify-center gap-2 rounded-2xl border px-4 py-3.5
+                  text-[13.5px] font-extrabold active:scale-[0.98] transition-transform"
                 style={{
-                  background: "rgba(var(--primary),0.12)",
+                  color: "rgb(var(--primary))",
+                  background:
+                    "color-mix(in srgb, rgb(var(--primary)) 8%, rgb(var(--surface)))",
+                  borderColor:
+                    "color-mix(in srgb, rgb(var(--primary)) 28%, rgb(var(--border)))",
+                  boxShadow: "0 8px 20px -14px rgba(var(--primary), 0.55)",
                 }}
               >
-                {menu.length}
-              </span>
-              <FaChevronDown size={11} />
-            </button>
+                {t("menu.viewAll", "View all modules")}
+                <span
+                  className="rounded-full px-2 py-0.5 text-[11px] font-bold tabular-nums"
+                  style={{
+                    background: "rgba(var(--primary),0.12)",
+                  }}
+                >
+                  {menu.length}
+                </span>
+                <FaChevronDown size={11} />
+              </button>
+            </>
           ) : (
-            <div
-              className={`flex flex-col gap-3 ${searching ? "" : "border-t pt-4"}`}
-              style={{ borderColor: "rgb(var(--border))" }}
-            >
+            <div className="flex flex-col gap-3">
+              {/* Search first — only in View all mode */}
+              {searchBar}
+
               <div className="flex items-center justify-between px-0.5 gap-2">
                 <h2
                   className="text-[13px] font-extrabold uppercase tracking-wide"
@@ -1240,13 +1207,9 @@ export function ModuleGrid({
                 </span>
               </div>
 
-              {searchBar}
-
               {filtered.length === 0
                 ? emptyState
-                : searching
-                  ? renderGrid(filtered, 0)
-                  : renderGrid(restItems, frequent.length)}
+                : renderGrid(filtered, 0)}
 
               <button
                 type="button"
@@ -1254,6 +1217,7 @@ export function ModuleGrid({
                   setShowAll(false);
                   setQuery("");
                   setOpenItem(null);
+                  onCollapse?.();
                 }}
                 className="flex w-full items-center justify-center gap-2 rounded-2xl border px-4 py-3
                   text-[13px] font-bold active:scale-[0.98] transition-transform"
@@ -1269,6 +1233,7 @@ export function ModuleGrid({
             </div>
           )}
         </div>
+        {!showAll && <UrgentActions className="mt-1" />}
         {animStyle}
       </div>
     );

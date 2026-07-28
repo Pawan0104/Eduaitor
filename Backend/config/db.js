@@ -61,6 +61,7 @@ const connectDB = async () => {
           serverSelectionTimeoutMS: 15000,
         });
         console.log("MongoDB Connected Successfully (Atlas)");
+        await ensureParentUsernameIndex();
         startNotificationCron();
         return conn;
       } catch (primaryError) {
@@ -73,6 +74,7 @@ const connectDB = async () => {
             "MongoDB Atlas connected on retry after initial error:",
             primaryError.message,
           );
+          await ensureParentUsernameIndex();
           startNotificationCron();
           return retryConn;
         } catch (retryError) {
@@ -95,6 +97,7 @@ const connectDB = async () => {
             "MongoDB Atlas connected using expanded SRV URI fallback:",
             retryError.message,
           );
+          await ensureParentUsernameIndex();
           startNotificationCron();
           return conn;
         }
@@ -113,6 +116,7 @@ const connectDB = async () => {
 
     await seedSampleData();
     console.log("MongoDB Connected Successfully (in-memory fallback)");
+    await ensureParentUsernameIndex();
     startNotificationCron();
     return mongoose.connection;
   } catch (error) {
@@ -120,5 +124,27 @@ const connectDB = async () => {
     throw error;
   }
 };
+
+/** Allow sibling students to share parent username (father mobile). */
+export async function ensureParentUsernameIndex() {
+  try {
+    const col = mongoose.connection.collection("students");
+    const indexes = await col.indexes();
+    const uniqueParent = indexes.find(
+      (idx) =>
+        idx.key?.schoolId === 1 &&
+        idx.key?.["parentCredentials.username"] === 1 &&
+        idx.unique === true,
+    );
+    if (uniqueParent?.name) {
+      await col.dropIndex(uniqueParent.name);
+      console.log(
+        `Dropped unique parent username index (${uniqueParent.name}) for multi-child support`,
+      );
+    }
+  } catch (err) {
+    console.warn("Parent username index migrate skipped:", err.message);
+  }
+}
 
 export default connectDB;

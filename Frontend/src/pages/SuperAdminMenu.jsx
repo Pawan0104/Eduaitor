@@ -282,7 +282,8 @@ export default function SuperAdminMenu() {
   };
 
   const menu = [
-    { name: "Dashboard", icon: <FaTachometerAlt />, path: "/admin/dashboard" },
+    // Dashboard disabled — welcome/menu hub covers the same actions
+    // { name: "Dashboard", icon: <FaTachometerAlt />, path: "/admin/dashboard" },
     // {
     //   name: "Platform Analytics",
     //   icon: <FaChartLine />,

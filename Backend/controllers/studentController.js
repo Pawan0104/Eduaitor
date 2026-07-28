@@ -14,6 +14,7 @@ import {
 } from "../utils/groupSync.js";
 import { ensureDefaultHouses } from "../utils/ensureDefaultHouses.js";
 import bcrypt from "bcryptjs";
+import { resolveParentCredentialsForCreate } from "../utils/parentChildren.js";
 
 const normalizeStudentFeeFields = (safeBody) => {
   if (safeBody.transport === "") {
@@ -227,12 +228,12 @@ export const createStudent = async (req, res) => {
       firstTimeLogin: true,
     };
 
-    const parentCredentials = {
-      username: safeBody.fatherMobile || "", // father mobile as username
-      password: hashedPassword, // same initial password
-      temp_password: rawPassword || undefined,
-      firstTimeLogin: true,
-    };
+    const parentCredentials = await resolveParentCredentialsForCreate({
+      schoolId,
+      fatherMobile: safeBody.fatherMobile,
+      hashedPassword,
+      rawPassword,
+    });
 
     // ── STRIP OLD TOP-LEVEL CREDENTIAL FIELDS ──
     delete safeBody.username;
@@ -615,6 +616,23 @@ export const updateStudent = async (req, res) => {
     // Sync parent username if fatherMobile changed
     if (safeBody.fatherMobile) {
       credentialUpdate["parentCredentials.username"] = safeBody.fatherMobile;
+      // Reuse sibling parent password when linking to an existing father mobile
+      const sibling = await Student.findOne({
+        schoolId,
+        _id: { $ne: student._id },
+        "parentCredentials.username": String(safeBody.fatherMobile).trim(),
+        "parentCredentials.password": { $exists: true, $ne: null },
+      })
+        .select("parentCredentials")
+        .lean();
+      if (sibling?.parentCredentials?.password && !safeBody.password) {
+        credentialUpdate["parentCredentials.password"] =
+          sibling.parentCredentials.password;
+        credentialUpdate["parentCredentials.temp_password"] =
+          sibling.parentCredentials.temp_password;
+        credentialUpdate["parentCredentials.firstTimeLogin"] =
+          sibling.parentCredentials.firstTimeLogin ?? false;
+      }
     }
 
     // ── STRIP password from safeBody so it doesn't conflict ──
@@ -659,6 +677,38 @@ export const updateStudent = async (req, res) => {
 
       // add to new groups
       await syncStudentGroups(updatedStudent);
+    }
+
+    // Keep sibling parent logins in sync (same father mobile)
+    const sharedParentUser =
+      updatedStudent?.parentCredentials?.username ||
+      String(safeBody.fatherMobile || "").trim();
+    if (
+      sharedParentUser &&
+      (credentialUpdate["parentCredentials.password"] ||
+        credentialUpdate["parentCredentials.username"])
+    ) {
+      const siblingSet = {};
+      if (credentialUpdate["parentCredentials.password"]) {
+        siblingSet["parentCredentials.password"] =
+          credentialUpdate["parentCredentials.password"];
+        siblingSet["parentCredentials.temp_password"] =
+          credentialUpdate["parentCredentials.temp_password"];
+      }
+      if (credentialUpdate["parentCredentials.firstTimeLogin"] !== undefined) {
+        siblingSet["parentCredentials.firstTimeLogin"] =
+          credentialUpdate["parentCredentials.firstTimeLogin"];
+      }
+      if (Object.keys(siblingSet).length) {
+        await Student.updateMany(
+          {
+            schoolId,
+            "parentCredentials.username": sharedParentUser,
+            _id: { $ne: updatedStudent._id },
+          },
+          { $set: siblingSet },
+        );
+      }
     }
 
     res.json({

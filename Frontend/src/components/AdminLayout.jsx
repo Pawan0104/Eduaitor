@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { Outlet } from "react-router-dom";
 import {
-  FaTachometerAlt,
+  FaThLarge,
   FaUserGraduate,
   FaChalkboardTeacher,
   FaComments,
@@ -48,15 +48,16 @@ const getNavItems = (role, loginAs, openProfile, tn) => {
     icon: <FaUserAlt />,
     onClick: openProfile,
   };
+  const menuItem = (path) => ({
+    label: tn("Menu"),
+    icon: <FaThLarge />,
+    path,
+  });
 
   switch (role) {
     case "teacher_admin":
       return [
-        {
-          label: tn("Dashboard"),
-          icon: <FaTachometerAlt />,
-          path: "/teacher/dashboard",
-        },
+        menuItem("/teacher/menu"),
         { label: tn("Classes"), icon: <HiAcademicCap />, path: "/teacher/class" },
         { label: tn("Tasks"), icon: <GiSchoolBag />, path: "/teacher/assignment" },
         { label: tn("Chat"), icon: <FaComments />, path: "/teacher/messages" },
@@ -65,11 +66,7 @@ const getNavItems = (role, loginAs, openProfile, tn) => {
 
     case "school_admin":
       return [
-        {
-          label: tn("Dashboard"),
-          icon: <FaTachometerAlt />,
-          path: "/school/dashboard",
-        },
+        menuItem("/school/menu"),
         {
           label: tn("Students"),
           icon: <FaUserGraduate />,
@@ -86,11 +83,7 @@ const getNavItems = (role, loginAs, openProfile, tn) => {
 
     case "staff_admin":
       return [
-        {
-          label: tn("Dashboard"),
-          icon: <FaTachometerAlt />,
-          path: "/staff/dashboard",
-        },
+        menuItem("/staff/menu"),
         {
           label: tn("Students"),
           icon: <FaUserGraduate />,
@@ -108,11 +101,7 @@ const getNavItems = (role, loginAs, openProfile, tn) => {
     case "student_admin":
       if (loginAs === "parent") {
         return [
-          {
-            label: tn("Dashboard"),
-            icon: <FaTachometerAlt />,
-            path: "/parent/dashboard",
-          },
+          menuItem("/parent/menu"),
           { label: tn("Child"), icon: <FaUserGraduate />, path: "/parent/student" },
           { label: tn("Fees"), icon: <FaWallet />, path: "/parent/fees" },
           { label: tn("Chat"), icon: <FaComments />, path: "/parent/messages" },
@@ -120,11 +109,7 @@ const getNavItems = (role, loginAs, openProfile, tn) => {
         ];
       }
       return [
-        {
-          label: tn("Dashboard"),
-          icon: <FaTachometerAlt />,
-          path: "/student/dashboard",
-        },
+        menuItem("/student/menu"),
         { label: tn("Timetable"), icon: <FaClock />, path: "/student/timetable" },
         { label: tn("Tasks"), icon: <GiSchoolBag />, path: "/student/assignment" },
         { label: tn("Chat"), icon: <FaComments />, path: "/student/messages" },
@@ -133,11 +118,7 @@ const getNavItems = (role, loginAs, openProfile, tn) => {
 
     case "super_admin":
       return [
-        {
-          label: tn("Dashboard"),
-          icon: <FaTachometerAlt />,
-          path: "/admin/dashboard",
-        },
+        menuItem("/admin/menu"),
         { label: tn("Schools"), icon: <FaSchool />, path: "/admin/schools" },
         {
           label: tn("Access"),
