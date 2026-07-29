@@ -28,6 +28,8 @@ export function clearAuthToken() {
 const api = axios.create({
   baseURL: API,
   withCredentials: true,
+  // Render free tier cold-starts can take a while.
+  timeout: 60000,
 });
 
 api.interceptors.request.use((config) => {

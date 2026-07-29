@@ -90,15 +90,19 @@ export default function Login() {
       toast.success(t("login.success"));
     } catch (error) {
       const rawMsg = String(error?.message || "");
+      const isTimeout =
+        error?.code === "ECONNABORTED" || /timeout/i.test(rawMsg);
       const isNetwork =
         !error?.response &&
         (/Network/i.test(rawMsg) || /Failed to fetch/i.test(rawMsg));
       const backendMessage =
         error?.response?.data?.message ||
         error?.response?.data?.error ||
-        (isNetwork
-          ? "Cannot reach API (CORS/network). Set CLIENT_URL on Render to your Netlify URL."
-          : "Invalid credentials");
+        (isTimeout
+          ? "API is waking up (Render cold start). Wait ~30s and try again."
+          : isNetwork
+            ? "Cannot reach API. Check VITE_API_URL on Netlify and CLIENT_URL=https://admineduaitor.netlify.app on Render."
+            : "Invalid credentials");
       setError(backendMessage);
       toast.error(
         backendMessage === "Invalid credentials"

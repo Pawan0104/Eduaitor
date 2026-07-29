@@ -16,7 +16,9 @@ function ensureWebSplash() {
   el.setAttribute("aria-hidden", "true");
   el.innerHTML = `
     <div class="eduaitor-splash-inner">
-      <img class="eduaitor-splash-logo" src="/eduaitor.png" alt="Eduaitor" />
+      <div class="eduaitor-splash-logo-wrap">
+        <img class="eduaitor-splash-logo" src="/eduaitor-app-icon.png" alt="Eduaitor" />
+      </div>
       <p class="eduaitor-splash-tag">Smarter Schools. Stronger Students.</p>
     </div>
   `;
@@ -45,24 +47,37 @@ function ensureWebSplash() {
       display: flex;
       flex-direction: column;
       align-items: center;
-      gap: 1.25rem;
+      gap: 1.5rem;
       padding: 1.5rem;
     }
-    .eduaitor-splash-logo {
-      width: min(72vw, 280px);
-      height: auto;
-      display: block;
+    .eduaitor-splash-logo-wrap {
+      width: min(42vw, 168px);
+      height: min(42vw, 168px);
+      border-radius: 28%;
+      overflow: hidden;
+      box-shadow:
+        0 0 0 3px rgba(52, 211, 153, 0.35),
+        0 0 48px rgba(5, 150, 105, 0.55),
+        0 12px 32px rgba(0, 0, 0, 0.45);
       animation: eduaitor-spin 1.4s linear infinite;
       transform-origin: center center;
+    }
+    .eduaitor-splash-logo {
+      width: 100%;
+      height: 100%;
+      display: block;
+      object-fit: cover;
     }
     .eduaitor-splash-tag {
       margin: 0;
       font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
-      font-size: 0.8rem;
+      font-size: 0.85rem;
+      font-weight: 500;
       letter-spacing: 0.04em;
-      color: #5b9fd4;
-      opacity: 0.9;
+      color: #6ee7b7;
+      opacity: 0.95;
       text-align: center;
+      text-shadow: 0 0 20px rgba(52, 211, 153, 0.35);
     }
     @keyframes eduaitor-spin {
       from { transform: rotate(0deg); }

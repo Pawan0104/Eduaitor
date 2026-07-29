@@ -1,8 +1,9 @@
-import axios from "axios";
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { FaArrowLeft } from "react-icons/fa";
 import { toast } from "react-toastify";
+import { useAuth } from "../context/AuthContext";
+import api from "../config/axios";
 
 // ─── Mock data for development (replace with real API call) ───────────────────
 const MOCK_DATA = {
@@ -542,17 +543,17 @@ export default function ParentFee({ studentId, token }) {
   const [devCheckout, setDevCheckout] = useState(null); // { orderId, amountRupees, periodKeys }
   const [selectedPeriods, setSelectedPeriods] = useState([]);
   const navigate = useNavigate();
+  const { user } = useAuth();
   const isMobile = window.innerWidth <= 768;
-
-  const API = import.meta.env.VITE_API_URL;
+  const activeChildId = String(
+    user?.activeChildId || user?.student_id || studentId || "",
+  );
 
   const fetchFeeDetails = async () => {
     setLoading(true);
     setError(null);
     try {
-      const res = await axios.get(`${API}/fees/parent/student/me`, {
-        withCredentials: true,
-      });
+      const res = await api.get("/fees/parent/student/me");
       setFeeData(res.data);
       const installments = Array.isArray(res.data?.installments)
         ? res.data.installments
@@ -570,6 +571,7 @@ export default function ParentFee({ studentId, token }) {
           0,
       );
       setPayAmount(due > 0 ? String(due) : "");
+      setDevCheckout(null);
     } catch (e) {
       setError(
         e?.response?.data?.message || e.message || "Something went wrong",
@@ -580,20 +582,17 @@ export default function ParentFee({ studentId, token }) {
   };
 
   useEffect(() => {
+    if (!activeChildId) return;
     fetchFeeDetails();
-  }, []);
+  }, [activeChildId]);
 
   const verifyPayment = async (payload, amount, periodKeys = []) => {
-    const verifyRes = await axios.post(
-      `${API}/fees/razorpay/verify`,
-      {
-        ...payload,
-        studentId: feeData?.student?._id,
-        amountPaid: amount,
-        periodKeys,
-      },
-      { withCredentials: true },
-    );
+    const verifyRes = await api.post("/fees/razorpay/verify", {
+      ...payload,
+      studentId: feeData?.student?._id,
+      amountPaid: amount,
+      periodKeys,
+    });
 
     if (verifyRes.data?.success) {
       toast.success("Payment successful");
@@ -685,15 +684,11 @@ export default function ParentFee({ studentId, token }) {
     try {
       setPaying(true);
 
-      const { data } = await axios.post(
-        `${API}/fees/razorpay/order`,
-        {
-          studentId: feeData?.student?._id,
-          amount,
-          periodKeys,
-        },
-        { withCredentials: true },
-      );
+      const { data } = await api.post("/fees/razorpay/order", {
+        studentId: feeData?.student?._id,
+        amount,
+        periodKeys,
+      });
 
       if (!data?.success) {
         toast.error(data?.message || "Could not start payment");
