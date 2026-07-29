@@ -208,6 +208,39 @@ const upsertStudentAndParent = async (schoolId) => {
   return student;
 };
 
+/** Legacy demo student documented in QA plan */
+const upsertLegacyStudent = async (schoolId) => {
+  const password = "#disha@patni123";
+  const passwordHash = await hash(password);
+
+  let student = await Student.findOne({
+    schoolId,
+    "studentCredentials.username": "student@admin.com",
+  });
+
+  if (!student) {
+    student = new Student({
+      schoolId,
+      studentId: "STU0001",
+      firstName: "Disha",
+      lastName: "Patni",
+    });
+  }
+
+  student.firstName = "Disha";
+  student.lastName = "Patni";
+  student.schoolId = schoolId;
+  student.studentId = student.studentId || "STU0001";
+  student.studentCredentials = {
+    username: "student@admin.com",
+    password: passwordHash,
+    temp_password: password,
+    firstTimeLogin: false,
+  };
+  await student.save();
+  return student;
+};
+
 const upsertDriver = async (schoolId) => {
   let driver = await Driver.findOne({ schoolId, phone: "9876500999" });
   if (!driver) {
@@ -300,6 +333,7 @@ const run = async () => {
   const school = await ensureSchool(sub._id);
   const teacher = await upsertTeacher(school._id);
   const student = await upsertStudentAndParent(school._id);
+  const legacyStudent = await upsertLegacyStudent(school._id);
   const driver = await upsertDriver(school._id);
 
   const staffRows = [];
@@ -374,6 +408,11 @@ const run = async () => {
   console.log("  password:", STUDENT_PASSWORD);
   console.log("");
 
+  console.log("Student (legacy)");
+  console.log("  username: student@admin.com");
+  console.log("  password: #disha@patni123");
+  console.log("");
+
   console.log("Parent");
   console.log("  username: 9876543299  (father mobile)");
   console.log("  password:", PARENT_PASSWORD);
@@ -394,6 +433,7 @@ const run = async () => {
   console.log("School id:", school._id.toString());
   console.log("Teacher id:", teacher._id.toString());
   console.log("Student id:", student._id.toString());
+  console.log("Legacy student id:", legacyStudent._id.toString());
   console.log("\nSeed complete.\n");
   process.exit(0);
 };

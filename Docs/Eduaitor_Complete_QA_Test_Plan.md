@@ -52,6 +52,14 @@ node scripts/seedQaTestUsers.js
 | 10 | Librarian (Staff) | `qa.library@default.com` | `#staff@school123` | `/staff` |
 | 11 | Driver | **No login portal** | — | Managed under School/Staff → Transport / Staff list |
 
+**Multi-child parents (switcher QA)** — seed: `node scripts/seedMultiChildParents.js`
+
+| Role | Username | Password | Notes |
+|------|----------|----------|-------|
+| Parent (3 kids) | `9000001001` | `#multi@parent123` | Ramesh Gupta — Arjun / Anvi / Kabir |
+| Parent (2 kids) | `9000002001` | `#multi@parent123` | — Ishaan / Diya |
+| Student (multi) | `arjun.gupta@multi.test` (etc.) | `#multi@student123` | Per-child student logins |
+
 **Legacy aliases (also valid if present)**
 
 | Role | Username | Password |

@@ -50,6 +50,12 @@ export const MENU_ICON_META = {
   "Lead Management": { emoji: "📈", accent: "#DB2777", short: "Leads" },
   "House Allocation": { emoji: "🏠", accent: "#EA580C", short: "House" },
   "Help / Support": { emoji: "🎧", accent: "#D97706", short: "Help" },
+  "Help Requests": { emoji: "🎧", accent: "#D97706", short: "Help" },
+  "Access Control": { emoji: "🛡️", accent: "#A855F7", short: "Access" },
+  School: { emoji: "🏫", accent: "#3B82F6", short: "Schools" },
+  "School Detail": { emoji: "🗂️", accent: "#22C55E", short: "Details" },
+  "Syllabus Catalog": { emoji: "📚", accent: "#10B981", short: "Catalog" },
+  "Platform Analytics": { emoji: "📊", accent: "#4F46E5", short: "Analytics" },
 };
 
 const DEFAULT_META = { emoji: "⭐", accent: "#6B7280", short: null };
