@@ -93,7 +93,11 @@ export const loginUser = async (req, res) => {
         success: true,
         token,
         message: "Super Admin login successful",
-        data: { role: "super_admin", email: process.env.SUPER_ADMIN_EMAIL },
+        data: {
+          role: "super_admin",
+          email: process.env.SUPER_ADMIN_EMAIL,
+          name: "Super Admin",
+        },
       });
     }
 

@@ -185,6 +185,7 @@ app.get("/api/auth/me", authMiddleware, async (req, res) => {
         user: {
           email: req.user.email,
           role: req.user.role,
+          name: "Super Admin",
           subscribed_modules: [], // super admin has no module restriction
         },
       });
