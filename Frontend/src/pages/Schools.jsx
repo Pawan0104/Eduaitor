@@ -1,11 +1,9 @@
 import { useEffect, useState } from "react";
-import axios from "axios";
 import { FaSchool, FaUsers, FaCalendarAlt, FaEye } from "react-icons/fa";
 import { useNavigate } from "react-router-dom";
 import { toast } from "react-toastify";
 import {FaArrowLeft} from "react-icons/fa";
-
-const API = import.meta.env.VITE_API_URL;
+import api from "../config/axios";
 
 const Schools = () => {
   const navigate = useNavigate();
@@ -17,7 +15,7 @@ const Schools = () => {
 
   const fetchSchools = async () => {
     try {
-      const res = await axios.get(`${API}/schools`);
+      const res = await api.get(`/schools`);
       setSchools(res.data.data);
     } catch {
       toast.error("Failed to fetch schools");

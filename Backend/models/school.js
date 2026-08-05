@@ -64,12 +64,16 @@ const schoolSchema = new mongoose.Schema(
     admin_name: {
       type: String,
       required: true,
+      unique: true,
+      trim: true,
     },
 
     admin_email: {
       type: String,
       required: true,
       unique: true,
+      trim: true,
+      lowercase: true,
     },
 
     admin_password: {

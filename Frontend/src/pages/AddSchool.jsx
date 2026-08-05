@@ -1,11 +1,9 @@
 import { useEffect, useState } from "react";
-import axios from "axios";
 import { useNavigate } from "react-router-dom";
 import { FaArrowLeft, FaLock } from "react-icons/fa";
 import { toast } from "react-toastify";
 import { MODULES, DEFAULT_MODULES } from "../constants/module.js"; // adjust path
-
-const API = import.meta.env.VITE_API_URL;
+import api from "../config/axios";
 
 const AddSchool = () => {
   const navigate = useNavigate();
@@ -39,7 +37,7 @@ const AddSchool = () => {
   /* FETCH SUBSCRIPTIONS */
   const fetchSubscriptions = async () => {
     try {
-      const res = await axios.get(`${API}/subscriptions`);
+      const res = await api.get(`/subscriptions`);
       setSubscriptions(res.data.data);
     } catch {
       toast.error("Failed to load subscriptions");
@@ -108,8 +106,10 @@ const AddSchool = () => {
   const validate = () => {
     if (!form.school_name.trim()) return "School name is required";
     if (!form.slug.trim())        return "Slug is required";
+    if (!form.subscription_plan)  return "Subscription plan is required";
     if (!form.contact_email)      return "Contact email is required";
     if (!form.contact_phone)      return "Contact phone is required";
+    if (!form.admin_name.trim())  return "Admin name is required";
     if (!form.admin_email)        return "Admin email is required";
     if (!form.admin_password)     return "Admin password is required";
     if (selectedModules.length === 0) return "Select at least one module";
@@ -140,9 +140,8 @@ const AddSchool = () => {
         formData.append("school_logo", logoFile);
       }
 
-      await axios.post(`${API}/schools`, formData, {
-        headers: { "Content-Type": "multipart/form-data" },
-      });
+      // Shared api client attaches Bearer token (required on Netlify → Render)
+      await api.post(`/schools`, formData);
 
       toast.success("School created successfully");
       navigate("/admin/schools");
@@ -391,11 +390,12 @@ const AddSchool = () => {
               </div>
 
               <Input
-                label="Admin Name"
+                label="Admin Name (must be unique)"
                 name="admin_name"
                 placeholder="Full Name"
                 value={form.admin_name}
                 onChange={handleChange}
+                required
               />
               <Input
                 label="Admin Email"

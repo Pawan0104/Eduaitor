@@ -1,5 +1,4 @@
 import { useEffect, useMemo, useState } from "react";
-import axios from "axios";
 import {
   FaSchool,
   FaUsers,
@@ -27,8 +26,7 @@ import { toast } from "react-toastify";
 import { FaStudiovinari } from "react-icons/fa";
 import { useNavigate, useParams } from "react-router-dom";
 import { FaArrowLeft } from "react-icons/fa";
-
-const API = import.meta.env.VITE_API_URL;
+import api from "../config/axios";
 
 const fmt = (v) =>
   v
@@ -83,8 +81,8 @@ export default function SchoolDetail() {
   const isMobile = window.innerWidth <= 768;
 
   useEffect(() => {
-    axios
-      .get(`${API}/schools`)
+    api
+      .get(`/schools`)
       .then((r) => {
         const allSchools = r.data.data || [];
 
@@ -106,11 +104,8 @@ export default function SchoolDetail() {
     setWs(null);
     try {
       const p = (url, options = {}) =>
-        axios
-          .get(url, {
-            ...options,
-            withCredentials: true,
-          })
+        api
+          .get(url, options)
           .catch(() => null);
       const [
         school,
@@ -131,29 +126,29 @@ export default function SchoolDetail() {
         issues,
         syllabus,
       ] = await Promise.all([
-        p(`${API}/schools/${id}`),
-        p(`${API}/students/all/admin`, { params: { schoolId: id } }),
-        p(`${API}/teachers/all/admin`, { params: { schoolId: id } }),
-        p(`${API}/sections/all/admin`, { params: { schoolId: id } }),
-        p(`${API}/classes/all/admin`, { params: { schoolId: id } }),
-        p(`${API}/subjects/all/admin`, { params: { schoolId: id } }),
-        p(`${API}/notices/all/admin`, { params: { schoolId: id } }),
-        p(`${API}/events/all/admin`, { params: { schoolId: id } }),
-        p(`${API}/fee-history/admin`, {
+        p(`/schools/${id}`),
+        p(`/students/all/admin`, { params: { schoolId: id } }),
+        p(`/teachers/all/admin`, { params: { schoolId: id } }),
+        p(`/sections/all/admin`, { params: { schoolId: id } }),
+        p(`/classes/all/admin`, { params: { schoolId: id } }),
+        p(`/subjects/all/admin`, { params: { schoolId: id } }),
+        p(`/notices/all/admin`, { params: { schoolId: id } }),
+        p(`/events/all/admin`, { params: { schoolId: id } }),
+        p(`/fee-history/admin`, {
           params: { schoolId: id, page: 1, limit: 50 },
         }),
-        p(`${API}/fees/defaulters/admin`, {
+        p(`/fees/defaulters/admin`, {
           params: { schoolId: id, page: 1, limit: 50 },
         }),
-        p(`${API}/transport/buses/admin`, { params: { schoolId: id } }),
-        p(`${API}/transport/drivers/admin`, { params: { schoolId: id } }),
-        p(`${API}/transport/routes/admin`, { params: { schoolId: id } }),
-        p(`${API}/transport/summary/admin`, { params: { schoolId: id } }),
-        p(`${API}/library/books/admin`, { params: { schoolId: id } }),
-        p(`${API}/library/issues/admin`, {
+        p(`/transport/buses/admin`, { params: { schoolId: id } }),
+        p(`/transport/drivers/admin`, { params: { schoolId: id } }),
+        p(`/transport/routes/admin`, { params: { schoolId: id } }),
+        p(`/transport/summary/admin`, { params: { schoolId: id } }),
+        p(`/library/books/admin`, { params: { schoolId: id } }),
+        p(`/library/issues/admin`, {
           params: { schoolId: id, status: "all" },
         }),
-        p(`${API}/syllabus/complete/`, { params: { schoolId: id } }),
+        p(`/syllabus/complete/`, { params: { schoolId: id } }),
       ]);
 
       const schoolData = school?.data?.data;

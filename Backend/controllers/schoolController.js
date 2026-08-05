@@ -11,6 +11,33 @@ const isMockRazorpayKey = (keyId = "") =>
 const isValidRazorpayKeyId = (keyId = "") =>
   /^rzp_(test|live)_[A-Za-z0-9]+$/.test(String(keyId).trim());
 
+const escapeRegex = (value = "") =>
+  String(value).replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+
+const findSchoolByAdminName = async (adminName, excludeId = null) => {
+  const name = String(adminName || "").trim();
+  if (!name) return null;
+  const query = {
+    admin_name: new RegExp(`^${escapeRegex(name)}$`, "i"),
+  };
+  if (excludeId) query._id = { $ne: excludeId };
+  return School.findOne(query).select("_id admin_name school_name");
+};
+
+const duplicateKeyMessage = (error) => {
+  const key = Object.keys(error?.keyPattern || {})[0];
+  if (key === "admin_name") {
+    return "Admin name already used by another school. Choose a unique admin name.";
+  }
+  if (key === "admin_email") {
+    return "Admin email already used by another school.";
+  }
+  if (key === "slug") {
+    return "School slug already exists. Choose a different slug.";
+  }
+  return "A school with this unique field already exists.";
+};
+
 /* ---------------- CREATE SCHOOL ---------------- */
 
 export const createSchool = async (req, res, next) => {
@@ -32,6 +59,23 @@ export const createSchool = async (req, res, next) => {
       razorpayKeyId,
       razorpayKeySecret,
     } = req.body;
+
+    const adminName = String(admin_name || "").trim();
+    if (!adminName) {
+      return res.status(400).json({
+        success: false,
+        message: "Admin name is required",
+      });
+    }
+
+    const existingAdminName = await findSchoolByAdminName(adminName);
+    if (existingAdminName) {
+      return res.status(400).json({
+        success: false,
+        message:
+          "Admin name already used by another school. Choose a unique admin name.",
+      });
+    }
 
     // ── 1. PARSE MODULES ──────────────────────────────
     let modules = [];
@@ -81,7 +125,7 @@ export const createSchool = async (req, res, next) => {
       address,
       contact_email,
       contact_phone,
-      admin_name,
+      admin_name: adminName,
       admin_email,
       admin_password: hashedPassword,
       temp_password: admin_password,
@@ -103,6 +147,12 @@ export const createSchool = async (req, res, next) => {
     });
 
   } catch (error) {
+    if (error?.code === 11000) {
+      return res.status(400).json({
+        success: false,
+        message: duplicateKeyMessage(error),
+      });
+    }
     next(error);
   }
 };
@@ -180,11 +230,26 @@ export const updateSchool = async (req, res, next) => {
     if (address)          updateData.address          = address;
     if (contact_email)    updateData.contact_email    = contact_email;
     if (contact_phone)    updateData.contact_phone    = contact_phone;
-    if (admin_name)       updateData.admin_name       = admin_name;
     if (admin_email)      updateData.admin_email      = admin_email;
     if (status)           updateData.status           = status;
     if (razorpayKeyId !== undefined)     updateData.razorpayKeyId     = razorpayKeyId;
     if (razorpayKeySecret !== undefined) updateData.razorpayKeySecret = razorpayKeySecret;
+
+    if (admin_name !== undefined && String(admin_name).trim() !== "") {
+      const adminName = String(admin_name).trim();
+      const existingAdminName = await findSchoolByAdminName(
+        adminName,
+        req.params.id,
+      );
+      if (existingAdminName) {
+        return res.status(400).json({
+          success: false,
+          message:
+            "Admin name already used by another school. Choose a unique admin name.",
+        });
+      }
+      updateData.admin_name = adminName;
+    }
 
     // ── 2. HANDLE PASSWORD ────────────────────────────
     if (admin_password) {
@@ -262,6 +327,12 @@ export const updateSchool = async (req, res, next) => {
     });
 
   } catch (error) {
+    if (error?.code === 11000) {
+      return res.status(400).json({
+        success: false,
+        message: duplicateKeyMessage(error),
+      });
+    }
     next(error);
   }
 };

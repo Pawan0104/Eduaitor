@@ -1,5 +1,4 @@
 import { useEffect, useMemo, useState } from "react";
-import axios from "axios";
 import {
   FaArrowLeft,
   FaBolt,
@@ -12,8 +11,7 @@ import {
 } from "react-icons/fa";
 import { useNavigate } from "react-router-dom";
 import { toast } from "react-toastify";
-
-const API = import.meta.env.VITE_API_URL;
+import api from "../config/axios";
 
 const createInitialActionForm = () => ({
   schoolId: "",
@@ -133,7 +131,7 @@ const getExpiryMeta = (endDate) => {
 
 const fetchCount = async (url, mapper) => {
   try {
-    const res = await axios.get(url, { withCredentials: true });
+    const res = await api.get(url);
     return mapper(res.data);
   } catch {
     return 0;
@@ -159,9 +157,7 @@ export default function PlatformAnalytics() {
     else setLoading(true);
 
     try {
-      const schoolsRes = await axios.get(`${API}/schools`, {
-        withCredentials: true,
-      });
+      const schoolsRes = await api.get(`/schools`);
       const rawSchools = schoolsRes.data.data || [];
 
       const schoolRows = await Promise.all(
@@ -170,27 +166,27 @@ export default function PlatformAnalytics() {
           const [studentsCount, teachersCount, classesCount, sectionsCount, defaultersCount, syllabusClassesCount] =
             await Promise.all([
               fetchCount(
-                `${API}/students/all/admin?schoolId=${schoolId}`,
+                `/students/all/admin?schoolId=${schoolId}`,
                 (data) => data.data?.length || 0,
               ),
               fetchCount(
-                `${API}/teachers/all/admin?schoolId=${schoolId}`,
+                `/teachers/all/admin?schoolId=${schoolId}`,
                 (data) => data.data?.length || 0,
               ),
               fetchCount(
-                `${API}/classes/all/admin?schoolId=${schoolId}`,
+                `/classes/all/admin?schoolId=${schoolId}`,
                 (data) => data.classes?.length || 0,
               ),
               fetchCount(
-                `${API}/sections/all/admin?schoolId=${schoolId}`,
+                `/sections/all/admin?schoolId=${schoolId}`,
                 (data) => data.sections?.length || 0,
               ),
               fetchCount(
-                `${API}/fees/defaulters/admin?schoolId=${schoolId}&page=1&limit=1`,
+                `/fees/defaulters/admin?schoolId=${schoolId}&page=1&limit=1`,
                 (data) => data.pagination?.total || data.defaulters?.length || 0,
               ),
               fetchCount(
-                `${API}/syllabus/complete?schoolId=${schoolId}`,
+                `/syllabus/complete?schoolId=${schoolId}`,
                 (data) => data.data?.classes?.length || 0,
               ),
             ]);
@@ -305,9 +301,7 @@ export default function PlatformAnalytics() {
 
     setSavingAction(true);
     try {
-      await axios.put(`${API}/schools/${actionForm.schoolId}`, payload, {
-        withCredentials: true,
-      });
+      await api.put(`/schools/${actionForm.schoolId}`, payload);
       toast.success(
         actionForm.mode === "extend"
           ? "Subscription updated"

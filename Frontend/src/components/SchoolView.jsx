@@ -1,9 +1,7 @@
 import { useEffect, useState } from "react";
-import axios from "axios";
 import { useParams, useNavigate } from "react-router-dom";
 import { FaArrowLeft } from "react-icons/fa";
-
-const API = import.meta.env.VITE_API_URL;
+import api from "../config/axios";
 
 const SchoolView = () => {
   const { id } = useParams();
@@ -12,7 +10,7 @@ const SchoolView = () => {
   const [school, setSchool] = useState(null);
 
   const fetchSchool = async () => {
-    const res = await axios.get(`${API}/schools/${id}`);
+    const res = await api.get(`/schools/${id}`);
 
     setSchool(res.data.data);
   };

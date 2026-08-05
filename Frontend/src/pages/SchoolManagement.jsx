@@ -1,11 +1,9 @@
 import { useEffect, useState } from "react";
-import axios from "axios";
 import { FaPlus, FaEye, FaEdit, FaTrash, FaArrowLeft, FaLock, FaKey } from "react-icons/fa";
 import { useNavigate } from "react-router-dom";
 import { toast } from "react-toastify";
 import { MODULES } from "../constants/module.js"; 
-
-const API = import.meta.env.VITE_API_URL;
+import api from "../config/axios";
 
 const SchoolManagement = () => {
   const navigate = useNavigate();
@@ -46,7 +44,7 @@ const SchoolManagement = () => {
   /* ── FETCH ──────────────────────────────────────── */
   const fetchSchools = async () => {
     try {
-      const res = await axios.get(`${API}/schools`);
+      const res = await api.get(`/schools`);
       setSchools(res.data.data);
     } catch {
       toast.error("Failed to load schools");
@@ -55,7 +53,7 @@ const SchoolManagement = () => {
 
   const fetchSubscriptions = async () => {
     try {
-      const res = await axios.get(`${API}/subscriptions`);
+      const res = await api.get(`/subscriptions`);
       setSubscriptions(res.data.data);
     } catch {
       toast.error("Failed to load subscriptions");
@@ -178,9 +176,7 @@ const SchoolManagement = () => {
           formData.append("school_logo", logoFile);
         }
 
-        await axios.put(`${API}/schools/${editingId}`, formData, {
-          headers: { "Content-Type": "multipart/form-data" },
-        });
+        await api.put(`/schools/${editingId}`, formData);
 
         toast.success("School updated successfully");
         setShowModal(false);
@@ -201,7 +197,7 @@ const SchoolManagement = () => {
     setConfirmMessage("Delete this school permanently? This cannot be undone.");
     setConfirmAction(() => async () => {
       try {
-        await axios.delete(`${API}/schools/${id}`);
+        await api.delete(`/schools/${id}`);
         toast.success("School deleted");
         fetchSchools();
       } catch {
