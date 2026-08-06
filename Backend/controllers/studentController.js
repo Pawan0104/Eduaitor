@@ -20,24 +20,28 @@ import { notifyCredentialsAsync } from "../services/credentials/notifyCredential
 const isValidObjectId = (value) =>
   Boolean(value) && mongoose.Types.ObjectId.isValid(String(value));
 
-/** Coerce FormData ObjectId fields; reject placeholder strings like "Section". */
+/** Coerce FormData ObjectId fields; optional fields become null when missing/invalid. */
 const sanitizeStudentObjectIds = (safeBody) => {
   const errors = [];
+  const optionalIds = new Set(["sectionId", "transport", "houseId"]);
 
   for (const key of ["classId", "sectionId", "transport", "houseId"]) {
-    if (safeBody[key] === undefined || safeBody[key] === null || safeBody[key] === "") {
-      if (key === "transport" || key === "houseId") {
-        safeBody[key] = null;
-      }
+    if (
+      safeBody[key] === undefined ||
+      safeBody[key] === null ||
+      safeBody[key] === ""
+    ) {
+      if (optionalIds.has(key)) safeBody[key] = null;
       continue;
     }
     const raw = String(safeBody[key]).trim();
     if (!isValidObjectId(raw)) {
-      errors.push(
-        key === "sectionId"
-          ? "Invalid section selected. Re-select class and section."
-          : `Invalid ${key}`,
-      );
+      // Bad placeholders like "Section" — drop optional ids instead of failing create
+      if (optionalIds.has(key)) {
+        safeBody[key] = null;
+        continue;
+      }
+      errors.push(`Invalid ${key}`);
       continue;
     }
     safeBody[key] = raw;

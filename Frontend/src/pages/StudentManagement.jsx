@@ -814,10 +814,6 @@ const StudentManagement = () => {
     if (step === 5) {
       if (!form.classId) errors.push("Class required");
 
-      if (sections.length > 0 && !form.sectionId) {
-        errors.push("Section required");
-      }
-
       if (!form.rollNo) errors.push("Roll number required");
     }
 
@@ -1546,20 +1542,13 @@ const forbidden = [
 
                 {form.classId && sections.length > 0 && (
                   <Select
-                    label="Section *"
+                    label="Section"
                     name="sectionId"
                     value={form.sectionId}
                     options={sections}
                     onChange={handleChange}
                     error={errors.sectionId}
                   />
-                )}
-
-                {form.classId && sections.length === 0 && (
-                  <div className="text-sm text-amber-600">
-                    This class has no sections linked. Add a section under Class
-                    management, then try again.
-                  </div>
                 )}
 
                 <Input
