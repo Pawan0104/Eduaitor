@@ -44,19 +44,82 @@ const emptyForm = {
   password: "",
 };
 
+const TEACHER_DRAFT_PREFIX = "eduaitor:teacher-create-draft:";
+
+const teacherDraftKey = (schoolId) =>
+  `${TEACHER_DRAFT_PREFIX}${schoolId || "default"}`;
+
+const loadTeacherDraft = (schoolId) => {
+  try {
+    const raw = localStorage.getItem(teacherDraftKey(schoolId));
+    if (!raw) return null;
+    const parsed = JSON.parse(raw);
+    if (!parsed || typeof parsed !== "object") return null;
+    const { step: savedStep, form: savedForm } = parsed;
+    if (!savedForm || typeof savedForm !== "object") return null;
+    return {
+      step:
+        Number.isFinite(Number(savedStep)) && Number(savedStep) >= 1
+          ? Math.min(Number(savedStep), steps.length)
+          : 1,
+      form: {
+        ...emptyForm,
+        ...savedForm,
+        // File inputs cannot be restored from storage
+        photo: null,
+        subjects: Array.isArray(savedForm.subjects) ? savedForm.subjects : [],
+        assignedClasses: Array.isArray(savedForm.assignedClasses)
+          ? savedForm.assignedClasses
+          : [],
+      },
+    };
+  } catch {
+    return null;
+  }
+};
+
+const saveTeacherDraft = (schoolId, step, form) => {
+  try {
+    const { photo, ...rest } = form || {};
+    localStorage.setItem(
+      teacherDraftKey(schoolId),
+      JSON.stringify({
+        step,
+        form: {
+          ...rest,
+          photo: null,
+        },
+        savedAt: Date.now(),
+      }),
+    );
+  } catch {
+    /* ignore quota / private mode */
+  }
+};
+
+const clearTeacherDraft = (schoolId) => {
+  try {
+    localStorage.removeItem(teacherDraftKey(schoolId));
+  } catch {
+    /* ignore */
+  }
+};
+
 const TeacherManagement = () => {
   const { id } = useParams();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
-  const { user } = useAuth();
+  const { user, loading: authLoading } = useAuth();
 
   const isEdit = Boolean(id);
   const basePath = user?.role === "staff_admin" ? "/staff" : "/school";
   const fromStaff = searchParams.get("from") === "staff";
   const listPath = fromStaff ? `${basePath}/staff` : `${basePath}/teachers`;
+  const schoolId = user?.school_id;
 
   const [step, setStep] = useState(1);
   const [form, setForm] = useState(emptyForm);
+  const [draftReady, setDraftReady] = useState(false);
   const [errors, setErrors] = useState({});
 
   const [confirmOpen, setConfirmOpen] = useState(false);
@@ -78,6 +141,26 @@ const TeacherManagement = () => {
     (r) => String(r._id) === String(form.customRoleId),
   );
   const rolePermissions = selectedAccessRole?.permissions || [];
+
+  /* RESTORE CREATE DRAFT (skip when editing) */
+  useEffect(() => {
+    if (isEdit) {
+      setDraftReady(true);
+      return;
+    }
+    const draft = loadTeacherDraft(schoolId);
+    if (draft) {
+      setForm(draft.form);
+      setStep(draft.step);
+    }
+    setDraftReady(true);
+  }, [isEdit, schoolId]);
+
+  /* PERSIST CREATE DRAFT */
+  useEffect(() => {
+    if (isEdit || !draftReady) return;
+    saveTeacherDraft(schoolId, step, form);
+  }, [isEdit, draftReady, schoolId, step, form]);
 
   /* FETCH DROPDOWN DATA */
 
@@ -403,6 +486,7 @@ const TeacherManagement = () => {
     if (!isDirty()) {
       setForm(emptyForm);
       setStep(1);
+      if (!isEdit) clearTeacherDraft(schoolId);
       return;
     }
 
@@ -412,6 +496,7 @@ const TeacherManagement = () => {
       setForm(emptyForm);
       setStep(1);
       setErrors({});
+      if (!isEdit) clearTeacherDraft(schoolId);
     });
 
     setConfirmOpen(true);
@@ -477,6 +562,7 @@ const TeacherManagement = () => {
         toast.success("Teacher updated successfully");
       } else {
         await axios.post(`${API}/teachers`, data, { withCredentials: true });
+        clearTeacherDraft(schoolId);
         toast.success("Teacher added successfully");
       }
 
