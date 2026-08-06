@@ -713,20 +713,26 @@ const TeacherManagement = () => {
                   onChange={handleChange}
                   placeholder="Years of teaching"
                 />
-                <div>
-                  <div className="flex items-center justify-between gap-2 mb-1">
-                    <label className="block text-sm text-[rgb(var(--text))]">
-                      Subjects
-                    </label>
+                <div className="md:col-span-2 rounded-xl border border-dashed border-indigo-300 bg-indigo-50/40 p-3">
+                  <div className="flex flex-wrap items-center justify-between gap-2 mb-2">
+                    <div>
+                      <label className="block text-sm font-semibold text-[rgb(var(--text))]">
+                        Subjects{" "}
+                        <span className="font-normal text-slate-500">(optional)</span>
+                      </label>
+                      <p className="text-xs text-slate-500">
+                        You can save the teacher now and assign subjects later.
+                      </p>
+                    </div>
                     <button
                       type="button"
                       onClick={() => {
                         setNewSubjectName("");
                         setShowAddSubject(true);
                       }}
-                      className="inline-flex items-center gap-1 text-xs font-semibold text-indigo-600 hover:text-indigo-800"
+                      className="inline-flex items-center gap-2 px-3 py-2 rounded-lg bg-indigo-600 text-white text-sm font-semibold hover:bg-indigo-700 shadow-sm"
                     >
-                      <FaPlus className="text-[10px]" />
+                      <FaPlus className="text-xs" />
                       Add subject
                     </button>
                   </div>
@@ -742,10 +748,25 @@ const TeacherManagement = () => {
                     hideLabel
                   />
                   {subjects.length === 0 && (
-                    <p className="text-xs text-amber-600 mt-1">
-                      No subjects yet. Use Add subject to create one without leaving
-                      this page.
+                    <p className="text-xs text-amber-700 mt-2">
+                      No subjects in this school yet. Click{" "}
+                      <button
+                        type="button"
+                        className="underline font-semibold"
+                        onClick={() => {
+                          setNewSubjectName("");
+                          setShowAddSubject(true);
+                        }}
+                      >
+                        Add subject
+                      </button>{" "}
+                      to create one here.
                     </p>
+                  )}
+                  {errors.subjects && (
+                    <span className="text-xs text-red-500 font-medium">
+                      {errors.subjects}
+                    </span>
                   )}
                 </div>
                 <Input
