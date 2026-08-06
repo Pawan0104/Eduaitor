@@ -337,10 +337,25 @@ const StudentManagement = () => {
     if (!selectedClass) return;
 
     const derivedSections =
-      selectedClass.details?.map((d) => ({
-        label: d.sectionId?.name || d.sectionId?.sectionName || "Section",
-        value: d.sectionId?._id,
-      })) || [];
+      selectedClass.details
+        ?.map((d) => {
+          const raw = d.sectionId;
+          const id =
+            raw && typeof raw === "object"
+              ? raw._id || raw.id
+              : raw;
+          if (!id) return null;
+          const idStr = String(id);
+          if (!/^[a-f\d]{24}$/i.test(idStr)) return null;
+          return {
+            label:
+              (typeof raw === "object" &&
+                (raw.name || raw.sectionName)) ||
+              "Section",
+            value: idStr,
+          };
+        })
+        .filter(Boolean) || [];
 
     setSections(derivedSections);
     if (
@@ -1540,6 +1555,13 @@ const forbidden = [
                   />
                 )}
 
+                {form.classId && sections.length === 0 && (
+                  <div className="text-sm text-amber-600">
+                    This class has no sections linked. Add a section under Class
+                    management, then try again.
+                  </div>
+                )}
+
                 <Input
                   label="Roll Number *"
                   name="rollNo"
@@ -1915,7 +1937,7 @@ const Select = ({ label, error, options, ...props }) => (
         }
 
         return (
-          <option key={i} value={o.value}>
+          <option key={i} value={String(o.value ?? "")} disabled={!o.value}>
             {o.label}
           </option>
         );

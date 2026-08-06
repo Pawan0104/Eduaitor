@@ -5,6 +5,8 @@ import Class from "../models/class.js";
 // NOTE: adjust this import path/filename if your Section model lives elsewhere.
 import Section from "../models/section.js";
 import { syncStudentGroups } from "../utils/groupSync.js";
+import School from "../models/school.js";
+import { notifyCredentialsAsync } from "../services/credentials/notifyCredentials.js";
 
 /* ================= TEMPLATE ================= */
 
@@ -321,6 +323,8 @@ export const bulkUploadStudents = async (req, res) => {
     }
 
     const created = [];
+    const schoolDoc = await School.findById(schoolId).select("school_name").lean();
+
     for (const student of insertedDocs) {
       created.push({
         studentId: student.studentId,
@@ -331,6 +335,28 @@ export const bulkUploadStudents = async (req, res) => {
         await syncStudentGroups(student);
       } catch (err) {
         console.error("Group sync failed for", student.studentId, err);
+      }
+
+      const parentEmail =
+        student.fatherEmail || student.motherEmail || "";
+      const parentMobile =
+        student.fatherMobile || student.motherMobile || "";
+      if (parentEmail || parentMobile) {
+        notifyCredentialsAsync({
+          role: "parent",
+          name: student.fatherName || student.motherName || "Parent",
+          username: student.parentCredentials?.username || parentMobile,
+          password:
+            student.parentCredentials?.temp_password ||
+            student.studentCredentials?.temp_password,
+          email: parentEmail,
+          mobile: parentMobile,
+          schoolName: schoolDoc?.school_name,
+          extraLines: [
+            `Student login username: ${student.studentCredentials?.username || student.studentId}`,
+            `Student login password: ${student.studentCredentials?.temp_password || ""}`,
+          ],
+        });
       }
     }
 

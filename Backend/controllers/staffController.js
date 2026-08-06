@@ -17,6 +17,8 @@ import {
   getDriverDeleteBlocker,
   getStaffDeleteBlocker,
 } from "../utils/staffDeleteGuards.js";
+import { notifyCredentialsAsync } from "../services/credentials/notifyCredentials.js";
+import School from "../models/school.js";
 
 /** Resolve permissions from custom role or client payload; enforce school modules. */
 const resolveStaffPermissions = async ({
@@ -208,10 +210,22 @@ export const createStaff = async (req, res, next) => {
       username,
       password:       hashedPassword,
       temp_password:  password,
+      firstTimeLogin: true,
       status:         status     || "Active",
       photo,
       schoolId,
       idCardIssuedAt: new Date(),
+    });
+
+    const schoolDoc = await School.findById(schoolId).select("school_name").lean();
+    notifyCredentialsAsync({
+      role: "staff",
+      name: staff.fullName,
+      username: staff.username,
+      password,
+      email: staff.email,
+      mobile: staff.phone,
+      schoolName: schoolDoc?.school_name,
     });
 
     return res.status(201).json({
@@ -219,6 +233,7 @@ export const createStaff = async (req, res, next) => {
       message: "Staff member created successfully. ID card is ready to download.",
       data: staff,
       idCardReady: true,
+      credentialsNotified: Boolean(staff.email),
     });
 
   } catch (error) {

@@ -209,6 +209,9 @@ app.get("/api/auth/me", authMiddleware, async (req, res) => {
 
     /* ---------- SCHOOL ADMIN ---------- */
     if (req.user.role === "school_admin") {
+      const schoolDoc = await School.findById(req.user.school_id)
+        .select("firstTimeLogin admin_email")
+        .lean();
       return res.json({
         success: true,
         user: {
@@ -219,7 +222,8 @@ app.get("/api/auth/me", authMiddleware, async (req, res) => {
           school_name: school?.school_name || school?.name,
           school_logo: school?.school_logo,
           _id: req.user._id,
-          subscribed_modules, // ← added
+          subscribed_modules,
+          firstTimeLogin: schoolDoc?.firstTimeLogin ?? false,
         },
       });
     }
@@ -227,7 +231,7 @@ app.get("/api/auth/me", authMiddleware, async (req, res) => {
     /* ---------- TEACHER ADMIN ---------- */
     if (req.user.role === "teacher_admin") {
       const teacherMember = await Teacher.findById(req.user.teacher_id)
-        .select("permissions status customRoleId photo")
+        .select("permissions status customRoleId photo firstTimeLogin")
         .populate("customRoleId", "name");
 
       if (!teacherMember) {
@@ -256,6 +260,7 @@ app.get("/api/auth/me", authMiddleware, async (req, res) => {
           customRoleName: teacherMember.customRoleId?.name || null,
           permissions: teacherMember.permissions || [],
           subscribed_modules,
+          firstTimeLogin: teacherMember.firstTimeLogin ?? false,
         },
       });
     }

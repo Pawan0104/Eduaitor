@@ -84,8 +84,14 @@ const schoolSchema = new mongoose.Schema(
     temp_password: {
       type: String,
     },
-      school_logo: {
-      type: String,        
+
+    firstTimeLogin: {
+      type: Boolean,
+      default: true,
+    },
+
+    school_logo: {
+      type: String,
       default: null,
     },
 

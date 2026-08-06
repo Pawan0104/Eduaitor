@@ -94,6 +94,11 @@ const teacherSchema = new mongoose.Schema(
     temp_password: {
       type: String,
     },
+
+    firstTimeLogin: {
+      type: Boolean,
+      default: true,
+    },
   },
   { timestamps: true },
 );

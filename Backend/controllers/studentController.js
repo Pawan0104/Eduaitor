@@ -15,6 +15,36 @@ import {
 import { ensureDefaultHouses } from "../utils/ensureDefaultHouses.js";
 import bcrypt from "bcryptjs";
 import { resolveParentCredentialsForCreate } from "../utils/parentChildren.js";
+import { notifyCredentialsAsync } from "../services/credentials/notifyCredentials.js";
+
+const isValidObjectId = (value) =>
+  Boolean(value) && mongoose.Types.ObjectId.isValid(String(value));
+
+/** Coerce FormData ObjectId fields; reject placeholder strings like "Section". */
+const sanitizeStudentObjectIds = (safeBody) => {
+  const errors = [];
+
+  for (const key of ["classId", "sectionId", "transport", "houseId"]) {
+    if (safeBody[key] === undefined || safeBody[key] === null || safeBody[key] === "") {
+      if (key === "transport" || key === "houseId") {
+        safeBody[key] = null;
+      }
+      continue;
+    }
+    const raw = String(safeBody[key]).trim();
+    if (!isValidObjectId(raw)) {
+      errors.push(
+        key === "sectionId"
+          ? "Invalid section selected. Re-select class and section."
+          : `Invalid ${key}`,
+      );
+      continue;
+    }
+    safeBody[key] = raw;
+  }
+
+  return errors;
+};
 
 const normalizeStudentFeeFields = (safeBody) => {
   if (safeBody.transport === "") {
@@ -88,6 +118,14 @@ export const createStudent = async (req, res) => {
     const schoolId = req.user?.school_id;
     const { ...safeBody } = req.body;
     normalizeStudentFeeFields(safeBody);
+
+    const idErrors = sanitizeStudentObjectIds(safeBody);
+    if (idErrors.length > 0) {
+      return res.status(400).json({
+        success: false,
+        message: idErrors[0],
+      });
+    }
 
     const totalDue = Number(safeBody.finalFee) || 0;
 
@@ -333,11 +371,36 @@ export const createStudent = async (req, res) => {
     // AUTO ADD TO GROUPS
     await syncStudentGroups(student);
 
+    const schoolDoc = await School.findById(schoolId)
+      .select("school_name")
+      .lean();
+    const parentEmail = student.fatherEmail || student.motherEmail || "";
+    const parentMobile =
+      student.fatherMobile || student.motherMobile || student.guardianMobile || "";
+    const studentExtraLines = [
+      `Student login username: ${student.studentCredentials?.username || student.studentId}`,
+      `Student login password: ${rawPassword || "(same as parent)"}`,
+    ];
+
+    if (parentEmail || parentMobile) {
+      notifyCredentialsAsync({
+        role: "parent",
+        name: student.fatherName || student.motherName || "Parent",
+        username: student.parentCredentials?.username || parentMobile,
+        password: student.parentCredentials?.temp_password || rawPassword,
+        email: parentEmail,
+        mobile: parentMobile,
+        schoolName: schoolDoc?.school_name,
+        extraLines: studentExtraLines,
+      });
+    }
+
     res.status(201).json({
       success: true,
       message: "Student created successfully. ID card is ready to download.",
       data: student,
       idCardReady: true,
+      credentialsNotified: Boolean(parentEmail),
     });
   } catch (error) {
     console.error("Create student error:", error);
@@ -454,6 +517,14 @@ export const updateStudent = async (req, res) => {
     }
 
     normalizeStudentFeeFields(safeBody);
+
+    const idErrors = sanitizeStudentObjectIds(safeBody);
+    if (idErrors.length > 0) {
+      return res.status(400).json({
+        success: false,
+        message: idErrors[0],
+      });
+    }
 
     const student = await Student.findOne({
       _id: req.params.id,

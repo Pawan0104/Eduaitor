@@ -63,9 +63,8 @@ export default function ChangePassword() {
             Set New Password
           </h2>
           <p className="text-gray-500 text-sm mt-1">
-            Your default password is{" "}
-            <span className="font-semibold text-indigo-500">123456</span>.
-            Please set a new one to continue.
+            Choose a new password for your account. This is optional if you
+            arrived here from settings.
           </p>
         </div>
 

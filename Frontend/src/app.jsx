@@ -94,6 +94,7 @@ import ParentFee from "./pages/ParentFee";
 import ParentStore from "./pages/ParentStore";
 import AttendanceParent from "./pages/AttendanceParent";
 import MyChild from "./pages/MyChild";
+import ParentStudentCredentials from "./pages/ParentStudentCredentials";
 import ParentLibrary from "./pages/ParentLibrary";
 import ParentTransport from "./pages/ParentTransport";
 
@@ -313,6 +314,7 @@ const App = () => {
           <Route path="dashboard" element={<Navigate to="/parent/menu" replace />} />
           <Route path="notification" element={<NotificationPage />} />
           <Route path="student" element={<MyChild />} /> {/* child profile */}
+          <Route path="credentials" element={<ParentStudentCredentials />} />
           <Route path="fees" element={<ParentFee />} />
           <Route path="fees/receipt/:paymentId" element={<FeeReceipt />} />
           <Route path="store" element={<ParentStore />} />

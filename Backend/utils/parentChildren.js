@@ -15,6 +15,8 @@ export function toChildSummary(student) {
     sectionName: student.sectionId?.name || student.sectionId?.sectionName || "",
     rollNo: student.rollNo || "",
     studentId: student.studentId || "",
+    username:
+      student.studentCredentials?.username || student.studentId || "",
     photo_url: student.documents?.studentPhoto?.url || null,
   };
 }
@@ -33,7 +35,7 @@ export async function findChildrenByParentUsername(parentUsername, schoolId) {
     .populate("classId", "name className")
     .populate("sectionId", "name sectionName")
     .select(
-      "firstName lastName rollNo studentId classId sectionId documents.studentPhoto parentCredentials schoolId",
+      "firstName lastName rollNo studentId classId sectionId documents.studentPhoto parentCredentials studentCredentials.username schoolId",
     )
     .sort({ firstName: 1, lastName: 1 })
     .lean();

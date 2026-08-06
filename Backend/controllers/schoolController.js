@@ -4,6 +4,7 @@ import Razorpay from "razorpay";
 import {MODULE_KEYS,DEFAULT_MODULES} from "../constants/module.js";
 import { uploadToCloudinary } from "../utils/uploadToCloudinary.js";
 import { ensureDefaultHouses } from "../utils/ensureDefaultHouses.js";
+import { notifyCredentialsAsync } from "../services/credentials/notifyCredentials.js";
 
 const isMockRazorpayKey = (keyId = "") =>
   keyId === "rzp_test_local" || keyId.startsWith("rzp_test_eduaitor");
@@ -129,6 +130,7 @@ export const createSchool = async (req, res, next) => {
       admin_email,
       admin_password: hashedPassword,
       temp_password: admin_password,
+      firstTimeLogin: true,
       status: status || "Active",
       school_logo,
       subscribed_modules: modules,
@@ -140,10 +142,21 @@ export const createSchool = async (req, res, next) => {
       await ensureDefaultHouses(school._id);
     }
 
+    notifyCredentialsAsync({
+      role: "school_admin",
+      name: adminName,
+      username: admin_email,
+      password: admin_password,
+      email: admin_email,
+      mobile: contact_phone,
+      schoolName: school_name,
+    });
+
     return res.status(201).json({
       success: true,
       message: "School created successfully",
       data: school,
+      credentialsNotified: Boolean(admin_email),
     });
 
   } catch (error) {

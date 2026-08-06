@@ -1,4 +1,5 @@
 import Teacher from "../models/teacher.js";
+import School from "../models/school.js";
 import Group from "../models/group.js";
 import { uploadToCloudinary } from "../utils/uploadToCloudinary.js";
 import { deleteFromCloudinary } from "../utils/deleteFromCloudinary.js";
@@ -8,6 +9,7 @@ import {
   removeTeacherFromOldGroups,
 } from "../utils/groupSync.js";
 import { resolveRolePermissions } from "../utils/resolveRolePermissions.js";
+import { notifyCredentialsAsync } from "../services/credentials/notifyCredentials.js";
 
 /* ================= GENERATE TEACHER ID ================= */
 
@@ -69,7 +71,9 @@ export const createTeacher = async (req, res) => {
       }
     }
 
-    req.body.temp_password = req.body.password;
+    const rawTeacherPassword = req.body.password;
+    req.body.temp_password = rawTeacherPassword;
+    req.body.firstTimeLogin = true;
     let hashedPassword = await bcrypt.hash(req.body.password, 10);
     req.body.password = hashedPassword;
 
@@ -119,6 +123,19 @@ export const createTeacher = async (req, res) => {
       .populate("customRoleId", "name permissions isActive")
       .lean();
 
+    const schoolDoc = await School.findById(schoolId).select("school_name").lean();
+    const teacherUsername =
+      teacher.username || teacher.email || String(teacher.email || "");
+    notifyCredentialsAsync({
+      role: "teacher",
+      name: teacher.fullName,
+      username: teacherUsername,
+      password: rawTeacherPassword,
+      email: teacher.email,
+      mobile: teacher.phone,
+      schoolName: schoolDoc?.school_name,
+    });
+
     res.status(201).json({
       success: true,
       message: "Teacher created successfully",
@@ -128,6 +145,7 @@ export const createTeacher = async (req, res) => {
         customRoleId:
           populated.customRoleId?._id || populated.customRoleId || null,
       },
+      credentialsNotified: Boolean(teacher.email),
     });
   } catch (error) {
     console.error("Create teacher error:", error);

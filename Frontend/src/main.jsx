@@ -12,6 +12,7 @@ import { initNativeShell } from "./utils/initNativeShell.js";
 import { initTheme } from "./utils/theme.js";
 import { initUiSkin } from "./utils/uiSkin.js";
 import AppUpdatePrompt from "./components/AppUpdatePrompt.jsx";
+import OptionalPasswordChangeModal from "./components/OptionalPasswordChangeModal.jsx";
 import ErrorBoundary from "./components/ErrorBoundary.jsx";
 
 initTheme();
@@ -26,6 +27,7 @@ createRoot(document.getElementById("root")).render(
           <AuthProvider>
             <HelmetProvider>
               <App />
+              <OptionalPasswordChangeModal />
               <AppUpdatePrompt />
             </HelmetProvider>
           </AuthProvider>

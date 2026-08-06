@@ -15,6 +15,7 @@ import {
   FaClipboardList,
   FaBookDead,
   FaBookOpen,
+  FaKey,
 } from "react-icons/fa";
 import { GiOpenBook } from "react-icons/gi";
 import { toast } from "react-toastify";
@@ -52,6 +53,7 @@ const COLOR_MAP = {
   "Learned today": { bg: "#ECFDF5", icon: "#059669", dot: "#A7F3D0" },
   "Daily learning": { bg: "#EEF2FF", icon: "#4F46E5", dot: "#C7D2FE" },
   "Syllabus Books": { bg: "#F0FDF4", icon: "#10B981", dot: "#A7F3D0" },
+  Credentials: { bg: "#EEF2FF", icon: "#4F46E5", dot: "#C7D2FE" },
 };
 
 export default function ParentMenu() {
@@ -93,6 +95,11 @@ export default function ParentMenu() {
     // Dashboard disabled — welcome/menu hub covers the same actions
     // { name: "Dashboard", icon: <FaTachometerAlt />, path: "/parent/dashboard" },
     { name: "My Child", icon: <FaUserGraduate />, path: "/parent/student" },
+    {
+      name: "Credentials",
+      icon: <FaKey />,
+      path: "/parent/credentials",
+    },
     { name: "Pay Fee", icon: <FaWallet />, path: "/parent/fees" },
     { name: "School Store", icon: <FaStore />, path: "/parent/store" },
     { name: "Transport & GPS", icon: <FaBusAlt />, path: "/parent/transport" },

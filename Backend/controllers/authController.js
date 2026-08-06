@@ -158,6 +158,7 @@ export const loginUser = async (req, res) => {
           permissions: teacher.permissions || [],
           subscribed_modules,
           photo_url: teacher.photo?.url || null,
+          firstTimeLogin: teacher.firstTimeLogin ?? false,
         },
       });
     }
@@ -216,10 +217,22 @@ export const loginUser = async (req, res) => {
 
     // ── PARENT LOGIN (supports multiple children sharing father mobile) ──
     const parentUsername = normalizeParentUsername(loginUsername);
+    const requestedSchoolId = req.body?.schoolId
+      ? String(req.body.schoolId).trim()
+      : "";
+
+    const parentQuery = {
+      "parentCredentials.username": parentUsername,
+    };
+    if (
+      requestedSchoolId &&
+      mongoose.Types.ObjectId.isValid(requestedSchoolId)
+    ) {
+      parentQuery.schoolId = requestedSchoolId;
+    }
+
     const parentCandidates = parentUsername
-      ? await Student.find({
-          "parentCredentials.username": parentUsername,
-        })
+      ? await Student.find(parentQuery)
           .populate("classId", "name className")
           .populate("sectionId", "name sectionName")
           .select(
@@ -368,6 +381,7 @@ export const loginUser = async (req, res) => {
         email: school.admin_email,
         name: school.school_name,
         subscribed_modules,
+        firstTimeLogin: school.firstTimeLogin ?? false,
       },
     });
   } catch (error) {
@@ -383,16 +397,17 @@ export const changePassWord = async (req, res) => {
       return res.status(400).json({ message: "Password too short" });
     }
     const hashed = await bcrypt.hash(newPassword, 10);
+    const role = req.user.role;
     const loginAs = req.user.loginAs;
     const studentId = req.user.student_id || req.user._id;
 
-    if (loginAs === "student") {
+    if (role === "student_admin" && loginAs === "student") {
       await Student.findByIdAndUpdate(studentId, {
         "studentCredentials.password": hashed,
         "studentCredentials.temp_password": newPassword,
         "studentCredentials.firstTimeLogin": false,
       });
-    } else if (loginAs === "parent") {
+    } else if (role === "student_admin" && loginAs === "parent") {
       const parentUsername = normalizeParentUsername(
         req.user.parent_username || req.user.username,
       );
@@ -418,17 +433,231 @@ export const changePassWord = async (req, res) => {
           "parentCredentials.firstTimeLogin": false,
         });
       }
-    } else {
-      await Student.findByIdAndUpdate(studentId, {
+    } else if (role === "teacher_admin") {
+      await Teacher.findByIdAndUpdate(req.user.teacher_id || req.user._id, {
         password: hashed,
+        temp_password: newPassword,
         firstTimeLogin: false,
       });
+    } else if (role === "staff_admin") {
+      await Staff.findByIdAndUpdate(req.user.staff_id || req.user._id, {
+        password: hashed,
+        temp_password: newPassword,
+        firstTimeLogin: false,
+      });
+    } else if (role === "school_admin") {
+      await School.findByIdAndUpdate(req.user.school_id || req.user.id, {
+        admin_password: hashed,
+        temp_password: newPassword,
+        firstTimeLogin: false,
+      });
+    } else {
+      return res.status(403).json({ message: "Password change not supported for this role" });
     }
 
     res.json({ message: "Password updated successfully" });
   } catch (err) {
     console.error("changePassWord error:", err);
     res.status(500).json({ message: "Server error" });
+  }
+};
+
+/** POST /auth/dismiss-password-prompt — skip optional first-login change */
+export const dismissPasswordPrompt = async (req, res) => {
+  try {
+    const role = req.user.role;
+    const loginAs = req.user.loginAs;
+    const studentId = req.user.student_id || req.user._id;
+
+    if (role === "student_admin" && loginAs === "student") {
+      await Student.findByIdAndUpdate(studentId, {
+        "studentCredentials.firstTimeLogin": false,
+      });
+    } else if (role === "student_admin" && loginAs === "parent") {
+      const parentUsername = normalizeParentUsername(
+        req.user.parent_username || req.user.username,
+      );
+      const schoolId = req.user.school_id;
+      if (parentUsername && schoolId) {
+        await Student.updateMany(
+          {
+            schoolId,
+            "parentCredentials.username": parentUsername,
+          },
+          { $set: { "parentCredentials.firstTimeLogin": false } },
+        );
+      } else {
+        await Student.findByIdAndUpdate(studentId, {
+          "parentCredentials.firstTimeLogin": false,
+        });
+      }
+    } else if (role === "teacher_admin") {
+      await Teacher.findByIdAndUpdate(req.user.teacher_id || req.user._id, {
+        firstTimeLogin: false,
+      });
+    } else if (role === "staff_admin") {
+      await Staff.findByIdAndUpdate(req.user.staff_id || req.user._id, {
+        firstTimeLogin: false,
+      });
+    } else if (role === "school_admin") {
+      await School.findByIdAndUpdate(req.user.school_id || req.user.id, {
+        firstTimeLogin: false,
+      });
+    } else {
+      return res.status(403).json({
+        success: false,
+        message: "Not available for this role",
+      });
+    }
+
+    return res.json({
+      success: true,
+      message: "Password prompt dismissed",
+      firstTimeLogin: false,
+    });
+  } catch (err) {
+    console.error("dismissPasswordPrompt error:", err);
+    return res.status(500).json({ success: false, message: "Server error" });
+  }
+};
+
+/**
+ * POST /auth/parent/student-password
+ * Parent sets/resets the active (or specified) child's student login password.
+ */
+export const updateStudentPasswordByParent = async (req, res) => {
+  try {
+    if (req.user?.role !== "student_admin" || req.user?.loginAs !== "parent") {
+      return res.status(403).json({ success: false, message: "Parents only" });
+    }
+
+    const { newPassword, studentId: bodyStudentId } = req.body || {};
+    if (!newPassword || String(newPassword).length < 4) {
+      return res.status(400).json({
+        success: false,
+        message: "Password too short",
+      });
+    }
+
+    const parentUsername = normalizeParentUsername(
+      req.user.parent_username || req.user.username,
+    );
+    const children = await findChildrenByParentUsername(
+      parentUsername,
+      req.user.school_id,
+    );
+    const targetId = bodyStudentId || req.user.student_id;
+    const child = children.find((c) => String(c._id) === String(targetId));
+    if (!child) {
+      return res.status(403).json({
+        success: false,
+        message: "That student is not linked to this parent account",
+      });
+    }
+
+    const hashed = await bcrypt.hash(String(newPassword), 10);
+    const updated = await Student.findByIdAndUpdate(
+      child._id,
+      {
+        $set: {
+          "studentCredentials.password": hashed,
+          "studentCredentials.temp_password": String(newPassword),
+          "studentCredentials.firstTimeLogin": false,
+        },
+      },
+      { new: true },
+    ).select("studentCredentials.username firstName lastName studentId");
+
+    return res.json({
+      success: true,
+      message: "Student password updated",
+      data: {
+        studentId: updated?.studentId,
+        username: updated?.studentCredentials?.username,
+        name: `${updated?.firstName || ""} ${updated?.lastName || ""}`.trim(),
+      },
+    });
+  } catch (err) {
+    console.error("updateStudentPasswordByParent error:", err);
+    return res.status(500).json({ success: false, message: "Server error" });
+  }
+};
+
+/**
+ * POST /auth/parent/lookup { mobile }
+ * Public: resolve school branding for a parent mobile before password entry.
+ */
+export const lookupParentSchools = async (req, res) => {
+  try {
+    const mobile = normalizeParentUsername(
+      req.body?.mobile || req.body?.email || req.body?.username,
+    );
+
+    if (!mobile) {
+      return res.status(400).json({
+        success: false,
+        message: "Mobile number is required",
+      });
+    }
+
+    const students = await Student.find({
+      "parentCredentials.username": mobile,
+    })
+      .select("schoolId")
+      .lean();
+
+    if (!students.length) {
+      return res.status(404).json({
+        success: false,
+        message: "No parent account found for this mobile",
+      });
+    }
+
+    const counts = new Map();
+    for (const row of students) {
+      const id = String(row.schoolId || "");
+      if (!id) continue;
+      counts.set(id, (counts.get(id) || 0) + 1);
+    }
+
+    const schoolIds = [...counts.keys()];
+    const schools = await School.find({ _id: { $in: schoolIds } })
+      .select("school_name school_logo status")
+      .lean();
+
+    const byId = new Map(schools.map((s) => [String(s._id), s]));
+    const payload = schoolIds
+      .map((id) => {
+        const school = byId.get(id);
+        if (!school) return null;
+        if (school.status && school.status !== "Active") return null;
+        return {
+          schoolId: id,
+          school_name: school.school_name || "School",
+          school_logo: school.school_logo || null,
+          childCount: counts.get(id) || 0,
+        };
+      })
+      .filter(Boolean)
+      .sort((a, b) =>
+        String(a.school_name).localeCompare(String(b.school_name)),
+      );
+
+    if (!payload.length) {
+      return res.status(404).json({
+        success: false,
+        message: "No parent account found for this mobile",
+      });
+    }
+
+    return res.json({
+      success: true,
+      mobile,
+      schools: payload,
+    });
+  } catch (err) {
+    console.error("lookupParentSchools error:", err);
+    return res.status(500).json({ success: false, message: "Server error" });
   }
 };
 
