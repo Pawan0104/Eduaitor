@@ -1,0 +1,28 @@
+# Apache (shared hosting) — SPA fallback for React Router
+# Place this in the same folder as index.html (Vite copies public/ → dist/)
+
+<IfModule mod_rewrite.c>
+  RewriteEngine On
+
+  # If the app is in a subfolder, set RewriteBase (example: /admin/)
+  # Leave as / when the site is at domain root or a subdomain root.
+  RewriteBase /
+
+  # Don't rewrite real files or directories
+  RewriteCond %{REQUEST_FILENAME} -f [OR]
+  RewriteCond %{REQUEST_FILENAME} -d
+  RewriteRule ^ - [L]
+
+  # Send everything else to index.html
+  RewriteRule ^ index.html [L]
+</IfModule>
+
+# Optional: prevent directory listing
+Options -Indexes
+
+# Cache hashed assets aggressively; keep HTML fresh
+<IfModule mod_headers.c>
+  <FilesMatch "\.(html)$">
+    Header set Cache-Control "no-cache, no-store, must-revalidate"
+  </FilesMatch>
+</IfModule>

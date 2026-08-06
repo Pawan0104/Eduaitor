@@ -46,8 +46,11 @@ const productionAllowedOrigins = () => {
 
   return new Set([
     ...fromEnv,
-    // Known production frontend (safe default if CLIENT_URL unset on Render)
+    // Known production frontends (safe defaults if CLIENT_URL unset on Render)
     "https://admineduaitor.netlify.app",
+    "https://eduaitorschool.netlify.app",
+    "https://eduaitor.com",
+    "https://www.eduaitor.com",
     "capacitor://localhost",
     "http://localhost",
     "https://localhost",

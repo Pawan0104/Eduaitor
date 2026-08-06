@@ -11,14 +11,29 @@ function normalizeApiUrl(url) {
   return base;
 }
 
+function normalizeBase(base) {
+  let b = String(base || "/").trim() || "/";
+  if (!b.startsWith("/")) b = `/${b}`;
+  if (!b.endsWith("/")) b = `${b}/`;
+  // Vite treats "./" as relative; keep that for APK if requested
+  if (base === "./" || base === ".") return "./";
+  return b === "//" ? "/" : b;
+}
+
 // https://vite.dev/config/
 export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, process.cwd(), "");
   const apiUrl = normalizeApiUrl(env.VITE_API_URL);
 
+  // Shared hosting / Netlify: "/" at domain or subdomain root (recommended).
+  // APK mode may use "./". Override with VITE_BASE=/admin/ only for subfolder deploys.
+  const base =
+    mode === "apk"
+      ? normalizeBase(env.VITE_BASE || "./")
+      : normalizeBase(env.VITE_BASE || "/");
+
   return {
-    // Relative paths only for APK builds; absolute "/" for local Vite / Netlify
-    base: mode === "apk" ? "./" : "/",
+    base,
     plugins: [react(), tailwindcss(), emitAppVersionPlugin()],
     server: {
       host: true,

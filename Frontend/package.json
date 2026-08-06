@@ -6,6 +6,7 @@
   "scripts": {
     "dev": "vite",
     "build": "vite build",
+    "build:hosting": "vite build --mode production",
     "build:apk": "vite build --mode apk",
     "cap:sync": "npx cap sync android",
     "cap:open": "npx cap open android",
