@@ -2,7 +2,8 @@ import { useState, useEffect } from "react";
 import axios from "axios";
 import { toast } from "react-toastify";
 import { useParams, useNavigate, useSearchParams } from "react-router-dom";
-import { FaArrowLeft, FaShieldAlt } from "react-icons/fa";
+import { FaArrowLeft, FaShieldAlt, FaPlus } from "react-icons/fa";
+import { FiX } from "react-icons/fi";
 import { MODULES } from "../constants/module.js";
 import { useAuth } from "../context/AuthContext";
 
@@ -67,6 +68,9 @@ const TeacherManagement = () => {
   const [classes, setClasses] = useState([]);
   const [accessRoles, setAccessRoles] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [showAddSubject, setShowAddSubject] = useState(false);
+  const [newSubjectName, setNewSubjectName] = useState("");
+  const [savingSubject, setSavingSubject] = useState(false);
   const isMobile = window.innerWidth <= 768;
   const progress = (step / steps.length) * 100;
 
@@ -256,7 +260,6 @@ const TeacherManagement = () => {
 
     if (step === 2) {
       if (!form.qualification) errors.push("Qualification required");
-      if (!form.subjects) errors.push("Subject required");
     }
 
     if (step === 3) {
@@ -354,6 +357,44 @@ const TeacherManagement = () => {
 
   const prev = () => {
     if (step > 1) setStep((s) => s - 1);
+  };
+
+  const handleQuickAddSubject = async () => {
+    const name = newSubjectName.trim();
+    if (!name) {
+      toast.error("Subject name is required");
+      return;
+    }
+    try {
+      setSavingSubject(true);
+      const { data } = await axios.post(
+        `${API}/subjects/create`,
+        { name, status: "Active" },
+        { withCredentials: true },
+      );
+      const created = data?.subject;
+      if (!created?._id) {
+        toast.error("Subject created but response was incomplete");
+        return;
+      }
+      setSubjects((prev) => {
+        const exists = prev.some((s) => String(s._id) === String(created._id));
+        return exists ? prev : [created, ...prev];
+      });
+      setForm((prev) => {
+        const current = Array.isArray(prev.subjects) ? prev.subjects : [];
+        const id = String(created._id);
+        if (current.map(String).includes(id)) return prev;
+        return { ...prev, subjects: [...current, id] };
+      });
+      setShowAddSubject(false);
+      setNewSubjectName("");
+      toast.success("Subject added");
+    } catch (err) {
+      toast.error(err?.response?.data?.message || "Failed to create subject");
+    } finally {
+      setSavingSubject(false);
+    }
   };
 
   /* RESET */
@@ -672,18 +713,41 @@ const TeacherManagement = () => {
                   onChange={handleChange}
                   placeholder="Years of teaching"
                 />
-                <Select
-                  label="Subjects *"
-                  name="subjects"
-                  multiple
-                  value={form.subjects}
-                  options={subjects.map((s) => ({
-                    label: s.name,
-                    value: s._id,
-                  }))}
-                  onChange={handleChange}
-                  // error={errors.subjects}
-                />
+                <div>
+                  <div className="flex items-center justify-between gap-2 mb-1">
+                    <label className="block text-sm text-[rgb(var(--text))]">
+                      Subjects
+                    </label>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setNewSubjectName("");
+                        setShowAddSubject(true);
+                      }}
+                      className="inline-flex items-center gap-1 text-xs font-semibold text-indigo-600 hover:text-indigo-800"
+                    >
+                      <FaPlus className="text-[10px]" />
+                      Add subject
+                    </button>
+                  </div>
+                  <Select
+                    name="subjects"
+                    multiple
+                    value={form.subjects}
+                    options={subjects.map((s) => ({
+                      label: s.name,
+                      value: s._id,
+                    }))}
+                    onChange={handleChange}
+                    hideLabel
+                  />
+                  {subjects.length === 0 && (
+                    <p className="text-xs text-amber-600 mt-1">
+                      No subjects yet. Use Add subject to create one without leaving
+                      this page.
+                    </p>
+                  )}
+                </div>
                 <Input
                   label="Department"
                   name="department"
@@ -945,6 +1009,64 @@ const TeacherManagement = () => {
           }}
         />
       )}
+
+      {showAddSubject && (
+        <div
+          className="fixed inset-0 z-[10040] flex items-center justify-center p-4"
+          style={{ background: "rgba(15, 23, 42, 0.55)" }}
+          role="dialog"
+          aria-modal="true"
+        >
+          <div className="w-full max-w-md rounded-2xl bg-white shadow-xl border border-slate-200 p-5">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-lg font-bold text-slate-800">Add subject</h3>
+              <button
+                type="button"
+                onClick={() => setShowAddSubject(false)}
+                className="p-1 rounded-lg text-slate-500 hover:bg-slate-100"
+                aria-label="Close"
+              >
+                <FiX size={20} />
+              </button>
+            </div>
+            <label className="block text-sm font-medium text-slate-600 mb-1">
+              Subject name *
+            </label>
+            <input
+              autoFocus
+              type="text"
+              value={newSubjectName}
+              onChange={(e) => setNewSubjectName(e.target.value)}
+              placeholder="e.g. Mathematics"
+              className="w-full border px-3 py-2.5 rounded-xl outline-none focus:ring-2 focus:ring-indigo-500"
+              onKeyDown={(e) => {
+                if (e.key === "Enter") {
+                  e.preventDefault();
+                  handleQuickAddSubject();
+                }
+              }}
+            />
+            <div className="flex justify-end gap-2 mt-5">
+              <button
+                type="button"
+                disabled={savingSubject}
+                onClick={() => setShowAddSubject(false)}
+                className="px-4 py-2 rounded-xl border border-slate-200 text-slate-700"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                disabled={savingSubject}
+                onClick={handleQuickAddSubject}
+                className="px-4 py-2 rounded-xl bg-indigo-600 text-white font-semibold disabled:opacity-60"
+              >
+                {savingSubject ? "Saving…" : "Save subject"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
@@ -972,6 +1094,7 @@ const Select = ({
   name,
   onChange,
   error,
+  hideLabel = false,
   ...props
 }) => {
   const handleChange = (e) => {
@@ -989,9 +1112,11 @@ const Select = ({
 
   return (
     <div>
-      <label className="block text-sm mb-1 text-[rgb(var(--text))]">
-        {label}
-      </label>
+      {!hideLabel && label && (
+        <label className="block text-sm mb-1 text-[rgb(var(--text))]">
+          {label}
+        </label>
+      )}
 
       <select
         {...props}
@@ -1005,11 +1130,11 @@ const Select = ({
 
         {options.map((o, i) => {
           const val = typeof o === "object" ? o.value : o;
-          const label = typeof o === "object" ? o.label : o;
+          const optLabel = typeof o === "object" ? o.label : o;
 
           return (
             <option key={i} value={val}>
-              {label}
+              {optLabel}
             </option>
           );
         })}
