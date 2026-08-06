@@ -148,17 +148,18 @@ const TeacherManagement = () => {
       setDraftReady(true);
       return;
     }
+    if (authLoading || !schoolId) return;
     const draft = loadTeacherDraft(schoolId);
     if (draft) {
       setForm(draft.form);
       setStep(draft.step);
     }
     setDraftReady(true);
-  }, [isEdit, schoolId]);
+  }, [isEdit, schoolId, authLoading]);
 
   /* PERSIST CREATE DRAFT */
   useEffect(() => {
-    if (isEdit || !draftReady) return;
+    if (isEdit || !draftReady || !schoolId) return;
     saveTeacherDraft(schoolId, step, form);
   }, [isEdit, draftReady, schoolId, step, form]);
 
