@@ -1,6 +1,7 @@
 import CommerceProduct, {
   COMMERCE_CATEGORIES,
 } from "../models/commerceProduct.js";
+import Student from "../models/student.js";
 
 const getSchoolId = (req) => req.user?.school_id;
 
@@ -82,7 +83,51 @@ export const getParentProducts = async (req, res, next) => {
       .sort({ category: 1, name: 1 })
       .lean();
 
-    return res.json({ success: true, data: products });
+    let studentGender = null;
+    let studentClassName = null;
+    const studentId = req.user?.student_id;
+    if (studentId) {
+      const student = await Student.findById(studentId)
+        .select("gender classId")
+        .populate("classId", "name")
+        .lean();
+      if (student) {
+        studentGender = student.gender;
+        studentClassName = student.classId?.name || null;
+      }
+    }
+
+    const genderLabel =
+      studentGender === "Male"
+        ? "Boys"
+        : studentGender === "Female"
+          ? "Girls"
+          : null;
+
+    let filtered = products;
+    if (genderLabel) {
+      filtered = filtered.filter((p) => {
+        if (p.category === "uniform") {
+          return !p.gender || p.gender === "Unisex" || p.gender === genderLabel;
+        }
+        return true;
+      });
+    }
+    if (studentClassName) {
+      filtered = filtered.filter((p) => {
+        if (p.category === "book") {
+          const label = (p.classLabel || "").trim();
+          return (
+            !label ||
+            label.toLowerCase() === "unisex-all" ||
+            label === studentClassName
+          );
+        }
+        return true;
+      });
+    }
+
+    return res.json({ success: true, data: filtered });
   } catch (error) {
     next(error);
   }

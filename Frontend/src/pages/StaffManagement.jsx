@@ -195,6 +195,10 @@ const StaffManagement = () => {
       /* keep cached */
     }
     const activeRoles = roles.filter((r) => r.isActive !== false);
+    if (activeRoles.length === 0) {
+      toast.error("No active staff roles available. Create a role in Staff Roles first.");
+      return;
+    }
     const defaultRoleId = activeRoles[0]?._id || "";
     setForm({
       ...emptyForm,

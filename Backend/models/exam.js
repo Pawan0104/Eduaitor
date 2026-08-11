@@ -16,4 +16,9 @@ const ExamSchema = new mongoose.Schema({
   sectionId: { type: mongoose.Schema.Types.ObjectId, ref: 'Section' }, // Added Section
 }, { timestamps: true });
 
+ExamSchema.index(
+  { schoolId: 1, className: 1, subject: 1, termId: 1 },
+  { unique: true, name: "one_exam_per_class_subject_term" }
+);
+
 export default mongoose.model('Exam', ExamSchema);

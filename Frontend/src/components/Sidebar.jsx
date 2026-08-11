@@ -522,6 +522,12 @@ const Sidebar = ({ closeSidebar }) => {
       module: "gatepass",
     },
     {
+      name: "Hostel Visit",
+      icon: <FaHotel />,
+      path: "/parent/hostel-visit",
+      module: "hostel",
+    },
+    {
       name: "Homework",
       icon: <FaClipboardList />,
       path: "/parent/homework",
@@ -747,12 +753,19 @@ const Sidebar = ({ closeSidebar }) => {
       name: "Lead Management",
       icon: <FaClipboardList />,
       path: "/staff/leads",
+      module: "leads",
     },
     {
       name: "Hostel Management",
       icon: <FaHotel />,
       path: "/staff/hostel",
       module: "hostel",
+    },
+    {
+      name: "Gate Pass",
+      icon: <FaIdCard />,
+      path: "/staff/gatepass",
+      module: "gatepass",
     },
     {
       name: "Groups",
@@ -770,9 +783,9 @@ const Sidebar = ({ closeSidebar }) => {
         { name: "Staff Roles", path: "/staff/staff-roles" },
       ],
     },
-    { name: "Notices", icon: <FaBell />, path: "/staff/notice" },
-    { name: "Events", icon: <FaCalendar />, path: "/staff/event" },
-    { name: "Calendar", icon: <FaCalendarAlt />, path: "/staff/calendar" },
+    { name: "Notices", icon: <FaBell />, path: "/staff/notice", module: "notices" },
+    { name: "Events", icon: <FaCalendar />, path: "/staff/event", module: "events" },
+    { name: "Calendar", icon: <FaCalendarAlt />, path: "/staff/calendar", module: "events" },
   ];
 
   let menu = [];
@@ -793,7 +806,6 @@ const Sidebar = ({ closeSidebar }) => {
   } else if (role === "staff_admin") {
     menu = staffAdminMenu.filter((item) => {
       if (!item.module) return true;
-      if (item.module === "staff") return true;
       return user?.permissions?.includes(item.module);
     });
   }

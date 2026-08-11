@@ -660,13 +660,16 @@ function Syllabus() {
             )}
 
             {/* Add Chapter Button */}
-            <button
-              onClick={() => openChapterModal()}
-              className="flex items-center gap-2 px-4 py-3 text-[rgb(var(--text))] bg-[rgb(var(--primary))]  font-semibold rounded-lg transition transform hover:scale-105"
-            >
-              <FiPlus className="w-5 h-5" />
-              Add Chapter
-            </button>
+            <div className="flex flex-wrap items-center justify-end gap-2 w-full">
+              <button
+                type="button"
+                onClick={() => openChapterModal()}
+                className="inline-flex items-center gap-2 px-4 py-2.5 text-white bg-[rgb(var(--primary))] font-semibold rounded-lg transition hover:opacity-90 cursor-pointer"
+              >
+                <FiPlus className="w-5 h-5" />
+                Add Chapter
+              </button>
+            </div>
 
             {/* Loading State */}
             {loading && (

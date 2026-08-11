@@ -37,7 +37,7 @@ export const getMenuPath = (role, loginAs) => {
     case "student_admin":
       return loginAs === "parent" ? "/parent/menu" : "/student/menu";
     default:
-      return "/";
+      return "/admin/login";
   }
 };
 

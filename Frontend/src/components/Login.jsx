@@ -130,6 +130,7 @@ export default function Login() {
       const res = await api.post(`/auth/login`, {
         email: form.email.trim(),
         password: form.password,
+        portal: "staff",
       });
 
       await finishLogin(res);
@@ -210,6 +211,7 @@ export default function Login() {
         email: mobile.trim(),
         password: form.password,
         schoolId: selectedSchool.schoolId,
+        portal: "parent",
       });
 
       await finishLogin(res);

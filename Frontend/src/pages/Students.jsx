@@ -3,7 +3,7 @@ import axios from "axios";
 import { FaPlus, FaArrowLeft, FaEye, FaEdit, FaUsers, FaFileExcel, FaFilePdf } from "react-icons/fa";
 import { MdPersonOutline } from "react-icons/md";
 import { PiChartPieSliceBold } from "react-icons/pi";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useLocation } from "react-router-dom";
 import { toast } from "react-toastify";
 import { FiTrash2 } from "react-icons/fi";
 import * as XLSX from "xlsx";
@@ -14,11 +14,13 @@ const API = import.meta.env.VITE_API_URL;
 
 const Students = () => {
   const navigate = useNavigate();
+  const location = useLocation();
 
   const [students, setStudents] = useState([]);
   const [selectedClass, setSelectedClass] = useState("");
   const [searchQuery, setSearchQuery] = useState("");
   const [classes, setClasses] = useState([]);
+  const [loading, setLoading] = useState(true);
 
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [confirmAction, setConfirmAction] = useState(null);
@@ -38,11 +40,14 @@ const Students = () => {
 
   const fetchStudents = async () => {
     try {
+      setLoading(true);
       const res = await axios.get(`${API}/students`, { withCredentials: true });
 
       setStudents(res.data.data);
     } catch {
       toast.error("Failed to load students");
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -50,6 +55,13 @@ const Students = () => {
     fetchStudents();
     fetchClasses();
   }, []);
+
+  useEffect(() => {
+    if (location.state?.refresh) {
+      fetchStudents();
+      navigate(location.pathname, { replace: true, state: {} });
+    }
+  }, [location.state?.refresh]);
 
   /* ================= STATS ================= */
 
@@ -348,9 +360,16 @@ const Students = () => {
           </div>
         </div>
 
-        {students.length === 0 && <EmptyState text="No students available" />}
+        {loading && (
+          <div className="flex flex-col items-center justify-center py-16 text-slate-500">
+            <div className="h-8 w-8 border-2 border-[rgb(var(--primary))] border-t-transparent rounded-full animate-spin" />
+            <p className="mt-3 text-sm">Loading students…</p>
+          </div>
+        )}
 
-        {students.length > 0 && (
+        {!loading && students.length === 0 && <EmptyState text="No students available" />}
+
+        {!loading && students.length > 0 && (
           <div className="overflow-x-auto">
             <table className="w-full min-w-175 text-sm">
               <thead className="bg-[rgb(var(--surface))] ">

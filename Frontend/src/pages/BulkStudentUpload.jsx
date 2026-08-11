@@ -12,6 +12,12 @@ const getRowIssues = (row) => {
   const issues = [];
   if (!row.firstName) issues.push("firstName missing");
   if (!row.lastName) issues.push("lastName missing");
+  const docsOk = String(row.documentsVerified || "")
+    .trim()
+    .toLowerCase();
+  if (!["yes", "y", "true", "1"].includes(docsOk)) {
+    issues.push("documentsVerified must be Yes");
+  }
   return issues;
 };
 
@@ -24,6 +30,7 @@ const BulkStudentUpload = ({ onComplete }) => {
   const [uploading, setUploading] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(0);
   const [result, setResult] = useState(null);
+  const [docsConfirmed, setDocsConfirmed] = useState(false);
 
   const parseFileForPreview = (selectedFile) => {
     const reader = new FileReader();
@@ -81,6 +88,7 @@ const BulkStudentUpload = ({ onComplete }) => {
     setFile(null);
     setPreviewRows([]);
     setUploadProgress(0);
+    setDocsConfirmed(false);
     if (fileInputRef.current) fileInputRef.current.value = "";
   };
 
@@ -93,6 +101,12 @@ const BulkStudentUpload = ({ onComplete }) => {
   const handleUpload = async () => {
     if (!file) {
       toast.warn("Choose a file first");
+      return;
+    }
+    if (!docsConfirmed) {
+      toast.error(
+        "Confirm that required documents were verified for every student row",
+      );
       return;
     }
 
@@ -302,13 +316,33 @@ const BulkStudentUpload = ({ onComplete }) => {
         </div>
       )}
 
+      {/* ── DOCUMENT VERIFICATION GATE ── */}
+      {file && !uploading && (
+        <label className="flex items-start gap-2 text-sm text-gray-700 cursor-pointer">
+          <input
+            type="checkbox"
+            className="mt-1"
+            checked={docsConfirmed}
+            onChange={(e) => setDocsConfirmed(e.target.checked)}
+          />
+          <span>
+            I confirm that required admission documents have been verified for
+            every student in this file. Each row must have{" "}
+            <code className="text-xs bg-gray-100 px-1 rounded">
+              documentsVerified=Yes
+            </code>
+            .
+          </span>
+        </label>
+      )}
+
       {/* ── ACTIONS ── */}
       <div className="flex gap-3">
         <button
           type="button"
           onClick={handleUpload}
-          disabled={!file || uploading}
-          className="px-4 py-2 rounded-md bg-blue-600 text-white text-sm disabled:opacity-50 flex items-center gap-2"
+          disabled={!file || uploading || !docsConfirmed}
+          className="px-4 py-2 rounded-md bg-blue-600 text-white text-sm disabled:opacity-50 flex items-center gap-2 cursor-pointer"
         >
           {uploading && (
             <span className="inline-block h-3.5 w-3.5 border-2 border-white border-t-transparent rounded-full animate-spin" />

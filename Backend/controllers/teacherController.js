@@ -99,6 +99,31 @@ export const createTeacher = async (req, res) => {
       });
     }
 
+    if (req.body.email?.trim()) {
+      const dupEmail = await Teacher.findOne({
+        schoolId,
+        email: req.body.email.trim(),
+      });
+      if (dupEmail) {
+        return res.status(400).json({
+          success: false,
+          message: "A teacher with this email already exists in your school",
+        });
+      }
+    }
+    if (req.body.phone?.trim()) {
+      const dupPhone = await Teacher.findOne({
+        schoolId,
+        phone: req.body.phone.trim(),
+      });
+      if (dupPhone) {
+        return res.status(400).json({
+          success: false,
+          message: "A teacher with this phone already exists in your school",
+        });
+      }
+    }
+
     const {
       customRoleId: _omitRole,
       permissions: _omitPerms,

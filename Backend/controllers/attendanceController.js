@@ -36,7 +36,26 @@ export const getMetaData = async (req, res) => {
       .populate('subjects', 'name');
 
     if (!teacher) return res.status(404).json({ success: false, message: 'Teacher not found' });
-    res.status(200).json({ success: true, teacher });
+
+    const classAssignments = await Class.find({
+      schoolId: req.user.school_id,
+      "details.subjectTeachers.teacherId": teacherId,
+    }).select("details.subjectTeachers");
+
+    const assignedSubjectIds = classAssignments.flatMap((c) =>
+      (c.details || []).flatMap((d) =>
+        (d.subjectTeachers || [])
+          .filter((st) => String(st.teacherId) === String(teacherId))
+          .map((st) => st.subjectId)
+      )
+    );
+
+    const profileIds = (teacher.subjects || []).map((s) => String(s._id || s));
+    const allSubjectIds = [...new Set([...profileIds, ...assignedSubjectIds.map(String)])];
+    const mergedSubjects = await Subject.find({ _id: { $in: allSubjectIds } }).select("name");
+    const teacherObj = teacher.toObject();
+    teacherObj.subjects = mergedSubjects;
+    res.status(200).json({ success: true, teacher: teacherObj });
   } catch (err) {
     res.status(500).json({ success: false, message: 'Internal Server Error', error: err.message });
   }

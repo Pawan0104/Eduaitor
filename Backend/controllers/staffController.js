@@ -161,6 +161,16 @@ export const createStaff = async (req, res, next) => {
       });
     }
 
+    if (phone?.trim()) {
+      const phoneExists = await Staff.findOne({ schoolId, phone: phone.trim() });
+      if (phoneExists) {
+        return res.status(400).json({
+          success: false,
+          message: "A staff member with this phone already exists in your school",
+        });
+      }
+    }
+
     // ── 4–5. RESOLVE PERMISSIONS FROM CUSTOM ROLE ─
     const resolved = await resolveStaffPermissions({
       schoolId,

@@ -103,6 +103,13 @@ export const createExam = async (req, res) => {
         .json({ message: "Exams cannot be scheduled on Sundays!" });
     }
 
+    const duplicate = await Exam.findOne({ schoolId, className, subject, termId });
+    if (duplicate) {
+      return res.status(409).json({
+        message: "An exam for this class, subject and term already exists.",
+      });
+    }
+
     // 2. Conflict Validation (SaaS Level)
     // Check if an exam already exists for this CLASS on this DATE that OVERLAPS the time
     const overlappingExam = await Exam.findOne({

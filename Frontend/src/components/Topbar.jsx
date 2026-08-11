@@ -56,7 +56,7 @@ const Topbar = ({ menuPath = "/" }) => {
 
   const name = user?.name || user?.school_name || "User";
   const role = user?.role || "User";
-  const userId = user?._id || null;
+  const userId = String(user?._id || user?.id || user?.school_id || "");
   const loginAs = user?.loginAs;
   const onMenuHub = Boolean(menuPath && location.pathname === menuPath);
   const canGoBack = !onMenuHub && window.history.length > 1;
@@ -89,7 +89,17 @@ const Topbar = ({ menuPath = "/" }) => {
       );
       setNotifications((prev) =>
         prev.map((n) =>
-          n._id === id ? { ...n, readBy: [...(n.readBy || []), userId] } : n,
+          n._id === id
+            ? {
+                ...n,
+                readBy: [
+                  ...new Set([
+                    ...(n.readBy || []).map(String),
+                    userId,
+                  ].filter(Boolean)),
+                ],
+              }
+            : n,
         ),
       );
     } catch {
@@ -97,8 +107,12 @@ const Topbar = ({ menuPath = "/" }) => {
     }
   };
 
+  const isNotifRead = (n) =>
+    Boolean(userId) &&
+    (n.readBy || []).some((id) => String(id) === userId);
+
   const handleNotifClick = async (notif) => {
-    if (!notif.readBy?.includes(userId)) {
+    if (!isNotifRead(notif)) {
       handleMarkAsRead(notif._id);
     }
     setOpenNotif(false);
@@ -116,7 +130,11 @@ const Topbar = ({ menuPath = "/" }) => {
       setNotifications((prev) =>
         prev.map((n) => ({
           ...n,
-          readBy: [...new Set([...(n.readBy || []), userId])],
+          readBy: [
+            ...new Set(
+              [...(n.readBy || []).map(String), userId].filter(Boolean),
+            ),
+          ],
         })),
       );
     } catch {
@@ -140,9 +158,7 @@ const Topbar = ({ menuPath = "/" }) => {
     }
   };
 
-  const unreadCount = notifications.filter(
-    (n) => !n.readBy?.includes(userId),
-  ).length;
+  const unreadCount = notifications.filter((n) => !isNotifRead(n)).length;
 
   const logout = async () => {
     try {
@@ -354,7 +370,7 @@ const Topbar = ({ menuPath = "/" }) => {
                   </div>
                 ) : (
                   notifications.map((n) => {
-                    const isUnread = !n.readBy?.includes(userId);
+                    const isUnread = !isNotifRead(n);
                     const colors =
                       TYPE_COLORS[n.notificationType] || TYPE_COLORS.general;
                     return (

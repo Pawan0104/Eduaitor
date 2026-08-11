@@ -73,6 +73,17 @@ export const loginUser = async (req, res) => {
     const { email, password } = req.body;
     const loginEmail = email?.trim().toLowerCase();
     const loginUsername = email?.trim();
+    const portal = String(req.body?.portal || req.body?.loginAs || "")
+      .trim()
+      .toLowerCase();
+    // staff/other portal must not accept parent/student credentials
+    const staffPortal =
+      portal === "staff" ||
+      portal === "other" ||
+      portal === "admin" ||
+      portal === "teacher";
+    const parentPortal = portal === "parent";
+    const studentPortal = portal === "student";
 
     const normalizeQuery = (value) => {
       if (!value) return null;
@@ -102,182 +113,201 @@ export const loginUser = async (req, res) => {
     }
 
     /* ---------- TEACHER ADMIN ---------- */
-    const teacher = await Teacher.findOne({
-      $or: [
-        emailQuery ? { email: emailQuery } : null,
-        { username: loginUsername },
-      ].filter(Boolean),
-    });
-
-    if (teacher && (await bcrypt.compare(password, teacher.password))) {
-      const school = await School.findById(teacher.schoolId).select(
-        "subscribed_modules admin_email school_name school_logo",
-      );
-
-      const moduleCtx = {
-        userEmail: teacher.email,
-        role: "teacher_admin",
-      };
-      const healed = await ensureDefaultSchoolModules(
-        school?.toObject?.() || school,
-        moduleCtx,
-      );
-      const subscribed_modules = resolveSubscribedModules(healed, moduleCtx);
-
-      let customRoleName = null;
-      if (teacher.customRoleId) {
-        const roleDoc = await SchoolStaffRole.findById(teacher.customRoleId)
-          .select("name")
-          .lean();
-        customRoleName = roleDoc?.name || null;
-      }
-
-      const token = generateToken({
-        role: "teacher_admin",
-        email: teacher.email,
-        school_id: teacher.schoolId,
-        teacher_id: teacher._id,
-        name: teacher.fullName,
-        _id: teacher._id,
+    if (!parentPortal && !studentPortal) {
+      const teacher = await Teacher.findOne({
+        $or: [
+          emailQuery ? { email: emailQuery } : null,
+          { username: loginUsername },
+        ].filter(Boolean),
       });
-      res.cookie("token", token, cookieOptions);
-      return res.json({
-        success: true,
-        token,
-        message: "Teacher login successful",
-        data: {
+
+      if (teacher && (await bcrypt.compare(password, teacher.password))) {
+        const school = await School.findById(teacher.schoolId).select(
+          "subscribed_modules admin_email school_name school_logo",
+        );
+
+        const moduleCtx = {
+          userEmail: teacher.email,
           role: "teacher_admin",
-          teacher_id: teacher._id,
-          name: teacher.fullName,
-          email: teacher.email,
-          school_id: teacher.schoolId,
-          school_name: school?.school_name || null,
-          school_logo: school?.school_logo || null,
-          customRoleId: teacher.customRoleId || null,
-          customRoleName,
-          permissions: teacher.permissions || [],
-          subscribed_modules,
-          photo_url: teacher.photo?.url || null,
-          firstTimeLogin: teacher.firstTimeLogin ?? false,
-        },
-      });
-    }
+        };
+        const healed = await ensureDefaultSchoolModules(
+          school?.toObject?.() || school,
+          moduleCtx,
+        );
+        const subscribed_modules = resolveSubscribedModules(healed, moduleCtx);
 
-    /* ---------- STUDENT / PARENT ADMIN ---------- */
-    const studentByStudentCreds = await Student.findOne({
-      "studentCredentials.username": loginUsername,
-    });
-
-    // ── STUDENT LOGIN ──
-    if (studentByStudentCreds) {
-      const passwordMatch = await bcrypt.compare(
-        password,
-        studentByStudentCreds.studentCredentials.password,
-      );
-
-      if (passwordMatch) {
-        const school = await School.findById(
-          studentByStudentCreds.schoolId,
-        ).select("subscribed_modules school_name school_logo");
-        const subscribed_modules = school?.subscribed_modules || [];
+        let customRoleName = null;
+        if (teacher.customRoleId) {
+          const roleDoc = await SchoolStaffRole.findById(teacher.customRoleId)
+            .select("name")
+            .lean();
+          customRoleName = roleDoc?.name || null;
+        }
 
         const token = generateToken({
-          role: "student_admin",
-          loginAs: "student",
-          username: studentByStudentCreds.studentCredentials.username,
-          school_id: studentByStudentCreds.schoolId,
-          student_id: studentByStudentCreds._id,
-          name: `${studentByStudentCreds.firstName} ${studentByStudentCreds.lastName}`,
-          _id: studentByStudentCreds._id,
+          role: "teacher_admin",
+          email: teacher.email,
+          school_id: teacher.schoolId,
+          teacher_id: teacher._id,
+          name: teacher.fullName,
+          _id: teacher._id,
         });
-
         res.cookie("token", token, cookieOptions);
         return res.json({
           success: true,
           token,
-          message: "Student login successful",
+          message: "Teacher login successful",
           data: {
-            role: "student_admin",
-            loginAs: "student",
-            student_id: studentByStudentCreds._id,
-            name: `${studentByStudentCreds.firstName} ${studentByStudentCreds.lastName}`,
-            username: studentByStudentCreds.studentCredentials.username,
-            school_id: studentByStudentCreds.schoolId,
+            role: "teacher_admin",
+            teacher_id: teacher._id,
+            name: teacher.fullName,
+            email: teacher.email,
+            school_id: teacher.schoolId,
             school_name: school?.school_name || null,
             school_logo: school?.school_logo || null,
-            firstTimeLogin:
-              studentByStudentCreds.studentCredentials.firstTimeLogin,
+            customRoleId: teacher.customRoleId || null,
+            customRoleName,
+            permissions: teacher.permissions || [],
             subscribed_modules,
-            photo_url:
-              studentByStudentCreds.documents?.studentPhoto?.url || null,
+            photo_url: teacher.photo?.url || null,
+            firstTimeLogin: teacher.firstTimeLogin ?? false,
           },
         });
       }
     }
 
-    // ── PARENT LOGIN (supports multiple children sharing father mobile) ──
-    const parentUsername = normalizeParentUsername(loginUsername);
-    const requestedSchoolId = req.body?.schoolId
-      ? String(req.body.schoolId).trim()
-      : "";
+    /* ---------- STUDENT / PARENT ADMIN ---------- */
+    // Staff/Admin portal must never accept parent or student credentials
+    if (!staffPortal) {
+      const studentByStudentCreds =
+        !parentPortal
+          ? await Student.findOne({
+              "studentCredentials.username": loginUsername,
+            })
+          : null;
 
-    const parentQuery = {
-      "parentCredentials.username": parentUsername,
-    };
-    if (
-      requestedSchoolId &&
-      mongoose.Types.ObjectId.isValid(requestedSchoolId)
-    ) {
-      parentQuery.schoolId = requestedSchoolId;
-    }
+      // ── STUDENT LOGIN ──
+      if (studentByStudentCreds) {
+        const passwordMatch = await bcrypt.compare(
+          password,
+          studentByStudentCreds.studentCredentials.password,
+        );
 
-    const parentCandidates = parentUsername
-      ? await Student.find(parentQuery)
-          .populate("classId", "name className")
-          .populate("sectionId", "name sectionName")
-          .select(
-            "firstName lastName rollNo studentId classId sectionId schoolId documents.studentPhoto parentCredentials",
-          )
-      : [];
+        if (passwordMatch) {
+          const school = await School.findById(
+            studentByStudentCreds.schoolId,
+          ).select("subscribed_modules school_name school_logo");
+          const subscribed_modules = school?.subscribed_modules || [];
 
-    let matchedParentStudent = null;
-    for (const candidate of parentCandidates) {
-      const hash = candidate.parentCredentials?.password;
-      if (!hash) continue;
-      if (await bcrypt.compare(password, hash)) {
-        matchedParentStudent = candidate;
-        break;
+          const token = generateToken({
+            role: "student_admin",
+            loginAs: "student",
+            username: studentByStudentCreds.studentCredentials.username,
+            school_id: studentByStudentCreds.schoolId,
+            student_id: studentByStudentCreds._id,
+            name: `${studentByStudentCreds.firstName} ${studentByStudentCreds.lastName}`,
+            _id: studentByStudentCreds._id,
+          });
+
+          res.cookie("token", token, cookieOptions);
+          return res.json({
+            success: true,
+            token,
+            message: "Student login successful",
+            data: {
+              role: "student_admin",
+              loginAs: "student",
+              student_id: studentByStudentCreds._id,
+              name: `${studentByStudentCreds.firstName} ${studentByStudentCreds.lastName}`,
+              username: studentByStudentCreds.studentCredentials.username,
+              school_id: studentByStudentCreds.schoolId,
+              school_name: school?.school_name || null,
+              school_logo: school?.school_logo || null,
+              firstTimeLogin:
+                studentByStudentCreds.studentCredentials.firstTimeLogin,
+              subscribed_modules,
+              photo_url:
+                studentByStudentCreds.documents?.studentPhoto?.url || null,
+            },
+          });
+        }
+      }
+
+      // ── PARENT LOGIN (supports multiple children sharing father mobile) ──
+      if (!studentPortal) {
+        const parentUsername = normalizeParentUsername(loginUsername);
+        const requestedSchoolId = req.body?.schoolId
+          ? String(req.body.schoolId).trim()
+          : "";
+
+        const parentQuery = {
+          "parentCredentials.username": parentUsername,
+        };
+        if (
+          requestedSchoolId &&
+          mongoose.Types.ObjectId.isValid(requestedSchoolId)
+        ) {
+          parentQuery.schoolId = requestedSchoolId;
+        }
+
+        const parentCandidates = parentUsername
+          ? await Student.find(parentQuery)
+              .populate("classId", "name className")
+              .populate("sectionId", "name sectionName")
+              .select(
+                "firstName lastName rollNo studentId classId sectionId schoolId documents.studentPhoto parentCredentials",
+              )
+          : [];
+
+        let matchedParentStudent = null;
+        for (const candidate of parentCandidates) {
+          const hash = candidate.parentCredentials?.password;
+          if (!hash) continue;
+          if (await bcrypt.compare(password, hash)) {
+            matchedParentStudent = candidate;
+            break;
+          }
+        }
+
+        if (matchedParentStudent) {
+          const children = await findChildrenByParentUsername(
+            parentUsername,
+            matchedParentStudent.schoolId,
+          );
+          // Prefer matched student as active; fall back to first sibling
+          const active =
+            children.find(
+              (c) => String(c._id) === String(matchedParentStudent._id),
+            ) ||
+            children[0] ||
+            matchedParentStudent;
+
+          const school = await School.findById(active.schoolId).select(
+            "subscribed_modules school_name school_logo",
+          );
+          const subscribed_modules = school?.subscribed_modules || [];
+          const session = buildParentSession(
+            active,
+            children.length ? children : [active],
+            school,
+            subscribed_modules,
+          );
+
+          res.cookie("token", session.token, cookieOptions);
+          return res.json({
+            success: true,
+            token: session.token,
+            message: "Parent login successful",
+            data: session.data,
+          });
+        }
       }
     }
 
-    if (matchedParentStudent) {
-      const children = await findChildrenByParentUsername(
-        parentUsername,
-        matchedParentStudent.schoolId,
-      );
-      // Prefer matched student as active; fall back to first sibling
-      const active =
-        children.find(
-          (c) => String(c._id) === String(matchedParentStudent._id),
-        ) || children[0] || matchedParentStudent;
-
-      const school = await School.findById(active.schoolId).select(
-        "subscribed_modules school_name school_logo",
-      );
-      const subscribed_modules = school?.subscribed_modules || [];
-      const session = buildParentSession(
-        active,
-        children.length ? children : [active],
-        school,
-        subscribed_modules,
-      );
-
-      res.cookie("token", session.token, cookieOptions);
-      return res.json({
-        success: true,
-        token: session.token,
-        message: "Parent login successful",
-        data: session.data,
+    if (parentPortal || studentPortal) {
+      return res.status(401).json({
+        success: false,
+        message: "Invalid credentials",
       });
     }
 

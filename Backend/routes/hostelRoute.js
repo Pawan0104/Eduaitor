@@ -26,6 +26,7 @@ import {
 import {
   getVisitors,
   createVisitor,
+  createParentVisitorRequest,
   updateVisitor,
   approveVisitor,
   rejectVisitor,
@@ -36,6 +37,12 @@ import {
 const router = express.Router();
 const guard = [authMiddleware, checkModuleAccess("hostel")];
 const visitorPhotoUpload = upload.single("photo");
+
+router.post(
+  "/visitors/parent-request",
+  authMiddleware,
+  createParentVisitorRequest,
+);
 
 /* Nested resources before /:id */
 router.get("/rooms", ...guard, getRooms);

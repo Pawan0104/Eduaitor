@@ -16,6 +16,7 @@ import {
   FaBookDead,
   FaBookOpen,
   FaKey,
+  FaHotel,
 } from "react-icons/fa";
 import { GiOpenBook } from "react-icons/gi";
 import { toast } from "react-toastify";
@@ -54,6 +55,7 @@ const COLOR_MAP = {
   "Daily learning": { bg: "#EEF2FF", icon: "#4F46E5", dot: "#C7D2FE" },
   "Syllabus Books": { bg: "#F0FDF4", icon: "#10B981", dot: "#A7F3D0" },
   Credentials: { bg: "#EEF2FF", icon: "#4F46E5", dot: "#C7D2FE" },
+  "Hostel Visit": { bg: "#EEF2FF", icon: "#6366F1", dot: "#C7D2FE" },
 };
 
 export default function ParentMenu() {
@@ -103,6 +105,7 @@ export default function ParentMenu() {
     { name: "Pay Fee", icon: <FaWallet />, path: "/parent/fees" },
     { name: "School Store", icon: <FaStore />, path: "/parent/store" },
     { name: "Transport & GPS", icon: <FaBusAlt />, path: "/parent/transport" },
+    { name: "Hostel Visit", icon: <FaHotel />, path: "/parent/hostel-visit" },
     { name: "Exam Results", icon: <GiOpenBook />, path: "/parent/exam-result" },
     { name: "Report Card", icon: <GiOpenBook />, path: "/parent/report-card" },
     { name: "Student ID Card", icon: <FaIdCard />, path: "/parent/id-card" },

@@ -1,6 +1,7 @@
 import mongoose from "mongoose";
 import Class from "../models/class.js";
 import Teacher from "../models/teacher.js";
+import Student from "../models/student.js";
 import {
   autoCreateClassGroups,
   syncClassGroupsMembers,
@@ -271,6 +272,13 @@ export const getClassesFlat = async (req, res) => {
 
     const filter = await teacherScopedClassFilter(req);
     filter.status = "Active";
+
+    if (req.user?.role === "student_admin" && req.user?.student_id) {
+      const student = await Student.findById(req.user.student_id).select("classId");
+      if (student?.classId) {
+        filter._id = student.classId;
+      }
+    }
 
     const classes = await Class.find(filter)
       .populate("details.sectionId", "name status")

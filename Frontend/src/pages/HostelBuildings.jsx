@@ -20,6 +20,7 @@ const EMPTY_FORM = {
   address: "",
   totalFloors: "1",
   capacity: "",
+  wardenId: "",
   wardenName: "",
   wardenPhone: "",
   description: "",
@@ -46,6 +47,18 @@ const HostelBuildings = () => {
 
   const [deleteModal, setDeleteModal] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState(null);
+  const [staffList, setStaffList] = useState([]);
+
+  const fetchStaff = async () => {
+    try {
+      const res = await axios.get(`${API}/staff`, { withCredentials: true });
+      const all = res.data.data || [];
+      const wardens = all.filter((s) => s.staffRole === "hostel_warden");
+      setStaffList(wardens.length > 0 ? wardens : all);
+    } catch {
+      setStaffList([]);
+    }
+  };
 
   const fetchHostels = async () => {
     try {
@@ -69,12 +82,14 @@ const HostelBuildings = () => {
     setIsEdit(false);
     setEditId(null);
     setForm({ ...EMPTY_FORM });
+    fetchStaff();
     setFormModal(true);
   };
 
   const openEdit = (hostel) => {
     setIsEdit(true);
     setEditId(hostel._id);
+    fetchStaff();
     setForm({
       name: hostel.name || "",
       code: hostel.code || "",
@@ -82,6 +97,7 @@ const HostelBuildings = () => {
       address: hostel.address || "",
       totalFloors: String(hostel.totalFloors ?? 1),
       capacity: hostel.capacity ? String(hostel.capacity) : "",
+      wardenId: hostel.wardenId?._id || hostel.wardenId || "",
       wardenName: hostel.wardenName || "",
       wardenPhone: hostel.wardenPhone || "",
       description: hostel.description || "",
@@ -112,6 +128,7 @@ const HostelBuildings = () => {
       address: form.address.trim(),
       totalFloors: floors || 0,
       capacity: capacityNum,
+      wardenId: form.wardenId || null,
       wardenName: form.wardenName.trim(),
       wardenPhone: form.wardenPhone.trim(),
       description: form.description.trim(),
@@ -370,6 +387,7 @@ const HostelBuildings = () => {
           isEdit={isEdit}
           form={form}
           setForm={setForm}
+          staffList={staffList}
           onClose={() => {
             setFormModal(false);
             setForm({ ...EMPTY_FORM });
@@ -412,9 +430,20 @@ const StatCard = ({ title, value, color = "blue" }) => {
   );
 };
 
-const HostelFormModal = ({ isEdit, form, setForm, onClose, onSubmit, loading }) => {
+const HostelFormModal = ({ isEdit, form, setForm, staffList, onClose, onSubmit, loading }) => {
   const set = (key) => (e) =>
     setForm((p) => ({ ...p, [key]: e.target.value }));
+
+  const handleWardenSelect = (e) => {
+    const id = e.target.value;
+    const staff = staffList.find((s) => String(s._id) === String(id));
+    setForm((p) => ({
+      ...p,
+      wardenId: id,
+      wardenName: staff?.fullName || "",
+      wardenPhone: staff?.phone || "",
+    }));
+  };
 
   return (
     <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50">
@@ -511,6 +540,24 @@ const HostelFormModal = ({ isEdit, form, setForm, onClose, onSubmit, loading }) 
               onChange={set("capacity")}
               className="w-full border rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 outline-none bg-[rgb(var(--surface))]"
             />
+          </div>
+
+          <div className="sm:col-span-2">
+            <label className="block text-xs font-semibold text-[rgb(var(--text-muted))] uppercase tracking-wide mb-1">
+              Warden (Staff)
+            </label>
+            <select
+              value={form.wardenId}
+              onChange={handleWardenSelect}
+              className="w-full border rounded-lg px-3 py-2 text-sm bg-[rgb(var(--surface))]"
+            >
+              <option value="">Select warden</option>
+              {staffList.map((s) => (
+                <option key={s._id} value={s._id}>
+                  {s.fullName}{s.staffRole === "hostel_warden" ? " (Warden)" : ""}
+                </option>
+              ))}
+            </select>
           </div>
 
           <div>

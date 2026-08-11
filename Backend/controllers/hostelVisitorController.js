@@ -87,6 +87,108 @@ export const getVisitors = async (req, res, next) => {
   }
 };
 
+/* ---------------- CREATE (parent request — no photo, no hostel module) ---------------- */
+export const createParentVisitorRequest = async (req, res, next) => {
+  try {
+    const schoolId = getSchoolId(req);
+    if (!schoolId) {
+      return res.status(403).json({
+        success: false,
+        message: "School not identified.",
+      });
+    }
+
+    const isParent =
+      req.user?.role === "student_admin" &&
+      (req.user?.loginAs === "parent" || !req.user?.loginAs);
+    if (!isParent) {
+      return res.status(403).json({
+        success: false,
+        message: "Only parents can submit hostel visit requests.",
+      });
+    }
+
+    const studentId = req.user?.student_id;
+    if (!studentId) {
+      return res.status(400).json({
+        success: false,
+        message: "Student not linked to this account.",
+      });
+    }
+
+    const { visitorName, phone, purpose, visitDate } = req.body;
+
+    if (!String(visitorName || "").trim()) {
+      return res.status(400).json({
+        success: false,
+        message: "Visitor name is required.",
+      });
+    }
+
+    const resident = await HostelResident.findOne({
+      schoolId,
+      studentId,
+      status: "Active",
+    }).populate("studentId", "firstName lastName studentId");
+
+    if (!resident) {
+      return res.status(400).json({
+        success: false,
+        message: "Your child is not an active hostel resident.",
+      });
+    }
+
+    const resolvedWhom = resident.studentId
+      ? `${resident.studentId.firstName || ""} ${resident.studentId.lastName || ""}`.trim()
+      : "";
+
+    const submittedBy = resolveActor(req.user);
+    const notes = visitDate ? `Requested visit date: ${visitDate}` : "";
+
+    const visitor = await HostelVisitor.create({
+      schoolId,
+      hostelId: resident.hostelId,
+      visitorName: String(visitorName).trim(),
+      phone: String(phone || "").trim(),
+      purpose: String(purpose || "").trim(),
+      whomVisiting: resolvedWhom,
+      residentId: resident._id,
+      studentId,
+      photo: { url: "", public_id: "", type: "" },
+      status: "Pending",
+      checkInAt: null,
+      submittedBy,
+      notes,
+    });
+
+    try {
+      await createNotificationHelper({
+        title: "Parent hostel visit request",
+        message: `${visitor.visitorName} requested a visit for ${resolvedWhom || "a hostel resident"}.`,
+        notificationType: "general",
+        schoolId,
+        createdBy: submittedBy.userId,
+        targets: [
+          { type: "role", roles: ["school_admin"] },
+          { type: "role", roles: ["staff_admin"] },
+        ],
+      });
+    } catch (notifyErr) {
+      console.error("Parent visitor notify failed:", notifyErr.message);
+    }
+
+    const data = await populateVisitor(HostelVisitor.findById(visitor._id)).lean();
+
+    return res.status(201).json({
+      success: true,
+      message: "Visit request submitted for warden approval.",
+      data,
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
 /* ---------------- CREATE (guard submits for approval) ---------------- */
 export const createVisitor = async (req, res, next) => {
   try {

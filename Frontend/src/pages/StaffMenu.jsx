@@ -135,6 +135,12 @@ export default function StaffMenu() {
         module: "hostel",
       },
       {
+        name: "Gate Pass",
+        icon: <FaIdCard />,
+        path: "/staff/gatepass",
+        module: "gatepass",
+      },
+      {
         name: "Timetable",
         icon: <FaClock />,
         path: "/staff/timetable",
@@ -178,6 +184,7 @@ export default function StaffMenu() {
         name: "Lead Management",
         icon: <FaClipboardList />,
         path: "/staff/leads",
+        module: "leads",
       },
       {
         name: "Groups",
@@ -194,14 +201,13 @@ export default function StaffMenu() {
           { name: "Staff Roles", path: "/staff/staff-roles" },
         ],
       },
-      { name: "Notices", icon: <FaBell />, path: "/staff/notice" },
-      { name: "Events", icon: <FaCalendar />, path: "/staff/event" },
-      { name: "Calendar", icon: <FaCalendarAlt />, path: "/staff/calendar" },
+      { name: "Notices", icon: <FaBell />, path: "/staff/notice", module: "notices" },
+      { name: "Events", icon: <FaCalendar />, path: "/staff/event", module: "events" },
+      { name: "Calendar", icon: <FaCalendarAlt />, path: "/staff/calendar", module: "events" },
     ];
 
     return all.filter((item) => {
       if (!item.module) return true;
-      if (item.module === "staff") return true;
       return user?.permissions?.includes(item.module);
     });
   }, [user?.permissions]);

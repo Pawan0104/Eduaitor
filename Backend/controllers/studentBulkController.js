@@ -38,6 +38,7 @@ const TEMPLATE_HEADERS = [
   "finalFee",
   "feeFrequency",
   "password",
+  "documentsVerified",
 ];
 
 export const downloadStudentTemplate = (req, res) => {
@@ -69,6 +70,7 @@ export const downloadStudentTemplate = (req, res) => {
       finalFee: 50000,
       feeFrequency: "annually",
       password: "Welcome@123", // optional — defaults to Student@123 if left blank
+      documentsVerified: "Yes", // required: Yes after physical/digital docs verified
     };
 
     const worksheet = XLSX.utils.json_to_sheet([sampleRow], {
@@ -207,6 +209,15 @@ export const bulkUploadStudents = async (req, res) => {
 
       if (!row.firstName) errors.push("firstName is required");
       if (!row.lastName) errors.push("lastName is required");
+
+      const docsOk = String(row.documentsVerified || "")
+        .trim()
+        .toLowerCase();
+      if (!["yes", "y", "true", "1"].includes(docsOk)) {
+        errors.push(
+          "documentsVerified must be Yes (required documents verified before admission)",
+        );
+      }
 
       let classId = null;
       let sectionId = null;

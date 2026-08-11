@@ -1038,9 +1038,9 @@ const forbidden = [
         );
         const newId = res.data?.data?._id;
         if (newId) {
-          navigate(`${basePath}/id-card/student/${newId}`);
+          navigate(`${basePath}/students`, { state: { refresh: true } });
         } else {
-          navigate(leadId ? `${basePath}/leads` : `${basePath}/students`);
+          navigate(leadId ? `${basePath}/leads` : `${basePath}/students`, { state: { refresh: true } });
         }
       }
     } catch (err) {

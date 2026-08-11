@@ -48,6 +48,11 @@ const hostelSchema = new mongoose.Schema(
       trim: true,
       default: "",
     },
+    wardenId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "Staff",
+      default: null,
+    },
     description: {
       type: String,
       trim: true,

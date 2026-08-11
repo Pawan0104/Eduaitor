@@ -107,6 +107,7 @@ import StudentAttendanceDetail from "./pages/StudentAttendanceDetail";
 import StaffManagement from "./pages/StaffManagement";
 import SchoolStaffRoles from "./pages/SchoolStaffRoles";
 import ParentGatepass from "./pages/ParentGatepass";
+import ParentHostelVisit from "./pages/ParentHostelVisit";
 import TeacherGatepass from "./pages/TeacherGatepass";
 import MessagesPage from "./pages/messagesingal/MessagePage";
 import NewMessagePage from "./pages/messagesingal/NewMessagePage";
@@ -328,6 +329,7 @@ const App = () => {
           <Route path="calendar" element={<TeacherCalendar />} />
           <Route path="blogs" element={<Blogs />} />
            <Route path="gatepass" element={<ParentGatepass />} />
+           <Route path="hostel-visit" element={<ParentHostelVisit />} />
            <Route path="homework" element={<HomeworkParent />} />
            <Route path="learning-today" element={<ParentLearningToday />} />
            <Route path="daily-learning" element={<DailyLearningHub />} />
@@ -424,6 +426,7 @@ const App = () => {
           <Route path="hostel/rooms" element={<HostelRooms />} />
           <Route path="hostel/residents" element={<HostelResidents />} />
           <Route path="hostel/visitors" element={<HostelVisitors />} />
+          <Route path="gatepass" element={<TeacherGatepass />} />
           <Route path="timetable" element={<ReadTimetable />} />
           <Route path="syllabus" element={<Syllabus />} />
           <Route path="diary" element={<DiaryPrincipal />} />

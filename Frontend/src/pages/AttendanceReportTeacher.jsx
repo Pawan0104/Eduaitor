@@ -284,7 +284,7 @@ function SubjectWiseReport() {
 
   const goToStudent = (record) => {
     const studentId = record.studentId?._id ?? record._id;
-    navigate(`/attendance/student/${studentId}`, {
+    navigate(`/teacher/attendance/student/${studentId}`, {
       state: { from: "subject", month, year, selDate, subjectId: selSubject },
     });
   };

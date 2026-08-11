@@ -86,6 +86,7 @@ export const createHostel = async (req, res, next) => {
       capacity,
       wardenName,
       wardenPhone,
+      wardenId,
       description,
       status,
     } = req.body;
@@ -110,6 +111,7 @@ export const createHostel = async (req, res, next) => {
         capacity === undefined || capacity === "" ? 0 : Number(capacity),
       wardenName: wardenName?.trim() || "",
       wardenPhone: wardenPhone?.trim() || "",
+      wardenId: wardenId || null,
       description: description?.trim() || "",
       status: status || "Active",
     };
@@ -160,6 +162,7 @@ export const updateHostel = async (req, res, next) => {
       capacity,
       wardenName,
       wardenPhone,
+      wardenId,
       description,
       status,
     } = req.body;
@@ -190,6 +193,9 @@ export const updateHostel = async (req, res, next) => {
     if (wardenName !== undefined) hostel.wardenName = String(wardenName).trim();
     if (wardenPhone !== undefined) {
       hostel.wardenPhone = String(wardenPhone).trim();
+    }
+    if (wardenId !== undefined) {
+      hostel.wardenId = wardenId || null;
     }
     if (description !== undefined) {
       hostel.description = String(description).trim();

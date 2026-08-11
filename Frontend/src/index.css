@@ -1,5 +1,18 @@
 @import "tailwindcss";
 
+/* ---------- INTERACTIVE CURSOR ---------- */
+button:not(:disabled),
+[role="button"]:not([aria-disabled="true"]),
+a,
+.cursor-pointer {
+  cursor: pointer;
+}
+
+button:disabled,
+[aria-disabled="true"] {
+  cursor: not-allowed;
+}
+
 /* ---------- INPUT ---------- */
 
 .input {

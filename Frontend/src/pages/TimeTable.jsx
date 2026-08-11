@@ -42,6 +42,7 @@ export default function TimeTable() {
   const [selectedEntry, setSelectedEntry] = useState(null);
   const [classId, setClassId] = useState("");
   const [detailId, setDetailId] = useState("");
+  const [classSubjectIds, setClassSubjectIds] = useState([]);
 
   const [isEditMode, setIsEditMode] = useState(false);
   const [hasChanges, setHasChanges] = useState(false);
@@ -82,6 +83,36 @@ export default function TimeTable() {
   useEffect(() => {
     if (classId) fetchTimetable();
   }, [classId, detailId]);
+
+  useEffect(() => {
+    if (!classId) {
+      setClassSubjectIds([]);
+      return;
+    }
+    const loadClassSubjects = async () => {
+      try {
+        const res = await axios.get(`${API}/classes/${classId}`, {
+          withCredentials: true,
+        });
+        const cls = res.data.class;
+        const detail = detailId
+          ? (cls?.details || []).find((d) => String(d._id) === String(detailId))
+          : (cls?.details || [])[0];
+        const ids = (detail?.subjectTeachers || [])
+          .map((st) => String(st.subjectId?._id || st.subjectId))
+          .filter(Boolean);
+        setClassSubjectIds(ids);
+      } catch {
+        setClassSubjectIds([]);
+      }
+    };
+    loadClassSubjects();
+  }, [classId, detailId]);
+
+  const filteredSubjects =
+    classSubjectIds.length > 0
+      ? subjects.filter((s) => classSubjectIds.includes(String(s._id)))
+      : subjects;
 
   const fetchTimetable = async () => {
     try {
@@ -219,7 +250,7 @@ export default function TimeTable() {
   };
 
   /* ── subject / teacher name lookup ── */
-  const subjectName = (id) => subjects.find((s) => s._id === id)?.name || "";
+  const subjectName = (id) => filteredSubjects.find((s) => s._id === id)?.name || subjects.find((s) => s._id === id)?.name || "";
   const teacherName = (id) =>
     teachers.find((t) => t._id === id)?.fullName || "";
 
@@ -484,7 +515,7 @@ export default function TimeTable() {
                                 className="text-xs w-full px-2 py-1.5 border border-gray-200 rounded-lg  focus:outline-none focus:border-indigo-400 text-[rgb(var(--text))] bg-[rgb(var(--surface))] "
                               >
                                 <option value="">Select Subject</option>
-                                {subjects.map((s) => (
+                                {filteredSubjects.map((s) => (
                                   <option key={s._id} value={s._id}>
                                     {s.name}
                                   </option>

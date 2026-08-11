@@ -94,6 +94,11 @@ export default function ClassPage() {
     fetchAll();
   }, []);
 
+  const teachersForSubject = (subjectId) =>
+    teachers.filter((t) =>
+      (t.subjects || []).some((s) => String(s._id || s) === String(subjectId))
+    );
+
   /* ── detail helpers (admin only) ── */
   const updateDetail = (index, field, value) => {
     setForm((p) => {
@@ -739,7 +744,7 @@ export default function ClassPage() {
                                   className="text-xs border rounded px-2 py-1 flex-1 text-[rgb(var(--text))] bg-[rgb(var(--surface))]"
                                 >
                                   <option value="">Assign Teacher</option>
-                                  {teachers.map((t) => (
+                                  {teachersForSubject(st.subjectId).map((t) => (
                                     <option key={t._id} value={t._id} className="bg-[rgb(var(--surface))]">
                                       {t.fullName}
                                     </option>
