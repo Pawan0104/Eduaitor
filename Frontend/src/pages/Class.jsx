@@ -95,10 +95,31 @@ export default function ClassPage() {
     fetchAll();
   }, []);
 
-  const teachersForSubject = (subjectId) =>
-    teachers.filter((t) =>
-      (t.subjects || []).some((s) => String(s._id || s) === String(subjectId))
+  const teachersForSubject = (subjectId) => {
+    const matched = teachers.filter((t) =>
+      (t.subjects || []).some((s) => String(s._id || s) === String(subjectId)),
     );
+    // If nobody is tagged for this subject yet, still allow picking any teacher
+    return matched.length > 0 ? matched : teachers;
+  };
+
+  const buildPayload = () => ({
+    name: form.name.trim(),
+    status: form.status || "Active",
+    details: form.details.map((d) => ({
+      ...(d._id ? { _id: d._id } : {}),
+      sectionId: d.sectionId || null,
+      roomNumber: String(d.roomNumber || "").trim(),
+      teacherId: d.teacherId || null,
+      capacity: Number(d.capacity) > 0 ? Number(d.capacity) : 40,
+      subjectTeachers: (d.subjectTeachers || [])
+        .filter((st) => st.subjectId)
+        .map((st) => ({
+          subjectId: st.subjectId,
+          teacherId: st.teacherId || null,
+        })),
+    })),
+  });
 
   /* ── detail helpers (admin only) ── */
   const updateDetail = (index, field, value) => {
@@ -199,21 +220,20 @@ export default function ClassPage() {
 
   const confirmAndSave = async () => {
     setConfirmSave(false);
+    const payload = buildPayload();
     try {
       setSubmitting(true);
       if (editingClass) {
         await axios.put(
           `${API}/classes/update/${editingClass._id}`,
-          { ...form },
+          payload,
           { withCredentials: true },
         );
         toast.success("Class updated successfully!");
       } else {
-        await axios.post(
-          `${API}/classes/create`,
-          { ...form },
-          { withCredentials: true },
-        );
+        await axios.post(`${API}/classes/create`, payload, {
+          withCredentials: true,
+        });
         toast.success("Class created successfully!");
       }
       closeModal();

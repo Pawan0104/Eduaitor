@@ -8,6 +8,46 @@ import {
   removeTeacherFromClassGroups,
 } from "../utils/groupSync.js";
 
+/** Convert form values to ObjectId or null (never pass "" to mongoose). */
+const toIdOrNull = (value) => {
+  if (value == null || value === "") return null;
+  if (typeof value === "object") {
+    const id = value._id ?? value.id;
+    return toIdOrNull(id);
+  }
+  const str = String(value).trim();
+  if (!str || str === "null" || str === "undefined") return null;
+  if (!mongoose.Types.ObjectId.isValid(str)) return null;
+  return str;
+};
+
+const sanitizeDetails = (details = []) =>
+  (Array.isArray(details) ? details : []).map((d) => {
+    const subjectTeachers = (d.subjectTeachers || [])
+      .map((st) => ({
+        subjectId: toIdOrNull(st?.subjectId),
+        teacherId: toIdOrNull(st?.teacherId),
+      }))
+      .filter((st) => st.subjectId); // drop incomplete rows
+
+    const cleaned = {
+      sectionId: toIdOrNull(d.sectionId),
+      roomNumber: String(d.roomNumber || "").trim(),
+      teacherId: toIdOrNull(d.teacherId),
+      capacity: Number(d.capacity) > 0 ? Number(d.capacity) : 40,
+      studentCount:
+        typeof d.studentCount === "number" ? d.studentCount : undefined,
+      subjectTeachers,
+    };
+
+    const detailId = toIdOrNull(d._id);
+    if (detailId) cleaned._id = detailId;
+    return cleaned;
+  });
+
+const escapeRegex = (value) =>
+  String(value).replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+
 /**
  * Classes a teacher may access: assignedClasses ∪ class-teacher ∪ subject-teacher.
  */
@@ -79,7 +119,7 @@ export const createClass = async (req, res) => {
 
     const exists = await Class.findOne({
       schoolId,
-      name: { $regex: `^${name}$`, $options: "i" },
+      name: { $regex: `^${escapeRegex(name)}$`, $options: "i" },
     });
 
     if (exists)
@@ -89,40 +129,34 @@ export const createClass = async (req, res) => {
       });
 
     for (const d of details) {
-      if (!d.roomNumber)
+      if (!String(d.roomNumber || "").trim())
         return res.status(400).json({
           success: false,
           message: "Room number required",
         });
     }
 
-    const sanitized = details.map((d) => ({
-      ...d,
-      sectionId: d.sectionId || null,
-      teacherId: d.teacherId || null,
-      subjectTeachers:
-        d.subjectTeachers?.map((st) => ({
-          subjectId: st.subjectId || null,
-          teacherId: st.teacherId || null,
-        })) || [],
-      capacity: d.capacity || 40,
-    }));
+    const sanitized = sanitizeDetails(details);
 
     const newClass = await Class.create({
       name,
       schoolId,
       details: sanitized,
-      status,
+      status: status === "Inactive" ? "Inactive" : "Active",
     });
 
     // ✅ SYNC TEACHERS (MULTI CLASS SUPPORT)
     const teacherIds = [
       ...new Map(
         sanitized
-          .filter((d) => d.teacherId)
-          .map((d) => {
-            const id = new mongoose.Types.ObjectId(d.teacherId);
-            return [id.toString(), id];
+          .flatMap((d) => [
+            d.teacherId,
+            ...(d.subjectTeachers || []).map((st) => st.teacherId),
+          ])
+          .filter(Boolean)
+          .map((id) => {
+            const oid = new mongoose.Types.ObjectId(id);
+            return [oid.toString(), oid];
           }),
       ).values(),
     ];
@@ -331,10 +365,10 @@ export const updateClass = async (req, res) => {
         message: "Class not found",
       });
 
-    if (name && name !== cls.name) {
+    if (name && name.trim() !== cls.name) {
       const exists = await Class.findOne({
         schoolId,
-        name: { $regex: `^${name}$`, $options: "i" },
+        name: { $regex: `^${escapeRegex(name.trim())}$`, $options: "i" },
         _id: { $ne: cls._id },
       });
 
@@ -345,53 +379,70 @@ export const updateClass = async (req, res) => {
         });
     }
 
+    if (!details || !Array.isArray(details) || details.length === 0) {
+      return res.status(400).json({
+        success: false,
+        message: "At least one detail entry is required",
+      });
+    }
+
+    for (const d of details) {
+      if (!String(d.roomNumber || "").trim()) {
+        return res.status(400).json({
+          success: false,
+          message: "Room number required",
+        });
+      }
+    }
+
     // 🔥 OLD TEACHERS
     const oldTeacherIds = cls.details
-      .filter((d) => d.teacherId)
-      .map((d) => d.teacherId.toString());
+      .flatMap((d) => [
+        d.teacherId,
+        ...(d.subjectTeachers || []).map((st) => st.teacherId),
+      ])
+      .filter(Boolean)
+      .map((id) => id.toString());
 
-    const sanitized = details?.map((d) => ({
-      ...d,
-      sectionId: d.sectionId || null,
-      teacherId: d.teacherId || null,
-      subjectTeachers:
-        d.subjectTeachers?.map((st) => ({
-          subjectId: st.subjectId || null,
-          teacherId: st.teacherId || null,
-        })) || [],
-      capacity: d.capacity || 40,
-    }));
+    const sanitized = sanitizeDetails(details);
 
     // 🔥 NEW TEACHERS
-    const newTeacherIds =
-      sanitized
-        ?.filter((d) => d.teacherId)
-        .map((d) => d.teacherId.toString()) || [];
+    const newTeacherIds = sanitized
+      .flatMap((d) => [
+        d.teacherId,
+        ...(d.subjectTeachers || []).map((st) => st.teacherId),
+      ])
+      .filter(Boolean)
+      .map((id) => id.toString());
 
     // 🔥 FIND DIFF
-    const removedTeachers = oldTeacherIds.filter(
-      (id) => !newTeacherIds.includes(id),
-    );
-    const addedTeachers = newTeacherIds.filter(
-      (id) => !oldTeacherIds.includes(id),
-    );
+    const removedTeachers = [
+      ...new Set(oldTeacherIds.filter((id) => !newTeacherIds.includes(id))),
+    ];
+    const addedTeachers = [
+      ...new Set(newTeacherIds.filter((id) => !oldTeacherIds.includes(id))),
+    ];
 
     // 🔥 REMOVE CLASS FROM OLD TEACHERS
-    await Teacher.updateMany(
-      { _id: { $in: removedTeachers } },
-      { $pull: { assignedClasses: cls._id } },
-    );
+    if (removedTeachers.length) {
+      await Teacher.updateMany(
+        { _id: { $in: removedTeachers } },
+        { $pull: { assignedClasses: cls._id } },
+      );
+    }
 
     // 🔥 ADD CLASS TO NEW TEACHERS
-    await Teacher.updateMany(
-      { _id: { $in: addedTeachers } },
-      { $addToSet: { assignedClasses: cls._id } },
-    );
+    if (addedTeachers.length) {
+      await Teacher.updateMany(
+        { _id: { $in: addedTeachers } },
+        { $addToSet: { assignedClasses: cls._id } },
+      );
+    }
 
     // 🔥 UPDATE CLASS
-    cls.name = name || cls.name;
-    cls.details = sanitized || cls.details;
-    cls.status = status || cls.status;
+    cls.name = name?.trim() || cls.name;
+    cls.details = sanitized;
+    cls.status = status === "Inactive" ? "Inactive" : status || cls.status;
 
     await cls.save();
 
