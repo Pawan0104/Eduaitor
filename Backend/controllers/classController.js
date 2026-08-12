@@ -35,8 +35,7 @@ const sanitizeDetails = (details = []) =>
       roomNumber: String(d.roomNumber || "").trim(),
       teacherId: toIdOrNull(d.teacherId),
       capacity: Number(d.capacity) > 0 ? Number(d.capacity) : 40,
-      studentCount:
-        typeof d.studentCount === "number" ? d.studentCount : undefined,
+      // Never trust client studentCount — live counts are attached on read
       subjectTeachers,
     };
 
@@ -47,6 +46,94 @@ const sanitizeDetails = (details = []) =>
 
 const escapeRegex = (value) =>
   String(value).replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+
+/**
+ * Fill details[].studentCount from live Student rows (classId + sectionId).
+ * Stored studentCount on Class is often stale/0 after admissions.
+ */
+const attachLiveStudentCounts = async (classes, schoolId) => {
+  if (!Array.isArray(classes) || classes.length === 0) return classes;
+  if (!schoolId) return classes;
+
+  const schoolObjId = new mongoose.Types.ObjectId(String(schoolId));
+  const classObjIds = classes
+    .map((c) => c?._id)
+    .filter(Boolean)
+    .map((id) => new mongoose.Types.ObjectId(String(id)));
+
+  if (!classObjIds.length) return classes;
+
+  const rows = await Student.aggregate([
+    {
+      $match: {
+        schoolId: schoolObjId,
+        classId: { $in: classObjIds },
+      },
+    },
+    {
+      $group: {
+        _id: {
+          classId: "$classId",
+          sectionId: { $ifNull: ["$sectionId", null] },
+        },
+        count: { $sum: 1 },
+      },
+    },
+  ]);
+
+  // classId -> list of { sectionId|null, count }
+  const byClass = new Map();
+  for (const row of rows) {
+    const classKey = String(row._id.classId);
+    const list = byClass.get(classKey) || [];
+    list.push({
+      sectionId: row._id.sectionId ? String(row._id.sectionId) : null,
+      count: row.count,
+    });
+    byClass.set(classKey, list);
+  }
+
+  for (const cls of classes) {
+    const classKey = String(cls._id);
+    const buckets = byClass.get(classKey) || [];
+    const details = cls.details || [];
+    const detailSectionKeys = new Set(
+      details
+        .map((d) => {
+          const ref = d.sectionId?._id || d.sectionId || null;
+          return ref ? String(ref) : null;
+        })
+        .filter(Boolean),
+    );
+
+    for (const detail of details) {
+      detail.studentCount = 0;
+    }
+
+    for (const bucket of buckets) {
+      let target = null;
+      if (bucket.sectionId) {
+        target = details.find((d) => {
+          const ref = d.sectionId?._id || d.sectionId || null;
+          return ref && String(ref) === bucket.sectionId;
+        });
+        // Student section not on any class detail → count on first detail
+        if (!target) target = details[0];
+      } else {
+        // No section on student → prefer detail without section, else first
+        target =
+          details.find((d) => !(d.sectionId?._id || d.sectionId)) ||
+          details[0];
+      }
+      if (target) target.studentCount = (target.studentCount || 0) + bucket.count;
+    }
+
+    // Ignore unused set (kept for clarity / future filters)
+    void detailSectionKeys;
+  }
+
+  return classes;
+};
 
 /**
  * Classes a teacher may access: assignedClasses ∪ class-teacher ∪ subject-teacher.
@@ -233,6 +320,8 @@ export const getClasses = async (req, res) => {
       .sort({ name: 1 })
       .lean();
 
+    await attachLiveStudentCounts(classes, schoolId);
+
     res.json({ success: true, classes });
   } catch (err) {
     console.error(err);
@@ -261,7 +350,8 @@ export const getClassById = async (req, res) => {
       .populate("details.sectionId", "name status")
       .populate("details.teacherId", "fullName")
       .populate("details.subjectTeachers.teacherId", "fullName")
-      .populate("details.subjectTeachers.subjectId", "name");
+      .populate("details.subjectTeachers.subjectId", "name")
+      .lean();
 
     if (!cls)
       return res.status(404).json({
@@ -281,6 +371,8 @@ export const getClassById = async (req, res) => {
         });
       }
     }
+
+    await attachLiveStudentCounts([cls], schoolId);
 
     res.json({ success: true, class: cls });
   } catch (err) {
@@ -538,6 +630,8 @@ export const getAllClasses = async (req, res) => {
       .sort({ name: 1 })
       .lean();
 
+    await attachLiveStudentCounts(classes, schoolId);
+
     res.json({ success: true, classes });
   } catch (err) {
     console.error(err);
@@ -575,6 +669,8 @@ export const getTeacherClasses = async (req, res) => {
       .populate("details.subjectTeachers.teacherId", "fullName")
       .sort({ name: 1 })
       .lean();
+
+    await attachLiveStudentCounts(classes, schoolId);
 
     res.json({ success: true, classes });
   } catch (err) {
