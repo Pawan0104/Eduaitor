@@ -256,7 +256,7 @@ const RoleManagement = () => {
               value={roleName}
               onChange={(e) => setRoleName(e.target.value)}
               placeholder="Role name"
-              className="w-full border px-4 py-2 rounded-lg mb-4 focus:ring-2 focus:ring-indigo-400"
+              className="w-full min-w-0 border px-4 py-2 rounded-lg mb-4 focus:ring-2 focus:ring-indigo-400"
             />
 
             <label className="text-sm mb-1 block">

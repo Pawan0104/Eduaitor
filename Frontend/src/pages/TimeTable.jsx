@@ -18,6 +18,7 @@ import {
 import { MdOutlineClass } from "react-icons/md";
 import { FiX } from "react-icons/fi";
 import BulkTimetableUpload from "../components/BulkTimetableUpload";
+import LoadingSpinner from "../components/LoadingSpinner";
 
 const API = import.meta.env.VITE_API_URL;
 
@@ -47,6 +48,7 @@ export default function TimeTable() {
   const [isEditMode, setIsEditMode] = useState(false);
   const [hasChanges, setHasChanges] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [saving, setSaving] = useState(false);
 
   const [savedPeriodConfigs, setSavedPeriodConfigs] = useState([]);
   const [savedAssignments, setSavedAssignments] = useState({});
@@ -201,6 +203,7 @@ export default function TimeTable() {
   /* ── save ── */
   const saveDraft = async () => {
     if (!classId) return toast.warning("Select a class first");
+    setSaving(true);
     try {
       await axios.post(
         `${API}/timetable/save`,
@@ -217,10 +220,13 @@ export default function TimeTable() {
       setHasChanges(false);
     } catch {
       toast.error("Save failed");
+    } finally {
+      setSaving(false);
     }
   };
 
   const saveTeacherUpdate = async () => {
+    setSaving(true);
     try {
       await axios.post(
         `${API}/timetable/save`,
@@ -237,6 +243,8 @@ export default function TimeTable() {
       fetchTimetable();
     } catch {
       toast.error("Update failed");
+    } finally {
+      setSaving(false);
     }
   };
 
@@ -325,10 +333,20 @@ export default function TimeTable() {
               {hasChanges && !isEditMode && (
                 <button
                   onClick={saveTeacherUpdate}
-                  className="flex items-center gap-2 text-[rgb(var(--text))] bg-[rgb(var(--primary))] text-xs sm:text-sm font-semibold px-4 py-2 sm:px-5 sm:py-2.5 rounded-xl transition"
+                  disabled={saving}
+                  className="flex items-center gap-2 text-[rgb(var(--text))] bg-[rgb(var(--primary))] text-xs sm:text-sm font-semibold px-4 py-2 sm:px-5 sm:py-2.5 rounded-xl transition disabled:opacity-50 min-h-11"
                 >
-                  <FaSave size={12} />
-                  <span>Save Changes</span>
+                  {saving ? (
+                    <>
+                      <LoadingSpinner size="sm" label="" inline />
+                      <span>Saving…</span>
+                    </>
+                  ) : (
+                    <>
+                      <FaSave size={12} />
+                      <span>Save Changes</span>
+                    </>
+                  )}
                 </button>
               )}
 
@@ -346,10 +364,20 @@ export default function TimeTable() {
                   )}
                   <button
                     onClick={saveDraft}
-                    className="flex items-center gap-2 text-[rgb(var(--text))] bg-[rgb(var(--primary))]  text-xs sm:text-sm font-semibold px-4 py-2 sm:px-5 sm:py-2.5 rounded-xl transition"
+                    disabled={saving}
+                    className="flex items-center gap-2 text-[rgb(var(--text))] bg-[rgb(var(--primary))] text-xs sm:text-sm font-semibold px-4 py-2 sm:px-5 sm:py-2.5 rounded-xl transition disabled:opacity-50 min-h-11"
                   >
-                    <FaSave size={12} />
-                    <span>Save Timetable</span>
+                    {saving ? (
+                      <>
+                        <LoadingSpinner size="sm" label="" inline />
+                        <span>Saving…</span>
+                      </>
+                    ) : (
+                      <>
+                        <FaSave size={12} />
+                        <span>Save Timetable</span>
+                      </>
+                    )}
                   </button>
                 </>
               ) : (
@@ -382,11 +410,7 @@ export default function TimeTable() {
       )}
 
       {/* ── Loading ── */}
-      {classId && loading && (
-        <div className="flex items-center justify-center py-20">
-          <div className="w-8 h-8 border-4 border-indigo-400 border-t-transparent rounded-full animate-spin" />
-        </div>
-      )}
+      {classId && loading && <LoadingSpinner label="Loading timetable…" />}
 
       {/* ── Edit Mode ── */}
       {classId && !loading && isEditMode && (

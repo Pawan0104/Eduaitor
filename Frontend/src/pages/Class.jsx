@@ -16,6 +16,7 @@ import { FiX, FiCheckCircle, FiAlertTriangle } from "react-icons/fi";
 import { toast } from "react-toastify";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
+import LoadingSpinner from "../components/LoadingSpinner";
 
 const API = import.meta.env.VITE_API_URL;
 
@@ -345,9 +346,7 @@ export default function ClassPage() {
 
       {/* Class Cards */}
       {loading ? (
-        <div className="flex items-center justify-center py-20">
-          <div className="w-8 h-8 border-4 border-indigo-400 border-t-transparent rounded-full animate-spin" />
-        </div>
+        <LoadingSpinner label="Loading classes…" />
       ) : classes.length === 0 ? (
         <div className="text-center py-20 text-gray-400 text-sm">
           {isTeacher

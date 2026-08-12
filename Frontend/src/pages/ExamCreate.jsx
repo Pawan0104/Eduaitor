@@ -466,7 +466,7 @@ function ExamCreate() {
             className="absolute inset-0 bg-slate-900/60 backdrop-blur-sm"
             onClick={() => setIsModalOpen(false)}
           ></div>
-          <div className="relative text-[rgb(var(--text))] bg-[rgb(var(--surface))] w-full max-w-xl md:rounded-4xl rounded-t-4xl shadow-2xl flex flex-col max-h-[90vh]">
+          <div className="relative text-[rgb(var(--text))] bg-[rgb(var(--surface))] w-full max-w-xl md:rounded-4xl rounded-t-4xl shadow-2xl flex flex-col max-h-[90vh] min-w-0 pb-[max(1rem,env(safe-area-inset-bottom,0px))]">
             <div className="text-[rgb(var(--text))] bg-[rgb(var(--primary))] p-6  shrink-0">
               <h2 className="text-xl font-bold">
                 {editingId ? "Edit Exam" : "Schedule Exam"}
@@ -480,7 +480,7 @@ function ExamCreate() {
               onSubmit={handleFormSubmit}
               className="p-6 space-y-4 overflow-y-auto"
             >
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div className="col-span-2">
                   <label className="text-[10px] font-bold uppercase">
                     Exam Term
@@ -504,7 +504,7 @@ function ExamCreate() {
                   </select>
                 </div>
 
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   {/* Class Selection */}
                   <div className="col-span-1">
                     <label className="text-[10px] font-bold  uppercase">
@@ -595,7 +595,7 @@ function ExamCreate() {
                 </div>
               </div>
 
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div className="col-span-1">
                   <label className="text-[10px] font-bold  uppercase">
                     Date
@@ -624,7 +624,7 @@ function ExamCreate() {
                 </div>
               </div>
 
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
                   <label className="text-[10px] font-bold  uppercase">
                     Start Time
@@ -655,7 +655,7 @@ function ExamCreate() {
                 </div>
               </div>
 
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
                   <label className="text-[10px] font-bold  uppercase">
                     Total Marks
@@ -686,17 +686,17 @@ function ExamCreate() {
                 </div>
               </div>
 
-              <div className="flex gap-3 pt-4 pb-2">
+              <div className="flex flex-col sm:flex-row gap-3 pt-4 pb-2">
                 <button
                   type="button"
                   onClick={() => setIsModalOpen(false)}
-                  className="flex-1 py-3 font-bold text-[rgb(var(--primary))] border rounded-2xl transition"
+                  className="w-full sm:flex-1 py-3 font-bold text-[rgb(var(--primary))] border rounded-2xl transition min-h-11"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
-                  className="flex-2 py-4 text-[rgb(var(--text))] bg-[rgb(var(--primary))] font-bold rounded-2xl"
+                  className="w-full sm:flex-[2] py-4 text-[rgb(var(--text))] bg-[rgb(var(--primary))] font-bold rounded-2xl min-h-11"
                 >
                   {editingId ? "Update Exam" : "Save Exam"}
                 </button>

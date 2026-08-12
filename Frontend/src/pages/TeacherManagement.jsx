@@ -6,6 +6,7 @@ import { FaArrowLeft, FaShieldAlt, FaPlus } from "react-icons/fa";
 import { FiX } from "react-icons/fi";
 import { MODULES } from "../constants/module.js";
 import { useAuth } from "../context/AuthContext";
+import LoadingSpinner from "../components/LoadingSpinner";
 
 const API = import.meta.env.VITE_API_URL;
 
@@ -598,10 +599,7 @@ const TeacherManagement = () => {
   if (loading) {
     return (
       <div className="p-8 flex items-center justify-center min-h-screen">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-600 mx-auto mb-4"></div>
-          <p className="text-gray-600">Loading...</p>
-        </div>
+        <LoadingSpinner label="Loading…" />
       </div>
     );
   }

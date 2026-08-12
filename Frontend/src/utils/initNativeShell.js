@@ -5,19 +5,21 @@
 import { Capacitor } from "@capacitor/core";
 import { StatusBar, Style } from "@capacitor/status-bar";
 import { SplashScreen } from "@capacitor/splash-screen";
+import { publicAsset } from "./publicAsset";
 
 const SPLASH_MIN_MS = 2200;
 
 function ensureWebSplash() {
   if (document.getElementById("eduaitor-native-splash")) return;
 
+  const logoSrc = publicAsset("eduaitor-app-icon.png");
   const el = document.createElement("div");
   el.id = "eduaitor-native-splash";
   el.setAttribute("aria-hidden", "true");
   el.innerHTML = `
     <div class="eduaitor-splash-inner">
       <div class="eduaitor-splash-logo-wrap">
-        <img class="eduaitor-splash-logo" src="/eduaitor-app-icon.png" alt="Eduaitor" />
+        <img class="eduaitor-splash-logo" src="${logoSrc}" alt="Eduaitor" />
       </div>
       <p class="eduaitor-splash-tag">Smarter Schools. Stronger Students.</p>
     </div>
@@ -56,8 +58,8 @@ function ensureWebSplash() {
       border-radius: 28%;
       overflow: hidden;
       box-shadow:
-        0 0 0 3px rgba(52, 211, 153, 0.35),
-        0 0 48px rgba(5, 150, 105, 0.55),
+        0 0 0 3px rgba(56, 189, 248, 0.35),
+        0 0 48px rgba(37, 99, 235, 0.55),
         0 12px 32px rgba(0, 0, 0, 0.45);
       animation: eduaitor-spin 1.4s linear infinite;
       transform-origin: center center;
@@ -74,10 +76,10 @@ function ensureWebSplash() {
       font-size: 0.85rem;
       font-weight: 500;
       letter-spacing: 0.04em;
-      color: #6ee7b7;
+      color: #7dd3fc;
       opacity: 0.95;
       text-align: center;
-      text-shadow: 0 0 20px rgba(52, 211, 153, 0.35);
+      text-shadow: 0 0 20px rgba(56, 189, 248, 0.4);
     }
     @keyframes eduaitor-spin {
       from { transform: rotate(0deg); }

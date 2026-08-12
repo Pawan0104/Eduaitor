@@ -318,12 +318,12 @@ export default function PlatformAnalytics() {
   };
 
   return (
-    <div className="space-y-6 p-6">
+    <div className="space-y-6 p-4 sm:p-6 overflow-x-hidden min-w-0">
       {isMobile && (
         <div className="pt-4">
           <button
             onClick={() => navigate(-1)}
-            className="mb-2.5 flex items-center gap-2 rounded-xl border border-slate-100 bg-white px-3 py-1.5 text-sm font-bold text-slate-600 shadow-sm transition-transform active:scale-95"
+            className="mb-2.5 flex items-center gap-2 rounded-xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))] px-3 py-1.5 text-sm font-bold text-[rgb(var(--text))] shadow-sm transition-transform active:scale-95"
           >
             <FaArrowLeft size={16} />
             Back
@@ -465,10 +465,10 @@ export default function PlatformAnalytics() {
             {filteredSchools.map((school) => (
               <article
                 key={school._id}
-                className="rounded-3xl border border-slate-200 bg-slate-50 p-5"
+                className="min-w-0 rounded-3xl border border-slate-200 bg-slate-50 p-5"
               >
-                <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
-                  <div>
+                <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between min-w-0">
+                  <div className="min-w-0">
                     <div className="flex flex-wrap items-center gap-2">
                       <h3 className="text-xl font-bold text-slate-900">
                         {school.school_name}
@@ -482,7 +482,7 @@ export default function PlatformAnalytics() {
                     </p>
                   </div>
 
-                  <div className="min-w-32 rounded-2xl bg-white px-4 py-3 text-center shadow-sm">
+                  <div className="min-w-0 w-full sm:w-auto rounded-2xl bg-white px-4 py-3 text-center shadow-sm">
                     <p className="text-xs font-semibold uppercase tracking-[0.22em] text-slate-400">
                       Health
                     </p>
@@ -648,7 +648,7 @@ export default function PlatformAnalytics() {
 }
 
 const StatCard = ({ icon, label, value, detail, tone }) => (
-  <div className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm">
+  <div className="min-w-0 rounded-3xl border border-slate-200 bg-white p-5 shadow-sm">
     <div className="flex items-start justify-between gap-4">
       <div>
         <p className="text-sm font-medium text-slate-500">{label}</p>
@@ -661,7 +661,7 @@ const StatCard = ({ icon, label, value, detail, tone }) => (
 );
 
 const MiniMetric = ({ label, value, warn = false }) => (
-  <div className="rounded-2xl border border-slate-200 bg-white px-4 py-3 shadow-sm">
+  <div className="min-w-0 rounded-2xl border border-slate-200 bg-white px-4 py-3 shadow-sm">
     <p className="text-xs font-semibold uppercase tracking-[0.22em] text-slate-400">
       {label}
     </p>

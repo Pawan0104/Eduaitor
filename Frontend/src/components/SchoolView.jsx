@@ -86,6 +86,6 @@ const Info = ({ label, value }) => (
   <div className="bg-[rgb(var(--surface))] text-[rgb(var(--text))] rounded-xl shadow p-5">
     <p className="text-sm text-[rgb(var(--text))] mb-1">{label}</p>
 
-    <p className="font-medium text-[rgb(var(--text))]">{value}</p>
+    <p className="font-medium text-[rgb(var(--text))] min-w-0 break-words">{value}</p>
   </div>
 );

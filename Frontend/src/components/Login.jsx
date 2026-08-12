@@ -4,6 +4,7 @@ import { useState, useEffect } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import {
   FaUserShield,
+  FaUserGraduate,
   FaLock,
   FaEye,
   FaEyeSlash,
@@ -32,7 +33,7 @@ function childCountLabel(count, t) {
 }
 
 export default function Login() {
-  const [mode, setMode] = useState("other"); // "parent" | "other"
+  const [mode, setMode] = useState("other"); // "parent" | "student" | "other"
   const [parentStep, setParentStep] = useState("mobile"); // mobile | school | password
   const [mobile, setMobile] = useState("");
   const [schools, setSchools] = useState([]);
@@ -71,7 +72,10 @@ export default function Login() {
     setError("");
     setShowPassword(false);
     if (next === "parent") resetParentFlow();
-    else setForm({ email: "", password: "" });
+    else {
+      setForm({ email: "", password: "" });
+      resetParentFlow();
+    }
   };
 
   const handleChange = (e) => {
@@ -131,6 +135,33 @@ export default function Login() {
         email: form.email.trim(),
         password: form.password,
         portal: "staff",
+      });
+
+      await finishLogin(res);
+    } catch (err) {
+      const backendMessage = mapLoginError(err);
+      setError(backendMessage);
+      toast.error(
+        backendMessage === "Invalid credentials"
+          ? t("login.failed")
+          : backendMessage,
+      );
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleStudentSubmit = async (e) => {
+    e.preventDefault();
+
+    try {
+      setLoading(true);
+      setError("");
+
+      const res = await api.post(`/auth/login`, {
+        email: form.email.trim(),
+        password: form.password,
+        portal: "student",
       });
 
       await finishLogin(res);
@@ -258,11 +289,11 @@ export default function Login() {
           <LanguageSwitcher variant="login" />
 
           {/* Mode toggle */}
-          <div className="mb-6 grid grid-cols-2 gap-2 rounded-xl bg-[rgb(var(--bg))] p-1">
+          <div className="mb-6 grid grid-cols-3 gap-1 rounded-xl bg-[rgb(var(--bg))] p-1">
             <button
               type="button"
               onClick={() => switchMode("parent")}
-              className={`rounded-lg py-2.5 text-sm font-semibold transition ${
+              className={`rounded-lg py-2.5 text-xs sm:text-sm font-semibold transition ${
                 mode === "parent"
                   ? "bg-[rgb(var(--primary))] text-white shadow"
                   : "text-[rgb(var(--text-muted))] hover:text-[rgb(var(--text))]"
@@ -272,8 +303,19 @@ export default function Login() {
             </button>
             <button
               type="button"
+              onClick={() => switchMode("student")}
+              className={`rounded-lg py-2.5 text-xs sm:text-sm font-semibold transition ${
+                mode === "student"
+                  ? "bg-[rgb(var(--primary))] text-white shadow"
+                  : "text-[rgb(var(--text-muted))] hover:text-[rgb(var(--text))]"
+              }`}
+            >
+              {t("login.modeStudent", "Student")}
+            </button>
+            <button
+              type="button"
               onClick={() => switchMode("other")}
-              className={`rounded-lg py-2.5 text-sm font-semibold transition ${
+              className={`rounded-lg py-2.5 text-xs sm:text-sm font-semibold transition ${
                 mode === "other"
                   ? "bg-[rgb(var(--primary))] text-white shadow"
                   : "text-[rgb(var(--text-muted))] hover:text-[rgb(var(--text))]"
@@ -287,7 +329,84 @@ export default function Login() {
             <p className="mb-4 text-center text-sm text-red-500">{error}</p>
           )}
 
-          {/* â”€â”€ Staff / Admin classic form â”€â”€ */}
+          {/* Student form */}
+          {mode === "student" && (
+            <>
+              <div className="mb-8 text-center">
+                <FaUserGraduate className="mx-auto mb-3 text-4xl text-[rgb(var(--primary))]" />
+                <h2 className="mb-2 text-3xl font-bold text-[rgb(var(--text))]">
+                  {t("login.studentTitle", "Student Login")}
+                </h2>
+                <p className="text-sm text-[rgb(var(--text-muted))]">
+                  {t(
+                    "login.studentSubtitle",
+                    "Use your student ID / username and password",
+                  )}
+                </p>
+              </div>
+
+              <form onSubmit={handleStudentSubmit} className="space-y-5">
+                <div className="relative">
+                  <FaUserGraduate className="pointer-events-none absolute top-1/2 left-4 z-10 -translate-y-1/2 text-[rgb(var(--text-muted))]" />
+                  <input
+                    name="email"
+                    placeholder={t(
+                      "login.studentUsernamePlaceholder",
+                      "Student ID / Username",
+                    )}
+                    value={form.email}
+                    onChange={handleChange}
+                    required
+                    autoComplete="username"
+                    className="input !pl-12"
+                  />
+                </div>
+
+                <div className="relative">
+                  <FaLock className="pointer-events-none absolute top-1/2 left-4 z-10 -translate-y-1/2 text-[rgb(var(--text-muted))]" />
+                  <input
+                    type={showPassword ? "text" : "password"}
+                    name="password"
+                    placeholder={t("login.passwordPlaceholder")}
+                    value={form.password}
+                    onChange={handleChange}
+                    required
+                    autoComplete="current-password"
+                    className="input !pl-12 !pr-12"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword(!showPassword)}
+                    className="absolute top-1/2 right-3 z-10 -translate-y-1/2 cursor-pointer p-1 text-[rgb(var(--text-muted))]"
+                    aria-label={showPassword ? "Hide password" : "Show password"}
+                  >
+                    {showPassword ? <FaEyeSlash /> : <FaEye />}
+                  </button>
+                </div>
+
+                <button
+                  type="submit"
+                  disabled={loading}
+                  className={`w-full py-3 rounded-xl font-semibold shadow-md transition ${
+                    loading
+                      ? "cursor-not-allowed bg-gray-400 text-white"
+                      : "login-submit hover:opacity-90"
+                  }`}
+                >
+                  {loading ? (
+                    <div className="flex items-center justify-center gap-2">
+                      <div className="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent" />
+                      {t("login.loggingIn")}
+                    </div>
+                  ) : (
+                    t("login.signIn", "Sign In")
+                  )}
+                </button>
+              </form>
+            </>
+          )}
+
+          {/* Staff / Admin classic form */}
           {mode === "other" && (
             <>
               <div className="mb-8 text-center">

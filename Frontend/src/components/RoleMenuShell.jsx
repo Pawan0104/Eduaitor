@@ -448,17 +448,20 @@ function MenuCard({ item, color, globalIdx, isOpen, onToggle, styleId }) {
     );
   }
 
-  /* Shared vertical shell for icon styles — glyph is always the shared emoji */
+  /* Shared vertical shell for icon styles — fixed box so all styles align */
   let iconWrapStyle = {};
   let iconClass =
     "relative flex items-center justify-center shrink-0 transition-transform duration-200 group-active:scale-90";
 
+  const ICON_BOX = 64;
+  const ICON_FONT = 30;
+
   if (styleId === "3d" || styleId === "minimal") {
     iconClass += " rounded-2xl";
     iconWrapStyle = {
-      width: 56,
-      height: 56,
-      fontSize: 32,
+      width: ICON_BOX,
+      height: ICON_BOX,
+      fontSize: ICON_FONT,
       lineHeight: 1,
       background: "transparent",
       boxShadow: "none",
@@ -466,9 +469,9 @@ function MenuCard({ item, color, globalIdx, isOpen, onToggle, styleId }) {
   } else if (styleId === "solid") {
     iconClass += " rounded-[20px]";
     iconWrapStyle = {
-      width: 68,
-      height: 68,
-      fontSize: 32,
+      width: ICON_BOX,
+      height: ICON_BOX,
+      fontSize: ICON_FONT,
       lineHeight: 1,
       background: `linear-gradient(145deg, ${color.icon}, color-mix(in srgb, ${color.icon} 72%, #000))`,
       boxShadow: `0 12px 22px -12px ${color.icon}cc`,
@@ -476,9 +479,9 @@ function MenuCard({ item, color, globalIdx, isOpen, onToggle, styleId }) {
   } else if (styleId === "soft") {
     iconClass += " rounded-[20px]";
     iconWrapStyle = {
-      width: 68,
-      height: 68,
-      fontSize: 32,
+      width: ICON_BOX,
+      height: ICON_BOX,
+      fontSize: ICON_FONT,
       lineHeight: 1,
       background: `linear-gradient(160deg, ${color.bg} 0%, color-mix(in srgb, ${color.icon} 22%, ${color.bg}) 100%)`,
       boxShadow: `inset 0 1px 0 rgba(255,255,255,0.55), 0 10px 18px -10px ${color.icon}aa`,
@@ -486,9 +489,9 @@ function MenuCard({ item, color, globalIdx, isOpen, onToggle, styleId }) {
   } else {
     iconClass += " rounded-full";
     iconWrapStyle = {
-      width: 64,
-      height: 64,
-      fontSize: 32,
+      width: ICON_BOX,
+      height: ICON_BOX,
+      fontSize: ICON_FONT,
       lineHeight: 1,
       background: "transparent",
       boxShadow: "none",
@@ -914,20 +917,20 @@ export function MenuStylePicker({ className = "" }) {
         aria-expanded={open}
         aria-label={t("menu.style", "Menu style")}
         title={t("menu.style", "Menu style")}
-        className="flex h-9 w-9 items-center justify-center rounded-2xl border
+        className="flex h-11 w-full items-center gap-2 rounded-xl border px-3
           transition active:scale-[0.97]
           border-[rgb(var(--border))] bg-[rgb(var(--bg))]
           hover:border-[rgba(var(--primary),0.35)]
           hover:bg-[rgba(var(--primary),0.06)]"
       >
         <span
-          className="flex h-6 w-6 items-center justify-center rounded-lg text-white"
+          className="flex h-6 w-6 items-center justify-center rounded-lg text-white text-lg"
           style={{
             background:
               "linear-gradient(135deg, rgb(var(--primary)) 0%, rgb(var(--sidebar)) 100%)",
           }}
         >
-          <FaThLarge size={10} />
+          <FaThLarge size={14} />
         </span>
       </button>
       {sheet}

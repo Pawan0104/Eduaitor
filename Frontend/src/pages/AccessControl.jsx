@@ -350,7 +350,7 @@ const AccessControl = () => {
             <div>
               <h3 className="font-semibold mb-3">Permission Matrix</h3>
 
-              <div className="border rounded-lg overflow-auto max-h-100">
+              <div className="border rounded-lg overflow-x-auto max-h-100">
                 <table className="w-full text-sm">
                   <thead className=" sticky top-0">
                     <tr>
@@ -445,8 +445,8 @@ export default AccessControl;
 /* ---------------- UI COMPONENTS ---------------- */
 
 const Modal = ({ title, children }) => (
-  <div className="fixed inset-0 bg-black/40 flex items-center justify-center">
-    <div className="bg-[rgb(var(--surface))] rounded-xl p-6 w-full max-w-5xl max-h-[90vh] overflow-y-auto">
+  <div className="app-modal-backdrop p-4">
+    <div className="app-modal max-w-full sm:max-w-5xl max-h-[90vh] overflow-y-auto p-6">
       <h2 className="text-lg font-semibold mb-4">{title}</h2>
 
       {children}

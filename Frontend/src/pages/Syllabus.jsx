@@ -14,6 +14,7 @@ import { FaCloudDownloadAlt } from "react-icons/fa";
 import { FaArrowLeft } from "react-icons/fa";
 import { toast } from "react-toastify";
 import TermManagement from "../components/TermManagement";
+import LoadingSpinner from "../components/LoadingSpinner";
 import ImportSyllabusCatalog from "../components/ImportSyllabusCatalog";
 import ChapterPdfViewer from "../components/ChapterPdfViewer";
 import { useNavigate } from "react-router-dom";
@@ -495,7 +496,7 @@ function Syllabus() {
         </div>
 
         {/* Filters */}
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
           {/* Class Select */}
           <div className="relative">
             <label className="block text-sm font-semibold mb-2">
@@ -573,9 +574,11 @@ function Syllabus() {
               <FiChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400 pointer-events-none" />
             </div>
           </div>
+        </div>
+        <div className="flex justify-stretch md:justify-end mb-8">
           <button
             onClick={() => setShowTerm((p) => !p)}
-            className="flex items-center gap-2 px-4 py-2 rounded-xl bg-linear-to-r text-[rgb(var(--text))] bg-[rgb(var(--primary))] font-medium shadow-md hover:scale-105 transition"
+            className="app-btn-primary app-btn-block md:w-auto md:min-w-[10rem]"
           >
             {showTerm ? "Hide Terms" : "Manage Terms"}
           </button>
@@ -673,10 +676,7 @@ function Syllabus() {
 
             {/* Loading State */}
             {loading && (
-              <div className="text-center py-8 text-slate-400">
-                <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-cyan-400"></div>
-                <p className="mt-2">Loading chapters...</p>
-              </div>
+              <LoadingSpinner label="Loading chapters…" />
             )}
 
             {/* Chapters List */}

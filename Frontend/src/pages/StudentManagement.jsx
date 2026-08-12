@@ -4,6 +4,7 @@ import { toast } from "react-toastify";
 import { useParams, useNavigate, useSearchParams } from "react-router-dom";
 import { FaArrowLeft } from "react-icons/fa";
 import { useAuth } from "../context/AuthContext";
+import LoadingSpinner from "../components/LoadingSpinner";
 
 const API = import.meta.env.VITE_API_URL;
 
@@ -122,6 +123,7 @@ const StudentManagement = () => {
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [confirmAction, setConfirmAction] = useState(null);
   const [confirmMessage, setConfirmMessage] = useState("");
+  const [submitting, setSubmitting] = useState(false);
 
   const [classes, setClasses] = useState([]);
   const [sections, setSections] = useState([]);
@@ -1840,9 +1842,19 @@ const forbidden = [
               ) : (
                 <button
                   onClick={handleSubmit}
-                  className="px-6 py-2 bg-green-600 text-white rounded-lg"
+                  disabled={submitting}
+                  className="inline-flex items-center justify-center gap-2 px-6 py-2 bg-green-600 text-white rounded-lg disabled:opacity-50 min-h-11"
                 >
-                  {isEdit ? "Update Student" : "Submit"}
+                  {submitting ? (
+                    <>
+                      <LoadingSpinner size="sm" label="" inline />
+                      {isEdit ? "Updating…" : "Submitting…"}
+                    </>
+                  ) : isEdit ? (
+                    "Update Student"
+                  ) : (
+                    "Submit"
+                  )}
                 </button>
               )}
             </div>
@@ -1853,28 +1865,43 @@ const forbidden = [
       {/* MODAL */}
 
       {confirmOpen && (
-        <div className="fixed inset-0 bg-black/40 flex items-center justify-center p-4">
-          <div className="bg-[rgb(var(--surface))]  border border-[rgb(var(--border))] text-[rgb(var(--text))] rounded-xl p-6 w-full max-w-md">
+        <div className="app-modal-backdrop">
+          <div className="app-modal max-w-md p-6">
             <h3 className="text-lg font-semibold mb-2">Confirmation</h3>
 
-            <p className=" mb-6">{confirmMessage}</p>
+            <p className="mb-6">{confirmMessage}</p>
 
-            <div className="flex justify-end gap-3">
+            <div className="app-modal-footer !px-0 !py-0 !border-0">
               <button
                 onClick={() => setConfirmOpen(false)}
-                className="px-4 py-2  rounded-lg"
+                disabled={submitting}
+                className="app-btn app-btn-secondary w-full sm:w-auto"
               >
                 Cancel
               </button>
 
               <button
-                onClick={() => {
-                  confirmAction?.();
-                  setConfirmOpen(false);
+                disabled={submitting}
+                onClick={async () => {
+                  if (submitting) return;
+                  setSubmitting(true);
+                  try {
+                    await confirmAction?.();
+                    setConfirmOpen(false);
+                  } finally {
+                    setSubmitting(false);
+                  }
                 }}
-                className="px-4 py-2 bg-[rgb(var(--primary))]  border border-[rgb(var(--border))] text-[rgb(var(--text))] rounded-lg"
+                className="app-btn app-btn-primary w-full sm:w-auto"
               >
-                Confirm
+                {submitting ? (
+                  <>
+                    <LoadingSpinner size="sm" label="" inline />
+                    Confirming…
+                  </>
+                ) : (
+                  "Confirm"
+                )}
               </button>
             </div>
           </div>
@@ -2172,7 +2199,7 @@ const ReviewStep = ({
         <div className="text-[11px] uppercase tracking-wide  mb-0.5">
           {label}
         </div>
-        <div className="text-sm font-medium ">{value}</div>
+        <div className="text-sm font-medium min-w-0 break-words">{value}</div>
       </div>
     );
   };

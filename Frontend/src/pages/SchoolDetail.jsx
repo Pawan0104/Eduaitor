@@ -2313,7 +2313,7 @@ const ContactChip = ({ icon, text }) => (
 const InfoPair = ({ label, value }) => (
   <div className="flex items-start justify-between gap-2">
     <p className="text-xs text-slate-400 shrink-0">{label}</p>
-    <p className="text-xs font-semibold text-slate-700 text-right truncate max-w-32.5">
+    <p className="text-xs font-semibold text-slate-700 text-right break-words min-w-0">
       {value}
     </p>
   </div>

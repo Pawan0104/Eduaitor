@@ -95,6 +95,8 @@ export const loginUser = async (req, res) => {
 
     /* ---------- SUPER ADMIN ---------- */
     if (
+      !parentPortal &&
+      !studentPortal &&
       loginEmail === process.env.SUPER_ADMIN_EMAIL?.toLowerCase() &&
       password === process.env.SUPER_ADMIN_PASSWORD
     ) {

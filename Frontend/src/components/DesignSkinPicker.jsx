@@ -207,8 +207,8 @@ export default function DesignSkinPicker({
         title="App design"
         className={
           isLogin
-            ? "mb-4 flex w-full items-center justify-between gap-3 rounded-2xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-left transition hover:border-slate-300"
-            : "inline-flex h-9 w-9 items-center justify-center rounded-xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))] text-[rgb(var(--text))] transition hover:border-[rgba(var(--primary),0.35)] sm:h-9 sm:w-auto sm:gap-1.5 sm:px-3"
+            ? "mb-4 flex w-full items-center justify-between gap-3 rounded-2xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))] px-3 py-2.5 text-left transition hover:border-[rgba(var(--primary),0.35)]"
+            : "inline-flex h-11 w-full items-center justify-center gap-2 rounded-xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))] px-3 text-[rgb(var(--text))] transition hover:border-[rgba(var(--primary),0.35)] sm:w-auto"
         }
       >
         <span
@@ -230,7 +230,7 @@ export default function DesignSkinPicker({
             {isLogin ? "Design" : active.label}
           </span>
           {isLogin && (
-            <span className="block text-[11px] text-slate-500">
+            <span className="block text-[11px] text-[rgb(var(--text-muted))]">
               {active.label} — tap to change look
             </span>
           )}

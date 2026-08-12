@@ -4,6 +4,7 @@ import { FaArrowLeft, FaLock } from "react-icons/fa";
 import { toast } from "react-toastify";
 import { MODULES, DEFAULT_MODULES } from "../constants/module.js"; // adjust path
 import api from "../config/axios";
+import LoadingSpinner from "../components/LoadingSpinner";
 
 const AddSchool = () => {
   const navigate = useNavigate();
@@ -362,7 +363,7 @@ const AddSchool = () => {
                           onChange={() => handleModuleToggle(mod.key)}
                           className="accent-[rgb(var(--primary))] w-4 h-4 shrink-0"
                         />
-                        <span className="text-sm font-medium text-[rgb(var(--text))] leading-tight">
+                        <span className="text-sm font-medium text-[rgb(var(--text))] leading-tight break-words min-w-0">
                           {mod.label}
                         </span>
                         {isDefault && (
@@ -436,21 +437,27 @@ const AddSchool = () => {
             </div>
 
             {/* FOOTER */}
-            <div className="flex justify-between items-center px-8 py-6 border-t
+            <div className="flex flex-col-reverse sm:flex-row gap-3 justify-between items-stretch sm:items-center px-4 sm:px-8 py-6 border-t
               bg-[rgb(var(--surface))] text-[rgb(var(--text))] rounded-b-2xl">
               <button
                 onClick={() => navigate("/admin/schools")}
-                className="px-5 py-2 border border-gray-300 rounded-lg transition"
+                className="app-btn app-btn-secondary w-full sm:w-auto min-h-11"
               >
                 Cancel
               </button>
               <button
                 onClick={handleSubmit}
                 disabled={loading}
-                className="px-6 py-2 bg-[rgb(var(--primary))] text-white rounded-lg
-                  shadow-sm transition disabled:opacity-50"
+                className="app-btn app-btn-primary w-full sm:w-auto min-h-11"
               >
-                {loading ? "Saving..." : "Create School"}
+                {loading ? (
+                  <>
+                    <LoadingSpinner size="sm" label="" inline />
+                    Saving…
+                  </>
+                ) : (
+                  "Create School"
+                )}
               </button>
             </div>
           </div>

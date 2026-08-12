@@ -10,6 +10,7 @@ import {
 import { toast } from "react-toastify";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
+import LoadingSpinner from "../components/LoadingSpinner";
 
 const API = import.meta.env.VITE_API_URL;
 
@@ -200,10 +201,7 @@ const HostelBuildings = () => {
   if (loading) {
     return (
       <div className="p-8 flex items-center justify-center min-h-screen">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-600 mx-auto mb-4" />
-          <p className="text-gray-600">Loading hostels...</p>
-        </div>
+        <LoadingSpinner label="Loading hostels…" />
       </div>
     );
   }

@@ -81,7 +81,7 @@ const ProfileSheet = ({ onClose }) => {
               <p className="mb-2 text-[10px] font-extrabold uppercase tracking-wide text-[rgb(var(--text-muted))]">
                 {t("menu.style", "Menu icons")}
               </p>
-              <MenuStylePicker className="w-full [&_button]:h-11 [&_button]:w-full [&_button]:justify-start" />
+              <MenuStylePicker className="w-full h-11 [&_button]:h-11 [&_button]:w-full [&_button]:justify-start [&_button]:px-3" />
             </div>
 
             <div>
@@ -90,7 +90,7 @@ const ProfileSheet = ({ onClose }) => {
               </p>
               <DesignSkinPicker
                 variant="topbar"
-                className="w-full [&_button]:h-11 [&_button]:w-full [&_button]:justify-start [&_button]:px-3"
+                className="w-full h-11 [&_button]:h-11 [&_button]:w-full [&_button]:justify-start [&_button]:px-3"
               />
             </div>
           </div>

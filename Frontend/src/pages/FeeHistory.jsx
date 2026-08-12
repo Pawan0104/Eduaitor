@@ -257,17 +257,14 @@ function FeeHistory() {
       .join(" ") || "all time";
 
   return (
-    <div
-      className="min-h-screen bg-[rgb(var(--bg))] py-8"
-      style={{ fontFamily: "Georgia, serif" }}
-    >
+    <div className="min-h-screen bg-[rgb(var(--bg))] py-8">
       {/* 🔙 BACK BUTTON */}
       {isMobile && (
           <div className="pt-4">
           <button
             onClick={() => navigate(-1)}
-            className="flex items-center gap-2  rounded-xl
-                bg-[rgb(var(--primary))] shadow-sm border border-slate-100
+            className="flex items-center gap-2 rounded-xl
+                bg-[rgb(var(--primary))] shadow-sm border border-[rgb(var(--border))]
                  text-sm font-bold text-[rgb(var(--text))] active:scale-95 transition-transform mb-2.5"
           >
             <FaArrowLeft size={16} />
@@ -282,7 +279,7 @@ function FeeHistory() {
             <p className="text-xs tracking-widest  uppercase mb-1 font-sans">
               School Management
             </p>
-            <h1 className="text-2xl sm:text-3xl text-[rgb(var(--primary))] font-normal tracking-tight">
+            <h1 className="app-page-title text-[rgb(var(--primary))]">
               Fee Collection History
             </h1>
           </div>

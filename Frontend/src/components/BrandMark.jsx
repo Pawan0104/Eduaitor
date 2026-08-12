@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { useLanguage } from "../context/LanguageContext";
+import { publicAsset } from "../utils/publicAsset";
 
 /**
  * App chrome brand mark.
@@ -22,7 +23,7 @@ export default function BrandMark({ user, compact = false }) {
     return (
       <div className="flex min-w-0 items-center gap-2 sm:gap-2.5">
         <img
-          src="/eduaitor.png"
+          src={publicAsset("eduaitor.png")}
           alt="Eduaitor"
           className={`shrink-0 rounded-lg object-contain ${
             compact ? "h-8 w-auto max-w-20" : "h-8 w-auto max-w-24 lg:h-10 lg:max-w-35"
