@@ -8,7 +8,9 @@ import "react-toastify/dist/ReactToastify.css";
 import { AuthProvider } from "./context/AuthContext.jsx";
 import { LanguageProvider } from "./context/LanguageContext.jsx";
 import { HelmetProvider } from "react-helmet-async";
-import { initNativeShell } from "./utils/initNativeShell.js";
+import {
+  initNativeShell,
+} from "./utils/initNativeShell.js";
 import { initTheme } from "./utils/theme.js";
 import { initUiSkin } from "./utils/uiSkin.js";
 import AppUpdatePrompt from "./components/AppUpdatePrompt.jsx";
@@ -31,7 +33,12 @@ createRoot(document.getElementById("root")).render(
               <AppUpdatePrompt />
             </HelmetProvider>
           </AuthProvider>
-          <ToastContainer position="top-right" autoClose={2000} />
+          <ToastContainer
+            position="top-right"
+            autoClose={3000}
+            style={{ zIndex: 100000 }}
+            toastStyle={{ zIndex: 100000 }}
+          />
         </LanguageProvider>
       </ErrorBoundary>
     </StrictMode>

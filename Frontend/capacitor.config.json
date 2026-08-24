@@ -3,24 +3,24 @@
   "appName": "Eduaitor",
   "webDir": "dist",
   "server": {
-    "url": "https://admineduaitor.netlify.app",
     "cleartext": false,
     "androidScheme": "https",
     "allowNavigation": [
-      "admineduaitor.netlify.app",
-      "*.netlify.app",
+      "eduaitor.com",
+      "www.eduaitor.com",
+      "*.eduaitor.com",
       "eduaitor-api.onrender.com"
     ]
   },
   "android": {
     "allowMixedContent": false,
-    "backgroundColor": "#05080f"
+    "backgroundColor": "#ffffff"
   },
   "plugins": {
     "SplashScreen": {
       "launchShowDuration": 0,
       "launchAutoHide": false,
-      "backgroundColor": "#05080f",
+      "backgroundColor": "#ffffff",
       "androidSplashResourceName": "splash",
       "androidScaleType": "CENTER_CROP",
       "showSpinner": false,

@@ -3,6 +3,7 @@ import { useAuth } from "../context/AuthContext.jsx";
 import { toast } from "react-toastify";
 import { useEffect, useRef } from "react";
 import { getMenuPath } from "./AdminLayout";
+import BootSplash from "./BootSplash";
 
 const ProtectedRoute = ({ children, allowedRoles, requiredLoginAs }) => {
   const { user, loading } = useAuth();
@@ -27,7 +28,7 @@ const ProtectedRoute = ({ children, allowedRoles, requiredLoginAs }) => {
     }
   }, [user, loading, allowedRoles]);
 
-  if (loading) return <div>Loading...</div>;
+  if (loading) return <BootSplash />;
 
   if (!user)
     return <Navigate to="/admin/login" state={{ from: location }} replace />;

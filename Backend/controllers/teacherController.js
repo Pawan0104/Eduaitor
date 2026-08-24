@@ -1,4 +1,5 @@
 import Teacher from "../models/teacher.js";
+import Staff from "../models/staff.js";
 import School from "../models/school.js";
 import Group from "../models/group.js";
 import { uploadToCloudinary } from "../utils/uploadToCloudinary.js";
@@ -10,6 +11,12 @@ import {
 } from "../utils/groupSync.js";
 import { resolveRolePermissions } from "../utils/resolveRolePermissions.js";
 import { notifyCredentialsAsync } from "../services/credentials/notifyCredentials.js";
+import {
+  normalizeEmail,
+  emailMatchQuery,
+  isDuplicateKeyError,
+  duplicateKeyMessage,
+} from "../utils/emailUnique.js";
 
 /* ================= GENERATE TEACHER ID ================= */
 
@@ -99,17 +106,27 @@ export const createTeacher = async (req, res) => {
       });
     }
 
-    if (req.body.email?.trim()) {
-      const dupEmail = await Teacher.findOne({
-        schoolId,
-        email: req.body.email.trim(),
-      });
-      if (dupEmail) {
+    const normalizedEmail = normalizeEmail(req.body.email);
+    if (normalizedEmail) {
+      const emailQuery = emailMatchQuery(normalizedEmail);
+      const [dupTeacher, dupStaff] = await Promise.all([
+        Teacher.findOne({ schoolId, email: emailQuery }),
+        Staff.findOne({ schoolId, email: emailQuery }),
+      ]);
+      if (dupTeacher) {
         return res.status(400).json({
           success: false,
           message: "A teacher with this email already exists in your school",
         });
       }
+      if (dupStaff) {
+        return res.status(400).json({
+          success: false,
+          message:
+            "This email is already used by a staff member in your school",
+        });
+      }
+      req.body.email = normalizedEmail;
     }
     if (req.body.phone?.trim()) {
       const dupPhone = await Teacher.findOne({
@@ -132,6 +149,7 @@ export const createTeacher = async (req, res) => {
 
     const teacher = await Teacher.create({
       ...restBody,
+      email: normalizedEmail || restBody.email,
       teacherId,
       photo,
       assignedClasses,
@@ -174,6 +192,16 @@ export const createTeacher = async (req, res) => {
     });
   } catch (error) {
     console.error("Create teacher error:", error);
+
+    if (isDuplicateKeyError(error)) {
+      return res.status(400).json({
+        success: false,
+        message: duplicateKeyMessage(
+          error,
+          "A teacher with this email already exists in your school",
+        ),
+      });
+    }
 
     res.status(500).json({
       success: false,
@@ -394,6 +422,35 @@ export const updateTeacher = async (req, res) => {
       }
     }
 
+    if (updateData.email !== undefined) {
+      const normalizedEmail = normalizeEmail(updateData.email);
+      if (normalizedEmail) {
+        const emailQuery = emailMatchQuery(normalizedEmail);
+        const [dupTeacher, dupStaff] = await Promise.all([
+          Teacher.findOne({
+            schoolId: safeSchoolId,
+            email: emailQuery,
+            _id: { $ne: teacher._id },
+          }),
+          Staff.findOne({ schoolId: safeSchoolId, email: emailQuery }),
+        ]);
+        if (dupTeacher) {
+          return res.status(400).json({
+            success: false,
+            message: "A teacher with this email already exists in your school",
+          });
+        }
+        if (dupStaff) {
+          return res.status(400).json({
+            success: false,
+            message:
+              "This email is already used by a staff member in your school",
+          });
+        }
+        updateData.email = normalizedEmail;
+      }
+    }
+
     const updatedTeacher = await Teacher.findByIdAndUpdate(
       req.params.id,
       { $set: updateData },
@@ -422,6 +479,16 @@ export const updateTeacher = async (req, res) => {
     });
   } catch (error) {
     console.error("Update teacher error:", error);
+
+    if (isDuplicateKeyError(error)) {
+      return res.status(400).json({
+        success: false,
+        message: duplicateKeyMessage(
+          error,
+          "A teacher with this email already exists in your school",
+        ),
+      });
+    }
 
     res.status(500).json({
       success: false,

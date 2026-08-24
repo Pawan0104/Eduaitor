@@ -12,6 +12,7 @@ import {
   FaMoneyBillWave, FaLock, FaIdCard, FaUsers, FaBus,
 } from "react-icons/fa";
 import { GiTeacher } from "react-icons/gi";
+import { getApiErrorMessage } from "../utils/apiError.js";
 
 const API = import.meta.env.VITE_API_URL;
 
@@ -90,6 +91,7 @@ const StaffManagement = () => {
   const [confirmMsg, setConfirmMsg]         = useState("");
   const [confirmAction, setConfirmAction]   = useState(null);
   const [showTypePicker, setShowTypePicker] = useState(false);
+  const [formError, setFormError]           = useState("");
   const [searchParams, setSearchParams]     = useSearchParams();
 
   const basePath = user?.role === "staff_admin" ? "/staff" : "/school";
@@ -210,6 +212,7 @@ const StaffManagement = () => {
     setChangePassword(false);
     setEditingId(null);
     setDirty(false);
+    setFormError("");
     setShowFormModal(true);
   };
 
@@ -248,6 +251,7 @@ const StaffManagement = () => {
     setChangePassword(false);
     setEditingId(staff._id);
     setDirty(false);
+    setFormError("");
     setShowFormModal(true);
   };
 
@@ -287,6 +291,7 @@ const StaffManagement = () => {
     setConfirmAction(() => async () => {
       try {
         setSaving(true);
+        setFormError("");
         const fd = new FormData();
 
         Object.entries(form).forEach(([key, val]) => {
@@ -332,7 +337,9 @@ const StaffManagement = () => {
           }
         }
       } catch (err) {
-        toast.error(err.response?.data?.message || "Error saving staff");
+        const msg = getApiErrorMessage(err, "Error saving staff");
+        setFormError(msg);
+        toast.error(msg, { autoClose: 5000 });
       } finally {
         setSaving(false);
       }
@@ -347,7 +354,7 @@ const StaffManagement = () => {
     setConfirmAction(() => async () => {
       try {
         await axios.patch(
-          `${API}/staff/${staff._id}/toggle-status`, {},
+          `${API}/staff/${staff._id}/toggle-status${staff.model ? `?model=${staff.model}` : ""}`, {},
           { withCredentials: true }
         );
         toast.success(`Updated successfully`);
@@ -367,7 +374,7 @@ const StaffManagement = () => {
     );
     setConfirmAction(() => async () => {
       try {
-        await axios.delete(`${API}/staff/${staff._id}`, {
+        await axios.delete(`${API}/staff/${staff._id}${staff.model ? `?model=${staff.model}` : ""}`, {
           withCredentials: true,
         });
         toast.success("Deleted successfully");
@@ -411,6 +418,7 @@ const StaffManagement = () => {
     setChangePassword(false);
     setEditingId(null);
     setDirty(false);
+    setFormError("");
   };
 
   const closeFormModal = () => {
@@ -967,6 +975,14 @@ const StaffManagement = () => {
             {/* scrollable body */}
             <div className="overflow-y-auto flex-1 px-6 py-5 space-y-6">
 
+              {formError ? (
+                <div
+                  role="alert"
+                  className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700"
+                >
+                  {formError}
+                </div>
+              ) : null}
               {/* ── PHOTO ── */}
               <div>
                 <p className="text-sm font-semibold mb-2">

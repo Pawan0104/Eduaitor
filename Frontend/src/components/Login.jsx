@@ -1,7 +1,7 @@
 ﻿import { useAuth } from "../context/AuthContext";
 import { useLanguage } from "../context/LanguageContext";
 import { useState, useEffect } from "react";
-import { useNavigate, useLocation } from "react-router-dom";
+import { useNavigate, useLocation, Link } from "react-router-dom";
 import {
   FaUserShield,
   FaUserGraduate,
@@ -18,6 +18,19 @@ import logo from "/eduaitor.png";
 import LanguageSwitcher from "./LanguageSwitcher";
 import api, { setAuthToken } from "../config/axios";
 import { getMenuPath } from "./AdminLayout";
+
+function ForgotPasswordLink({ t }) {
+  return (
+    <div className="flex justify-end">
+      <Link
+        to="/admin/forgot-password"
+        className="text-sm font-medium text-[rgb(var(--primary))] hover:underline"
+      >
+        {t("login.forgotPassword", "Forgot password?")}
+      </Link>
+    </div>
+  );
+}
 
 function homePathForRole(role, loginAs) {
   return getMenuPath(role, loginAs) || "/admin/login";
@@ -384,6 +397,8 @@ export default function Login() {
                   </button>
                 </div>
 
+                <ForgotPasswordLink t={t} />
+
                 <button
                   type="submit"
                   disabled={loading}
@@ -452,6 +467,8 @@ export default function Login() {
                     {showPassword ? <FaEyeSlash /> : <FaEye />}
                   </button>
                 </div>
+
+                <ForgotPasswordLink t={t} />
 
                 <button
                   type="submit"
@@ -665,6 +682,8 @@ export default function Login() {
                     {showPassword ? <FaEyeSlash /> : <FaEye />}
                   </button>
                 </div>
+
+                <ForgotPasswordLink t={t} />
 
                 <button
                   type="submit"

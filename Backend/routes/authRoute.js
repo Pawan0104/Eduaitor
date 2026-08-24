@@ -8,11 +8,17 @@ import {
   getParentChildren,
   switchParentChild,
 } from "../controllers/authController.js";
+import {
+  forgotPassword,
+  resetPassword,
+} from "../controllers/passwordResetController.js";
 import { authMiddleware } from "../auth/auth.js";
 
 const router = express.Router();
 
 router.post("/login", loginUser);
+router.post("/forgot-password", forgotPassword);
+router.post("/reset-password", resetPassword);
 router.post("/parent/lookup", lookupParentSchools);
 router.post("/change-password", authMiddleware, changePassWord);
 router.post("/dismiss-password-prompt", authMiddleware, dismissPasswordPrompt);

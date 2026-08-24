@@ -1,7 +1,11 @@
 import { createContext, useContext, useEffect, useState } from "react";
 import api, { clearAuthToken, setAuthToken } from "../config/axios";
+import { signalAppShellReady } from "../utils/initNativeShell.js";
 
 const AuthContext = createContext();
+
+/** Boot session check — keep short so splash isn't followed by a long blank wait. */
+const AUTH_BOOT_TIMEOUT_MS = 8000;
 
 export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null);
@@ -10,7 +14,7 @@ export const AuthProvider = ({ children }) => {
 
   const fetchUser = async () => {
     try {
-      const res = await api.get(`/auth/me`);
+      const res = await api.get(`/auth/me`, { timeout: AUTH_BOOT_TIMEOUT_MS });
       setUser(res.data.user);
     } catch (err) {
       const status = err?.response?.status;
@@ -21,6 +25,7 @@ export const AuthProvider = ({ children }) => {
       }
     } finally {
       setLoading(false);
+      signalAppShellReady();
     }
   };
 

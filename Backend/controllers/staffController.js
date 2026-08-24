@@ -19,6 +19,12 @@ import {
 } from "../utils/staffDeleteGuards.js";
 import { notifyCredentialsAsync } from "../services/credentials/notifyCredentials.js";
 import School from "../models/school.js";
+import {
+  normalizeEmail,
+  emailMatchQuery,
+  isDuplicateKeyError,
+  duplicateKeyMessage,
+} from "../utils/emailUnique.js";
 
 /** Resolve permissions from custom role or client payload; enforce school modules. */
 const resolveStaffPermissions = async ({
@@ -153,11 +159,22 @@ export const createStaff = async (req, res, next) => {
     }
 
     // ── 3. CHECK EMAIL UNIQUE IN SCHOOL ───────────
-    const exists = await Staff.findOne({ schoolId, email });
-    if (exists) {
+    const normalizedEmail = normalizeEmail(email);
+    const emailQuery = emailMatchQuery(normalizedEmail);
+    const [existsStaff, existsTeacher] = await Promise.all([
+      Staff.findOne({ schoolId, email: emailQuery }),
+      Teacher.findOne({ schoolId, email: emailQuery }),
+    ]);
+    if (existsStaff) {
       return res.status(400).json({
         success: false,
         message: "A staff member with this email already exists in your school",
+      });
+    }
+    if (existsTeacher) {
+      return res.status(400).json({
+        success: false,
+        message: "This email is already used by a teacher in your school",
       });
     }
 
@@ -204,7 +221,7 @@ export const createStaff = async (req, res, next) => {
     // ── 9. CREATE ─────────────────────────────────
     const staff = await Staff.create({
       fullName,
-      email,
+      email: normalizedEmail,
       phone,
       dob:            dob        || null,
       gender,
@@ -247,7 +264,22 @@ export const createStaff = async (req, res, next) => {
     });
 
   } catch (error) {
-    next(error);
+    console.error("Create staff error:", error);
+
+    if (isDuplicateKeyError(error)) {
+      return res.status(400).json({
+        success: false,
+        message: duplicateKeyMessage(
+          error,
+          "A staff member with this email already exists in your school",
+        ),
+      });
+    }
+
+    return res.status(500).json({
+      success: false,
+      message: error.message || "Failed to create staff",
+    });
   }
 };
 
@@ -393,7 +425,32 @@ export const updateStaff = async (req, res, next) => {
     const updateData = {};
 
     if (fullName?.trim())  updateData.fullName  = fullName;
-    if (email?.trim())     updateData.email     = email;
+    if (email?.trim()) {
+      const normalizedEmail = normalizeEmail(email);
+      const emailQuery = emailMatchQuery(normalizedEmail);
+      const [dupStaff, dupTeacher] = await Promise.all([
+        Staff.findOne({
+          schoolId,
+          email: emailQuery,
+          _id: { $ne: staff._id },
+        }),
+        Teacher.findOne({ schoolId, email: emailQuery }),
+      ]);
+      if (dupStaff) {
+        return res.status(400).json({
+          success: false,
+          message:
+            "A staff member with this email already exists in your school",
+        });
+      }
+      if (dupTeacher) {
+        return res.status(400).json({
+          success: false,
+          message: "This email is already used by a teacher in your school",
+        });
+      }
+      updateData.email = normalizedEmail;
+    }
     if (phone)             updateData.phone     = phone;
     if (dob)               updateData.dob       = dob;
     if (gender)            updateData.gender    = gender;
@@ -498,7 +555,22 @@ export const updateStaff = async (req, res, next) => {
     });
 
   } catch (error) {
-    next(error);
+    console.error("Update staff error:", error);
+
+    if (isDuplicateKeyError(error)) {
+      return res.status(400).json({
+        success: false,
+        message: duplicateKeyMessage(
+          error,
+          "A staff member with this email already exists in your school",
+        ),
+      });
+    }
+
+    return res.status(500).json({
+      success: false,
+      message: error.message || "Failed to update staff",
+    });
   }
 };
 

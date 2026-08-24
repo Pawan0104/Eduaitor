@@ -7,6 +7,7 @@ import { FiX } from "react-icons/fi";
 import { MODULES } from "../constants/module.js";
 import { useAuth } from "../context/AuthContext";
 import LoadingSpinner from "../components/LoadingSpinner";
+import { getApiErrorMessage } from "../utils/apiError.js";
 
 const API = import.meta.env.VITE_API_URL;
 
@@ -126,6 +127,7 @@ const TeacherManagement = () => {
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [confirmAction, setConfirmAction] = useState(null);
   const [confirmMessage, setConfirmMessage] = useState("");
+  const [formError, setFormError] = useState("");
 
   // Dropdowns
   const [subjects, setSubjects] = useState([]);
@@ -520,6 +522,7 @@ const TeacherManagement = () => {
 
   const submitTeacher = async () => {
     try {
+      setFormError("");
       const data = new FormData();
 
       Object.keys(form).forEach((key) => {
@@ -570,7 +573,9 @@ const TeacherManagement = () => {
 
       navigate(listPath);
     } catch (err) {
-      toast.error(err?.response?.data?.message || "Operation failed");
+      const msg = getApiErrorMessage(err, "Operation failed");
+      setFormError(msg);
+      toast.error(msg, { autoClose: 5000 });
     }
   };
 
@@ -1037,6 +1042,14 @@ const TeacherManagement = () => {
             {step === 5 && (
               <div>
                 <h3 className="text-lg font-semibold mb-4">Review Details</h3>
+                {formError ? (
+                  <div
+                    role="alert"
+                    className="mb-4 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700"
+                  >
+                    {formError}
+                  </div>
+                ) : null}
                 <div className="grid md:grid-cols-2 gap-4">
                   <ReviewField label="Full Name" value={form.fullName} />
                   <ReviewField label="Email" value={form.email} />
