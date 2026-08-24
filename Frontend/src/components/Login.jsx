@@ -1,6 +1,6 @@
 ﻿import { useAuth } from "../context/AuthContext";
 import { useLanguage } from "../context/LanguageContext";
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { useNavigate, useLocation, Link } from "react-router-dom";
 import {
   FaUserShield,
@@ -24,6 +24,7 @@ function ForgotPasswordLink({ t }) {
     <div className="flex justify-end">
       <Link
         to="/admin/forgot-password"
+        reloadDocument={false}
         className="text-sm font-medium text-[rgb(var(--primary))] hover:underline"
       >
         {t("login.forgotPassword", "Forgot password?")}
@@ -60,17 +61,6 @@ export default function Login() {
   const location = useLocation();
   const { fetchUser, setUser } = useAuth();
   const { t } = useLanguage();
-
-  useEffect(() => {
-    window.history.pushState(null, "", window.location.href);
-
-    const handlePopState = () => {
-      window.history.pushState(null, "", window.location.href);
-    };
-
-    window.addEventListener("popstate", handlePopState);
-    return () => window.removeEventListener("popstate", handlePopState);
-  }, []);
 
   const resetParentFlow = () => {
     setParentStep("mobile");
