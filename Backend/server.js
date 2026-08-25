@@ -22,6 +22,7 @@ import {
 import {
   clientOrigin,
   isMailConfigured,
+  isRelayConfigured,
   isResendConfigured,
   isSmtpConfigured,
   verifySmtpConnection,
@@ -424,7 +425,7 @@ app.get("/api/health/mail", async (_req, res) => {
   let smtpReachable = null;
   let smtpError = null;
   if (isSmtpConfigured()) {
-    const result = await verifySmtpConnection(10000);
+    const result = await verifySmtpConnection(8000);
     smtpReachable = result.ok;
     if (!result.ok) smtpError = result.reason || "unreachable";
   }
@@ -432,6 +433,7 @@ app.get("/api/health/mail", async (_req, res) => {
     success: true,
     smtpConfigured: isSmtpConfigured(),
     resendConfigured: isResendConfigured(),
+    relayConfigured: isRelayConfigured(),
     mailConfigured: isMailConfigured(),
     clientUrlSet,
     smtpReachable,

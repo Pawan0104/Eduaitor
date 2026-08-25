@@ -5,11 +5,14 @@ let transporter = null;
 let warnedMissingConfig = false;
 
 export function isSmtpConfigured() {
+  if (String(process.env.EMAIL_SMTP_DISABLED || "").toLowerCase() === "true") {
+    return false;
+  }
   return Boolean(
     process.env.EMAIL_HOST &&
       process.env.EMAIL_USER &&
       process.env.EMAIL_PASS &&
-      process.env.EMAIL_FROM,
+      (process.env.EMAIL_FROM || process.env.EMAIL_USER),
   );
 }
 
@@ -17,17 +20,39 @@ export function isResendConfigured() {
   return Boolean(process.env.RESEND_API_KEY);
 }
 
-export function isMailConfigured() {
-  return isSmtpConfigured() || isResendConfigured();
+export function isRelayConfigured() {
+  return Boolean(process.env.MAIL_RELAY_URL && process.env.MAIL_RELAY_SECRET);
 }
 
-function getFrom() {
+export function isMailConfigured() {
+  return isSmtpConfigured() || isResendConfigured() || isRelayConfigured();
+}
+
+function parseFrom(raw) {
+  const s = String(raw || "").trim();
+  const m = s.match(/^(.+?)\s*<([^>]+)>$/);
+  if (m) return { name: m[1].replace(/^"|"$/g, "").trim(), email: m[2].trim() };
+  if (s.includes("@")) return { name: "Eduaitor", email: s };
+  return {
+    name: "Eduaitor",
+    email: process.env.EMAIL_USER || "support@eduaitor.com",
+  };
+}
+
+function getSmtpFrom() {
   return (
     process.env.EMAIL_FROM ||
-    process.env.RESEND_FROM ||
     (process.env.EMAIL_USER
       ? `Eduaitor <${process.env.EMAIL_USER}>`
-      : "Eduaitor <onboarding@resend.dev>")
+      : "Eduaitor <support@eduaitor.com>")
+  );
+}
+
+function getResendFrom() {
+  return (
+    process.env.RESEND_FROM ||
+    process.env.EMAIL_FROM ||
+    "Eduaitor <onboarding@resend.dev>"
   );
 }
 
@@ -39,9 +64,6 @@ function getTransporter() {
   const secure =
     String(process.env.EMAIL_SECURE || "").toLowerCase() === "true" ||
     port === 465;
-
-  // Shared hosts (e.g. GoDaddy cPanel) often present a cert for *.secureserver.net
-  // while clients connect via mail.yourdomain.com — allow opt-out of strict check.
   const rejectUnauthorized =
     String(process.env.EMAIL_TLS_REJECT_UNAUTHORIZED || "true").toLowerCase() !==
     "false";
@@ -56,15 +78,14 @@ function getTransporter() {
     },
     tls: { rejectUnauthorized },
     requireTLS: !secure && port === 587,
-    connectionTimeout: 12_000,
-    greetingTimeout: 12_000,
-    socketTimeout: 20_000,
+    connectionTimeout: 8_000,
+    greetingTimeout: 8_000,
+    socketTimeout: 12_000,
   });
 
   return transporter;
 }
 
-/** Quick SMTP connectivity check (for /api/health/mail). */
 export async function verifySmtpConnection(timeoutMs = 10000) {
   if (!isSmtpConfigured()) {
     return { ok: false, reason: "SMTP not configured" };
@@ -83,7 +104,6 @@ export async function verifySmtpConnection(timeoutMs = 10000) {
   }
 }
 
-/** Public app origin without trailing slash (used in email links). */
 export function clientOrigin() {
   return String(process.env.CLIENT_URL || "")
     .trim()
@@ -99,7 +119,7 @@ async function sendViaSmtp({ to, subject, text, html, replyTo }) {
   const mailer = getTransporter();
   if (!mailer) throw new Error("SMTP not configured");
   const info = await mailer.sendMail({
-    from: getFrom(),
+    from: getSmtpFrom(),
     to,
     subject,
     text,
@@ -120,7 +140,7 @@ async function sendViaResend({ to, subject, html, text }) {
   if (!apiKey) throw new Error("RESEND_API_KEY is not set");
   const resend = new Resend(apiKey);
   const result = await resend.emails.send({
-    from: getFrom(),
+    from: getResendFrom(),
     to: Array.isArray(to) ? to : [to],
     subject,
     html,
@@ -138,9 +158,52 @@ async function sendViaResend({ to, subject, html, text }) {
   };
 }
 
+async function sendViaRelay({ to, subject, text, html }) {
+  const url = process.env.MAIL_RELAY_URL;
+  const secret = process.env.MAIL_RELAY_SECRET;
+  if (!url || !secret) throw new Error("Mail relay not configured");
+
+  const from = parseFrom(getSmtpFrom());
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), 20_000);
+  try {
+    const res = await fetch(url, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "X-Mail-Relay-Secret": secret,
+      },
+      body: JSON.stringify({
+        to,
+        subject,
+        text,
+        html,
+        fromEmail: from.email,
+        fromName: from.name,
+      }),
+      signal: controller.signal,
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok || data.ok === false) {
+      throw new Error(data.error || `Relay HTTP ${res.status}`);
+    }
+    return {
+      sent: true,
+      skipped: false,
+      messageId: data.id || `relay-${Date.now()}`,
+      to,
+      provider: "cpanel-relay",
+    };
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
 /**
- * Send an email via SMTP when reachable; otherwise Resend (needed on Render —
- * GoDaddy mail.eduaitor.com often times out from cloud IPs).
+ * Delivery order on Render:
+ * 1) cPanel relay (GoDaddy can send; Render SMTP to mail.eduaitor.com times out)
+ * 2) SMTP (works locally / if unblocked)
+ * 3) Resend (only if domain verified; testing keys are recipient-limited)
  */
 export async function sendMail({ to, subject, text, html, replyTo } = {}) {
   if (!to) {
@@ -150,7 +213,7 @@ export async function sendMail({ to, subject, text, html, replyTo } = {}) {
   if (!isMailConfigured()) {
     if (!warnedMissingConfig) {
       console.warn(
-        "[mailer] Mail not configured (set EMAIL_* and/or RESEND_API_KEY).",
+        "[mailer] Mail not configured (set MAIL_RELAY_* and/or EMAIL_* / RESEND_API_KEY).",
       );
       warnedMissingConfig = true;
     }
@@ -159,19 +222,31 @@ export async function sendMail({ to, subject, text, html, replyTo } = {}) {
 
   const errors = [];
 
+  if (isRelayConfigured()) {
+    try {
+      const result = await sendViaRelay({ to, subject, text, html });
+      console.info("[mailer] sent via cPanel relay", result.messageId, "to:", to);
+      return result;
+    } catch (err) {
+      const msg = err?.message || String(err);
+      console.warn("[mailer] relay failed:", msg);
+      errors.push(`relay: ${msg}`);
+    }
+  }
+
   if (isSmtpConfigured()) {
     try {
       const result = await Promise.race([
         sendViaSmtp({ to, subject, text, html, replyTo }),
         new Promise((_, reject) =>
-          setTimeout(() => reject(new Error("SMTP send timeout")), 18_000),
+          setTimeout(() => reject(new Error("SMTP send timeout")), 12_000),
         ),
       ]);
       console.info("[mailer] sent via SMTP", result.messageId, "to:", to);
       return result;
     } catch (err) {
       const msg = err?.message || String(err);
-      console.warn("[mailer] SMTP failed, will try Resend if configured:", msg);
+      console.warn("[mailer] SMTP failed:", msg);
       errors.push(`smtp: ${msg}`);
     }
   }
