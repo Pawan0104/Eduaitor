@@ -37,9 +37,31 @@ function getTransporter() {
     },
     tls: { rejectUnauthorized },
     requireTLS: !secure && port === 587,
+    connectionTimeout: 12_000,
+    greetingTimeout: 12_000,
+    socketTimeout: 20_000,
   });
 
   return transporter;
+}
+
+/** Quick SMTP connectivity check (for /api/health/mail). */
+export async function verifySmtpConnection(timeoutMs = 10000) {
+  if (!isMailConfigured()) {
+    return { ok: false, reason: "SMTP not configured" };
+  }
+  const mailer = getTransporter();
+  try {
+    await Promise.race([
+      mailer.verify(),
+      new Promise((_, reject) =>
+        setTimeout(() => reject(new Error("SMTP verify timeout")), timeoutMs),
+      ),
+    ]);
+    return { ok: true };
+  } catch (err) {
+    return { ok: false, reason: err?.message || "SMTP verify failed" };
+  }
 }
 
 /** Public app origin without trailing slash (used in email links). */

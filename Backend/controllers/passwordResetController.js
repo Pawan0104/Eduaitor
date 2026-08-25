@@ -153,19 +153,25 @@ export const forgotPassword = async (req, res) => {
       loginUrl,
     });
 
-    const mailResult = await sendMail({
-      to: account.email,
-      subject,
-      text,
-      html,
+    // Do not await SMTP — GoDaddy can hang from cloud hosts and time out the browser.
+    const to = account.email;
+    setImmediate(() => {
+      sendMail({ to, subject, text, html })
+        .then((mailResult) => {
+          if (!mailResult.sent && !mailResult.skipped) {
+            console.error("[forgotPassword] mail error:", mailResult.error);
+          }
+          if (mailResult.skipped) {
+            console.warn("[forgotPassword] SMTP skipped:", mailResult.reason);
+          }
+          if (mailResult.sent) {
+            console.info("[forgotPassword] reset email queued/sent to", to);
+          }
+        })
+        .catch((mailErr) => {
+          console.error("[forgotPassword] mail unexpected:", mailErr?.message || mailErr);
+        });
     });
-
-    if (!mailResult.sent && !mailResult.skipped) {
-      console.error("[forgotPassword] mail error:", mailResult.error);
-    }
-    if (mailResult.skipped) {
-      console.warn("[forgotPassword] SMTP skipped:", mailResult.reason);
-    }
 
     return res.json({ success: true, message: GENERIC_OK });
   } catch (err) {

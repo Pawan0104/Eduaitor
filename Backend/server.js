@@ -19,7 +19,7 @@ import {
   findChildrenByParentUsername,
   toChildSummary,
 } from "./utils/parentChildren.js";
-import { clientOrigin, isMailConfigured } from "./services/mail/mailer.js";
+import { clientOrigin, isMailConfigured, verifySmtpConnection } from "./services/mail/mailer.js";
 
 
 const __filename = fileURLToPath(import.meta.url);
@@ -413,11 +413,22 @@ app.post("/api/auth/logout", (req, res) => {
 app.use("/api/auth", authRoutes);
 
 /** Safe mail readiness check (no secrets). */
-app.get("/api/health/mail", (_req, res) => {
+app.get("/api/health/mail", async (_req, res) => {
+  const smtpConfigured = isMailConfigured();
+  const clientUrlSet = Boolean(clientOrigin());
+  let smtpReachable = null;
+  let smtpError = null;
+  if (smtpConfigured) {
+    const result = await verifySmtpConnection(10000);
+    smtpReachable = result.ok;
+    if (!result.ok) smtpError = result.reason || "unreachable";
+  }
   res.json({
     success: true,
-    smtpConfigured: isMailConfigured(),
-    clientUrlSet: Boolean(clientOrigin()),
+    smtpConfigured,
+    clientUrlSet,
+    smtpReachable,
+    ...(smtpError ? { smtpError } : {}),
   });
 });
 
