@@ -11,6 +11,23 @@ const ROLE_LABELS = {
   parent: "Parent",
 };
 
+function normalizeEmails(email, emails) {
+  const list = [];
+  if (Array.isArray(emails)) list.push(...emails);
+  if (email) list.push(email);
+  const seen = new Set();
+  const out = [];
+  for (const raw of list) {
+    const v = String(raw || "")
+      .trim()
+      .toLowerCase();
+    if (!v || !v.includes("@") || seen.has(v)) continue;
+    seen.add(v);
+    out.push(v);
+  }
+  return out;
+}
+
 /**
  * Deliver username/password via email (now) and SMS (stub for later).
  * Safe to fire-and-forget — never throws to callers.
@@ -21,9 +38,11 @@ const ROLE_LABELS = {
  * @param {string} opts.username
  * @param {string} opts.password
  * @param {string} [opts.email]
+ * @param {string[]} [opts.emails] - send the same welcome mail to multiple addresses
  * @param {string} [opts.mobile]
  * @param {string} [opts.schoolName]
- * @param {string[]} [opts.extraLines] - e.g. student login lines in parent email
+ * @param {string[]} [opts.extraLines]
+ * @param {Array<{title?:string,username?:string,password?:string}>} [opts.credentialBlocks]
  * @param {object} [opts.meta]
  */
 export async function notifyCredentials(opts = {}) {
@@ -34,9 +53,11 @@ export async function notifyCredentials(opts = {}) {
       username,
       password,
       email,
+      emails,
       mobile,
       schoolName,
       extraLines = [],
+      credentialBlocks,
       meta = {},
     } = opts;
 
@@ -48,18 +69,33 @@ export async function notifyCredentials(opts = {}) {
     }
 
     const roleLabel = ROLE_LABELS[role] || role || "account";
+    const recipients = normalizeEmails(email, emails);
 
-    const [emailResult, smsResult] = await Promise.all([
-      sendCredentialEmail({
-        to: email,
-        name,
-        username,
-        password,
-        schoolName,
-        roleLabel,
-        extraLines,
-        meta,
-      }),
+    const blocks =
+      Array.isArray(credentialBlocks) && credentialBlocks.length
+        ? credentialBlocks
+        : [{ title: `${roleLabel} login`, username, password }];
+
+    const [emailResults, smsResult] = await Promise.all([
+      recipients.length
+        ? Promise.all(
+            recipients.map((to) =>
+              sendCredentialEmail({
+                to,
+                name,
+                username,
+                password,
+                schoolName,
+                roleLabel,
+                extraLines,
+                credentialBlocks: blocks,
+                meta,
+              }),
+            ),
+          )
+        : Promise.resolve([
+            { sent: false, skipped: true, reason: "No email address" },
+          ]),
       sendCredentialSms({
         mobile,
         name,
@@ -70,6 +106,19 @@ export async function notifyCredentials(opts = {}) {
         meta,
       }),
     ]);
+
+    const anySent = emailResults.some((r) => r?.sent);
+    const anyError = emailResults.find((r) => r && !r.sent && !r.skipped);
+    const emailResult = {
+      sent: anySent,
+      skipped: !anySent && emailResults.every((r) => r?.skipped),
+      results: emailResults,
+      recipients,
+      ...(anyError ? { error: anyError.error } : {}),
+      ...(!anySent && emailResults[0]?.reason
+        ? { reason: emailResults[0].reason }
+        : {}),
+    };
 
     return { email: emailResult, sms: smsResult };
   } catch (err) {

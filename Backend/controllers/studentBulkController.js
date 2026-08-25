@@ -348,24 +348,44 @@ export const bulkUploadStudents = async (req, res) => {
         console.error("Group sync failed for", student.studentId, err);
       }
 
-      const parentEmail =
-        student.fatherEmail || student.motherEmail || "";
+      const parentEmails = [student.fatherEmail, student.motherEmail].filter(
+        Boolean,
+      );
       const parentMobile =
         student.fatherMobile || student.motherMobile || "";
-      if (parentEmail || parentMobile) {
+      const parentUsername =
+        student.parentCredentials?.username || parentMobile;
+      const parentPassword =
+        student.parentCredentials?.temp_password ||
+        student.studentCredentials?.temp_password;
+      const studentUsername =
+        student.studentCredentials?.username || student.studentId;
+      const studentPassword =
+        student.studentCredentials?.temp_password || parentPassword;
+
+      if (parentEmails.length || parentMobile) {
         notifyCredentialsAsync({
           role: "parent",
           name: student.fatherName || student.motherName || "Parent",
-          username: student.parentCredentials?.username || parentMobile,
-          password:
-            student.parentCredentials?.temp_password ||
-            student.studentCredentials?.temp_password,
-          email: parentEmail,
+          username: parentUsername,
+          password: parentPassword,
+          emails: parentEmails,
           mobile: parentMobile,
           schoolName: schoolDoc?.school_name,
+          credentialBlocks: [
+            {
+              title: "Parent login",
+              username: parentUsername,
+              password: parentPassword,
+            },
+            {
+              title: "Student login",
+              username: studentUsername,
+              password: studentPassword,
+            },
+          ],
           extraLines: [
-            `Student login username: ${student.studentCredentials?.username || student.studentId}`,
-            `Student login password: ${student.studentCredentials?.temp_password || ""}`,
+            `Student: ${student.firstName || ""} ${student.lastName || ""}`.trim(),
           ],
         });
       }

@@ -9,9 +9,12 @@ import PasswordResetToken, {
 import {
   adminLoginUrl,
   clientOrigin,
-  escapeHtml,
   sendMail,
 } from "../services/mail/mailer.js";
+import {
+  buildPasswordChangedEmail,
+  buildPasswordResetEmail,
+} from "../services/mail/emailTemplates.js";
 
 const RESET_TTL_MS = 60 * 60 * 1000; // 1 hour
 const GENERIC_OK =
@@ -39,26 +42,26 @@ async function findAccountByEmail(email) {
 
   const teacher = await Teacher.findOne({
     email: { $regex: new RegExp(`^${escapeRegex(email)}$`, "i") },
-  }).select("_id email name");
+  }).select("_id email fullName");
   if (teacher?.email) {
     return {
       accountType: "teacher",
       accountId: teacher._id,
       email: String(teacher.email).trim(),
-      name: teacher.name || "Teacher",
+      name: teacher.fullName || "Teacher",
       label: "Teacher",
     };
   }
 
   const staff = await Staff.findOne({
     email: { $regex: new RegExp(`^${escapeRegex(email)}$`, "i") },
-  }).select("_id email name");
+  }).select("_id email fullName");
   if (staff?.email) {
     return {
       accountType: "staff",
       accountId: staff._id,
       email: String(staff.email).trim(),
-      name: staff.name || "Staff",
+      name: staff.fullName || "Staff",
       label: "Staff",
     };
   }
@@ -143,33 +146,12 @@ export const forgotPassword = async (req, res) => {
     }
 
     const loginUrl = adminLoginUrl();
-    const subject = "Reset your Eduaitor password";
-    const text = [
-      `Hello ${account.name},`,
-      "",
-      `We received a request to reset your Eduaitor ${account.label} password.`,
-      `Open this link within 1 hour to choose a new password:`,
+    const { subject, text, html } = buildPasswordResetEmail({
+      name: account.name,
+      roleLabel: account.label,
       resetUrl,
-      "",
-      "If you did not request this, you can ignore this email.",
-      loginUrl ? `Login: ${loginUrl}` : null,
-      "",
-      "— Eduaitor",
-    ]
-      .filter(Boolean)
-      .join("\n");
-
-    const html = `
-      <div style="font-family:Segoe UI,Arial,sans-serif;line-height:1.5;color:#1f2937;max-width:560px">
-        <p>Hello ${escapeHtml(account.name)},</p>
-        <p>We received a request to reset your Eduaitor <strong>${escapeHtml(account.label)}</strong> password.</p>
-        <p><a href="${escapeHtml(resetUrl)}" style="display:inline-block;background:#0d9488;color:#fff;text-decoration:none;padding:10px 18px;border-radius:8px;font-weight:600">Reset password</a></p>
-        <p style="font-size:13px;color:#64748b;word-break:break-all">${escapeHtml(resetUrl)}</p>
-        <p>This link expires in <strong>1 hour</strong>. If you did not request this, ignore this email.</p>
-        ${loginUrl ? `<p>Login: <a href="${escapeHtml(loginUrl)}">${escapeHtml(loginUrl)}</a></p>` : ""}
-        <p>— Eduaitor</p>
-      </div>
-    `;
+      loginUrl,
+    });
 
     const mailResult = await sendMail({
       to: account.email,
@@ -233,27 +215,12 @@ export const resetPassword = async (req, res) => {
     });
 
     const loginUrl = adminLoginUrl();
+    const changed = buildPasswordChangedEmail({ loginUrl });
     await sendMail({
       to: record.email,
-      subject: "Your Eduaitor password was changed",
-      text: [
-        "Your Eduaitor account password was changed successfully.",
-        loginUrl ? `Login: ${loginUrl}` : null,
-        "",
-        "If you did not do this, contact your school admin immediately.",
-        "",
-        "— Eduaitor",
-      ]
-        .filter(Boolean)
-        .join("\n"),
-      html: `
-        <div style="font-family:Segoe UI,Arial,sans-serif;line-height:1.5;color:#1f2937">
-          <p>Your Eduaitor account password was changed successfully.</p>
-          ${loginUrl ? `<p>Login: <a href="${escapeHtml(loginUrl)}">${escapeHtml(loginUrl)}</a></p>` : ""}
-          <p>If you did not do this, contact your school admin immediately.</p>
-          <p>— Eduaitor</p>
-        </div>
-      `,
+      subject: changed.subject,
+      text: changed.text,
+      html: changed.html,
     });
 
     return res.json({

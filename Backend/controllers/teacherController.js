@@ -107,7 +107,13 @@ export const createTeacher = async (req, res) => {
     }
 
     const normalizedEmail = normalizeEmail(req.body.email);
-    if (normalizedEmail) {
+    if (!normalizedEmail) {
+      return res.status(400).json({
+        success: false,
+        message: "Email is required so login details can be sent",
+      });
+    }
+    {
       const emailQuery = emailMatchQuery(normalizedEmail);
       const [dupTeacher, dupStaff] = await Promise.all([
         Teacher.findOne({ schoolId, email: emailQuery }),
@@ -177,6 +183,13 @@ export const createTeacher = async (req, res) => {
       email: teacher.email,
       mobile: teacher.phone,
       schoolName: schoolDoc?.school_name,
+      credentialBlocks: [
+        {
+          title: "Teacher login",
+          username: teacherUsername,
+          password: rawTeacherPassword,
+        },
+      ],
     });
 
     res.status(201).json({

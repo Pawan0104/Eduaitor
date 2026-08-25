@@ -378,24 +378,47 @@ export const createStudent = async (req, res) => {
     const schoolDoc = await School.findById(schoolId)
       .select("school_name")
       .lean();
-    const parentEmail = student.fatherEmail || student.motherEmail || "";
+    const parentEmails = [
+      student.fatherEmail,
+      student.motherEmail,
+    ].filter(Boolean);
     const parentMobile =
       student.fatherMobile || student.motherMobile || student.guardianMobile || "";
-    const studentExtraLines = [
-      `Student login username: ${student.studentCredentials?.username || student.studentId}`,
-      `Student login password: ${rawPassword || "(same as parent)"}`,
-    ];
+    const parentUsername =
+      student.parentCredentials?.username || parentMobile;
+    const parentPassword =
+      student.parentCredentials?.temp_password || rawPassword;
+    const studentUsername =
+      student.studentCredentials?.username || student.studentId;
+    const studentPassword =
+      student.studentCredentials?.temp_password || rawPassword || parentPassword;
 
-    if (parentEmail || parentMobile) {
+    if (parentEmails.length || parentMobile) {
       notifyCredentialsAsync({
         role: "parent",
         name: student.fatherName || student.motherName || "Parent",
-        username: student.parentCredentials?.username || parentMobile,
-        password: student.parentCredentials?.temp_password || rawPassword,
-        email: parentEmail,
+        username: parentUsername,
+        password: parentPassword,
+        emails: parentEmails,
         mobile: parentMobile,
         schoolName: schoolDoc?.school_name,
-        extraLines: studentExtraLines,
+        credentialBlocks: [
+          {
+            title: "Parent login",
+            username: parentUsername,
+            password: parentPassword,
+          },
+          {
+            title: "Student login",
+            username: studentUsername,
+            password: studentPassword,
+          },
+        ],
+        extraLines: [
+          student.firstName || student.lastName
+            ? `Student: ${[student.firstName, student.lastName].filter(Boolean).join(" ")}`
+            : null,
+        ].filter(Boolean),
       });
     }
 
@@ -404,7 +427,7 @@ export const createStudent = async (req, res) => {
       message: "Student created successfully. ID card is ready to download.",
       data: student,
       idCardReady: true,
-      credentialsNotified: Boolean(parentEmail),
+      credentialsNotified: parentEmails.length > 0,
     });
   } catch (error) {
     console.error("Create student error:", error);

@@ -150,6 +150,13 @@ export const createSchool = async (req, res, next) => {
       email: admin_email,
       mobile: contact_phone,
       schoolName: school_name,
+      credentialBlocks: [
+        {
+          title: "School Admin login",
+          username: admin_email,
+          password: admin_password,
+        },
+      ],
     });
 
     return res.status(201).json({

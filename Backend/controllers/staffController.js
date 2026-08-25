@@ -253,6 +253,13 @@ export const createStaff = async (req, res, next) => {
       email: staff.email,
       mobile: staff.phone,
       schoolName: schoolDoc?.school_name,
+      credentialBlocks: [
+        {
+          title: "Staff login",
+          username: staff.username,
+          password,
+        },
+      ],
     });
 
     return res.status(201).json({
