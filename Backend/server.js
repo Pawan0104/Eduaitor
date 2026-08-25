@@ -19,6 +19,7 @@ import {
   findChildrenByParentUsername,
   toChildSummary,
 } from "./utils/parentChildren.js";
+import { clientOrigin, isMailConfigured } from "./services/mail/mailer.js";
 
 
 const __filename = fileURLToPath(import.meta.url);
@@ -410,6 +411,15 @@ app.post("/api/auth/logout", (req, res) => {
 });
 
 app.use("/api/auth", authRoutes);
+
+/** Safe mail readiness check (no secrets). */
+app.get("/api/health/mail", (_req, res) => {
+  res.json({
+    success: true,
+    smtpConfigured: isMailConfigured(),
+    clientUrlSet: Boolean(clientOrigin()),
+  });
+});
 
 app.use("/api/access", accessRoutes);
 app.use("/api/roles", roleRoutes);

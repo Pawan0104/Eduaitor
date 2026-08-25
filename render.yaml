@@ -20,7 +20,7 @@ services:
       - key: JWT_SECRET
         generateValue: true
       - key: CLIENT_URL
-        value: https://eduaitor.com
+        value: https://www.eduaitor.com
       # Credential emails (SMTP) — set values in Render dashboard
       - key: EMAIL_HOST
         sync: false
