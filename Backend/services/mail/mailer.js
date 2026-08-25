@@ -1,9 +1,10 @@
 import nodemailer from "nodemailer";
+import { Resend } from "resend";
 
 let transporter = null;
 let warnedMissingConfig = false;
 
-export function isMailConfigured() {
+export function isSmtpConfigured() {
   return Boolean(
     process.env.EMAIL_HOST &&
       process.env.EMAIL_USER &&
@@ -12,8 +13,26 @@ export function isMailConfigured() {
   );
 }
 
+export function isResendConfigured() {
+  return Boolean(process.env.RESEND_API_KEY);
+}
+
+export function isMailConfigured() {
+  return isSmtpConfigured() || isResendConfigured();
+}
+
+function getFrom() {
+  return (
+    process.env.EMAIL_FROM ||
+    process.env.RESEND_FROM ||
+    (process.env.EMAIL_USER
+      ? `Eduaitor <${process.env.EMAIL_USER}>`
+      : "Eduaitor <onboarding@resend.dev>")
+  );
+}
+
 function getTransporter() {
-  if (!isMailConfigured()) return null;
+  if (!isSmtpConfigured()) return null;
   if (transporter) return transporter;
 
   const port = Number(process.env.EMAIL_PORT || 587);
@@ -47,7 +66,7 @@ function getTransporter() {
 
 /** Quick SMTP connectivity check (for /api/health/mail). */
 export async function verifySmtpConnection(timeoutMs = 10000) {
-  if (!isMailConfigured()) {
+  if (!isSmtpConfigured()) {
     return { ok: false, reason: "SMTP not configured" };
   }
   const mailer = getTransporter();
@@ -76,9 +95,52 @@ export function adminLoginUrl() {
   return base ? `${base}/admin/login` : null;
 }
 
+async function sendViaSmtp({ to, subject, text, html, replyTo }) {
+  const mailer = getTransporter();
+  if (!mailer) throw new Error("SMTP not configured");
+  const info = await mailer.sendMail({
+    from: getFrom(),
+    to,
+    subject,
+    text,
+    html,
+    replyTo,
+  });
+  return {
+    sent: true,
+    skipped: false,
+    messageId: info?.messageId,
+    to,
+    provider: "smtp",
+  };
+}
+
+async function sendViaResend({ to, subject, html, text }) {
+  const apiKey = process.env.RESEND_API_KEY;
+  if (!apiKey) throw new Error("RESEND_API_KEY is not set");
+  const resend = new Resend(apiKey);
+  const result = await resend.emails.send({
+    from: getFrom(),
+    to: Array.isArray(to) ? to : [to],
+    subject,
+    html,
+    text,
+  });
+  if (result.error) {
+    throw new Error(result.error.message || "Resend failed to send email");
+  }
+  return {
+    sent: true,
+    skipped: false,
+    messageId: result.data?.id,
+    to,
+    provider: "resend",
+  };
+}
+
 /**
- * Send an email via configured SMTP.
- * @returns {{ sent: boolean, skipped?: boolean, reason?: string, error?: string, messageId?: string }}
+ * Send an email via SMTP when reachable; otherwise Resend (needed on Render —
+ * GoDaddy mail.eduaitor.com often times out from cloud IPs).
  */
 export async function sendMail({ to, subject, text, html, replyTo } = {}) {
   if (!to) {
@@ -88,41 +150,49 @@ export async function sendMail({ to, subject, text, html, replyTo } = {}) {
   if (!isMailConfigured()) {
     if (!warnedMissingConfig) {
       console.warn(
-        "[mailer] SMTP not configured (set EMAIL_HOST, EMAIL_USER, EMAIL_PASS, EMAIL_FROM).",
+        "[mailer] Mail not configured (set EMAIL_* and/or RESEND_API_KEY).",
       );
       warnedMissingConfig = true;
     }
-    return { sent: false, skipped: true, reason: "SMTP not configured" };
+    return { sent: false, skipped: true, reason: "Mail not configured" };
   }
 
-  const mailer = getTransporter();
-  if (!mailer) {
-    return { sent: false, skipped: true, reason: "SMTP not configured" };
+  const errors = [];
+
+  if (isSmtpConfigured()) {
+    try {
+      const result = await Promise.race([
+        sendViaSmtp({ to, subject, text, html, replyTo }),
+        new Promise((_, reject) =>
+          setTimeout(() => reject(new Error("SMTP send timeout")), 18_000),
+        ),
+      ]);
+      console.info("[mailer] sent via SMTP", result.messageId, "to:", to);
+      return result;
+    } catch (err) {
+      const msg = err?.message || String(err);
+      console.warn("[mailer] SMTP failed, will try Resend if configured:", msg);
+      errors.push(`smtp: ${msg}`);
+    }
   }
 
-  try {
-    const info = await mailer.sendMail({
-      from: process.env.EMAIL_FROM,
-      to,
-      subject,
-      text,
-      html,
-      replyTo,
-    });
-    return {
-      sent: true,
-      skipped: false,
-      messageId: info?.messageId,
-      to,
-    };
-  } catch (err) {
-    console.error("[mailer] send failed:", err?.message || err);
-    return {
-      sent: false,
-      skipped: false,
-      error: err?.message || "Email send failed",
-    };
+  if (isResendConfigured()) {
+    try {
+      const result = await sendViaResend({ to, subject, html, text });
+      console.info("[mailer] sent via Resend", result.messageId, "to:", to);
+      return result;
+    } catch (err) {
+      const msg = err?.message || String(err);
+      console.error("[mailer] Resend failed:", msg);
+      errors.push(`resend: ${msg}`);
+    }
   }
+
+  return {
+    sent: false,
+    skipped: false,
+    error: errors.join(" | ") || "Email send failed",
+  };
 }
 
 export function escapeHtml(value) {
