@@ -104,15 +104,40 @@ export async function verifySmtpConnection(timeoutMs = 10000) {
   }
 }
 
+const LIVE_APP_ORIGIN = "https://www.eduaitor.com/admin";
+
+function isLocalOrigin(value) {
+  return /localhost|127\.0\.0\.1/i.test(String(value || ""));
+}
+
+/**
+ * Public web origin for links shown in emails.
+ * Never returns localhost — emails must open the live app.
+ */
 export function clientOrigin() {
-  return String(process.env.CLIENT_URL || "")
-    .trim()
-    .replace(/\/$/, "");
+  const candidates = [
+    process.env.PUBLIC_CLIENT_URL,
+    process.env.EMAIL_APP_URL,
+    process.env.CLIENT_URL,
+    LIVE_APP_ORIGIN,
+  ];
+
+  for (const raw of candidates) {
+    const origin = String(raw || "")
+      .trim()
+      .replace(/\/$/, "");
+    if (!origin || isLocalOrigin(origin)) continue;
+    return origin;
+  }
+
+  return LIVE_APP_ORIGIN;
 }
 
 export function adminLoginUrl() {
   const base = clientOrigin();
-  return base ? `${base}/admin/login` : null;
+  if (/\/admin$/i.test(base)) return `${base}/login`;
+  if (/\/admin\//i.test(base)) return `${base.replace(/\/$/, "")}/login`;
+  return `${base}/admin/login`;
 }
 
 async function sendViaSmtp({ to, subject, text, html, replyTo }) {
@@ -183,7 +208,12 @@ async function sendViaRelay({ to, subject, text, html }) {
       }),
       signal: controller.signal,
     });
-    const data = await res.json().catch(() => ({}));
+    const data = await res.json().catch(() => null);
+    if (!data || typeof data !== "object") {
+      throw new Error(
+        "Mail relay returned non-JSON (upload public_html/mail-relay from eduaitorcpanel)",
+      );
+    }
     if (!res.ok || data.ok === false) {
       throw new Error(data.error || `Relay HTTP ${res.status}`);
     }
