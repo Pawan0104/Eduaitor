@@ -11,6 +11,7 @@
     "cap:sync": "npx cap sync android",
     "cap:open": "npx cap open android",
     "apk:debug": "npm run build:apk && npx cap sync android && cd android && .\\gradlew.bat assembleDebug",
+    "aab:release": "npm run build:apk && npx cap sync android && cd android && .\\gradlew.bat bundleRelease",
     "lint": "eslint .",
     "preview": "vite preview"
   },
@@ -20,6 +21,7 @@
     "@capacitor/core": "^7.6.8",
     "@capacitor/splash-screen": "^7.0.5",
     "@capacitor/status-bar": "^7.0.6",
+    "@capgo/capacitor-native-biometric": "^7.6.0",
     "@tailwindcss/vite": "^4.2.1",
     "axios": "^1.13.6",
     "leaflet": "^1.9.4",

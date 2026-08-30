@@ -16,6 +16,8 @@ import { initUiSkin } from "./utils/uiSkin.js";
 import AppUpdatePrompt from "./components/AppUpdatePrompt.jsx";
 import OptionalPasswordChangeModal from "./components/OptionalPasswordChangeModal.jsx";
 import ErrorBoundary from "./components/ErrorBoundary.jsx";
+// Register global Bearer-token interceptors before any page axios calls.
+import "./config/axios.js";
 
 initTheme();
 initUiSkin();

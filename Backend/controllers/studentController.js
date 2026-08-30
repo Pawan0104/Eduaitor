@@ -76,16 +76,38 @@ const normalizeStudentFeeFields = (safeBody) => {
 };
 
 /* ================= GENERATE STUDENT ID ================= */
-const generateStudentId = async (schoolId) => {
-  const count = await Student.countDocuments({ schoolId });
-  const next = count + 1;
-  return `STU${String(next).padStart(4, "0")}`;
-};
-
 const normalizeAdmissionNumber = (value) =>
   String(value || "")
     .trim()
     .toUpperCase();
+
+/**
+ * Next STU#### for a school based on the highest existing STU number
+ * (not document count — count+1 collides when IDs have gaps or custom prefixes).
+ */
+const generateStudentId = async (schoolId) => {
+  const rows = await Student.find({ schoolId })
+    .select("studentId")
+    .lean();
+  const used = new Set(
+    rows.map((r) => normalizeAdmissionNumber(r.studentId)).filter(Boolean),
+  );
+
+  let maxStu = 0;
+  for (const id of used) {
+    const m = /^STU(\d+)$/.exec(id);
+    if (m) maxStu = Math.max(maxStu, parseInt(m[1], 10));
+  }
+
+  for (let n = maxStu + 1; n <= maxStu + 5000; n++) {
+    const candidate = `STU${String(n).padStart(4, "0")}`;
+    if (!used.has(candidate)) return candidate;
+  }
+
+  const err = new Error("Could not generate a unique admission number");
+  err.statusCode = 500;
+  throw err;
+};
 
 /** Resolve admission/student ID: use provided value or auto-generate; reject duplicates. */
 const resolveAdmissionNumber = async (schoolId, rawValue, excludeStudentId = null) => {
@@ -102,17 +124,7 @@ const resolveAdmissionNumber = async (schoolId, rawValue, excludeStudentId = nul
     }
     return custom;
   }
-  // Auto-generate; retry if rare collision
-  for (let i = 0; i < 5; i++) {
-    const candidate = await generateStudentId(schoolId);
-    const exists = await Student.findOne({ schoolId, studentId: candidate })
-      .select("_id")
-      .lean();
-    if (!exists) return candidate;
-  }
-  const err = new Error("Could not generate a unique admission number");
-  err.statusCode = 500;
-  throw err;
+  return generateStudentId(schoolId);
 };
 
 

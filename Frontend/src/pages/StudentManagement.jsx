@@ -1413,7 +1413,7 @@ const forbidden = [
             {step === 4 && (
               <div className="grid gap-4">
                 <File
-                  label="Student Photo"
+                  label="Student Photo *"
                   name="studentPhoto"
                   existingUrl={form?.documents?.studentPhoto?.url}
                   onChange={handleFileChange}
@@ -1465,7 +1465,7 @@ const forbidden = [
                 />
 
                 <File
-                  label="Father Aadhar"
+                  label="Father Aadhar *"
                   name="fatherAadhar"
                   existingUrl={form?.documents?.fatherAadhar?.url}
                   onChange={handleFileChange}
@@ -1473,7 +1473,7 @@ const forbidden = [
                 />
 
                 <File
-                  label="Mother Aadhar"
+                  label="Mother Aadhar *"
                   name="motherAadhar"
                   existingUrl={form?.documents?.motherAadhar?.url}
                   onChange={handleFileChange}

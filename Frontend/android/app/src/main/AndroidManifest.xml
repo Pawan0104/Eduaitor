@@ -38,4 +38,7 @@
     <!-- Permissions -->
 
     <uses-permission android:name="android.permission.INTERNET" />
+    <uses-permission android:name="android.permission.USE_BIOMETRIC" />
+    <!-- Older Android fingerprint support -->
+    <uses-permission android:name="android.permission.USE_FINGERPRINT" />
 </manifest>

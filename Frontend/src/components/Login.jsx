@@ -1,6 +1,6 @@
 ﻿import { useAuth } from "../context/AuthContext";
 import { useLanguage } from "../context/LanguageContext";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useNavigate, useLocation, Link } from "react-router-dom";
 import {
   FaUserShield,
@@ -12,12 +12,21 @@ import {
   FaArrowLeft,
   FaSchool,
   FaChevronRight,
+  FaFingerprint,
 } from "react-icons/fa";
 import { toast } from "react-toastify";
 import logo from "/eduaitor.png";
 import LanguageSwitcher from "./LanguageSwitcher";
 import api, { setAuthToken } from "../config/axios";
 import { getMenuPath } from "./AdminLayout";
+import {
+  biometricLabel,
+  disableBiometricLogin,
+  enableBiometricLogin,
+  getBiometricAvailability,
+  isNativeApp,
+  unlockWithBiometric,
+} from "../utils/biometricAuth";
 
 function ForgotPasswordLink({ t }) {
   return (
@@ -56,11 +65,73 @@ export default function Login() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [showPassword, setShowPassword] = useState(false);
+  const [bioAvailable, setBioAvailable] = useState(false);
+  const [bioReady, setBioReady] = useState(false);
+  const [bioType, setBioType] = useState(0);
 
   const navigate = useNavigate();
   const location = useLocation();
   const { fetchUser, setUser } = useAuth();
   const { t } = useLanguage();
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      if (!isNativeApp()) return;
+      const status = await getBiometricAvailability();
+      if (cancelled) return;
+      setBioAvailable(Boolean(status.isAvailable));
+      setBioReady(Boolean(status.isAvailable && status.hasCredentials));
+      setBioType(status.biometryType || 0);
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const refreshBiometricStatus = async () => {
+    const status = await getBiometricAvailability();
+    setBioAvailable(Boolean(status.isAvailable));
+    setBioReady(Boolean(status.isAvailable && status.hasCredentials));
+    setBioType(status.biometryType || 0);
+  };
+
+  const maybeOfferBiometric = async ({
+    username,
+    password,
+    portal,
+    schoolId,
+    mode: loginMode,
+  }) => {
+    if (!isNativeApp() || !bioAvailable || !username || !password) return;
+    const already = await getBiometricAvailability();
+    if (already.hasCredentials) return;
+    const ok = window.confirm(
+      t(
+        "login.enableBiometricConfirm",
+        "Enable fingerprint / face login on this device for faster sign-in next time?",
+      ),
+    );
+    if (!ok) return;
+    try {
+      await enableBiometricLogin({
+        username,
+        password,
+        portal,
+        schoolId,
+        mode: loginMode,
+      });
+      await refreshBiometricStatus();
+      toast.success(
+        t("login.biometricEnabled", "Biometric login enabled on this device"),
+      );
+    } catch (err) {
+      const msg =
+        err?.message ||
+        t("login.biometricEnableFailed", "Could not enable biometric login");
+      if (!/cancel|dismiss|user/i.test(msg)) toast.error(msg);
+    }
+  };
 
   const resetParentFlow = () => {
     setParentStep("mobile");
@@ -85,7 +156,7 @@ export default function Login() {
     setForm({ ...form, [e.target.name]: e.target.value });
   };
 
-  const finishLogin = async (res) => {
+  const finishLogin = async (res, credentialCtx = null) => {
     if (res.data?.token) setAuthToken(res.data.token);
 
     const role = res.data.data.role;
@@ -94,6 +165,10 @@ export default function Login() {
     if (res.data?.data) setUser(res.data.data);
 
     await fetchUser();
+
+    if (credentialCtx) {
+      await maybeOfferBiometric(credentialCtx);
+    }
 
     const intended = location.state?.from?.pathname;
     const safeIntended =
@@ -107,6 +182,54 @@ export default function Login() {
     const dest = safeIntended || homePathForRole(role, loginAs);
     navigate(dest, { replace: true });
     toast.success(t("login.success"));
+  };
+
+  const handleBiometricLogin = async () => {
+    try {
+      setLoading(true);
+      setError("");
+      const unlocked = await unlockWithBiometric();
+      const payload = {
+        email: unlocked.username,
+        password: unlocked.password,
+        portal: unlocked.portal || "staff",
+      };
+      if (unlocked.schoolId) payload.schoolId = unlocked.schoolId;
+
+      const res = await api.post(`/auth/login`, payload);
+      await finishLogin(res);
+    } catch (err) {
+      const msg =
+        err?.response?.data?.message ||
+        err?.message ||
+        t("login.biometricFailed", "Biometric login failed");
+      if (/cancel|dismiss|user cancel/i.test(String(msg))) return;
+      setError(msg);
+      toast.error(msg);
+      // Stale password — clear vault so user can re-enroll after password login
+      if (err?.response?.status === 401 || err?.response?.status === 403) {
+        try {
+          await disableBiometricLogin();
+          await refreshBiometricStatus();
+        } catch {
+          // ignore
+        }
+      }
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleDisableBiometric = async () => {
+    try {
+      await disableBiometricLogin();
+      await refreshBiometricStatus();
+      toast.info(
+        t("login.biometricRemoved", "Biometric login removed from this device"),
+      );
+    } catch (err) {
+      toast.error(err?.message || "Could not remove biometric login");
+    }
   };
 
   const mapLoginError = (err) => {
@@ -140,7 +263,12 @@ export default function Login() {
         portal: "staff",
       });
 
-      await finishLogin(res);
+      await finishLogin(res, {
+        username: form.email.trim(),
+        password: form.password,
+        portal: "staff",
+        mode: "other",
+      });
     } catch (err) {
       const backendMessage = mapLoginError(err);
       setError(backendMessage);
@@ -167,7 +295,12 @@ export default function Login() {
         portal: "student",
       });
 
-      await finishLogin(res);
+      await finishLogin(res, {
+        username: form.email.trim(),
+        password: form.password,
+        portal: "student",
+        mode: "student",
+      });
     } catch (err) {
       const backendMessage = mapLoginError(err);
       setError(backendMessage);
@@ -248,7 +381,13 @@ export default function Login() {
         portal: "parent",
       });
 
-      await finishLogin(res);
+      await finishLogin(res, {
+        username: mobile.trim(),
+        password: form.password,
+        portal: "parent",
+        schoolId: selectedSchool.schoolId,
+        mode: "parent",
+      });
     } catch (err) {
       const backendMessage = mapLoginError(err);
       setError(backendMessage);
@@ -330,6 +469,37 @@ export default function Login() {
 
           {error && (
             <p className="mb-4 text-center text-sm text-red-500">{error}</p>
+          )}
+
+          {bioReady && (
+            <div className="mb-6 space-y-2">
+              <button
+                type="button"
+                disabled={loading}
+                onClick={handleBiometricLogin}
+                className="flex w-full items-center justify-center gap-2 rounded-xl border-2 border-[rgb(var(--primary))] bg-[rgb(var(--surface))] py-3 text-sm font-semibold text-[rgb(var(--primary))] transition hover:bg-[rgb(var(--bg))] disabled:opacity-60"
+              >
+                <FaFingerprint className="text-lg" />
+                {t(
+                  "login.biometricSignIn",
+                  `Sign in with ${biometricLabel(bioType)}`,
+                )}
+              </button>
+              <button
+                type="button"
+                onClick={handleDisableBiometric}
+                className="w-full text-center text-xs font-medium text-[rgb(var(--text-muted))] hover:underline"
+              >
+                {t("login.biometricRemove", "Remove biometric login")}
+              </button>
+              <div className="flex items-center gap-3 py-1">
+                <div className="h-px flex-1 bg-[rgb(var(--border))]" />
+                <span className="text-[10px] font-bold uppercase tracking-wider text-[rgb(var(--text-muted))]">
+                  {t("login.orPassword", "or use password")}
+                </span>
+                <div className="h-px flex-1 bg-[rgb(var(--border))]" />
+              </div>
+            </div>
           )}
 
           {/* Student form */}
