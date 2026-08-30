@@ -481,7 +481,7 @@ const FeeStructure = () => {
                           <button
                             type="button"
                             onClick={() => openEdit(fee)}
-                            className="inline-flex shrink-0 items-center gap-1.5 rounded-lg bg-sky-600 px-3 py-1.5 text-[11px] font-bold text-white shadow-sm transition hover:bg-sky-700"
+                            className="inline-flex shrink-0 items-center gap-1.5 rounded-lg bg-[rgb(var(--primary))] px-3 py-1.5 text-[11px] font-bold text-white shadow-sm transition hover:opacity-90"
                           >
                             <FaEdit size={11} />
                             Edit
@@ -545,7 +545,7 @@ const FeeStructure = () => {
             <div className="flex gap-2 justify-end">
               <button
                 onClick={() => setConfirmVisible(false)}
-                className="px-4 py-2 bg-[rgb(var(--primary))] text-sm font-semibold rounded-lg cursor-pointer"
+                className="app-btn-secondary px-4 py-2 text-sm"
               >
                 Cancel
               </button>
@@ -634,14 +634,14 @@ const FeeStructure = () => {
             <div className="flex gap-2 justify-end">
               <button
                 onClick={closeModal}
-                className="px-4 py-2 text-[rgb(var(--text))] bg-[rgb(var(--primary))] text-sm font-semibold rounded-lg  transition-colors cursor-pointer"
+                className="app-btn-secondary px-4 py-2 text-sm"
               >
                 Cancel
               </button>
               <button
                 onClick={handleSave}
                 disabled={saving}
-                className={`px-5 py-2 text-[rgb(var(--text))] bg-[rgb(var(--primary))] text-sm font-semibold rounded-lg  cursor-pointer ${saving ? "opacity-60 cursor-not-allowed" : ""}`}
+                className={`app-btn-primary px-5 py-2 text-sm ${saving ? "opacity-60 cursor-not-allowed" : ""}`}
               >
                 {saving
                   ? "Saving…"

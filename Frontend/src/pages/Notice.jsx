@@ -364,11 +364,14 @@ export default function Notice() {
         <div className="pt-4">
           <button
             onClick={() => {
-              if (!user?.role) return;
-
-              if (isAdmin) navigate("/school/notice");
-              else if (isTeacher) navigate("/teacher/notice");
-              else if (isStudent) navigate("/parent/notice");
+              if (window.history.length > 1) {
+                navigate(-1);
+                return;
+              }
+              if (isAdmin) navigate("/school/menu");
+              else if (isTeacher) navigate("/teacher/menu");
+              else if (isStudent || user?.role === "parent") navigate("/parent/menu");
+              else navigate(-1);
             }}
             className="flex items-center gap-2 px-3 py-1.5 rounded-xl
                  bg-[rgb(var(--primary))]  shadow-sm border border-slate-100

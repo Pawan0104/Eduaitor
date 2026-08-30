@@ -28,7 +28,7 @@ const studentSchema = new mongoose.Schema(
 
     studentId: {
       type: String,
-      unique: true,
+      // Unique per school via compound index below — NOT globally unique
     },
 
     fatherName: String,

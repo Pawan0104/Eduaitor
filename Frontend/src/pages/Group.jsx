@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import axios from "axios";
-import { toast, ToastContainer } from "react-toastify";
+import { toast } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
 import {
   FiPlus,
@@ -2450,16 +2450,6 @@ export default function Groups() {
           }}
         />
       )}
-
-      <ToastContainer
-        position="bottom-right"
-        autoClose={3200}
-        toastStyle={{
-          fontFamily: "'Outfit', sans-serif",
-          fontSize: 13,
-          borderRadius: 12,
-        }}
-      />
     </>
   );
 }

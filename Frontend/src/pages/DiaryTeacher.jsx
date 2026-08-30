@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import axios from "axios";
-import { toast, ToastContainer } from "react-toastify";
+import { toast } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
 import { useAuth } from "../context/AuthContext";
 import { useNavigate } from "react-router-dom";
@@ -391,14 +391,6 @@ export default function DiaryTeacher() {
 
   return (
     <div className="min-h-screen ">
-      <ToastContainer
-        position="top-right"
-        autoClose={3000}
-        hideProgressBar
-        closeOnClick
-        pauseOnHover
-      />
-
       {/* 🔙 BACK BUTTON */}
       {isMobile && (
         <div className="px-4 pt-4">

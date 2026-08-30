@@ -132,7 +132,7 @@ function Pagination({ currentPage, totalPages, onPageChange }) {
             onClick={() => onPageChange(p)}
             className={`${btn} border font-medium ${
               p === currentPage
-                ? "bg-stone-800 text-white border-stone-800"
+                ? "bg-[rgb(var(--primary))] text-white border-[rgb(var(--primary))]"
                 : "border-stone-200 text-stone-600 hover:bg-stone-50"
             }`}
           >

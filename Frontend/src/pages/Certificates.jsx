@@ -77,6 +77,63 @@ export default function Certificates() {
       .slice(0, 40);
   }, [students, query]);
 
+  const getCertificateSheetHtml = () => {
+    const el = document.querySelector(".certificate-sheet");
+    if (!el) return null;
+    const styles = Array.from(document.querySelectorAll('style, link[rel="stylesheet"]'))
+      .map((n) => n.outerHTML)
+      .join("\n");
+    return `<!DOCTYPE html><html><head><meta charset="utf-8" /><title>Certificate</title>
+      ${styles}
+      <style>
+        @page { size: A4; margin: 12mm; }
+        body { margin: 0; background: #fff !important; }
+        .certificate-sheet { box-shadow: none !important; max-width: none !important; margin: 0 auto !important; }
+        @media print {
+          body { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+        }
+      </style>
+      </head><body>${el.outerHTML}</body></html>`;
+  };
+
+  const printCertificateSheet = () => {
+    const html = getCertificateSheetHtml();
+    if (!html) {
+      toast.error("Generate a certificate first");
+      return;
+    }
+    const win = window.open("", "_blank", "noopener,noreferrer,width=900,height=1200");
+    if (!win) {
+      toast.error("Pop-up blocked — allow pop-ups to print");
+      return;
+    }
+    win.document.write(html);
+    win.document.close();
+    win.focus();
+    setTimeout(() => {
+      win.print();
+    }, 400);
+  };
+
+  const downloadCertificate = () => {
+    const el = document.querySelector(".certificate-sheet");
+    if (!el) {
+      toast.error("Generate a certificate first");
+      return;
+    }
+    const html = getCertificateSheetHtml();
+    const blob = new Blob([html], { type: "text/html;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `${type}-certificate-${studentId || "student"}.html`;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(url);
+    toast.success("Certificate downloaded — open the file and use Print → Save as PDF");
+  };
+
   const generate = async () => {
     if (!studentId) {
       toast.error("Select a student");
@@ -314,13 +371,22 @@ export default function Certificates() {
           <div className="flex items-center justify-between print:hidden">
             <p className="text-sm font-bold text-[rgb(var(--text))]">Preview</p>
             {certificate && (
-              <button
-                type="button"
-                onClick={() => window.print()}
-                className="inline-flex items-center gap-2 rounded-xl bg-slate-900 px-4 py-2.5 text-sm font-bold text-white"
-              >
-                <FaPrint /> Print / PDF
-              </button>
+              <div className="flex flex-wrap gap-2">
+                <button
+                  type="button"
+                  onClick={printCertificateSheet}
+                  className="inline-flex items-center gap-2 rounded-xl bg-[rgb(var(--primary))] px-4 py-2.5 text-sm font-bold text-white"
+                >
+                  <FaPrint /> Print
+                </button>
+                <button
+                  type="button"
+                  onClick={downloadCertificate}
+                  className="inline-flex items-center gap-2 rounded-xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))] px-4 py-2.5 text-sm font-bold text-[rgb(var(--text))]"
+                >
+                  Download
+                </button>
+              </div>
             )}
           </div>
 

@@ -49,6 +49,7 @@ const HostelResidents = () => {
   const [deleteTarget, setDeleteTarget] = useState(null);
 
   const [assignedStudentIds, setAssignedStudentIds] = useState([]);
+  const [studentSearch, setStudentSearch] = useState("");
 
   const fetchAll = async () => {
     try {
@@ -113,6 +114,17 @@ const HostelResidents = () => {
       return !assigned.has(String(s._id));
     });
   }, [students, assignedStudentIds, isEdit, form.studentId]);
+
+  const filteredAvailableStudents = useMemo(() => {
+    const q = studentSearch.trim().toLowerCase();
+    if (!q) return availableStudents;
+    return availableStudents.filter((st) => {
+      const name = `${st.firstName || ""} ${st.lastName || ""}`.toLowerCase();
+      const id = String(st.studentId || "").toLowerCase();
+      const cls = String(st.classId?.name || "").toLowerCase();
+      return name.includes(q) || id.includes(q) || cls.includes(q);
+    });
+  }, [availableStudents, studentSearch]);
 
   const selectedStudent = useMemo(
     () => students.find((s) => String(s._id) === String(form.studentId)),
@@ -518,6 +530,15 @@ const HostelResidents = () => {
                 <label className="block text-xs font-semibold uppercase mb-1 text-[rgb(var(--text-muted))]">
                   Student *
                 </label>
+                {!isEdit && (
+                  <input
+                    type="text"
+                    value={studentSearch}
+                    onChange={(e) => setStudentSearch(e.target.value)}
+                    placeholder="Search student by name or ID…"
+                    className="w-full mb-2 border rounded-lg px-3 py-2 text-sm bg-[rgb(var(--surface))]"
+                  />
+                )}
                 <select
                   value={form.studentId}
                   disabled={isEdit}
@@ -533,7 +554,7 @@ const HostelResidents = () => {
                   className="w-full border rounded-lg px-3 py-2 text-sm bg-[rgb(var(--surface))] disabled:opacity-60"
                 >
                   <option value="">Select student</option>
-                  {availableStudents.map((s) => (
+                  {filteredAvailableStudents.map((s) => (
                     <option key={s._id} value={s._id}>
                       {s.firstName} {s.lastName}
                       {s.studentId ? ` (${s.studentId})` : ""}

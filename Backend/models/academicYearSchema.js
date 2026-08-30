@@ -1,3 +1,5 @@
+import mongoose from "mongoose";
+
 const academicYearSchema = new mongoose.Schema(
   {
     schoolId: {
@@ -8,6 +10,7 @@ const academicYearSchema = new mongoose.Schema(
     name: {
       type: String, // "2025-26"
       required: true,
+      trim: true,
     },
     startDate: Date,
     endDate: Date,
@@ -18,3 +21,9 @@ const academicYearSchema = new mongoose.Schema(
   },
   { timestamps: true },
 );
+
+// Same year label allowed across schools; unique within one school
+academicYearSchema.index({ schoolId: 1, name: 1 }, { unique: true });
+
+export default mongoose.models.AcademicYear ||
+  mongoose.model("AcademicYear", academicYearSchema);

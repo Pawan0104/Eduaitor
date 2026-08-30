@@ -115,6 +115,46 @@ const resolveAdmissionNumber = async (schoolId, rawValue, excludeStudentId = nul
   throw err;
 };
 
+
+/** Count active students in a class section and enforce capacity. */
+const assertSectionCapacity = async (schoolId, classId, sectionId, excludeStudentId = null) => {
+  if (!classId) return;
+  const cls = await Class.findOne({ _id: classId, schoolId }).lean();
+  if (!cls) {
+    const err = new Error("Selected class was not found");
+    err.statusCode = 400;
+    throw err;
+  }
+
+  let capacity = null;
+  if (sectionId && Array.isArray(cls.details)) {
+    const detail = cls.details.find(
+      (d) => String(d.sectionId) === String(sectionId),
+    );
+    if (detail && detail.capacity != null) capacity = Number(detail.capacity);
+  }
+  if (capacity == null && Array.isArray(cls.details) && cls.details.length) {
+    const caps = cls.details
+      .map((d) => Number(d.capacity))
+      .filter((n) => Number.isFinite(n) && n > 0);
+    capacity = caps.length ? Math.max(...caps) : null;
+  }
+  if (!capacity || capacity <= 0) return;
+
+  const query = { schoolId, classId };
+  if (sectionId) query.sectionId = sectionId;
+  if (excludeStudentId) query._id = { $ne: excludeStudentId };
+
+  const count = await Student.countDocuments(query);
+  if (count >= capacity) {
+    const err = new Error(
+      `Class/section is full (${count}/${capacity}). Cannot admit more students.`,
+    );
+    err.statusCode = 400;
+    throw err;
+  }
+};
+
 /* ================= CREATE STUDENT ================= */
 
 export const createStudent = async (req, res) => {
@@ -231,14 +271,17 @@ export const createStudent = async (req, res) => {
       });
     }
 
-    const studentUsernameExists = await Student.findOne({
-      schoolId,
-      "studentCredentials.username": safeBody.username, // username field from form
-    });
-    if (studentUsernameExists) {
-      return res
-        .status(400)
-        .json({ success: false, message: "Student username already exists" });
+    if (!String(safeBody.password || "").trim()) {
+      return res.status(400).json({
+        success: false,
+        message: "Password is required to create student and parent login credentials",
+      });
+    }
+    if (!String(safeBody.fatherMobile || safeBody.username || "").trim()) {
+      return res.status(400).json({
+        success: false,
+        message: "Father mobile (parent username) is required",
+      });
     }
 
     let studentId;
@@ -346,6 +389,12 @@ export const createStudent = async (req, res) => {
       }
     }
 
+    await assertSectionCapacity(
+      schoolId,
+      safeBody.classId,
+      safeBody.sectionId,
+    );
+
     const student = await Student.create({
       ...safeBody,
       schoolId,
@@ -372,8 +421,12 @@ export const createStudent = async (req, res) => {
       );
     }
 
-    // AUTO ADD TO GROUPS
-    await syncStudentGroups(student);
+    // AUTO ADD TO GROUPS (non-blocking for admit)
+    try {
+      await syncStudentGroups(student);
+    } catch (syncErr) {
+      console.error("syncStudentGroups after create failed:", syncErr);
+    }
 
     const schoolDoc = await School.findById(schoolId)
       .select("school_name")
@@ -743,6 +796,13 @@ export const updateStudent = async (req, res) => {
 
     const totalPaid = Number(student.totalPaid) || 0;
     const finalFee = Number(safeBody.finalFee);
+
+    await assertSectionCapacity(
+      schoolId,
+      safeBody.classId || student.classId,
+      safeBody.sectionId !== undefined ? safeBody.sectionId : student.sectionId,
+      req.params.id,
+    );
 
     const updatedStudent = await Student.findOneAndUpdate(
       { _id: req.params.id, schoolId },

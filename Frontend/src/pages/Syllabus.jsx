@@ -346,25 +346,43 @@ function Syllabus() {
 
       const toastloading = toast.loading("Processing ..");
 
-      if (formData.type === "addChapter") {
-        await axios.post(`${API}/syllabus/chapters`, payload, {
-          withCredentials: true,
-        });
-        toast.success("chapter added");
-      } else {
-        await axios.put(`${API}/syllabus/chapters/${formData.id}`, payload, {
-          withCredentials: true,
-        });
-        toast.success("chapter updated");
-      }
+      try {
+        if (formData.type === "addChapter") {
+          await axios.post(`${API}/syllabus/chapters`, payload, {
+            withCredentials: true,
+          });
+          toast.update(toastloading, {
+            render: "Chapter added",
+            type: "success",
+            isLoading: false,
+            autoClose: 2500,
+          });
+        } else {
+          await axios.put(`${API}/syllabus/chapters/${formData.id}`, payload, {
+            withCredentials: true,
+          });
+          toast.update(toastloading, {
+            render: "Chapter updated",
+            type: "success",
+            isLoading: false,
+            autoClose: 2500,
+          });
+        }
 
-      await fetchChapters();
-      closeModal();
-      toast.dismiss(toastloading);
+        await fetchChapters();
+        closeModal();
+      } catch (saveErr) {
+        toast.update(toastloading, {
+          render:
+            saveErr.response?.data?.message || "Error saving chapter",
+          type: "error",
+          isLoading: false,
+          autoClose: 3000,
+        });
+        throw saveErr;
+      }
     } catch (err) {
       console.error("Error saving chapter:", err);
-      toast.error("erro:", err.response?.data?.message);
-      alert(err.response?.data?.message || "Error saving chapter");
     }
   };
 
@@ -386,26 +404,42 @@ function Syllabus() {
       };
       const toastloading = toast.loading("Processing ..");
 
-      if (formData.type === "addTopic") {
-        await axios.post(`${API}/syllabus/topics`, payload, {
-          withCredentials: true,
-        });
-        toast.success("topic added successfully");
-      } else {
-        await axios.put(`${API}/syllabus/topics/${formData.id}`, payload, {
-          withCredentials: true,
-        });
-        toast.success("topic updated successfully");
-      }
+      try {
+        if (formData.type === "addTopic") {
+          await axios.post(`${API}/syllabus/topics`, payload, {
+            withCredentials: true,
+          });
+          toast.update(toastloading, {
+            render: "Topic added successfully",
+            type: "success",
+            isLoading: false,
+            autoClose: 2500,
+          });
+        } else {
+          await axios.put(`${API}/syllabus/topics/${formData.id}`, payload, {
+            withCredentials: true,
+          });
+          toast.update(toastloading, {
+            render: "Topic updated successfully",
+            type: "success",
+            isLoading: false,
+            autoClose: 2500,
+          });
+        }
 
-      await fetchChapters();
-      closeModal();
-      toast.dismiss(toastloading);
+        await fetchChapters();
+        closeModal();
+      } catch (saveErr) {
+        toast.update(toastloading, {
+          render: saveErr.response?.data?.message || "Error saving topic",
+          type: "error",
+          isLoading: false,
+          autoClose: 3000,
+        });
+        throw saveErr;
+      }
     } catch (err) {
       console.error("Error saving topic:", err);
-      alert(err.response?.data?.message || "Error saving topic");
-    } finally {
-      setTimeout(() => toast.dismiss(loadingToast), 500);
     }
   };
 

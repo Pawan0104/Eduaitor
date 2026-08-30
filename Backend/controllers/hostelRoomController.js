@@ -102,6 +102,28 @@ export const getRoom = async (req, res, next) => {
   }
 };
 
+
+const countHostelBeds = async (schoolId, hostelId, excludeRoomId = null) => {
+  const rooms = await HostelRoom.find({ schoolId, hostelId }).select("beds").lean();
+  return rooms.reduce((sum, room) => {
+    if (excludeRoomId && String(room._id) === String(excludeRoomId)) return sum;
+    return sum + (room.beds?.length || 0);
+  }, 0);
+};
+
+const assertHostelBedCapacity = async (schoolId, hostel, nextBeds, excludeRoomId = null) => {
+  const cap = Number(hostel?.capacity || 0);
+  if (!cap || cap <= 0) return;
+  const existing = await countHostelBeds(schoolId, hostel._id, excludeRoomId);
+  if (existing + nextBeds > cap) {
+    const err = new Error(
+      `Cannot add ${nextBeds} bed(s). Hostel capacity is ${cap}; currently ${existing} bed(s) assigned.`,
+    );
+    err.statusCode = 400;
+    throw err;
+  }
+};
+
 /* ---------------- CREATE ---------------- */
 export const createRoom = async (req, res, next) => {
   try {
@@ -152,10 +174,40 @@ export const createRoom = async (req, res, next) => {
       Number(bedCount) || DEFAULT_BEDS[type] || 2
     );
 
+    const maxForType = DEFAULT_BEDS[type] || 6;
+    if (count > maxForType * 2) {
+      return res.status(400).json({
+        success: false,
+        message: `Bed count ${count} is too high for room type ${type} (max suggested ${maxForType}).`,
+      });
+    }
+
+    const normalizedRoomNo = String(roomNumber).trim().toUpperCase();
+    const duplicate = await HostelRoom.findOne({
+      schoolId,
+      hostelId,
+      roomNumber: normalizedRoomNo,
+    }).select("_id").lean();
+    if (duplicate) {
+      return res.status(400).json({
+        success: false,
+        message: "A room with this number already exists in the hostel.",
+      });
+    }
+
+    try {
+      await assertHostelBedCapacity(schoolId, hostel, count);
+    } catch (capErr) {
+      return res.status(capErr.statusCode || 400).json({
+        success: false,
+        message: capErr.message,
+      });
+    }
+
     const room = await HostelRoom.create({
       schoolId,
       hostelId,
-      roomNumber: String(roomNumber).trim().toUpperCase(),
+      roomNumber: normalizedRoomNo,
       floor: floor === undefined || floor === "" ? 1 : Number(floor),
       roomType: type,
       beds: buildBeds(count),
@@ -230,7 +282,20 @@ export const updateRoom = async (req, res, next) => {
           message: "Room number is required.",
         });
       }
-      room.roomNumber = String(roomNumber).trim().toUpperCase();
+      const normalizedRoomNo = String(roomNumber).trim().toUpperCase();
+      const duplicate = await HostelRoom.findOne({
+        schoolId,
+        hostelId: room.hostelId,
+        roomNumber: normalizedRoomNo,
+        _id: { $ne: room._id },
+      }).select("_id").lean();
+      if (duplicate) {
+        return res.status(400).json({
+          success: false,
+          message: "A room with this number already exists in the hostel.",
+        });
+      }
+      room.roomNumber = normalizedRoomNo;
     }
 
     if (floor !== undefined && floor !== "") room.floor = Number(floor);
@@ -254,6 +319,15 @@ export const updateRoom = async (req, res, next) => {
         return res.status(400).json({
           success: false,
           message: `Cannot reduce beds below ${occupiedCount} occupied bed(s).`,
+        });
+      }
+      const hostelDoc = await Hostel.findOne({ _id: room.hostelId, schoolId });
+      try {
+        await assertHostelBedCapacity(schoolId, hostelDoc, count, room._id);
+      } catch (capErr) {
+        return res.status(capErr.statusCode || 400).json({
+          success: false,
+          message: capErr.message,
         });
       }
       room.beds = buildBeds(count, room.beds);

@@ -6,7 +6,6 @@ const subjectSchema = new mongoose.Schema(
       type: String,
       required: true,
       trim: true,
-      unique: true,
     },
     schoolId: {
       type: mongoose.Schema.Types.ObjectId,
@@ -22,10 +21,7 @@ const subjectSchema = new mongoose.Schema(
   { timestamps: true },
 );
 
-// Unique index scoped to school
-subjectSchema.index(
-  { schoolId: 1, name: 1 },
-  { unique: true },
-);
+// Same subject name allowed in different schools; unique within one school
+subjectSchema.index({ schoolId: 1, name: 1 }, { unique: true });
 
 export default mongoose.model("Subject", subjectSchema);

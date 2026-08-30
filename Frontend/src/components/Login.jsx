@@ -122,7 +122,7 @@ export default function Login() {
       (isTimeout
         ? "API is waking up (Render cold start). Wait ~30s and try again."
         : isNetwork
-          ? "Cannot reach API. Check VITE_API_URL on Netlify and CLIENT_URL=https://admineduaitor.netlify.app on Render."
+          ? "Cannot reach API. Check the app was built with VITE_API_URL=https://eduaitor-api.onrender.com/api, and Render allows your app origin (CLIENT_URL / CLIENT_URLS)."
           : "Invalid credentials")
     );
   };

@@ -28,4 +28,7 @@ const termSchema = new mongoose.Schema(
   { timestamps: true },
 );
 
+// Unique term name within a school + academic year
+termSchema.index({ schoolId: 1, academicYear: 1, name: 1 }, { unique: true });
+
 export default mongoose.model("Term", termSchema);

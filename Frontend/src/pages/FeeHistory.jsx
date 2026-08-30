@@ -150,7 +150,7 @@ function Pagination({ currentPage, totalPages, onPageChange }) {
             onClick={() => onPageChange(p)}
             className={`${btn} border font-medium ${
               p === currentPage
-                ? "bg-stone-800 text-white border-stone-800"
+                ? "bg-[rgb(var(--primary))] text-white border-[rgb(var(--primary))]"
                 : "border-stone-200 text-stone-600 hover:bg-stone-50"
             }`}
           >
@@ -456,7 +456,7 @@ function FeeHistory() {
                 ].map((h) => (
                   <th
                     key={h}
-                    className="px-4 py-3 text-left text-xs font-semibold tuppercase tracking-wider font-sans"
+                    className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider font-sans"
                   >
                     {h}
                   </th>

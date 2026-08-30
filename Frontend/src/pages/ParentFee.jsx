@@ -150,7 +150,7 @@ const ProgressBar = ({ pct }) => {
     pct >= 100
       ? "bg-emerald-500"
       : pct >= 60
-        ? "bg-indigo-500"
+        ? "bg-[rgb(var(--primary))]"
         : pct >= 30
           ? "bg-amber-500"
           : "bg-red-500";
@@ -184,15 +184,15 @@ const Tab = ({ label, active, onClick, count }) => (
     className={`relative flex items-center gap-1.5 px-4 py-2 text-sm font-medium rounded-xl transition-all duration-200
       ${
         active
-          ? "bg-[rgb(var(--primary))] text-[rgb(var(--text))] shadow-sm"
-          : "text-[rgb(var(--primary))] hover:text-[rgb(var(--text))] bg-[rgb(var(--surface))]"
+          ? "bg-[rgb(var(--primary))] text-white shadow-sm"
+          : "text-[rgb(var(--text))] hover:text-[rgb(var(--primary))] bg-[rgb(var(--surface))]"
       }`}
   >
     {label}
     {count != null && (
       <span
         className={`text-xs px-1.5 py-0.5 rounded-full font-semibold
-        ${active ? "bg-[rgb(var(--primary))] text-[rgb(var(--text))]" : "bg-[rgb(var(--surface))] text-[rgb(var(--text))]"}`}
+        ${active ? "bg-white/20 text-white" : "bg-[rgb(var(--bg))] text-[rgb(var(--text-muted))]"}`}
       >
         {count}
       </span>
@@ -241,7 +241,7 @@ const FeeStructureTab = ({ feeStructure, totalFees }) => {
             className={`flex items-center justify-between px-4 py-3 ${i < items.length - 1 ? "border-b border-gray-50" : ""}`}
           >
             <div className="flex items-center gap-2">
-              <div className="w-2 h-2 rounded-full bg-indigo-300 shrink-0" />
+              <div className="w-2 h-2 rounded-full bg-[rgb(var(--primary))]/40 shrink-0" />
               <span className="text-sm text-[rgb(var(--text))]">{f.name}</span>
             </div>
             <span className="text-sm font-semibold text-[rgb(var(--text))]">
@@ -263,7 +263,7 @@ const FeeStructureTab = ({ feeStructure, totalFees }) => {
       )}
 
       {/* Total row */}
-      <div className="flex items-center justify-between bg-indigo-600 text-white rounded-2xl px-4 py-3.5 mt-2 shadow-sm shadow-indigo-200">
+      <div className="flex items-center justify-between bg-[rgb(var(--primary))] text-white rounded-2xl px-4 py-3.5 mt-2 shadow-sm">
         <span className="text-sm font-semibold">Final annual fees</span>
         <span className="text-base font-bold">{fmtINR(totalFees)}</span>
       </div>
@@ -411,18 +411,19 @@ const SummaryTab = ({ data }) => {
                 cy="40"
                 r="32"
                 fill="none"
-                stroke={
-                  paidPercent >= 100
-                    ? "#10b981"
-                    : paidPercent >= 60
-                      ? "#6366f1"
-                      : "#f59e0b"
-                }
                 strokeWidth="10"
+                style={{
+                  stroke:
+                    paidPercent >= 100
+                      ? "#10b981"
+                      : paidPercent >= 60
+                        ? "rgb(var(--primary))"
+                        : "#f59e0b",
+                  transition: "stroke-dasharray 0.8s ease",
+                }}
                 strokeDasharray={`${(paidPercent / 100) * 201} 201`}
                 strokeLinecap="round"
                 transform="rotate(-90 40 40)"
-                style={{ transition: "stroke-dasharray 0.8s ease" }}
               />
             </svg>
             <div className="absolute inset-0 flex items-center justify-center">
@@ -436,7 +437,7 @@ const SummaryTab = ({ data }) => {
           <div className="flex-1 space-y-2.5">
             <div className="flex justify-between items-center">
               <div className="flex items-center gap-2">
-                <span className="w-2.5 h-2.5 rounded-full bg-indigo-500 shrink-0" />
+                <span className="w-2.5 h-2.5 rounded-full bg-[rgb(var(--primary))] shrink-0" />
                 <span className="text-xs text-[rgb(var(--text))]">Paid</span>
               </div>
               <span className="text-sm font-semibold text-[rgb(var(--text))]">
@@ -718,6 +719,11 @@ export default function ParentFee({ studentId, token }) {
         return;
       }
 
+      const primaryRgb = getComputedStyle(document.documentElement)
+        .getPropertyValue("--primary")
+        .trim();
+      const primaryColor = primaryRgb ? `rgb(${primaryRgb})` : "#4f46e5";
+
       const options = {
         key: data.key_id,
         amount: data.amount,
@@ -749,7 +755,7 @@ export default function ParentFee({ studentId, token }) {
             setPaying(false);
           }
         },
-        theme: { color: "#4f46e5" },
+        theme: { color: primaryColor },
         modal: {
           ondismiss: () => setPaying(false),
         },
@@ -803,7 +809,7 @@ export default function ParentFee({ studentId, token }) {
           <p className="text-xs text-[rgb(var(--text))] mb-4">{error}</p>
           <button
             onClick={() => fetchFeeDetails()}
-            className="text-sm text-indigo-600 font-medium hover:underline"
+            className="text-sm text-[rgb(var(--primary))] font-medium hover:underline"
           >
             Try again
           </button>
@@ -891,15 +897,15 @@ export default function ParentFee({ studentId, token }) {
 
       <div className="max-w-2xl mx-auto px-4 pb-8">
         {/* ── Student card ────────────────────────────────────────────────── */}
-        <div className=" rounded-2xl mt-4 p-4 shadow-md text-[rgb(var(--text))] bg-[rgb(var(--surface))] flex items-center gap-4">
-          <div className="w-12 h-12 rounded-full bg-[rgb(var(--primary))]  flex items-center justify-center text-[rgb(var(--text))] font-bold text-lg shrink-0 border-2">
+        <div className="rounded-2xl mt-4 p-4 shadow-md text-[rgb(var(--text))] bg-[rgb(var(--surface))] flex items-center gap-4 text-left">
+          <div className="w-12 h-12 rounded-full bg-[rgb(var(--primary))] flex items-center justify-center text-white font-bold text-lg shrink-0">
             {initials(student.name)}
           </div>
           <div className="flex-1 min-w-0">
             <p className="text-[rgb(var(--primary))] font-semibold text-base truncate">
               {student.name}
             </p>
-            <p className=" text-xs mt-0.5">
+            <p className="text-xs mt-0.5 text-[rgb(var(--text-muted))]">
               {student.className} – Sec {student.section} &nbsp;·&nbsp; Roll No.{" "}
               {student.rollNo}
             </p>
@@ -922,7 +928,7 @@ export default function ParentFee({ studentId, token }) {
           <MetricCard
             label="Final fee"
             value={fmtINR(finalFee)}
-            valueClass="text-indigo-600"
+            valueClass="text-[rgb(var(--primary))]"
             sub={`${paidPercent}% paid`}
           />
           <MetricCard
@@ -934,7 +940,7 @@ export default function ParentFee({ studentId, token }) {
         </div>
 
         {/* ── Online payment ──────────────────────────────────────────────── */}
-        <div className="mt-4 bg-[rgb(var(--surface))] rounded-2xl border border-indigo-100 shadow-sm p-4">
+        <div className="mt-4 bg-[rgb(var(--surface))] rounded-2xl border border-[rgb(var(--border))] shadow-sm p-4">
           <div className="flex items-start justify-between gap-3 mb-3">
             <div>
               <p className="text-sm font-semibold text-[rgb(var(--text))]">
@@ -966,7 +972,7 @@ export default function ParentFee({ studentId, token }) {
                     <button
                       type="button"
                       onClick={selectAllUnpaid}
-                      className="text-[11px] font-bold text-indigo-600 hover:underline"
+                      className="text-[11px] font-bold text-[rgb(var(--primary))] hover:underline"
                     >
                       Select all unpaid
                     </button>
@@ -984,7 +990,7 @@ export default function ParentFee({ studentId, token }) {
                           >
                             <input
                               type="checkbox"
-                              className="h-4 w-4 rounded border-slate-300 text-indigo-600"
+                              className="h-4 w-4 rounded border-slate-300 text-[rgb(var(--primary))] accent-[rgb(var(--primary))]"
                               checked={paid ? true : checked}
                               disabled={paid}
                               onChange={() => togglePeriod(row.key, paid)}
@@ -1035,7 +1041,7 @@ export default function ParentFee({ studentId, token }) {
                       <p className="text-[10px] font-bold uppercase tracking-wide text-[rgb(var(--text-muted))]">
                         Paying now
                       </p>
-                      <p className="text-base font-extrabold text-indigo-600">
+                      <p className="text-base font-extrabold text-[rgb(var(--primary))]">
                         {fmtINR(selectedPayTotal)}
                       </p>
                     </div>
@@ -1045,7 +1051,7 @@ export default function ParentFee({ studentId, token }) {
                   type="button"
                   onClick={handleOnlinePay}
                   disabled={paying || (useInstallments && selectedPayTotal <= 0)}
-                  className="sm:self-end px-5 py-2.5 rounded-xl bg-indigo-600 text-white text-sm font-semibold hover:bg-indigo-700 disabled:opacity-60"
+                  className="app-btn-primary sm:self-end px-5 py-2.5 rounded-xl text-sm disabled:opacity-60"
                 >
                   {paying
                     ? "Processing…"
@@ -1151,7 +1157,7 @@ export default function ParentFee({ studentId, token }) {
                 </div>
                 <div className="mt-2 flex justify-between text-sm">
                   <span className="text-slate-500">Amount</span>
-                  <span className="text-lg font-bold text-indigo-700">
+                  <span className="text-lg font-bold text-[rgb(var(--primary))]">
                     {fmtINR(devCheckout.amountRupees)}
                   </span>
                 </div>

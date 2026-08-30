@@ -129,7 +129,7 @@ export default function OptionalPasswordChangeModal() {
               type="button"
               disabled={loading}
               onClick={() => setShowForm(true)}
-              className="w-full py-3 rounded-xl text-white font-semibold bg-indigo-600 hover:bg-indigo-700 disabled:opacity-60"
+              className="app-btn-primary w-full py-3 rounded-xl disabled:opacity-60"
             >
               {t("password.changeNow", "Change password")}
             </button>
@@ -192,7 +192,7 @@ export default function OptionalPasswordChangeModal() {
             <button
               type="submit"
               disabled={loading}
-              className="w-full py-3 rounded-xl text-white font-semibold bg-indigo-600 hover:bg-indigo-700 disabled:opacity-60"
+              className="app-btn-primary w-full py-3 rounded-xl disabled:opacity-60"
             >
               {loading
                 ? t("common.updating", "Updating…")

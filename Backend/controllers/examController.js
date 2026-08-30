@@ -224,7 +224,7 @@ export const getExams = async (req, res) => {
       .populate("subject", "name") 
       .populate("termId", "name academicYear")   
 .populate("teacherId", "fullName") 
-      .sort({ examDate: 1, startTime: 1 })
+      .sort({ createdAt: -1 })
       .lean();
     res.json(exams);
   } catch (err) {

@@ -17,6 +17,7 @@ export default function ParentHostelVisit() {
   const [purpose, setPurpose] = useState("");
   const [visitDate, setVisitDate] = useState("");
   const [saving, setSaving] = useState(false);
+  const [submitMessage, setSubmitMessage] = useState("");
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -35,7 +36,10 @@ export default function ParentHostelVisit() {
         },
         { withCredentials: true },
       );
-      toast.success("Visit request submitted. The warden will review it.");
+      const msg =
+        "Visit request submitted successfully. The warden will review it shortly.";
+      toast.success(msg);
+      setSubmitMessage(msg);
       setVisitorName("");
       setPhone("");
       setPurpose("");
@@ -70,6 +74,11 @@ export default function ParentHostelVisit() {
             </div>
           </div>
 
+          {submitMessage && (
+            <div className="mb-4 rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2.5 text-sm text-emerald-800">
+              {submitMessage}
+            </div>
+          )}
           <form onSubmit={handleSubmit} className="space-y-4">
             <div>
               <label className="block text-xs font-semibold text-[rgb(var(--text-muted))] uppercase mb-1">

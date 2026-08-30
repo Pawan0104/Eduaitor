@@ -98,6 +98,15 @@ function ExamCreate() {
     }
   };
 
+  const isExamPast = (examDate) => {
+    if (!examDate) return false;
+    const d = new Date(examDate);
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    d.setHours(0, 0, 0, 0);
+    return d < today;
+  };
+
   // Handle Class Change
   const handleClassChange = (classId) => {
     setFormData((prev) => ({
@@ -157,23 +166,62 @@ function ExamCreate() {
   });
   // 1. CLICK ACTIONS: Just prepare the data or open the form
   const handleEditClick = (exam) => {
+    if (isExamPast(exam.examDate)) {
+      toast.error("Past exams cannot be edited");
+      return;
+    }
+    const classId = exam.className?._id || exam.className || "";
+    const sectionId =
+      exam.sectionId?._id || exam.sectionId || "";
+
     setEditingId(exam._id);
-    handleClassChange(exam.className?._id);
-    console.log("Editing Exam:", exam?.sectionId);
+
+    const selectedClass = classes.find((c) => String(c._id) === String(classId));
+    const selectedSection = selectedClass?.details?.find(
+      (d) => String(d.sectionId?._id || d.sectionId) === String(sectionId),
+    );
+
+    const subjects = [];
+    const teachers = [];
+    selectedSection?.subjectTeachers?.forEach((st) => {
+      if (st.subjectId) {
+        subjects.push({
+          _id: st.subjectId._id,
+          name: st.subjectId.name,
+        });
+      }
+      if (st.teacherId) {
+        teachers.push({
+          _id: st.teacherId._id,
+          name: st.teacherId.fullName,
+        });
+      }
+    });
+    setFilteredSubjects(subjects);
+    setFilteredTeachers(teachers);
+
     setFormData({
-      className: exam.className?._id || "",
-      subject: exam.subject?._id || "",
-      teacherId: exam.teacherId?._id || "",
-      termId: exam.termId?._id || "",
-      examDate: exam.examDate.split("T")[0],
+      className: classId,
+      subject: exam.subject?._id || exam.subject || "",
+      teacherId: exam.teacherId?._id || exam.teacherId || "",
+      termId: exam.termId?._id || exam.termId || "",
+      examDate: String(exam.examDate).split("T")[0],
       dayOfWeek: exam.dayOfWeek,
       startTime: exam.startTime,
       endTime: exam.endTime,
       totalMarks: exam.totalMarks,
       passingMarks: exam.passingMarks,
-      sectionId: exam.sectionId || "",
+      sectionId: String(sectionId),
     });
     setIsModalOpen(true);
+  };
+
+  const handleDeleteClickGuarded = (id, examDate) => {
+    if (isExamPast(examDate)) {
+      toast.error("Past exams cannot be deleted");
+      return;
+    }
+    handleDeleteClick(id);
   };
 
   const handleDeleteClick = (id) => {
@@ -209,7 +257,12 @@ function ExamCreate() {
         await axios.delete(`${API}/exam/delete/${data}`, {
           withCredentials: true,
         });
-        toast.success("Exam deleted successfully", { id: loadingToast });
+        toast.update(loadingToast, {
+          render: "Exam deleted successfully",
+          type: "success",
+          isLoading: false,
+          autoClose: 2500,
+        });
       } else if (actionType === "update") {
         await axios.put(
           `${API}/exam/edit/${editingId}`,
@@ -218,14 +271,24 @@ function ExamCreate() {
           },
           { withCredentials: true },
         );
-        toast.success("Changes saved successfully", { id: loadingToast });
+        toast.update(loadingToast, {
+          render: "Changes saved successfully",
+          type: "success",
+          isLoading: false,
+          autoClose: 2500,
+        });
       } else if (actionType === "create") {
         await axios.post(
           `${API}/exam/create`,
           { ...formData },
           { withCredentials: true },
         );
-        toast.success("New exam scheduled", { id: loadingToast });
+        toast.update(loadingToast, {
+          render: "New exam scheduled",
+          type: "success",
+          isLoading: false,
+          autoClose: 2500,
+        });
       }
 
       // Cleanup
@@ -235,11 +298,12 @@ function ExamCreate() {
       fetchExams();
     } catch (err) {
       const msg = err.response?.data?.message || "Operation failed";
-      toast.error(msg, { id: loadingToast });
-    } finally {
-      // 4. THE ULTIMATE SAFETY: If the toast is still stuck for any reason,
-      // this ensures it disappears after a short delay.
-      setTimeout(() => toast.dismiss(loadingToast), 500);
+      toast.update(loadingToast, {
+        render: msg,
+        type: "error",
+        isLoading: false,
+        autoClose: 3000,
+      });
     }
   };
 
@@ -372,32 +436,25 @@ function ExamCreate() {
                     </div>
                   </td>
                   <td className="p-4 text-right space-x-2">
-                    <button
-                      onClick={() => handleEditClick(exam)}
-                      className={`font-bold text-xs px-2 py-1 rounded 
-    ${
-      exam.examDate && new Date(exam.examDate) < new Date()
-        ? "bg-slate-200 text-slate-400 cursor-not-allowed"
-        : "text-[rgb(var(--surface))] bg-[rgb(var(--primary))] hover:underline cursor-pointer"
-    }
-  `}
-                      disabled={exam.examDate < new Date()}
-                    >
-                      Edit
-                    </button>
-                    <button
-                      onClick={() => handleDeleteClick(exam._id)}
-                      className={`font-bold text-xs px-2 py-1 rounded 
-    ${
-      exam.examDate && new Date(exam.examDate) < new Date()
-        ? "bg-slate-200 text-slate-400 cursor-not-allowed"
-        : "bg-[rgb(var(--primary))] text-[rgb(var(--surface))] hover:underline cursor-pointer"
-    }
-  `}
-                      disabled={exam.examDate < new Date()}
-                    >
-                      Delete
-                    </button>
+                    {!isExamPast(exam.examDate) && (
+                      <>
+                        <button
+                          onClick={() => handleEditClick(exam)}
+                          className="font-bold text-xs px-2 py-1 rounded text-white bg-[rgb(var(--primary))] hover:opacity-90 cursor-pointer"
+                        >
+                          Edit
+                        </button>
+                        <button
+                          onClick={() => handleDeleteClick(exam._id)}
+                          className="font-bold text-xs px-2 py-1 rounded bg-rose-600 text-white hover:opacity-90 cursor-pointer"
+                        >
+                          Delete
+                        </button>
+                      </>
+                    )}
+                    {isExamPast(exam.examDate) && (
+                      <span className="text-[11px] text-[rgb(var(--text-muted))]">Past exam</span>
+                    )}
                   </td>
                 </tr>
               ))}
@@ -441,18 +498,26 @@ function ExamCreate() {
                 </span>
               </div>
               <div className="flex gap-3">
-                <button
-                  onClick={() => handleEditClick(exam)}
-                  className="flex-1 bg-slate-100 text-slate-700 py-2 rounded-lg font-bold text-xs cursor-pointer"
-                >
-                  Edit
-                </button>
-                <button
-                  onClick={() => handleDeleteClick(exam._id)}
-                  className="flex-1 bg-red-50 text-red-500 py-2 rounded-lg font-bold text-xs cursor-pointer"
-                >
-                  Delete
-                </button>
+                {!isExamPast(exam.examDate) ? (
+                  <>
+                    <button
+                      onClick={() => handleEditClick(exam)}
+                      className="flex-1 bg-[rgb(var(--primary))] text-white py-2 rounded-lg font-bold text-xs cursor-pointer"
+                    >
+                      Edit
+                    </button>
+                    <button
+                      onClick={() => handleDeleteClick(exam._id)}
+                      className="flex-1 bg-rose-50 text-rose-600 py-2 rounded-lg font-bold text-xs cursor-pointer"
+                    >
+                      Delete
+                    </button>
+                  </>
+                ) : (
+                  <span className="flex-1 text-center text-xs text-[rgb(var(--text-muted))] py-2">
+                    Past exam — actions locked
+                  </span>
+                )}
               </div>
             </div>
           ))}

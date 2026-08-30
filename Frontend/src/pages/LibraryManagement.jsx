@@ -1,7 +1,6 @@
 import React, { useEffect, useState } from "react";
 import axios from "axios";
-import { toast, ToastContainer } from "react-toastify";
-import "react-toastify/dist/ReactToastify.css";
+import { toast } from "react-toastify";
 import { FaArrowLeft } from "react-icons/fa";
 import { useNavigate } from "react-router-dom";
 
@@ -364,9 +363,7 @@ const LibraryManagement = () => {
   const minDueDate = new Date().toISOString().split("T")[0];
 
   return (
-    <div className="min-h-screen text-[rgb(var(--text))] p-8">
-      <ToastContainer />
-
+    <div className="min-h-screen p-4 md:p-8 text-[rgb(var(--text))] bg-[rgb(var(--bg))]">
       <div className="border-b border-slate-200">
         {/* 🔙 BACK BUTTON */}
         {isMobile && (
@@ -394,7 +391,7 @@ const LibraryManagement = () => {
           </div>
           <button
             onClick={openAddBookModal}
-            className="hidden rounded-xl bg-[rgb(var(--primary))] px-5 py-2.5 text-sm font-bold text-[rgb(var(--text))] shadow-lg sm:block"
+            className="hidden rounded-xl bg-[rgb(var(--primary))] px-5 py-2.5 text-sm font-bold text-white shadow-lg sm:block"
           >
             Add Book
           </button>

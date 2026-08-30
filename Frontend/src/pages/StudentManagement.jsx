@@ -966,6 +966,21 @@ const StudentManagement = () => {
 
   const submitStudent = async () => {
     try {
+      if (!isEdit && form.classId) {
+        const selectedClass = classes.find((c) => c._id === form.classId);
+        const detail = selectedClass?.details?.find(
+          (d) => String(d.sectionId?._id || d.sectionId) === String(form.sectionId),
+        );
+        const capacity = Number(detail?.capacity || 0);
+        const occupied = Number(detail?.studentCount || 0);
+        if (capacity > 0 && occupied >= capacity) {
+          toast.error(
+            `Class/section capacity reached (${occupied}/${capacity}). Cannot admit more students.`,
+          );
+          return;
+        }
+      }
+
       const data = new FormData();
 const forbidden = [
         "_id",

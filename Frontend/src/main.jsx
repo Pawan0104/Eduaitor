@@ -35,9 +35,14 @@ createRoot(document.getElementById("root")).render(
           </AuthProvider>
           <ToastContainer
             position="top-right"
-            autoClose={3000}
+            autoClose={2500}
+            limit={3}
+            newestOnTop
+            closeOnClick
+            pauseOnHover
+            draggable
             style={{ zIndex: 100000 }}
-            toastStyle={{ zIndex: 100000 }}
+            toastStyle={{ zIndex: 100000, fontSize: "0.875rem" }}
           />
         </LanguageProvider>
       </ErrorBoundary>

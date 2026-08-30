@@ -194,11 +194,19 @@ const Topbar = ({ menuPath = "/" }) => {
     fetchNotifications();
 
     const clock = setInterval(updateTime, 1000);
-    const poll = setInterval(fetchNotifications, 5 * 60 * 1000);
+    const poll = setInterval(fetchNotifications, 45 * 1000);
+    const onFocus = () => fetchNotifications();
+    const onVis = () => {
+      if (document.visibilityState === "visible") fetchNotifications();
+    };
+    window.addEventListener("focus", onFocus);
+    document.addEventListener("visibilitychange", onVis);
 
     return () => {
       clearInterval(clock);
       clearInterval(poll);
+      window.removeEventListener("focus", onFocus);
+      document.removeEventListener("visibilitychange", onVis);
     };
   }, [locale]);
 
@@ -297,7 +305,7 @@ const Topbar = ({ menuPath = "/" }) => {
           <button
             onClick={(e) => {
               e.stopPropagation();
-              setOpenNotif((v) => !v);
+              setOpenNotif((v) => { if (!v) fetchNotifications(); return !v; });
             }}
             className="relative w-9 h-9 lg:w-10 lg:h-10 flex items-center justify-center
             rounded-xl bg-[rgb(var(--surface))]

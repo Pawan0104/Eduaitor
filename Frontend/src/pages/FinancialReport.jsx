@@ -237,7 +237,7 @@ export default function FinancialReport() {
           <button
             type="button"
             onClick={() => window.print()}
-            className="px-3 py-2 rounded-lg bg-emerald-600 text-white text-sm font-medium flex items-center gap-2"
+            className="app-btn-primary px-3 py-2 rounded-lg text-sm flex items-center gap-2"
           >
             <FaPrint /> Print
           </button>

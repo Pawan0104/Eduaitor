@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from "react";
 import axios from "axios";
-import { toast, ToastContainer } from "react-toastify";
+import { toast } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
 import {
   FaArrowLeft,
@@ -196,8 +196,6 @@ const LibrarianDashboard = () => {
 
   return (
     <div className="min-h-screen text-[rgb(var(--text))] p-4 sm:p-6 lg:p-8">
-      <ToastContainer />
-
       {isMobile && (
         <button
           onClick={() => navigate(-1)}

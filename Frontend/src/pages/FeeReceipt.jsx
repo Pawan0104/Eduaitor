@@ -111,7 +111,7 @@ export default function FeeReceipt() {
           <button
             type="button"
             onClick={handlePrint}
-            className="px-4 py-2 rounded-lg bg-emerald-600 text-white text-sm font-medium flex items-center gap-2"
+            className="app-btn-primary px-4 py-2 rounded-lg text-sm flex items-center gap-2"
           >
             <FaPrint /> Print / Download PDF
           </button>

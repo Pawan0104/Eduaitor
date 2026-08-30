@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import axios from "axios";
-import { toast, ToastContainer } from "react-toastify";
+import { toast } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
 import { useNavigate, Link } from "react-router-dom";
 import { FaArrowLeft, FaMagic, FaClipboardList } from "react-icons/fa";
@@ -131,7 +131,6 @@ export default function ParentLearningToday() {
 
   return (
     <div className="min-h-screen p-4 sm:p-8 text-[rgb(var(--text))]">
-      <ToastContainer position="top-right" autoClose={3000} hideProgressBar />
       {isMobile && (
         <button
           type="button"

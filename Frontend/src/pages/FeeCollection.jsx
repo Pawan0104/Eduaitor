@@ -317,40 +317,40 @@ function FeeCollection() {
       )}
       <h1 className="text-2xl font-bold mb-4">Fee Collection</h1>
 
-      <div className="mb-6 rounded-xl border border-indigo-200 bg-[rgb(var(--surface))] p-5 max-w-2xl shadow-sm">
+      <div className="mb-6 rounded-xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))] p-5 max-w-2xl shadow-sm">
         <div className="flex items-start justify-between gap-3 mb-3">
-          <div>
+          <div className="min-w-0 text-left">
             <h2 className="text-base font-semibold">Razorpay key setup</h2>
-            <p className="text-xs text-[rgb(var(--text))] mt-1">
+            <p className="text-xs text-[rgb(var(--text-muted))] mt-1">
               Optional for now. Without keys, parents use a development checkout
               (OK button → payment success). Add real keys later for live Razorpay.
             </p>
           </div>
           {razorpayStatus === "ready" && (
-            <span className="text-xs font-semibold px-2.5 py-1 rounded-full bg-emerald-50 text-emerald-700">
+            <span className="text-xs font-semibold px-2.5 py-1 rounded-full bg-emerald-50 text-emerald-700 shrink-0">
               Verified
             </span>
           )}
           {razorpayStatus === "saved" && (
-            <span className="text-xs font-semibold px-2.5 py-1 rounded-full bg-amber-50 text-amber-700">
+            <span className="text-xs font-semibold px-2.5 py-1 rounded-full bg-amber-50 text-amber-700 shrink-0">
               Saved — test next
             </span>
           )}
           {razorpayStatus === "error" && (
-            <span className="text-xs font-semibold px-2.5 py-1 rounded-full bg-red-50 text-red-600">
+            <span className="text-xs font-semibold px-2.5 py-1 rounded-full bg-red-50 text-red-600 shrink-0">
               Needs real keys
             </span>
           )}
         </div>
 
-        <ol className="text-xs text-[rgb(var(--text))] space-y-1.5 mb-4 list-decimal list-inside">
+        <ol className="text-xs text-[rgb(var(--text))] space-y-1.5 mb-4 list-decimal list-inside text-left">
           <li>
             Open{" "}
             <a
               href="https://dashboard.razorpay.com/app/keys"
               target="_blank"
               rel="noreferrer"
-              className="text-indigo-600 font-medium underline"
+              className="text-[rgb(var(--primary))] font-medium underline"
             >
               Razorpay Dashboard → API Keys
             </a>
@@ -361,7 +361,7 @@ function FeeCollection() {
         </ol>
 
         <div className="grid gap-3 sm:grid-cols-2">
-          <div>
+          <div className="text-left">
             <label className="block text-xs font-medium mb-1">Key ID</label>
             <input
               type="text"
@@ -371,10 +371,10 @@ function FeeCollection() {
                 setRazorpayStatus("");
               }}
               placeholder="rzp_test_xxxxxxxxxxxx"
-              className="w-full border rounded-lg px-3 py-2 text-sm bg-[rgb(var(--surface))]"
+              className="w-full border border-[rgb(var(--border))] rounded-lg px-3 py-2 text-sm bg-[rgb(var(--surface))]"
             />
           </div>
-          <div>
+          <div className="text-left">
             <label className="block text-xs font-medium mb-1">
               Key Secret {hasRazorpaySecret ? "(leave blank to keep)" : ""}
             </label>
@@ -386,7 +386,7 @@ function FeeCollection() {
                 setRazorpayStatus("");
               }}
               placeholder={hasRazorpaySecret ? "••••••••" : "Enter secret"}
-              className="w-full border rounded-lg px-3 py-2 text-sm bg-[rgb(var(--surface))]"
+              className="w-full border border-[rgb(var(--border))] rounded-lg px-3 py-2 text-sm bg-[rgb(var(--surface))]"
             />
           </div>
         </div>
@@ -395,7 +395,7 @@ function FeeCollection() {
             type="button"
             onClick={saveRazorpaySettings}
             disabled={savingRazorpay}
-            className="px-4 py-2 rounded-lg bg-indigo-600 text-white text-sm font-medium disabled:opacity-60"
+            className="app-btn-primary px-4 py-2 rounded-lg text-sm disabled:opacity-60"
           >
             {savingRazorpay ? "Saving…" : "1. Save keys"}
           </button>
@@ -403,7 +403,7 @@ function FeeCollection() {
             type="button"
             onClick={testRazorpaySettings}
             disabled={testingRazorpay || !hasRazorpaySecret}
-            className="px-4 py-2 rounded-lg border border-indigo-200 text-indigo-700 text-sm font-medium disabled:opacity-60"
+            className="app-btn-secondary px-4 py-2 rounded-lg text-sm disabled:opacity-60"
           >
             {testingRazorpay ? "Testing…" : "2. Test connection"}
           </button>
@@ -431,7 +431,7 @@ function FeeCollection() {
             <select
               onChange={handleClassChange}
               value={selectedClass}
-              className="block w-full px-4 py-2 text-[rgb(var(--text))] bg-[rgb(var(--surface))] border border-[rgb(var(--border))] rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 cursor-pointer appearance-none"
+              className="block w-full px-4 py-2 text-[rgb(var(--text))] bg-[rgb(var(--surface))] border border-[rgb(var(--border))] rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-[rgba(var(--primary),0.25)] focus:border-[rgb(var(--primary))] cursor-pointer appearance-none"
             >
               <option value="" className="text-[rgb(var(--text))] bg-[rgb(var(--surface))]">All Classes</option>
               {classes.map((c) => (
@@ -511,8 +511,8 @@ function FeeCollection() {
                         <button
                           onClick={() => handleCollectFee(student)}
                           className="inline-flex items-center px-4 py-2 border border-transparent 
-                    text-sm font-medium rounded-md shadow-sm text-[rgb(var(--text))] bg-[rgb(var(--primary))]
-                    focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-colors"
+                    text-sm font-medium rounded-md shadow-sm text-white bg-[rgb(var(--primary))]
+                    focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[rgb(var(--primary))] transition-colors"
                         >
                           <svg
                             className="mr-2 h-4 w-4"
@@ -588,8 +588,8 @@ function FeeCollection() {
             {/* 2. SCROLLABLE CONTENT AREA */}
             <div className="flex-1 overflow-y-auto p-4 sm:p-6 space-y-4 sm:space-y-6 custom-scrollbar">
               {/* Student Info Card */}
-              <div className="bg-[rgb(var(--surface))] p-4 rounded-2xl flex flex-col sm:flex-row items-center gap-3 sm:gap-4 border border-blue-100/50">
-                <div className="h-12 w-12 bg-[rgb(var(--primary))] rounded-xl flex items-center justify-center text-[rgb(var(--text))] text-xl font-bold shrink-0">
+              <div className="bg-[rgb(var(--surface))] p-4 rounded-2xl flex flex-col sm:flex-row items-center gap-3 sm:gap-4 border border-[rgb(var(--border))]">
+                <div className="h-12 w-12 bg-[rgb(var(--primary))] rounded-xl flex items-center justify-center text-white text-xl font-bold shrink-0">
                   {selectedStudent?.firstName?.charAt(0) || "S"}
                 </div>
                 <div className="text-center sm:text-left">
@@ -645,7 +645,7 @@ function FeeCollection() {
                       type="number"
                       value={amountToPay}
                       onChange={(e) => setAmountToPay(e.target.value)}
-                      className="w-full pl-8 pr-4 py-3 border-2  focus:border-blue-500 focus:bg-[rgb(var(--surface))] rounded-xl outline-none font-bold text-[rgb(var(--primary))] transition-all"
+                      className="w-full pl-8 pr-4 py-3 border-2  focus:border-[rgb(var(--primary))] focus:bg-[rgb(var(--surface))] rounded-xl outline-none font-bold text-[rgb(var(--primary))] transition-all"
                       placeholder="0.00"
                     />
                   </div>
@@ -667,7 +667,7 @@ function FeeCollection() {
                         }}
                         className={`py-3 px-2 rounded-xl border-2 text-xs font-bold transition-all ${
                           paymentMode === mode
-                            ? "border-blue-600  text-[rgb(var(--primary))]"
+                            ? "border-[rgb(var(--primary))] text-[rgb(var(--primary))]"
                             : "border-slate-50   text-[rgb(var(--text))]"
                         }`}
                       >
@@ -686,7 +686,7 @@ function FeeCollection() {
                       type="text"
                       value={utr}
                       onChange={(e) => setUtr(e.target.value)}
-                      className="w-full mt-1 px-4 py-3 border-2 focus:border-blue-500 rounded-xl outline-none font-medium text-sm transition-all"
+                      className="w-full mt-1 px-4 py-3 border-2 focus:border-[rgb(var(--primary))] rounded-xl outline-none font-medium text-sm transition-all"
                       placeholder="Enter 12-digit UTR / UPI reference"
                       autoComplete="off"
                     />
@@ -702,7 +702,7 @@ function FeeCollection() {
                       type="text"
                       value={transactionId}
                       onChange={(e) => setTransactionId(e.target.value)}
-                      className="w-full mt-1 px-4 py-3 border-2 focus:border-blue-500 rounded-xl outline-none font-medium text-sm transition-all"
+                      className="w-full mt-1 px-4 py-3 border-2 focus:border-[rgb(var(--primary))] rounded-xl outline-none font-medium text-sm transition-all"
                       placeholder="Enter bank / gateway transaction ID"
                       autoComplete="off"
                     />
@@ -721,7 +721,7 @@ function FeeCollection() {
               </button>
               <button
                 onClick={confirmPayment}
-                className="flex-2 py-3.5 bg-[rgb(var(--primary))]   text-[rgb(var(--text))]rounded-2xl font-bold shadow-lg  rounded-2xl  active:scale-95 transition-all"
+                className="flex-[2] py-3.5 bg-[rgb(var(--primary))] text-white rounded-2xl font-bold shadow-lg active:scale-95 transition-all"
               >
                 Confirm Payment
               </button>

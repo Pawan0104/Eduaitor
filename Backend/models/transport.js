@@ -166,8 +166,20 @@ const busSchema = new mongoose.Schema(
   { timestamps: true },
 );
 
-busSchema.index({ driver: 1 }, { unique: true, sparse: true });
-busSchema.index({ route: 1 }, { unique: true, sparse: true });
+busSchema.index(
+  { schoolId: 1, driver: 1 },
+  {
+    unique: true,
+    partialFilterExpression: { driver: { $type: "objectId" } },
+  },
+);
+busSchema.index(
+  { schoolId: 1, route: 1 },
+  {
+    unique: true,
+    partialFilterExpression: { route: { $type: "objectId" } },
+  },
+);
 
 busSchema.index({ schoolId: 1, busId: 1 }, { unique: true });
 

@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from "react";
 import axios from "axios";
-import { toast, ToastContainer } from "react-toastify";
+import { toast } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
 import { FaArrowLeft } from "react-icons/fa";
 import { useNavigate } from "react-router-dom";
@@ -152,8 +152,6 @@ const ParentLibrary = () => {
   // ── render ───────────────────────────────────────────────────────────────────
   return (
     <div className="min-h-screen  pb-16">
-      <ToastContainer />
-
       {/* ── header ── */}
       <div className="border-b border-slate-200 ">
         {isMobile && (

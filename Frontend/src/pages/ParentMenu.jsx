@@ -93,6 +93,9 @@ export default function ParentMenu() {
     navigate("/admin/login", { replace: true });
   };
 
+  const subscribed = user?.subscribed_modules || [];
+  const hasHostel = !subscribed.length || subscribed.includes("hostel");
+
   const menu = [
     // Dashboard disabled — welcome/menu hub covers the same actions
     // { name: "Dashboard", icon: <FaTachometerAlt />, path: "/parent/dashboard" },
@@ -105,7 +108,9 @@ export default function ParentMenu() {
     { name: "Pay Fee", icon: <FaWallet />, path: "/parent/fees" },
     { name: "School Store", icon: <FaStore />, path: "/parent/store" },
     { name: "Transport & GPS", icon: <FaBusAlt />, path: "/parent/transport" },
-    { name: "Hostel Visit", icon: <FaHotel />, path: "/parent/hostel-visit" },
+    ...(hasHostel
+      ? [{ name: "Hostel Visit", icon: <FaHotel />, path: "/parent/hostel-visit" }]
+      : []),
     { name: "Exam Results", icon: <GiOpenBook />, path: "/parent/exam-result" },
     { name: "Report Card", icon: <GiOpenBook />, path: "/parent/report-card" },
     { name: "Student ID Card", icon: <FaIdCard />, path: "/parent/id-card" },

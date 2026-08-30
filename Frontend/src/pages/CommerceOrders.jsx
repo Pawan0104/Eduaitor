@@ -39,6 +39,7 @@ const CommerceOrders = () => {
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
   const [filterPay, setFilterPay] = useState("");
+  const [issueGender, setIssueGender] = useState("");
 
   const [formModal, setFormModal] = useState(false);
   const [formLoading, setFormLoading] = useState(false);
@@ -86,6 +87,41 @@ const CommerceOrders = () => {
     }, 0);
   }, [form.lines, products]);
 
+  const normalizeGender = (g) => String(g || "").trim().toLowerCase();
+  const genderMatchesProduct = (studentGender, productGender) => {
+    const pg = String(productGender || "").trim();
+    if (!pg || pg === "Unisex") return true;
+    const sg = normalizeGender(studentGender);
+    if (!sg) return true;
+    if (pg === "Boys") return sg === "male" || sg === "boy" || sg === "boys" || sg === "m";
+    if (pg === "Girls") return sg === "female" || sg === "girl" || sg === "girls" || sg === "f";
+    return true;
+  };
+
+  const selectedStudent = useMemo(
+    () => students.find((x) => String(x._id) === String(form.studentId)),
+    [students, form.studentId],
+  );
+
+  const productsForIssue = useMemo(() => {
+    const g = issueGender || (selectedStudent?.gender ? (
+      normalizeGender(selectedStudent.gender).startsWith("f") ? "Girls" :
+      normalizeGender(selectedStudent.gender).startsWith("m") ? "Boys" : ""
+    ) : "");
+    if (!g) return products;
+    return products.filter((p) => !p.gender || p.gender === "Unisex" || p.gender === g);
+  }, [products, issueGender, selectedStudent]);
+
+  const studentsForIssue = useMemo(() => {
+    if (!issueGender) return students;
+    return students.filter((st) => {
+      const sg = normalizeGender(st.gender);
+      if (issueGender === "Boys") return sg.startsWith("m") || sg === "boy" || sg === "boys";
+      if (issueGender === "Girls") return sg.startsWith("f") || sg === "girl" || sg === "girls";
+      return true;
+    });
+  }, [students, issueGender]);
+
   const openCreate = () => {
     setForm({
       studentId: "",
@@ -94,10 +130,23 @@ const CommerceOrders = () => {
       paymentMode: "Cash",
       lines: [{ productId: "", quantity: "1" }],
     });
+    setIssueGender("");
     setFormModal(true);
   };
 
   const handleCreate = async () => {
+    const st = students.find((x) => String(x._id) === String(form.studentId));
+    for (const line of form.lines) {
+      if (!line.productId) continue;
+      const product = products.find((p) => p._id === line.productId);
+      if (st && product && !genderMatchesProduct(st.gender, product.gender)) {
+        toast.error(
+          `Product "${product.name}" (${product.gender || "Unisex"}) does not match student gender`,
+        );
+        return;
+      }
+    }
+
     const items = form.lines
       .filter((l) => l.productId && Number(l.quantity) > 0)
       .map((l) => ({
@@ -469,6 +518,28 @@ const CommerceOrders = () => {
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-4">
               <div>
                 <label className="text-xs font-semibold uppercase text-[rgb(var(--text-muted))]">
+                  Gender filter
+                </label>
+                <select
+                  value={issueGender}
+                  onChange={(e) => {
+                    const g = e.target.value;
+                    setIssueGender(g);
+                    setForm((p) => ({
+                      ...p,
+                      studentId: "",
+                      lines: p.lines.map((l) => ({ ...l, productId: "" })),
+                    }));
+                  }}
+                  className="w-full border rounded-lg px-3 py-2 text-sm mt-1 bg-[rgb(var(--surface))]"
+                >
+                  <option value="">All genders</option>
+                  <option value="Boys">Boys</option>
+                  <option value="Girls">Girls</option>
+                </select>
+              </div>
+              <div>
+                <label className="text-xs font-semibold uppercase text-[rgb(var(--text-muted))]">
                   Student (optional)
                 </label>
                 <select
@@ -483,13 +554,19 @@ const CommerceOrders = () => {
                         ? `${st.firstName} ${st.lastName}`.trim()
                         : p.customerName,
                     }));
+                    if (st?.gender) {
+                      const sg = String(st.gender).toLowerCase();
+                      if (sg.startsWith("f")) setIssueGender("Girls");
+                      else if (sg.startsWith("m")) setIssueGender("Boys");
+                    }
                   }}
                   className="w-full border rounded-lg px-3 py-2 text-sm mt-1 bg-[rgb(var(--surface))]"
                 >
                   <option value="">Walk-in / select student</option>
-                  {students.map((s) => (
+                  {studentsForIssue.map((s) => (
                     <option key={s._id} value={s._id}>
                       {s.firstName} {s.lastName}
+                      {s.gender ? ` (${s.gender})` : ""}
                     </option>
                   ))}
                 </select>
@@ -547,10 +624,11 @@ const CommerceOrders = () => {
                     className="flex-1 min-w-[200px] border rounded-lg px-3 py-2 text-sm bg-[rgb(var(--surface))]"
                   >
                     <option value="">Select product</option>
-                    {products.map((p) => (
+                    {productsForIssue.map((p) => (
                       <option key={p._id} value={p._id}>
-                        [{p.category}] {p.name} — {fmtINR(p.price)} (stock{" "}
-                        {p.stock})
+                        [{p.category}] {p.name}
+                        {p.gender ? ` · ${p.gender}` : ""} — {fmtINR(p.price)}{" "}
+                        (stock {p.stock})
                       </option>
                     ))}
                   </select>

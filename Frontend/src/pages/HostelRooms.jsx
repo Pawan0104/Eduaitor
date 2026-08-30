@@ -125,6 +125,23 @@ const HostelRooms = () => {
     if (!bedCount || bedCount < 1) {
       return toast.error("Bed count must be at least 1");
     }
+    const typeMax = TYPE_BEDS[form.roomType] || 6;
+    if (bedCount > typeMax * 2) {
+      return toast.error(
+        `Bed count cannot exceed ${typeMax * 2} for ${form.roomType} rooms`,
+      );
+    }
+    if (!isEdit) {
+      const dup = rooms.some(
+        (r) =>
+          String(r.hostelId?._id || r.hostelId) === String(form.hostelId) &&
+          String(r.roomNumber || "").toUpperCase() ===
+            form.roomNumber.trim().toUpperCase(),
+      );
+      if (dup) {
+        return toast.error("A room with this number already exists in the hostel");
+      }
+    }
 
     const payload = {
       hostelId: form.hostelId,

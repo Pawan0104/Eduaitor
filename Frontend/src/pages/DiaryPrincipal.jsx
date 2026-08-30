@@ -1,6 +1,6 @@
 import { useEffect, useState, useCallback } from "react";
 import axios from "axios";
-import { toast, ToastContainer } from "react-toastify";
+import { toast } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
 import { FaArrowLeft } from "react-icons/fa";
 import { useNavigate } from "react-router-dom";
@@ -473,14 +473,6 @@ console.log(res.data.data);
 
   return (
     <div className="min-h-screen ">
-      <ToastContainer
-        position="top-right"
-        autoClose={3000}
-        hideProgressBar
-        closeOnClick
-        pauseOnHover
-      />
-
       {/* ── Sticky Header ────────────────────────────────────────────────────── */}
       <div className="bg-[rgb(var(--surface))] text-[rgb(var(--text))] border-b border-slate-200 sticky top-0 z-20">
         <div className="max-w-3xl mx-auto px-4 py-4 flex items-center justify-between gap-3">
