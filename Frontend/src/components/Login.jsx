@@ -430,6 +430,15 @@ export default function Login() {
         <div className="login-card w-full max-w-md p-8">
           <LanguageSwitcher variant="login" />
 
+          {/* Mobile-only: show Eduaitor logo on the login screen */}
+          <div className="mb-4 flex items-center justify-center md:hidden">
+            <img
+              src={logo}
+              alt="Eduaitor"
+              className="h-12 w-auto object-contain"
+            />
+          </div>
+
           {/* Mode toggle */}
           <div className="mb-6 grid grid-cols-3 gap-1 rounded-xl bg-[rgb(var(--bg))] p-1">
             <button
