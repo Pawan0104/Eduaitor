@@ -465,8 +465,9 @@ export const createNotificationHelper = async ({
   createdBy = null, schoolId = null,
   startingDate = null, endingDate = null,
   targets = [],
-    status = 'sent',        // ← explicit, defaults to sent for auto-generated notifications
+  status = 'sent',        // ← explicit, defaults to sent for auto-generated notifications
   scheduledAt = null,
+  systemKey = null,
 }) => {
   // Always inject schoolId into every target for correct scoping
   const resolvedTargets = targets.map((t) => ({
@@ -482,6 +483,7 @@ export const createNotificationHelper = async ({
     status,
     scheduledAt,
     schoolId,
+    systemKey,
   });
 
   await notification.save();

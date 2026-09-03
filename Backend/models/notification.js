@@ -50,6 +50,10 @@ const notificationSchema = new mongoose.Schema({
   // scheduling
   status:       { type: String, enum: ['sent', 'scheduled'], default: 'sent' },
   scheduledAt:  Date,                      // when to auto-publish
+  // idempotency key for system-generated reminders
+  systemKey:    { type: String, default: null },
 }, { timestamps: true });
+
+notificationSchema.index({ systemKey: 1 }, { unique: true, sparse: true });
 
 export default mongoose.model('Notification', notificationSchema);

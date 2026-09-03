@@ -3,6 +3,22 @@ import Student from "../models/student.js";
 import Class from "../models/class.js";
 import {createNotificationHelper}  from "../controllers/notificationController.js"
 
+const sortEventsByDate = (items) => {
+  const now = new Date();
+  return [...items].sort((a, b) => {
+    const aStart = new Date(a.startDate || 0);
+    const bStart = new Date(b.startDate || 0);
+    const aEnd = new Date(a.endDate || a.startDate || 0);
+    const bEnd = new Date(b.endDate || b.startDate || 0);
+    const aUpcoming = aEnd >= now;
+    const bUpcoming = bEnd >= now;
+
+    if (aUpcoming !== bUpcoming) return aUpcoming ? -1 : 1;
+    if (aUpcoming) return aStart - bStart; // nearest upcoming first
+    return bStart - aStart; // recent past next
+  });
+};
+
 const buildEventTargets = async (assignClass, schoolId) => {
   if (!assignClass || assignClass === 'All Classes') {
     return [{ type: 'all' }];
@@ -55,7 +71,7 @@ export const getAllEvents = async (req, res) => {
       query.$or = [{ assignClass: "All Classes" }, { assignClass: className }];
     }
 
-    const events = await Event.find(query).sort({ startDate: -1 });
+    const events = sortEventsByDate(await Event.find(query));
 
     // 🔹 Stats calculation
     const now = new Date();
@@ -192,7 +208,7 @@ export const getAllAdminEvents = async (req, res) => {
     }
 
     const schoolId = req.query.schoolId;
-    const events = await Event.find({ schoolId }).sort({ createdAt: -1 });
+    const events = sortEventsByDate(await Event.find({ schoolId }));
 
     const total = events.length;
     const completed = events.filter((e) => {

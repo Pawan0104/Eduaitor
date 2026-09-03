@@ -3,6 +3,21 @@ import Student from "../models/student.js";
 import Class from "../models/class.js";
 import { createNotificationHelper } from "./notificationController.js";
 
+const sortNoticesByDate = (items) => {
+  const now = new Date();
+  return [...items].sort((a, b) => {
+    const aDate = new Date(a.publishDate || a.createdAt || 0);
+    const bDate = new Date(b.publishDate || b.createdAt || 0);
+    const aExpiry = new Date(a.expiryDate || a.publishDate || a.createdAt || 0);
+    const bExpiry = new Date(b.expiryDate || b.publishDate || b.createdAt || 0);
+    const aActive = aExpiry >= now;
+    const bActive = bExpiry >= now;
+    if (aActive !== bActive) return aActive ? -1 : 1;
+    if (aActive) return aDate - bDate; // nearest notice first
+    return bDate - aDate;
+  });
+};
+
 const buildNoticeTargets = async (audience, assignedClass, schoolId) => {
   switch (audience) {
     case 'All':
@@ -75,7 +90,7 @@ export const getAllNotices = async (req, res) => {
 
     // 🔹 ADMIN → no extra filter (sees all)
 
-    const notices = await Notice.find(query).sort({ createdAt: -1 });
+    const notices = sortNoticesByDate(await Notice.find(query));
 
     // 🔹 Stats
     const total = notices.length;
@@ -190,7 +205,7 @@ export const getAllAdminNotices = async (req, res) => {
     }
 
     const schoolId = req.query.schoolId;
-    const notices = await Notice.find({ schoolId }).sort({ createdAt: -1 });
+    const notices = sortNoticesByDate(await Notice.find({ schoolId }));
 
     const total = notices.length;
     const active = notices.filter((n) => n.isActive).length;
