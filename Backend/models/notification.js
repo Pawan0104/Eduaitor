@@ -50,10 +50,18 @@ const notificationSchema = new mongoose.Schema({
   // scheduling
   status:       { type: String, enum: ['sent', 'scheduled'], default: 'sent' },
   scheduledAt:  Date,                      // when to auto-publish
-  // idempotency key for system-generated reminders
-  systemKey:    { type: String, default: null },
+  // idempotency key for system-generated reminders (omit when unused;
+  // unique partial index ignores missing/null so event/notice creates work)
+  systemKey: { type: String },
 }, { timestamps: true });
 
-notificationSchema.index({ systemKey: 1 }, { unique: true, sparse: true });
+notificationSchema.index(
+  { systemKey: 1 },
+  {
+    unique: true,
+    name: "systemKey_1",
+    partialFilterExpression: { systemKey: { $type: "string" } },
+  },
+);
 
 export default mongoose.model('Notification', notificationSchema);

@@ -62,6 +62,7 @@ const connectDB = async () => {
         });
         console.log("MongoDB Connected Successfully (Atlas)");
         await ensureParentUsernameIndex();
+        await ensureNotificationSystemKeyIndex();
         startNotificationCron();
         return conn;
       } catch (primaryError) {
@@ -75,6 +76,7 @@ const connectDB = async () => {
             primaryError.message,
           );
           await ensureParentUsernameIndex();
+          await ensureNotificationSystemKeyIndex();
           startNotificationCron();
           return retryConn;
         } catch (retryError) {
@@ -98,6 +100,7 @@ const connectDB = async () => {
             retryError.message,
           );
           await ensureParentUsernameIndex();
+          await ensureNotificationSystemKeyIndex();
           startNotificationCron();
           return conn;
         }
@@ -117,6 +120,7 @@ const connectDB = async () => {
     await seedSampleData();
     console.log("MongoDB Connected Successfully (in-memory fallback)");
     await ensureParentUsernameIndex();
+    await ensureNotificationSystemKeyIndex();
     startNotificationCron();
     return mongoose.connection;
   } catch (error) {
@@ -144,6 +148,48 @@ export async function ensureParentUsernameIndex() {
     }
   } catch (err) {
     console.warn("Parent username index migrate skipped:", err.message);
+  }
+}
+
+/**
+ * Unique systemKey must not apply to null/missing values.
+ * Old sparse unique index still indexed null → E11000 on event create.
+ */
+export async function ensureNotificationSystemKeyIndex() {
+  try {
+    const col = mongoose.connection.collection("notifications");
+    await col.updateMany(
+      { $or: [{ systemKey: null }, { systemKey: "" }] },
+      { $unset: { systemKey: "" } },
+    );
+
+    const indexes = await col.indexes();
+    const systemKeyIdx = indexes.find(
+      (idx) => idx.name === "systemKey_1" || idx.key?.systemKey === 1,
+    );
+    const hasPartial =
+      systemKeyIdx?.partialFilterExpression?.systemKey?.$type === "string";
+
+    if (systemKeyIdx?.name && !hasPartial) {
+      await col.dropIndex(systemKeyIdx.name);
+      console.log(
+        `Dropped legacy notifications.${systemKeyIdx.name} (nulls collided)`,
+      );
+    }
+
+    if (!hasPartial) {
+      await col.createIndex(
+        { systemKey: 1 },
+        {
+          unique: true,
+          name: "systemKey_1",
+          partialFilterExpression: { systemKey: { $type: "string" } },
+        },
+      );
+      console.log("Ensured notifications.systemKey_1 partial unique index");
+    }
+  } catch (err) {
+    console.warn("Notification systemKey index migrate skipped:", err.message);
   }
 }
 

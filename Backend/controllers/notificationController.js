@@ -483,7 +483,8 @@ export const createNotificationHelper = async ({
     status,
     scheduledAt,
     schoolId,
-    systemKey,
+    // Only set when present — unique index rejects multiple null systemKeys
+    ...(systemKey ? { systemKey } : {}),
   });
 
   await notification.save();
