@@ -19,6 +19,8 @@ import {
   FaHotel,
   FaStore,
   FaHeadset,
+  FaBullhorn,
+  FaUserShield,
 } from "react-icons/fa";
 import { FaBookJournalWhills } from "react-icons/fa6";
 import { FiUsers } from "react-icons/fi";
@@ -83,6 +85,7 @@ export const COLOR_MAP = {
 
   Blog: { bg: "#F0FDFA", icon: "#0D9488", dot: "#99F6E4" },
   Blogs: { bg: "#F0FDFA", icon: "#0D9488", dot: "#99F6E4" },
+  "Marketing AI": { bg: "#FDF4FF", icon: "#C026D3", dot: "#F5D0FE" },
   "Help / Support": { bg: "#FFFBEB", icon: "#D97706", dot: "#FDE68A" },
 
   Group: { bg: "#F0FDF4", icon: "#22C55E", dot: "#BBF7D0" },
@@ -398,7 +401,7 @@ export default function SchoolMenu() {
     }
     setUser(null);
     clearSessionKeepPrefs();
-    navigate("/admin/login", { replace: true });
+    navigate("/login", { replace: true });
   };
 
   // ── Greeting info (same pattern as Topbar) ──────────────────
@@ -438,6 +441,7 @@ export default function SchoolMenu() {
       icon: <GiTeacher />,
       children: [
         { name: "All Teachers", path: "/school/teachers" },
+        { name: "Proxy Teacher", path: "/school/proxy-teacher" },
       ],
     },
     {
@@ -452,14 +456,21 @@ export default function SchoolMenu() {
     {
       name: "Attendance",
       icon: <FaClipboardCheck />,
-      path: "/school/attendance",
+      children: [
+        { name: "Attendance", path: "/school/attendance" },
+        { name: "Leave Request", path: "/school/leave-request" },
+      ],
+    },
+    {
+      name: "Access Control",
+      icon: <FaUserShield />,
+      path: "/school/access-control",
     },
     {
       name: "Staff",
       icon: <FiUsers />,
       children: [
         { name: "Staff Management", path: "/school/staff" },
-        { name: "Staff Roles", path: "/school/staff-roles" },
         { name: "Staff Attendance", path: "/school/staff-attendance" },
       ],
     },
@@ -467,7 +478,9 @@ export default function SchoolMenu() {
       name: "Exam Management",
       icon: <GiOpenBook />,
       children: [
-        { name: "Exam Structure", path: "/school/exam-structure" },
+        { name: "Smart Exam Scheduler", path: "/school/exam-scheduler" },
+        { name: "Class Tests", path: "/school/class-test" },
+        { name: "Exam Papers", path: "/school/exam-papers" },
         { name: "Marks Entry", path: "/school/exam-marks-entry" },
         { name: "Exam Marks", path: "/school/exam-marks" },
         { name: "Report Card", path: "/school/report-card" },
@@ -527,6 +540,9 @@ export default function SchoolMenu() {
         { name: "Route Manage", path: "/school/transport-route" },
         { name: "Bus Manage", path: "/school/transport-bus" },
         { name: "Driver Manage", path: "/school/transport-driver" },
+        { name: "Stop Manage", path: "/school/transport-stop" },
+        { name: "Attendant Manage", path: "/school/transport-attendant" },
+        { name: "Vendor Manage", path: "/school/transport-vendor" },
         { name: "GPS Tracking", path: "/school/transport-gps" },
       ],
     },
@@ -549,6 +565,11 @@ export default function SchoolMenu() {
       name: "Blog",
       icon: <FaBlog />,
       path: "/school/blogs",
+    },
+    {
+      name: "Marketing AI",
+      icon: <FaBullhorn />,
+      path: "/school/marketing",
     },
     {
       name: "Help / Support",

@@ -201,8 +201,42 @@ export default function TimeTable() {
   };
 
   /* ── save ── */
+  const toTimeMin = (t) => {
+    if (!t || typeof t !== "string") return -1;
+    const [h, m] = t.split(":").map(Number);
+    if (Number.isNaN(h) || Number.isNaN(m)) return -1;
+    return h * 60 + m;
+  };
+
+  const validateTimeSlots = () => {
+    const slots = periodConfigs
+      .map((p) => ({
+        id: p.id,
+        name: p.name || p.id,
+        start: toTimeMin(p.start),
+        end: toTimeMin(p.end),
+        startLabel: p.start,
+        endLabel: p.end,
+      }))
+      .filter((s) => s.start >= 0 && s.end >= 0);
+    for (let i = 0; i < slots.length; i++) {
+      for (let j = i + 1; j < slots.length; j++) {
+        const a = slots[i];
+        const b = slots[j];
+        if (a.start < b.end && b.start < a.end) {
+          toast.error(
+            `Time slots "${a.name}" (${a.startLabel}–${a.endLabel}) and "${b.name}" (${b.startLabel}–${b.endLabel}) overlap. Each period needs a unique time.`,
+          );
+          return false;
+        }
+      }
+    }
+    return true;
+  };
+
   const saveDraft = async () => {
     if (!classId) return toast.warning("Select a class first");
+    if (!validateTimeSlots()) return;
     setSaving(true);
     try {
       await axios.post(
@@ -218,14 +252,15 @@ export default function TimeTable() {
       toast.success("Timetable saved successfully!");
       setIsEditMode(false);
       setHasChanges(false);
-    } catch {
-      toast.error("Save failed");
+    } catch (err) {
+      toast.error(err?.response?.data?.message || "Save failed");
     } finally {
       setSaving(false);
     }
   };
 
   const saveTeacherUpdate = async () => {
+    if (!validateTimeSlots()) return;
     setSaving(true);
     try {
       await axios.post(
@@ -241,8 +276,8 @@ export default function TimeTable() {
       toast.success("Teacher assignment updated!");
       setHasChanges(false);
       fetchTimetable();
-    } catch {
-      toast.error("Update failed");
+    } catch (err) {
+      toast.error(err?.response?.data?.message || "Update failed");
     } finally {
       setSaving(false);
     }

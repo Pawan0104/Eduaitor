@@ -1,7 +1,7 @@
 import School from "../models/school.js";
 import bcrypt from "bcryptjs";
 import Razorpay from "razorpay";
-import {MODULE_KEYS,DEFAULT_MODULES} from "../constants/module.js";
+import { MODULE_KEYS } from "../constants/module.js";
 import { uploadToCloudinary } from "../utils/uploadToCloudinary.js";
 import { ensureDefaultHouses } from "../utils/ensureDefaultHouses.js";
 import { notifyCredentialsAsync } from "../services/credentials/notifyCredentials.js";
@@ -92,9 +92,10 @@ export const createSchool = async (req, res, next) => {
       }
     }
 
-    // fallback to defaults if nothing selected
+    // fallback to ALL modules if nothing selected
+    // (super admin explicitly deselects modules to restrict a school)
     if (!Array.isArray(modules) || modules.length === 0) {
-      modules = DEFAULT_MODULES;
+      modules = MODULE_KEYS;
     }
 
     // ── 2. VALIDATE MODULES ───────────────────────────

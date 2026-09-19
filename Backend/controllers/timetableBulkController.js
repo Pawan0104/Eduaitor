@@ -3,6 +3,10 @@ import Timetable from "../models/timetable.js";
 import Class from "../models/class.js";
 import Subject from "../models/subject.js";
 import Teacher from "../models/teacher.js";
+import {
+  findOverlappingPeriodSlots,
+  validateScheduleConflicts,
+} from "../utils/timetableValidation.js";
 
 const DAYS = [
   "Monday",
@@ -289,6 +293,30 @@ export const bulkUploadTimetable = async (req, res) => {
         classId: group.classId,
         detailId: group.detailId || null,
       };
+
+      // Rule 1 — unique time slots within this timetable
+      const overlap = findOverlappingPeriodSlots(periodConfigs);
+      if (overlap) {
+        return res.status(400).json({
+          success: false,
+          message: `${group.label}: ${overlap}`,
+        });
+      }
+
+      // Rule 2 — no teacher/room double-booking across timetables
+      const conflict = await validateScheduleConflicts({
+        schoolId,
+        classId: group.classId,
+        detailId: group.detailId || null,
+        periodConfigs,
+        assignments: group.assignments,
+      });
+      if (conflict) {
+        return res.status(400).json({
+          success: false,
+          message: `${group.label}: ${conflict.error}`,
+        });
+      }
 
       let timetable = await Timetable.findOne(filter);
       if (timetable) {

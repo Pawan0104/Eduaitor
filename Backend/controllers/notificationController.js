@@ -429,7 +429,15 @@ const buildTargetQuery = async (user) => {
       const student = await Student.findById(student_id).select('classId sectionId');
       if (student?.classId) {
         orConditions.push(
-          { classId: student.classId }, // kept for backward-compat with older notifications saved with the single classId shape
+          // legacy single classId shape — section-aware so a section-specific
+          // notification no longer over-delivers to other sections of the class
+          {
+            classId: student.classId,
+            $or: [
+              { sectionId: null },               // targeted the whole class
+              { sectionId: student.sectionId },  // targeted this student's section
+            ],
+          },
           {
             classes: {
               $elemMatch: {

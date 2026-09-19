@@ -82,7 +82,7 @@ export default function StudentMenu() {
     }
     setUser(null);
     clearSessionKeepPrefs();
-    navigate("/admin/login", { replace: true });
+    navigate("/login", { replace: true });
   };
 
   const menu = [
@@ -102,7 +102,6 @@ export default function StudentMenu() {
     { name: "My ID Card", icon: <FaIdCard />, path: "/student/id-card" },
     { name: "Diary", icon: <FaBookOpen />, path: "/student/diary" },
     { name: "Homework", icon: <FaClipboardList />, path: "/student/homework" },
-    { name: "Daily learning", icon: <FaClipboardList />, path: "/student/daily-learning" },
     { name: "Syllabus Books", icon: <FaBookDead />, path: "/student/syllabus-books" },
     { name: "Library", icon: <FaBookJournalWhills />, path: "/student/library" },
     { name: "Group", icon: <FaUsers />, path: "/student/group" },

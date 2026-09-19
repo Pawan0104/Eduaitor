@@ -520,7 +520,7 @@ function FeeHistory() {
                           onClick={() =>
                             navigate(
                               `${
-                                window.location.pathname.startsWith("/staff")
+                                /\/staff\//.test(window.location.pathname)
                                   ? "/staff"
                                   : "/school"
                               }/fees/receipt/${item._id}`,
@@ -592,7 +592,7 @@ function FeeHistory() {
                       onClick={() =>
                         navigate(
                           `${
-                            window.location.pathname.startsWith("/staff")
+                            window.location.pathname.includes("/staff")
                               ? "/staff"
                               : "/school"
                           }/fees/receipt/${item._id}`,

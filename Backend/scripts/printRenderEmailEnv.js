@@ -21,14 +21,21 @@ const keys = [
 console.log("Paste these into Render → eduaitor-api → Environment:\n");
 for (const key of keys) {
   const val = process.env[key];
+  if (key === "CLIENT_URL") {
+    console.log("CLIENT_URL=https://www.eduaitor.com");
+    console.log(`  (local .env has: ${val || "(unset)"} — do NOT use localhost on Render)`);
+    continue;
+  }
   if (!val) {
     console.log(`${key}=(MISSING — set in Backend/.env)`);
     continue;
   }
   if (key === "EMAIL_PASS") {
-    console.log(`${key}=******** (loaded from .env — copy from webmail password)`);
+    console.log(`${key}=******** (copy the real mailbox password into Render)`);
     continue;
   }
   console.log(`${key}=${val}`);
 }
 console.log("\nThen: Manual Deploy → Clear build cache & deploy (or Restart).");
+console.log("Verify: GET https://eduaitor-api.onrender.com/api/health/mail");
+console.log('  Expect: {"smtpConfigured":true,"clientUrlSet":true}');

@@ -51,7 +51,7 @@ export default function ForgotPassword() {
               Check your inbox (and spam folder). The link expires in 1 hour.
             </p>
             <Link
-              to="/admin/login"
+              to="/login"
               className="inline-flex items-center gap-2 text-sm font-semibold text-[rgb(var(--primary))]"
             >
               <FaArrowLeft /> Back to login
@@ -83,7 +83,7 @@ export default function ForgotPassword() {
               {loading ? "Sending…" : "Send reset link"}
             </button>
             <Link
-              to="/admin/login"
+              to="/login"
               className="flex items-center justify-center gap-2 text-sm text-[rgb(var(--text-muted))] hover:text-[rgb(var(--primary))]"
             >
               <FaArrowLeft /> Back to login

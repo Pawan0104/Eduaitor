@@ -24,11 +24,11 @@ import {
   FaStore,
   FaHeadset,
   FaThLarge,
+  FaBullhorn,
 } from "react-icons/fa";
 import { FiUsers } from "react-icons/fi";
 import {
   FaBookJournalWhills,
-  FaSchoolFlag,
   FaUserGroup,
 } from "react-icons/fa6";
 
@@ -115,6 +115,11 @@ const Sidebar = ({ closeSidebar }) => {
     return subscribedModules.includes(moduleKey);
   };
 
+  const hasLeaveRequest =
+    !needsModuleCheck ||
+    subscribedModules.length === 0 ||
+    subscribedModules.includes("leaveRequest");
+
   const logout = async () => {
     try {
       await axios.post(`${API}/auth/logout`, {}, { withCredentials: true });
@@ -125,44 +130,44 @@ const Sidebar = ({ closeSidebar }) => {
     }
     setUser(null);
     preservePrefsAndClear();
-    navigate("/admin/login", { replace: true });
+    navigate("/login", { replace: true });
   };
 
   /* ── SUPER ADMIN MENU ── */
   const superAdminMenu = [
-    { name: "Dashboard", icon: <FaTachometerAlt />, path: "/admin/dashboard" },
+    { name: "Dashboard", icon: <FaTachometerAlt />, path: "/dashboard" },
     {
       name: "Access Control",
       icon: <FaUserShield />,
-      children: [
-        { name: "Access", path: "/admin/access-control" },
-        { name: "Role Management", path: "/admin/roles" },
-      ],
+      path: "/access-control",
     },
     {
       name: "School",
       icon: <FaSchool />,
       children: [
-        { name: "All Schools", path: "/admin/schools" },
-        { name: "Add School", path: "/admin/add-school" },
-        { name: "School Management", path: "/admin/school-manage" },
-        { name: "School Subscription Plan", path: "/admin/subscription-plan" },
+        { name: "All Schools", path: "/schools" },
+        { name: "Add School", path: "/add-school" },
+        { name: "School Subscription Plan", path: "/subscription-plan" },
       ],
-    },
-    {
-      name: "School Detail",
-      icon: <FaSchoolFlag />,
-      path: "/admin/school-detail",
     },
     {
       name: "Syllabus Catalog",
       icon: <FaBookDead />,
-      path: "/admin/syllabus-catalog",
+      path: "/syllabus-catalog",
     },
     {
       name: "Help Requests",
       icon: <FaHeadset />,
-      path: "/admin/messages",
+      path: "/messages",
+    },
+    {
+      name: "Marketing AI",
+      icon: <FaBullhorn />,
+      module: "marketing",
+      children: [
+        { name: "Marketing Autopilot", path: "/marketing" },
+        { name: "Connect Accounts", path: "/marketing/accounts" },
+      ],
     },
   ];
 
@@ -197,6 +202,7 @@ const Sidebar = ({ closeSidebar }) => {
       module: "teachers",
       children: [
         { name: "All Teachers", path: "/school/teachers" },
+        { name: "Proxy Teacher", path: "/school/proxy-teacher" },
       ],
     },
     {
@@ -212,15 +218,25 @@ const Sidebar = ({ closeSidebar }) => {
     {
       name: "Attendance",
       icon: <FaUserAlt />,
-      path: "/school/attendance",
       module: "attendance",
+      children: [
+        { name: "Attendance", path: "/school/attendance" },
+        { name: "Leave Request", path: "/school/leave-request" },
+      ],
+    },
+    {
+      name: "Access Control",
+      icon: <FaUserShield />,
+      path: "/school/access-control",
     },
     {
       name: "Exam Management",
       icon: <GiOpenBook />,
       module: "exams",
       children: [
-        { name: "Exam Structure", path: "/school/exam-structure" },
+        { name: "Smart Exam Scheduler", path: "/school/exam-scheduler" },
+        { name: "Class Tests", path: "/school/class-test" },
+        { name: "Exam Papers", path: "/school/exam-papers" },
         { name: "Marks Entry", path: "/school/exam-marks-entry" },
         { name: "Exam Marks", path: "/school/exam-marks" },
         { name: "Report Card", path: "/school/report-card" },
@@ -280,6 +296,9 @@ const Sidebar = ({ closeSidebar }) => {
         { name: "Route Manage", path: "/school/transport-route" },
         { name: "Bus Manage", path: "/school/transport-bus" },
         { name: "Driver Manage", path: "/school/transport-driver" },
+        { name: "Stop Manage", path: "/school/transport-stop" },
+        { name: "Attendant Manage", path: "/school/transport-attendant" },
+        { name: "Vendor Manage", path: "/school/transport-vendor" },
         { name: "GPS Tracking", path: "/school/transport-gps", module: "gpsTracking" },
       ],
     },
@@ -308,13 +327,18 @@ const Sidebar = ({ closeSidebar }) => {
       module: "blogs",
     },
     {
+      name: "Marketing AI",
+      icon: <FaBullhorn />,
+      path: "/school/marketing",
+      module: "marketing",
+    },
+    {
       name: "Staff",
       icon: <FaUsers />,
       path: "/school/staff",
       module: "staff",
       children: [
         { name: "Staff Management", path: "/school/staff" },
-        { name: "Staff Roles", path: "/school/staff-roles" },
         { name: "Staff Attendance", path: "/school/staff-attendance" },
       ],
     },
@@ -356,6 +380,7 @@ const Sidebar = ({ closeSidebar }) => {
       children: [
         { name: "Mark Attendance", path: "/teacher/attendance/mark" },
         { name: "Attendance Report", path: "/teacher/attendance/report" },
+        { name: "Leave Request", path: "/teacher/leave-request" },
       ],
     },
     {
@@ -384,6 +409,8 @@ const Sidebar = ({ closeSidebar }) => {
       icon: <GiOpenBook />,
       module: "exams",
       children: [
+        { name: "Class Test", path: "/teacher/class-test" },
+        { name: "Exam Papers", path: "/teacher/exam-papers" },
         { name: "Marks Entry", path: "/teacher/exam" },
         { name: "Report Card", path: "/teacher/report-card" },
       ],
@@ -410,13 +437,7 @@ const Sidebar = ({ closeSidebar }) => {
       name: "Pages taught",
       icon: <FaBookOpen />,
       path: "/teacher/page-progress",
-      module: "daily_learning",
-    },
-    {
-      name: "Daily learning",
-      icon: <FaClipboardList />,
-      path: "/teacher/daily-learning",
-      module: "daily_learning",
+      module: "assignments",
     },
     {
       name: "Group",
@@ -442,6 +463,12 @@ const Sidebar = ({ closeSidebar }) => {
       icon: <FaBookJournalWhills />,
       path: "/teacher/blogs",
       module: "blogs",
+    },
+    {
+      name: "Marketing AI",
+      icon: <FaBullhorn />,
+      path: "/teacher/marketing",
+      module: "marketing",
     },
     {
       name: "Gate Pass",
@@ -534,16 +561,24 @@ const Sidebar = ({ closeSidebar }) => {
       module: "homework",
     },
     {
-      name: "Learned today",
-      icon: <FaBookOpen />,
-      path: "/parent/learning-today",
-      module: "daily_learning",
+      name: "Attendance",
+      icon: <FaUsers />,
+      module: "attendance",
+      children: [
+        { name: "Attendance", path: "/parent/attendance" },
+        ...(hasLeaveRequest
+          ? [{ name: "Leave Request", path: "/parent/leave-request" }]
+          : []),
+      ],
     },
     {
-      name: "Daily learning",
-      icon: <FaClipboardList />,
-      path: "/parent/daily-learning",
-      module: "daily_learning",
+      name: "Assignments",
+      icon: <GiSchoolBag />,
+      module: "assignments",
+      children: [
+        { name: "My Assignments", path: "/parent/assignment" },
+        { name: "Assignment Result", path: "/parent/assignment/result" },
+      ],
     },
     {
       name: "Syllabus Books",
@@ -621,12 +656,6 @@ const Sidebar = ({ closeSidebar }) => {
       module: "homework",
     },
     {
-      name: "Daily learning",
-      icon: <FaClipboardList />,
-      path: "/student/daily-learning",
-      module: "daily_learning",
-    },
-    {
       name: "Syllabus Books",
       icon: <FaBookDead />,
       path: "/student/syllabus-books",
@@ -677,8 +706,11 @@ const Sidebar = ({ closeSidebar }) => {
     {
       name: "Attendance",
       icon: <FaUserAlt />,
-      path: "/staff/attendance",
       module: "attendance",
+      children: [
+        { name: "Attendance", path: "/staff/attendance" },
+        { name: "Leave Request", path: "/staff/leave-request" },
+      ],
     },
     {
       name: "Fees",
@@ -706,8 +738,16 @@ const Sidebar = ({ closeSidebar }) => {
     {
       name: "Transport",
       icon: <FaBusAlt />,
-      path: "/staff/transport",
       module: "transport",
+      children: [
+        { name: "Transport", path: "/staff/transport" },
+        { name: "Route Manage", path: "/staff/transport-route" },
+        { name: "Bus Manage", path: "/staff/transport-bus" },
+        { name: "Driver Manage", path: "/staff/transport-driver" },
+        { name: "Stop Manage", path: "/staff/transport-stop" },
+        { name: "Attendant Manage", path: "/staff/transport-attendant" },
+        { name: "Vendor Manage", path: "/staff/transport-vendor" },
+      ],
     },
     {
       name: "Timetable",
@@ -786,6 +826,12 @@ const Sidebar = ({ closeSidebar }) => {
     { name: "Notices", icon: <FaBell />, path: "/staff/notice", module: "notices" },
     { name: "Events", icon: <FaCalendar />, path: "/staff/event", module: "events" },
     { name: "Calendar", icon: <FaCalendarAlt />, path: "/staff/calendar", module: "events" },
+    {
+      name: "Marketing AI",
+      icon: <FaBullhorn />,
+      path: "/staff/marketing",
+      module: "marketing",
+    },
   ];
 
   let menu = [];
@@ -815,7 +861,7 @@ const Sidebar = ({ closeSidebar }) => {
 
   const homePath =
     role === "super_admin"
-      ? "/admin/menu"
+      ? "/menu"
       : role === "school_admin"
         ? "/school/menu"
         : role === "teacher_admin"

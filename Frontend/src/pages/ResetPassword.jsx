@@ -34,7 +34,7 @@ export default function ResetPassword() {
     try {
       const res = await api.post("/auth/reset-password", { token, password });
       toast.success(res.data?.message || "Password updated");
-      navigate("/admin/login", { replace: true });
+      navigate("/login", { replace: true });
     } catch (err) {
       toast.error(
         err?.response?.data?.message || "Unable to reset password right now",
@@ -63,7 +63,7 @@ export default function ResetPassword() {
               This reset link is missing or invalid.
             </p>
             <Link
-              to="/admin/forgot-password"
+              to="/forgot-password"
               className="inline-flex items-center gap-2 text-sm font-semibold text-[rgb(var(--primary))]"
             >
               Request a new link
@@ -117,7 +117,7 @@ export default function ResetPassword() {
               {loading ? "Saving…" : "Update password"}
             </button>
             <Link
-              to="/admin/login"
+              to="/login"
               className="flex items-center justify-center gap-2 text-sm text-[rgb(var(--text-muted))] hover:text-[rgb(var(--primary))]"
             >
               <FaArrowLeft /> Back to login

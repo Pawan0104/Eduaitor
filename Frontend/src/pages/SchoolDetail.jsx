@@ -23,7 +23,7 @@ import {
   FiAlertCircle,
 } from "react-icons/fi";
 import { toast } from "react-toastify";
-import { FaStudiovinari } from "react-icons/fa";
+import { FaStudiovinari, FaUserCog } from "react-icons/fa";
 import { useNavigate, useParams } from "react-router-dom";
 import { FaArrowLeft } from "react-icons/fa";
 import api from "../config/axios";
@@ -79,6 +79,15 @@ export default function SchoolDetail() {
   const [ws, setWs] = useState(null);
   const navigate = useNavigate();
   const isMobile = window.innerWidth <= 768;
+
+  const [showAdminModal, setShowAdminModal] = useState(false);
+  const [adminForm, setAdminForm] = useState({
+    admin_name: "",
+    admin_email: "",
+    admin_password: "",
+    admin_confirm: "",
+  });
+  const [adminSaving, setAdminSaving] = useState(false);
 
   useEffect(() => {
     api
@@ -182,6 +191,67 @@ export default function SchoolDetail() {
       toast.error(e.message || "Failed to load workspace");
     } finally {
       setLoadingWS(false);
+    }
+  };
+
+  const openAdminModal = (school) => {
+    setAdminForm({
+      admin_name: school.admin_name || "",
+      admin_email: school.admin_email || "",
+      admin_password: "",
+      admin_confirm: "",
+    });
+    setShowAdminModal(true);
+  };
+
+  const handleAdminChange = (e) => {
+    setAdminForm((prev) => ({ ...prev, [e.target.name]: e.target.value }));
+  };
+
+  const handleAdminSave = async () => {
+    const name = adminForm.admin_name.trim();
+    const email = adminForm.admin_email.trim();
+
+    if (!name) {
+      toast.error("Admin name is required");
+      return;
+    }
+    if (!email) {
+      toast.error("Admin email is required");
+      return;
+    }
+    if (adminForm.admin_password && adminForm.admin_password !== adminForm.admin_confirm) {
+      toast.error("Passwords do not match");
+      return;
+    }
+    if (adminForm.admin_password && adminForm.admin_password.length < 6) {
+      toast.error("Password must be at least 6 characters");
+      return;
+    }
+
+    try {
+      setAdminSaving(true);
+
+      const formData = new FormData();
+      formData.append("admin_name", name);
+      formData.append("admin_email", email);
+      if (adminForm.admin_password) {
+        formData.append("admin_password", adminForm.admin_password);
+      }
+
+      await api.put(`/schools/${selId}`, formData);
+
+      toast.success(
+        adminForm.admin_password
+          ? "School admin updated — password reset"
+          : "School admin updated",
+      );
+      setShowAdminModal(false);
+      load(selId);
+    } catch (err) {
+      toast.error(err?.response?.data?.message || err?.message || "Update failed");
+    } finally {
+      setAdminSaving(false);
     }
   };
 
@@ -539,6 +609,14 @@ export default function SchoolDetail() {
             )}
             {loadingWS ? "Loading…" : "Open"}
           </button>
+          {ws && (
+            <button
+              onClick={() => openAdminModal(ws.school)}
+              className="flex items-center gap-1.5 px-3 py-2 rounded-lg border border-emerald-200 text-emerald-600 hover:bg-emerald-50 text-sm transition"
+            >
+              <FaUserCog /> Manage Admin
+            </button>
+          )}
           {ws && (
             <button
               onClick={() => load(selId)}
@@ -2297,6 +2375,86 @@ export default function SchoolDetail() {
           </>
         )}
       </div>
+
+      {/* MANAGE ADMIN MODAL */}
+      {showAdminModal && ws && (
+        <div className="fixed inset-0 z-[70] bg-black/40 flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl w-full max-w-md p-6 shadow-xl max-h-[90vh] overflow-y-auto">
+            <h2 className="text-lg font-semibold text-slate-900 mb-1">
+              Manage School Admin
+            </h2>
+            <p className="text-sm text-slate-400 mb-4">{ws.school.school_name}</p>
+
+            <div className="space-y-4">
+              <div>
+                <label className="block text-sm mb-1">Admin Name</label>
+                <input
+                  name="admin_name"
+                  value={adminForm.admin_name}
+                  onChange={handleAdminChange}
+                  className="w-full px-3 py-2 rounded-lg border border-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-400"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm mb-1">Admin Login Email</label>
+                <input
+                  name="admin_email"
+                  type="email"
+                  value={adminForm.admin_email}
+                  onChange={handleAdminChange}
+                  className="w-full px-3 py-2 rounded-lg border border-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-400"
+                />
+                <p className="text-xs text-slate-400 mt-1">
+                  This is the email the school admin uses to log in.
+                </p>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm mb-1">New Password</label>
+                  <input
+                    name="admin_password"
+                    type="password"
+                    value={adminForm.admin_password}
+                    onChange={handleAdminChange}
+                    placeholder="Leave blank to keep"
+                    className="w-full px-3 py-2 rounded-lg border border-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-400"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm mb-1">Confirm Password</label>
+                  <input
+                    name="admin_confirm"
+                    type="password"
+                    value={adminForm.admin_confirm}
+                    onChange={handleAdminChange}
+                    placeholder="Repeat password"
+                    className="w-full px-3 py-2 rounded-lg border border-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-400"
+                  />
+                </div>
+              </div>
+            </div>
+
+            <div className="flex justify-end gap-3 mt-6">
+              <button
+                onClick={() => setShowAdminModal(false)}
+                className="px-4 py-2 rounded-lg border border-slate-200 text-slate-600 hover:bg-slate-50"
+              >
+                Cancel
+              </button>
+
+              <button
+                onClick={handleAdminSave}
+                disabled={adminSaving}
+                className="px-4 py-2 rounded-lg bg-indigo-600 text-white font-semibold hover:bg-indigo-700 disabled:opacity-60"
+              >
+                {adminSaving ? "Saving..." : "Save"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

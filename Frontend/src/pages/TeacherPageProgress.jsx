@@ -2,8 +2,8 @@ import { useEffect, useMemo, useState } from "react";
 import axios from "axios";
 import { toast } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
-import { useNavigate, Link } from "react-router-dom";
-import { FaArrowLeft, FaTrash, FaBookOpen } from "react-icons/fa";
+import { useNavigate } from "react-router-dom";
+import { FaArrowLeft, FaTrash } from "react-icons/fa";
 import { useAuth } from "../context/AuthContext";
 
 const API = import.meta.env.VITE_API_URL;
@@ -198,16 +198,10 @@ export default function TeacherPageProgress() {
         <div>
           <h1 className="text-xl font-semibold">Pages completed</h1>
           <p className="text-xs text-slate-500 mt-1">
-            Mark textbook pages you finished teaching today. Parents can create
-            practice from these pages.
+            Mark textbook pages you finished teaching today. These feed the
+            assignment question generator.
           </p>
         </div>
-        <Link
-          to="/teacher/daily-learning"
-          className="inline-flex items-center gap-1.5 text-xs font-semibold text-emerald-800 px-3 py-2 rounded-xl border border-emerald-200 bg-emerald-50"
-        >
-          <FaBookOpen size={12} /> Student results
-        </Link>
       </div>
 
       <form

@@ -2,25 +2,22 @@ import OpenAI from "openai";
 
 const sleep = (ms) => new Promise((res) => setTimeout(res, ms));
 
-/** Live free models (checked Jul 2026) — prefer first */
-const MODELS = [
-  "google/gemma-4-31b-it:free",
-  "openrouter/free",
-  "meta-llama/llama-3.3-70b-instruct:free",
-  "openai/gpt-oss-20b:free",
-  "google/gemma-3-27b-it:free",
-  "meta-llama/llama-3.2-3b-instruct:free",
-];
+/**
+ * Live free models (re-checked Sep 2026).
+ * OpenRouter retired most ":free" slugs → they now 404 permanently.
+ * Only "openrouter/free" (auto-routes to a live free provider) is reliable;
+ * keep gemma-4 as a second chance since it sometimes recovers from 429.
+ */
+const MODELS = ["openrouter/free", "google/gemma-4-31b-it:free"];
 
-const VISION_MODELS = [
-  "google/gemma-4-31b-it:free",
-  "google/gemma-3-27b-it:free",
-  "qwen/qwen-2.5-vl-7b-instruct:free",
-  "meta-llama/llama-3.2-11b-vision-instruct:free",
-  "openrouter/free",
-];
+const VISION_MODELS = ["openrouter/free", "google/gemma-4-31b-it:free"];
 
-const RETRYABLE = new Set([400, 401, 402, 403, 404, 408, 429, 500, 502, 503, 529]);
+/** transient — retry across rounds with backoff */
+const RETRYABLE = new Set([400, 401, 402, 408, 429, 500, 502, 503, 529]);
+/** permanent — skip this model for the rest of the request */
+const PERMANENT = new Set([404, 406, 410, 413]);
+
+const MAX_ROUNDS = 3;
 
 const client = () =>
   new OpenAI({
@@ -41,47 +38,62 @@ const errInfo = (err) => {
   return { status, msg: String(msg).slice(0, 200) };
 };
 
-export const callAI = async (prompt) => {
-  const openai = client();
-  if (!process.env.OPENROUTER_API_KEY && !process.env.OPENAI_API_KEY) {
-    throw new Error("OPENROUTER_API_KEY is missing in Backend/.env");
-  }
-
+/** Shared resilient model loop: retries transient failures in rounds,
+ *  permanently skips dead models (404 “unavailable for free”), and
+ *  applies backoff so rate-limited free providers get time to recover. */
+const tryModels = async ({ openai, models, content, maxTokens, temperature = 0.4, label = "" }) => {
   const errors = [];
+  const dead = new Set();
 
-  for (const model of MODELS) {
-    try {
-      console.log("Trying:", model);
-      const response = await openai.chat.completions.create({
-        model,
-        messages: [{ role: "user", content: prompt }],
-        max_tokens: 4096,
-        temperature: 0.4,
-      });
-      const text = response.choices?.[0]?.message?.content?.trim() || "";
-      if (!text) {
-        errors.push(`${model}: empty response`);
-        console.log(`Empty response: ${model}`);
-        await sleep(500);
-        continue;
+  for (let round = 1; round <= MAX_ROUNDS; round++) {
+    for (const model of models) {
+      if (dead.has(model)) continue;
+      try {
+        const response = await openai.chat.completions.create({
+          model,
+          messages: [{ role: "user", content }],
+          max_tokens: maxTokens,
+          temperature,
+        });
+        const text = response.choices?.[0]?.message?.content?.trim() || "";
+        if (!text) {
+          errors.push(`${model}: empty response`);
+          console.log(`AI empty response: ${label} ${model}`);
+          continue;
+        }
+        return text;
+      } catch (err) {
+        const { status, msg } = errInfo(err);
+        const num = Number(status);
+        errors.push(`${model}: ${status} ${msg}`);
+        console.log(`AI model failed (round ${round}/${label}): ${model} (${status}) ${msg}`);
+        if (PERMANENT.has(num)) {
+          dead.add(model);
+        } else if (RETRYABLE.has(num) || status === "?") {
+          await sleep(800 * round);
+        }
       }
-      return text;
-    } catch (err) {
-      const { status, msg } = errInfo(err);
-      console.log(`Model failed: ${model} (${status}) ${msg}`);
-      errors.push(`${model}: ${status} ${msg}`);
-      if (RETRYABLE.has(Number(status)) || status === "?") {
-        await sleep(800);
-        continue;
-      }
-      // still try next model for unexpected codes
-      await sleep(400);
     }
+    if (round < MAX_ROUNDS) await sleep(900 * round);
   }
 
   throw new Error(
-    `All AI models failed. ${errors.slice(-3).join(" | ") || "No details"}`,
+    `All AI models failed. ${[...new Set(errors)].slice(-3).join(" | ") || "No details"}`,
   );
+};
+
+export const callAI = async (prompt) => {
+  if (!process.env.OPENROUTER_API_KEY && !process.env.OPENAI_API_KEY) {
+    throw new Error("OPENROUTER_API_KEY is missing in Backend/.env");
+  }
+  const openai = client();
+  return tryModels({
+    openai,
+    models: MODELS,
+    content: prompt,
+    maxTokens: 4096,
+    label: "text",
+  });
 };
 
 /**
@@ -89,7 +101,6 @@ export const callAI = async (prompt) => {
  * @param {{ prompt: string, imageUrls: string[] }}
  */
 export const callAIVision = async ({ prompt, imageUrls = [] }) => {
-  const openai = client();
   if (!process.env.OPENROUTER_API_KEY && !process.env.OPENAI_API_KEY) {
     throw new Error("OPENROUTER_API_KEY is missing in Backend/.env");
   }
@@ -102,33 +113,14 @@ export const callAIVision = async ({ prompt, imageUrls = [] }) => {
     })),
   ];
 
-  const errors = [];
-
-  for (const model of VISION_MODELS) {
-    try {
-      console.log("Trying vision:", model);
-      const response = await openai.chat.completions.create({
-        model,
-        messages: [{ role: "user", content }],
-        max_tokens: 2048,
-      });
-      const text = response.choices?.[0]?.message?.content?.trim() || "";
-      if (!text) {
-        errors.push(`${model}: empty response`);
-        continue;
-      }
-      return text;
-    } catch (err) {
-      const { status, msg } = errInfo(err);
-      console.log(`Vision model failed: ${model} (${status}) ${msg}`);
-      errors.push(`${model}: ${status} ${msg}`);
-      await sleep(800);
-    }
-  }
-
-  throw new Error(
-    `All vision AI models failed. ${errors.slice(-3).join(" | ") || "No details"}`,
-  );
+  return tryModels({
+    openai: client(),
+    models: VISION_MODELS,
+    content,
+    maxTokens: 2048,
+    temperature: 0.2,
+    label: "vision",
+  });
 };
 
 const parseJsonBlock = (raw) => {

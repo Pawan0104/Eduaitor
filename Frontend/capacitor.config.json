@@ -1,5 +1,5 @@
-﻿{
-  "appId": "com.eduaitor.app",
+{
+  "appId": "eduaitor.app",
   "appName": "Eduaitor",
   "webDir": "dist",
   "server": {

@@ -24,7 +24,7 @@ const SchoolView = () => {
   return (
     <div className="p-4 min-h-screen">
       <button
-        onClick={() => navigate("/admin/schools")}
+        onClick={() => navigate("/schools")}
         className="flex items-center gap-2 text-indigo-600 mb-6"
       >
         <FaArrowLeft />

@@ -8,6 +8,8 @@ import {
   FaCheckCircle,
   FaClock,
   FaHourglassHalf,
+  FaPaperclip,
+  FaImage,
 } from "react-icons/fa";
 
 const API = import.meta.env.VITE_API_URL;
@@ -40,6 +42,8 @@ export default function HomeworkParent() {
   const [loading, setLoading] = useState(true);
   const [markingId, setMarkingId] = useState(null);
   const [filter, setFilter] = useState("all");
+  const [noteDrafts, setNoteDrafts] = useState({});
+  const [photoDrafts, setPhotoDrafts] = useState({});
 
   const fetchList = async () => {
     try {
@@ -62,12 +66,18 @@ export default function HomeworkParent() {
   const markDone = async (id) => {
     setMarkingId(id);
     try {
-      await axios.post(
-        `${API}/homework/${id}/mark-done`,
-        {},
-        { withCredentials: true },
-      );
+      const fd = new FormData();
+      const note = (noteDrafts[id] || "").trim();
+      if (note) fd.append("note", note);
+      (photoDrafts[id] || []).forEach((f) => fd.append("photos", f));
+
+      await axios.post(`${API}/homework/${id}/mark-done`, fd, {
+        headers: { "Content-Type": "multipart/form-data" },
+        withCredentials: true,
+      });
       toast.success("Marked as done — teacher notified");
+      setNoteDrafts((d) => ({ ...d, [id]: "" }));
+      setPhotoDrafts((d) => ({ ...d, [id]: [] }));
       fetchList();
     } catch (err) {
       toast.error(err.response?.data?.error || "Could not mark as done");
@@ -103,8 +113,8 @@ export default function HomeworkParent() {
 
       <h1 className="text-lg font-semibold mb-1">Homework</h1>
       <p className="text-xs text-slate-500 mb-4">
-        Mark homework done when finished. It is completed only after the teacher
-        approves.
+        Mark homework done when finished. You can add a note or photo as proof.
+        It is completed only after the teacher approves.
       </p>
 
       <div className="flex flex-wrap gap-2 mb-4">
@@ -141,6 +151,7 @@ export default function HomeworkParent() {
             const status = hw.myStatus?.status || "assigned";
             const st = STATUS[status] || STATUS.assigned;
             const canMark = status === "assigned";
+            const photos = hw.myStatus?.photos || [];
 
             return (
               <div
@@ -170,6 +181,101 @@ export default function HomeworkParent() {
                   {hw.description}
                 </p>
 
+                {canMark && (
+                  <div className="mt-3 space-y-2 rounded-xl bg-slate-50 border border-slate-200 p-3">
+                    <textarea
+                      rows={2}
+                      className="w-full text-sm border border-slate-200 rounded-xl px-3 py-2.5 bg-white focus:outline-none focus:ring-2 focus:ring-slate-400"
+                      placeholder="Add a note (optional) — e.g. finished exercises 1–5"
+                      value={noteDrafts[hw._id] || ""}
+                      onChange={(e) =>
+                        setNoteDrafts((d) => ({
+                          ...d,
+                          [hw._id]: e.target.value,
+                        }))
+                      }
+                    />
+                    <div className="flex items-center gap-2">
+                      <label className="inline-flex items-center gap-1.5 text-xs font-medium text-slate-600 border border-slate-200 bg-white rounded-lg px-3 py-2 cursor-pointer">
+                        <FaPaperclip size={11} />
+                        {photoDrafts[hw._id]?.length
+                          ? `${photoDrafts[hw._id].length} photo(s)`
+                          : "Attach photos"}
+                        <input
+                          type="file"
+                          accept="image/*"
+                          multiple
+                          className="hidden"
+                          onChange={(e) =>
+                            setPhotoDrafts((d) => ({
+                              ...d,
+                              [hw._id]: Array.from(e.target.files || []).slice(
+                                0,
+                                3,
+                              ),
+                            }))
+                          }
+                        />
+                      </label>
+                      {photoDrafts[hw._id]?.length > 0 && (
+                        <div className="flex gap-1.5">
+                          {photoDrafts[hw._id].map((f, i) => (
+                            <img
+                              key={i}
+                              src={URL.createObjectURL(f)}
+                              className="h-10 w-10 object-cover rounded-lg border border-slate-200"
+                              alt=""
+                            />
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                    <button
+                      type="button"
+                      disabled={markingId === hw._id}
+                      onClick={() => markDone(hw._id)}
+                      className="w-full sm:w-auto px-4 py-2 rounded-xl text-sm font-medium bg-[rgb(var(--primary))] disabled:opacity-60"
+                    >
+                      {markingId === hw._id ? "Submitting…" : "Mark as done"}
+                    </button>
+                  </div>
+                )}
+
+                {hw.myStatus?.note ? (
+                  <div className="mt-3 rounded-xl bg-slate-50 border border-slate-200 px-3 py-2">
+                    <p className="text-[11px] font-semibold text-slate-600 mb-0.5">
+                      My note
+                    </p>
+                    <p className="text-xs text-slate-700 whitespace-pre-wrap">
+                      {hw.myStatus.note}
+                    </p>
+                  </div>
+                ) : null}
+
+                {photos.length > 0 && (
+                  <div className="mt-3">
+                    <p className="text-[11px] font-semibold text-slate-600 mb-1.5 flex items-center gap-1">
+                      <FaImage size={10} /> My photos
+                    </p>
+                    <div className="flex gap-2 flex-wrap">
+                      {photos.map((p, i) => (
+                        <a
+                          key={i}
+                          href={p.url}
+                          target="_blank"
+                          rel="noreferrer"
+                        >
+                          <img
+                            src={p.url}
+                            className="h-16 w-16 object-cover rounded-lg border border-slate-200"
+                            alt={p.name || "homework photo"}
+                          />
+                        </a>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
                 {hw.myStatus?.teacherRemark ? (
                   <div className="mt-3 rounded-xl bg-violet-50 border border-violet-100 px-3 py-2">
                     <p className="text-[11px] font-semibold text-violet-700 mb-0.5">
@@ -180,17 +286,6 @@ export default function HomeworkParent() {
                     </p>
                   </div>
                 ) : null}
-
-                {canMark && (
-                  <button
-                    type="button"
-                    disabled={markingId === hw._id}
-                    onClick={() => markDone(hw._id)}
-                    className="mt-3 w-full sm:w-auto px-4 py-2 rounded-xl text-sm font-medium bg-[rgb(var(--primary))] disabled:opacity-60"
-                  >
-                    {markingId === hw._id ? "Updating…" : "Mark as done"}
-                  </button>
-                )}
 
                 {status === "marked_done" && (
                   <p className="mt-3 text-[11px] text-amber-700">

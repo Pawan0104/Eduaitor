@@ -27,7 +27,7 @@ import { useLanguage } from "../context/LanguageContext";
 export const getMenuPath = (role, loginAs) => {
   switch (role) {
     case "super_admin":
-      return "/admin/menu";
+      return "/menu";
     case "school_admin":
       return "/school/menu";
     case "teacher_admin":
@@ -37,7 +37,7 @@ export const getMenuPath = (role, loginAs) => {
     case "student_admin":
       return loginAs === "parent" ? "/parent/menu" : "/student/menu";
     default:
-      return "/admin/login";
+      return "/login";
   }
 };
 
@@ -118,17 +118,17 @@ const getNavItems = (role, loginAs, openProfile, tn) => {
 
     case "super_admin":
       return [
-        menuItem("/admin/menu"),
-        { label: tn("Schools"), icon: <FaSchool />, path: "/admin/schools" },
+        menuItem("/menu"),
+        { label: tn("Schools"), icon: <FaSchool />, path: "/schools" },
         {
           label: tn("Access"),
           icon: <FaShieldAlt />,
-          path: "/admin/access-control",
+          path: "/access-control",
         },
         {
           label: tn("Analytics"),
           icon: <FaChartLine />,
-          path: "/admin/platform-analytics",
+          path: "/platform-analytics",
         },
         profileItem,
       ];

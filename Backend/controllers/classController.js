@@ -48,6 +48,62 @@ const escapeRegex = (value) =>
   String(value).replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 
 /**
+ * Find the first room already in use by ANOTHER class in the same school
+ * (case-insensitive, trimmed). Returns { room, className } or null.
+ */
+const findRoomConflict = async (schoolId, rooms, excludeClassId = null) => {
+  const trimmed = [
+    ...new Set(
+      (rooms || [])
+        .map((r) => String(r || "").trim())
+        .filter(Boolean),
+    ),
+  ];
+  if (trimmed.length === 0) return null;
+
+  const filter = {
+    schoolId,
+    $or: trimmed.map((room) => ({
+      "details.roomNumber": {
+        $regex: `^${escapeRegex(room)}$`,
+        $options: "i",
+      },
+    })),
+  };
+  if (excludeClassId) filter._id = { $ne: excludeClassId };
+
+  const conflicted = await Class.findOne(filter).select("name details");
+  if (!conflicted) return null;
+
+  for (const room of trimmed) {
+    const hit = conflicted.details.find(
+      (d) =>
+        String(d.roomNumber || "").trim().toLowerCase() === room.toLowerCase(),
+    );
+    if (hit) return { room: hit.roomNumber, className: conflicted.name };
+  }
+  return null;
+};
+
+/** Validate that every detail has a room and no room repeats in the form. */
+const validateRooms = (details) => {
+  const rooms = (details || []).map((d) => String(d.roomNumber || "").trim());
+  const emptyRoom = rooms.find((r) => !r);
+  if (emptyRoom !== undefined) {
+    return { error: "Room number required" };
+  }
+  const seen = new Map();
+  for (const room of rooms) {
+    const key = room.toLowerCase();
+    if (seen.has(key)) {
+      return { error: `Room "${seen.get(key)}" cannot be used more than once` };
+    }
+    seen.set(key, room);
+  }
+  return { error: null };
+};
+
+/**
  * Fill details[].studentCount from live Student rows (classId + sectionId).
  * Stored studentCount on Class is often stale/0 after admissions.
  */
@@ -215,12 +271,23 @@ export const createClass = async (req, res) => {
         message: `"${name}" already exists`,
       });
 
-    for (const d of details) {
-      if (!String(d.roomNumber || "").trim())
-        return res.status(400).json({
-          success: false,
-          message: "Room number required",
-        });
+    const roomCheck = validateRooms(details);
+    if (roomCheck.error) {
+      return res.status(400).json({
+        success: false,
+        message: roomCheck.error,
+      });
+    }
+
+    const roomConflict = await findRoomConflict(
+      schoolId,
+      details.map((d) => d.roomNumber),
+    );
+    if (roomConflict) {
+      return res.status(400).json({
+        success: false,
+        message: `Room "${roomConflict.room}" is already assigned to Class "${roomConflict.className}"`,
+      });
     }
 
     const sanitized = sanitizeDetails(details);
@@ -478,13 +545,24 @@ export const updateClass = async (req, res) => {
       });
     }
 
-    for (const d of details) {
-      if (!String(d.roomNumber || "").trim()) {
-        return res.status(400).json({
-          success: false,
-          message: "Room number required",
-        });
-      }
+    const roomCheck = validateRooms(details);
+    if (roomCheck.error) {
+      return res.status(400).json({
+        success: false,
+        message: roomCheck.error,
+      });
+    }
+
+    const roomConflict = await findRoomConflict(
+      schoolId,
+      details.map((d) => d.roomNumber),
+      cls._id,
+    );
+    if (roomConflict) {
+      return res.status(400).json({
+        success: false,
+        message: `Room "${roomConflict.room}" is already assigned to Class "${roomConflict.className}"`,
+      });
     }
 
     // 🔥 OLD TEACHERS

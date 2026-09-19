@@ -2,6 +2,12 @@ import Notice from "../models/notice.js";
 import Student from "../models/student.js";
 import Class from "../models/class.js";
 import { createNotificationHelper } from "./notificationController.js";
+import { emitMarketingTrigger } from "../services/marketing/eventTriggers.js";
+
+const isHolidayNotice = (title = "") =>
+  /holiday|closed|vacation|leave|break|pongal|diwali|eid|holi|christmas|new\s*year/i.test(
+    title,
+  );
 
 const sortNoticesByDate = (items) => {
   const now = new Date();
@@ -141,6 +147,15 @@ export const createNotice = async (req, res) => {
       schoolId,
       createdBy: req.user._id,
     });
+    emitMarketingTrigger({
+      schoolId,
+      entityType: "notice",
+      entityId: notice._id,
+      trigger: isHolidayNotice(notice.title)
+        ? "notice.holiday"
+        : "notice.announcement",
+      entitySummary: notice.title,
+    }).catch((err) => console.error("marketing trigger (notice):", err.message));
     res
       .status(201)
       .json({ success: true, message: "Notice created successfully", notice });

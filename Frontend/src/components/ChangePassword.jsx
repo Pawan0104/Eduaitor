@@ -43,7 +43,7 @@ export default function ChangePassword() {
       );
 
       toast.success("Password changed successfully! Please log in again.");
-      navigate("/admin/login");
+      navigate("/login");
     } catch (err) {
       toast.error(
         err?.response?.data?.message || "Failed to change password."

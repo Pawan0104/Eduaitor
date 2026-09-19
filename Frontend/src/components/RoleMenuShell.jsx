@@ -19,7 +19,7 @@ import { getMenuIconMeta } from "../utils/menuIcons";
 function resolveMenuPath(role, loginAs) {
   switch (role) {
     case "super_admin":
-      return "/admin/menu";
+      return "/menu";
     case "school_admin":
       return "/school/menu";
     case "teacher_admin":

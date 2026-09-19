@@ -194,7 +194,7 @@ const Schools = () => {
             <div className="flex justify-end mt-5">
 
               <button
-                onClick={() => navigate(`/admin/school-view/${school._id}`)}
+                onClick={() => navigate(`/school-view/${school._id}`)}
                 className="flex items-center gap-2 text-[rgb(var(--primary))] hover:text-[rgb(var(--primary-dark))] text-sm font-medium"
               >
                 <FaEye />

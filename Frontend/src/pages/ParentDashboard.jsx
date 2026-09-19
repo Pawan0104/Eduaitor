@@ -274,7 +274,7 @@ const ParentDashboard = () => {
       label: "My Assignments",
       helper: "Pending homework & quizzes",
       icon: <FaClipboardList />,
-      to: "/parent/assignments",
+      to: "/parent/assignment",
       tone: "emerald",
     },
     {
@@ -295,7 +295,7 @@ const ParentDashboard = () => {
 
   const campusModules = [
     { label: "Attendance", path: "/parent/attendance", icon: FiCheckSquare },
-    { label: "Assignments", path: "/parent/assignments", icon: FaClipboardList },
+    { label: "Assignments", path: "/parent/assignment", icon: FaClipboardList },
     { label: "Fees", path: "/parent/fees", icon: FiFileText },
     { label: "Transport", path: "/parent/transport", icon: FaBus },
     { label: "Syllabus", path: "/parent/syllabus-books", icon: FaBookOpen },
@@ -318,7 +318,7 @@ const ParentDashboard = () => {
     {
       title: "Assignments",
       tone: "blue",
-      path: "/parent/assignments",
+      path: "/parent/assignment",
       rows: [
         ["Total", metrics.totalAssignments],
         ["Pending", metrics.pendingAssignments],
@@ -671,8 +671,8 @@ const ParentDashboard = () => {
             <SectionCard
               title="Assignments"
               subtitle="Latest assignments from your child's teachers"
-              action={{ label: "View All", to: "/parent/assignments" }}
-              onAction={() => navigate("/parent/assignments")}
+              action={{ label: "View All", to: "/parent/assignment" }}
+              onAction={() => navigate("/parent/assignment")}
             >
               {recentAssignments.length === 0 ? (
                 <EmptyState message="No assignments found." />
@@ -694,7 +694,7 @@ const ParentDashboard = () => {
                     return (
                       <div
                         key={a._id}
-                        onClick={() => navigate(`/parent/assignments/${a._id}`)}
+                        onClick={() => navigate(`/parent/assignment`)}
                         className="group flex cursor-pointer items-start justify-between gap-3 rounded-2xl border border-slate-100  p-4 transition  hover:bg-[rgb(var(--surface))] hover:shadow-sm"
                       >
                         <div className="min-w-0 flex-1">

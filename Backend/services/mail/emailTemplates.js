@@ -198,6 +198,125 @@ export function buildCredentialWelcomeEmail(opts = {}) {
   };
 }
 
+/**
+ * Closed-testing invite + checklist for parents (branded).
+ */
+export function buildClosedTestingChecklistEmail(opts = {}) {
+  const {
+    name,
+    schoolName = "Bright Children Academy (BCA)",
+    username,
+    password,
+    loginUrl = adminLoginUrl(),
+  } = opts;
+
+  const greeting = name ? `Hello ${name},` : "Hello,";
+  const title = "Closed testing checklist";
+  const preheader = `Your Eduaitor closed testing steps for ${schoolName}`;
+
+  const checklist = [
+    "Page opens (no 403 / blank error)",
+    "Parent login succeeds",
+    "Correct school shows (BCA)",
+    "Child name / profile is visible",
+    "Dashboard / home opens",
+    "Can open at least 2–3 menus/screens",
+    "Logout works",
+    "Login again works",
+    "Tried on phone",
+    "Tried on laptop/desktop (if available)",
+  ];
+
+  const checklistHtml = checklist
+    .map(
+      (item, i) =>
+        `<tr>
+          <td style="padding:8px 0;border-bottom:1px solid ${BRAND.line};font-size:14px;color:${BRAND.ink};vertical-align:top;width:28px">${i + 1}.</td>
+          <td style="padding:8px 0;border-bottom:1px solid ${BRAND.line};font-size:14px;color:${BRAND.ink}">${escapeHtml(item)}</td>
+        </tr>`,
+    )
+    .join("");
+
+  const bodyHtml = `
+    <p style="margin:0 0 12px;font-size:15px;line-height:1.6;color:${BRAND.ink}">${escapeHtml(greeting)}</p>
+    <p style="margin:0 0 16px;font-size:15px;line-height:1.6;color:${BRAND.ink}">
+      Thank you for joining <strong>Eduaitor closed testing</strong> for
+      <strong>${escapeHtml(schoolName)}</strong>. Please complete the checklist below and reply with your results.
+    </p>
+
+    ${credentialRowsHtml([
+      { title: "Your parent login", username, password },
+    ])}
+
+    ${ctaButton(loginUrl, "Open Eduaitor login")}
+    ${loginUrl ? `<p style="margin:10px 0 18px;font-size:12px;color:${BRAND.muted};word-break:break-all">${escapeHtml(loginUrl)}</p>` : ""}
+
+    <p style="margin:0 0 8px;font-size:13px;font-weight:700;letter-spacing:0.02em;text-transform:uppercase;color:${BRAND.tealDark}">How to sign in</p>
+    <ol style="margin:0 0 18px;padding-left:20px;font-size:14px;line-height:1.7;color:${BRAND.ink}">
+      <li>Open the login link</li>
+      <li>Choose <strong>Parent</strong></li>
+      <li>Enter your username and password</li>
+      <li>Select school: <strong>${escapeHtml(schoolName)}</strong></li>
+    </ol>
+
+    <p style="margin:0 0 8px;font-size:13px;font-weight:700;letter-spacing:0.02em;text-transform:uppercase;color:${BRAND.tealDark}">Testing checklist</p>
+    <p style="margin:0 0 10px;font-size:14px;color:${BRAND.muted}">Reply with ✅ or ❌ for each item:</p>
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin:0 0 18px">${checklistHtml}</table>
+
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin:0 0 8px;background:${BRAND.soft};border:1px solid ${BRAND.line};border-radius:12px">
+      <tr><td style="padding:14px 16px">
+        <p style="margin:0 0 8px;font-size:13px;font-weight:700;color:${BRAND.tealDark}">When you reply, include</p>
+        <ul style="margin:0;padding-left:18px;font-size:14px;line-height:1.6;color:${BRAND.ink}">
+          <li>Device (Android / iPhone / Windows / Mac)</li>
+          <li>Browser (Chrome / Safari / etc.)</li>
+          <li>What worked and what failed</li>
+          <li>Screenshot if something breaks</li>
+        </ul>
+      </td></tr>
+    </table>
+  `;
+
+  const html = wrapBrandedEmail({
+    title,
+    preheader,
+    bodyHtml,
+    footerNote: "You received this because you were invited to Eduaitor closed testing.",
+  });
+
+  const text = [
+    greeting,
+    "",
+    `Thank you for joining Eduaitor closed testing for ${schoolName}.`,
+    "",
+    "Your parent login",
+    `Username: ${username || ""}`,
+    `Password: ${password || ""}`,
+    loginUrl ? `Login: ${loginUrl}` : null,
+    "",
+    "How to sign in:",
+    "1) Open the login link",
+    "2) Choose Parent",
+    "3) Enter username and password",
+    `4) Select school: ${schoolName}`,
+    "",
+    "Testing checklist (reply ✅ / ❌):",
+    ...checklist.map((item, i) => `${i + 1}. ${item}`),
+    "",
+    "When you reply, include device, browser, what worked/failed, and a screenshot if needed.",
+    "",
+    "Thank you!",
+    "— Eduaitor team",
+  ]
+    .filter((l) => l !== null && l !== undefined)
+    .join("\n");
+
+  return {
+    subject: `Eduaitor closed testing checklist — ${schoolName}`,
+    text,
+    html,
+  };
+}
+
 export function buildPasswordResetEmail({
   name,
   roleLabel = "account",

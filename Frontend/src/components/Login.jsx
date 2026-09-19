@@ -1,4 +1,4 @@
-﻿import { useAuth } from "../context/AuthContext";
+import { useAuth } from "../context/AuthContext";
 import { useLanguage } from "../context/LanguageContext";
 import { useEffect, useState } from "react";
 import { useNavigate, useLocation, Link } from "react-router-dom";
@@ -32,7 +32,7 @@ function ForgotPasswordLink({ t }) {
   return (
     <div className="flex justify-end">
       <Link
-        to="/admin/forgot-password"
+        to="/forgot-password"
         reloadDocument={false}
         className="text-sm font-medium text-[rgb(var(--primary))] hover:underline"
       >
@@ -43,7 +43,7 @@ function ForgotPasswordLink({ t }) {
 }
 
 function homePathForRole(role, loginAs) {
-  return getMenuPath(role, loginAs) || "/admin/login";
+  return getMenuPath(role, loginAs) || "/login";
 }
 
 function childCountLabel(count, t) {
@@ -174,7 +174,7 @@ export default function Login() {
     const safeIntended =
       intended &&
       intended !== "/dashboard" &&
-      intended !== "/admin/login" &&
+      intended !== "/login" &&
       !intended.endsWith("/login")
         ? intended
         : null;

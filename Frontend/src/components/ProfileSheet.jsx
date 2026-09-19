@@ -31,7 +31,7 @@ const ProfileSheet = ({ onClose }) => {
     }
     setUser(null);
     clearSessionKeepPrefs();
-    navigate("/admin/login", { replace: true });
+    navigate("/login", { replace: true });
   };
 
   return (

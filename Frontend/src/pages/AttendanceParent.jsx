@@ -20,7 +20,7 @@ const CURRENT_MONTH = new Date().getMonth() + 1;
 const STATUS_DOT = {
   Present: { dot: "bg-emerald-500", text: "text-emerald-700", bg: "bg-emerald-50",  border: "border-emerald-200", letter: "P", label: "Present" },
   Absent:  { dot: "bg-rose-500",    text: "text-rose-700",    bg: "bg-rose-50",     border: "border-rose-200",    letter: "A", label: "Absent"  },
-  Late:    { dot: "bg-amber-400",   text: "text-amber-700",   bg: "bg-amber-50",    border: "border-amber-200",   letter: "L", label: "Late"    },
+  Late:    { dot: "bg-amber-400",   text: "text-amber-700",   bg: "bg-amber-50",    border: "border-amber-200",   letter: "L", label: "Leave"   },
 };
 
 const EVENT_TYPE_STYLE = {
@@ -107,7 +107,7 @@ function SummaryCard({ summary }) {
         {[
           { label: "Present", val: present, cls: "text-emerald-600" },
           { label: "Absent",  val: absent,  cls: "text-rose-600"    },
-          { label: "Late",    val: late,    cls: "text-amber-600"   },
+          { label: "Leave",  val: late,    cls: "text-amber-600"   },
           { label: "Total",   val: total,   cls: "text-[rgb(var(--text))]" },
         ].map(({ label, val, cls }) => (
           <div key={label} className="flex flex-col items-center py-3 border-r last:border-0 border-slate-100">
@@ -487,7 +487,7 @@ function Legend() {
   const items = [
     { dot: "bg-emerald-500", label: "Present" },
     { dot: "bg-rose-500",    label: "Absent"  },
-    { dot: "bg-amber-400",   label: "Late"    },
+    { dot: "bg-amber-400",   label: "Leave"  },
     { dot: "bg-violet-500",  label: "Holiday" },
     { dot: "bg-blue-500",    label: "Event"   },
   ];

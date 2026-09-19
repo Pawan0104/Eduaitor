@@ -423,7 +423,7 @@ function ReportCardPrint({ card, includedLabel }) {
           </h3>
           <div className="grid grid-cols-2 sm:grid-cols-5 gap-3 mb-6">
             <Stat label="Present" value={card.attendance?.present ?? 0} />
-            <Stat label="Late" value={card.attendance?.late ?? 0} />
+            <Stat label="Leave" value={card.attendance?.late ?? 0} />
             <Stat label="Absent" value={card.attendance?.absent ?? 0} />
             <Stat label="Total days" value={card.attendance?.totalDays ?? 0} />
             <Stat

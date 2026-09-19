@@ -140,8 +140,9 @@ export default function ParentChildSwitcher({
                         className="block truncate text-[10px] font-semibold"
                         style={{ color: "rgb(var(--text-muted))" }}
                       >
-                        {[c.className, c.sectionName].filter(Boolean).join(" · ") ||
-                          c.studentId}
+                        {[c.schoolName, c.className, c.sectionName]
+                          .filter(Boolean)
+                          .join(" · ") || c.studentId}
                       </span>
                     </span>
                     {selected && (
@@ -229,7 +230,9 @@ export default function ParentChildSwitcher({
                   className="truncate text-[11px] font-semibold"
                   style={{ color: "rgb(var(--text-muted))" }}
                 >
-                  {[c.className, c.sectionName].filter(Boolean).join(" · ") ||
+                  {[c.schoolName, c.className, c.sectionName]
+                    .filter(Boolean)
+                    .join(" · ") ||
                     c.studentId ||
                     "—"}
                   {c.rollNo ? ` · #${c.rollNo}` : ""}

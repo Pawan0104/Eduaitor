@@ -2,6 +2,6 @@
 <resources>
     <string name="app_name">Eduaitor</string>
     <string name="title_activity_main">Eduaitor</string>
-    <string name="package_name">com.eduaitor.app</string>
-    <string name="custom_url_scheme">com.eduaitor.app</string>
+    <string name="package_name">eduaitor.app</string>
+    <string name="custom_url_scheme">eduaitor.app</string>
 </resources>

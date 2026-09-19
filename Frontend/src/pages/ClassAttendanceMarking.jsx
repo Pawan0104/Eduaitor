@@ -31,7 +31,7 @@ const STATUS = {
   },
   Late: {
     label: "L",
-    full: "Late",
+    full: "Leave",
     active: "bg-amber-500 border-amber-500 text-white shadow-sm",
     inactive: "bg-[rgb(var(--surface))] border-slate-200 text-[rgb(var(--text))] hover:border-amber-300",
     badge: "bg-amber-100 text-amber-700",
@@ -430,7 +430,7 @@ export default function ClassAttendanceMarking() {
                 <StatCard label="Total"   value={students.length}    valueClass="text-[rgb(var(--text))]" />
                 <StatCard label="Present" value={counts.Present || 0} valueClass="text-emerald-600" />
                 <StatCard label="Absent"  value={counts.Absent  || 0} valueClass="text-red-500" />
-                <StatCard label="Late"    value={counts.Late    || 0} valueClass="text-amber-600" />
+                <StatCard label="Leave"    value={counts.Late    || 0} valueClass="text-amber-600" />
               </div>
             )}
 
@@ -561,7 +561,7 @@ export default function ClassAttendanceMarking() {
                   <p className="text-xs text-[rgb(var(--text))]">
                     <span className="font-semibold text-emerald-600">{counts.Present ?? 0}</span> present ·{" "}
                     <span className="font-semibold text-red-500">{counts.Absent ?? 0}</span> absent ·{" "}
-                    <span className="font-semibold text-amber-600">{counts.Late ?? 0}</span> late
+                    <span className="font-semibold text-amber-600">{counts.Late ?? 0}</span> on leave
                     {isEdit && (
                       <span className="ml-2 font-semibold text-blue-600">· Editing existing record</span>
                     )}
@@ -642,7 +642,7 @@ export default function ClassAttendanceMarking() {
                           { label: "Total",   val: snapshot.length,                                         cls: "text-[rgb(var(--text))]" },
                           { label: "Present", val: snapshot.filter(s => s.todayStatus === "Present").length, cls: "text-emerald-600" },
                           { label: "Absent",  val: snapshot.filter(s => s.todayStatus === "Absent").length,  cls: "text-red-500" },
-                          { label: "Late",    val: snapshot.filter(s => s.todayStatus === "Late").length,    cls: "text-amber-600" },
+                          { label: "Leave",  val: snapshot.filter(s => s.todayStatus === "Late").length,    cls: "text-amber-600" },
                         ].map(({ label, val, cls }) => (
                           <div key={label} className="flex flex-col items-center py-3 border-r last:border-0 border-slate-100">
                             <span className={`text-lg font-bold leading-none ${cls}`}>{val}</span>

@@ -225,6 +225,7 @@ const TeacherManagement = () => {
         const t = res.data.data;
 
         setForm({
+          ...emptyForm,
           ...t,
           dob: t.dob ? t.dob.split("T")[0] : "",
           joiningDate: t.joiningDate ? t.joiningDate.split("T")[0] : "",
@@ -314,8 +315,8 @@ const TeacherManagement = () => {
     const errors = [];
 
     if (step === 1) {
-      if (!form.fullName.trim()) errors.push("Full Name required");
-      if (!form.phone.trim()) errors.push("Phone required");
+      if (!(form.fullName || "").trim()) errors.push("Full Name required");
+      if (!(form.phone || "").trim()) errors.push("Phone required");
       if (!form.dob) {
         errors.push("Date of Birth required");
       } else {

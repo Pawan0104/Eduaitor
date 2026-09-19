@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { FaArrowLeft, FaLock } from "react-icons/fa";
 import { toast } from "react-toastify";
-import { MODULES, DEFAULT_MODULES } from "../constants/module.js"; // adjust path
+import { MODULES, MODULE_KEYS } from "../constants/module.js";
 import api from "../config/axios";
 import LoadingSpinner from "../components/LoadingSpinner";
 
@@ -29,7 +29,8 @@ const AddSchool = () => {
   const [loading, setLoading] = useState(false);
 
   // ── MODULES STATE ─────────────────────────────────
-  const [selectedModules, setSelectedModules] = useState(DEFAULT_MODULES);
+  // New schools get ALL modules by default; super admin deselects to restrict.
+  const [selectedModules, setSelectedModules] = useState(MODULE_KEYS);
 
   // ── LOGO STATE ────────────────────────────────────
   const [logoFile, setLogoFile] = useState(null);
@@ -75,12 +76,12 @@ const AddSchool = () => {
     );
   };
 
-  // select all / deselect all
+  // select all / clear all
   const handleSelectAll = () => {
     if (selectedModules.length === MODULES.length) {
-      setSelectedModules(DEFAULT_MODULES); // reset to defaults
+      setSelectedModules([]); // clear all
     } else {
-      setSelectedModules(MODULES.map((m) => m.key));
+      setSelectedModules(MODULE_KEYS);
     }
   };
 
@@ -145,7 +146,7 @@ const AddSchool = () => {
       await api.post(`/schools`, formData);
 
       toast.success("School created successfully");
-      navigate("/admin/schools");
+      navigate("/schools");
     } catch (err) {
       toast.error(err.response?.data?.message || "Error creating school");
     } finally {
@@ -440,7 +441,7 @@ const AddSchool = () => {
             <div className="flex flex-col-reverse sm:flex-row gap-3 justify-between items-stretch sm:items-center px-4 sm:px-8 py-6 border-t
               bg-[rgb(var(--surface))] text-[rgb(var(--text))] rounded-b-2xl">
               <button
-                onClick={() => navigate("/admin/schools")}
+                onClick={() => navigate("/schools")}
                 className="app-btn app-btn-secondary w-full sm:w-auto min-h-11"
               >
                 Cancel

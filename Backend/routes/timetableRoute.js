@@ -2,7 +2,10 @@ import express from "express";
 import {
   saveTimetable,
   getTimetable,
+  getClassTimetablePreview,
   markTeacherAbsent,
+  getTeacherDaySchedule,
+  assignProxyTeacher,
 } from "../controllers/timetableController.js";
 import {
   downloadTimetableTemplate,
@@ -26,6 +29,9 @@ router.post(
 );
 
 router.post("/save", authMiddleware, saveTimetable);
+router.get("/teacher-schedule", authMiddleware, getTeacherDaySchedule);
+router.post("/proxy-assign", authMiddleware, assignProxyTeacher);
+router.get("/preview/:classId", authMiddleware, getClassTimetablePreview);
 router.get("/:classId", authMiddleware, getTimetable);
 router.post("/teacher-absent", markTeacherAbsent);
 

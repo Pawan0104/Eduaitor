@@ -31,7 +31,7 @@ export default function FeeReceipt() {
   const [data, setData] = useState(null);
 
   const basePath = (() => {
-    if (user?.role === "super_admin") return "/admin";
+    if (user?.role === "super_admin") return "/";
     if (user?.role === "school_admin") return "/school";
     if (user?.role === "staff_admin") return "/staff";
     if (user?.role === "student_admin")

@@ -28,6 +28,7 @@ function ensureWebSplash() {
   if (document.getElementById("eduaitor-native-splash")) return;
 
   const splashSrc = publicAsset("eduaitor-splash-logo.png");
+  const splashAiSrc = publicAsset("eduaitor-splash-ai.png");
   const isNative = Capacitor.isNativePlatform();
   const el = document.createElement("div");
   el.id = "eduaitor-native-splash";
@@ -36,7 +37,10 @@ function ensureWebSplash() {
     ? "eduaitor-splash-native"
     : "eduaitor-splash-web";
   el.innerHTML = `
-    <img class="eduaitor-splash-full" src="${splashSrc}" alt="Eduaitor" />
+    <div class="eduaitor-splash-wrap">
+      <img class="eduaitor-splash-full" src="${splashSrc}" alt="Eduaitor" />
+      <img class="eduaitor-splash-ai-spin" src="${splashAiSrc}" alt="" />
+    </div>
   `;
   document.body.appendChild(el);
 
@@ -68,28 +72,48 @@ function ensureWebSplash() {
       visibility: hidden;
       pointer-events: none;
     }
+    #eduaitor-native-splash .eduaitor-splash-wrap {
+      position: relative;
+      width: min(100%, 40rem);
+      max-width: 100%;
+      margin: 0 auto;
+    }
+    #eduaitor-native-splash .eduaitor-splash-ai-spin {
+      position: absolute;
+      left: 43%;
+      top: 2%;
+      width: 24%;
+      height: 72%;
+      object-fit: contain;
+      transform-origin: 50% 50%;
+      animation: eduaitor-ai-swing-spin 2.8s ease-in-out infinite;
+      pointer-events: none;
+    }
+    @keyframes eduaitor-ai-swing-spin {
+      0% { transform: rotate(0deg); }
+      50% { transform: rotate(360deg); }
+      100% { transform: rotate(0deg); }
+    }
     /* Website / desktop: fit inside viewport, no stretch */
     #eduaitor-native-splash.eduaitor-splash-web .eduaitor-splash-full {
       display: block;
-      width: auto;
+      width: 100%;
       height: auto;
-      max-width: min(100%, 28rem);
-      max-height: min(100%, 100dvh);
       object-fit: contain;
       object-position: center center;
     }
     @media (min-width: 768px) {
       #eduaitor-native-splash.eduaitor-splash-web .eduaitor-splash-full {
-        max-width: min(100%, 32rem);
         max-height: min(92dvh, 56rem);
       }
     }
-    /* Native APK: full-bleed cover */
+    /* Native APK: keep full logo visible (no crop) */
     #eduaitor-native-splash.eduaitor-splash-native .eduaitor-splash-full {
       display: block;
       width: 100%;
-      height: 100%;
-      object-fit: cover;
+      height: auto;
+      max-height: min(92dvh, 56rem);
+      object-fit: contain;
       object-position: center center;
     }
   `;

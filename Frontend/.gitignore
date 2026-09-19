@@ -12,12 +12,18 @@ lerna-debug.log*
 !.env.example
 !.env.production.example
 !.env.*.example
- 
+
+# Android release signing (never commit)
+android/key.properties
+android/*.jks
+android/*.keystore
 
 node_modules
 dist
 dist-ssr
 *.local
+google-play-upload/06-release-bundle/*.aab
+google-play-upload/06-release-bundle/*.apk
 
 # Editor directories and files
 .vscode/*

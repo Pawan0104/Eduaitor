@@ -68,7 +68,7 @@ function AttendanceCalendar({ records, month, year }) {
     >
       {/* Legend */}
       <div className="flex flex-wrap gap-4 mb-3">
-        {["Present","Absent","Late"].map((s) => (
+        {["Present","Absent","Leave"].map((s) => (
           <span key={s} className="flex items-center gap-1.5 text-xs text-[rgb(var(--text-muted))]">
             <span
               className="w-2.5 h-2.5 rounded-sm inline-block"
@@ -253,7 +253,7 @@ function StudentAttendanceDetail({}) {
         {[
           { label: "Present", val: summary?.present, color: "#0F6E56" },
           { label: "Absent",  val: summary?.absent,  color: "#A32D2D" },
-          { label: "Late",    val: summary?.late,    color: "#854F0B" },
+          { label: "Leave", val: summary?.late,    color: "#854F0B" },
           { label: "Total",   val: summary?.total,   color: "rgb(var(--text))" },
           { label: "Rate",    val: summary?.total ? `${summary.percentage}%` : "—", color: pctColor },
         ].map(({ label, val, color }) => (

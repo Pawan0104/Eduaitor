@@ -2,6 +2,7 @@ import Event from "../models/event.js";
 import Student from "../models/student.js";
 import Class from "../models/class.js";
 import {createNotificationHelper}  from "../controllers/notificationController.js"
+import { emitMarketingTrigger } from "../services/marketing/eventTriggers.js";
 
 const sortEventsByDate = (items) => {
   const now = new Date();
@@ -140,6 +141,13 @@ export const createEvent = async (req, res) => {
       startingDate:event.startDate || date.now,
       endingDate:event.endDate || "",
     });
+    emitMarketingTrigger({
+      schoolId,
+      entityType: "event",
+      entityId: event._id,
+      trigger: "event.created",
+      entitySummary: event.title,
+    }).catch((err) => console.error("marketing trigger (event):", err.message));
     res
       .status(201)
       .json({ success: true, message: "Event created successfully", event });

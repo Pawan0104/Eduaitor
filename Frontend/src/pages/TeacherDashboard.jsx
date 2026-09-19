@@ -110,6 +110,7 @@ const TeacherDashboard = () => {
         studentsRes,
         assignmentsRes,
         resultsRes,
+        homeworkRes,
         diaryRes,
         groupsRes,
         noticesRes,
@@ -125,6 +126,7 @@ const TeacherDashboard = () => {
         axios.get(`${API}/assignment/teacher/results`, {
           withCredentials: true,
         }),
+        axios.get(`${API}/homework/teacher`, { withCredentials: true }),
         axios.get(`${API}/diary`, { withCredentials: true }),
         axios.get(`${API}/groups/my-groups`, { withCredentials: true }),
         axios.get(`${API}/notices`, { withCredentials: true }),
@@ -147,6 +149,10 @@ const TeacherDashboard = () => {
         assignmentResults:
           resultsRes.status === "fulfilled"
             ? resultsRes.value.data?.data || []
+            : [],
+        homework:
+          homeworkRes.status === "fulfilled"
+            ? homeworkRes.value.data || []
             : [],
         diaries:
           diaryRes.status === "fulfilled" ? diaryRes.value.data || [] : [],
@@ -185,9 +191,9 @@ const TeacherDashboard = () => {
     const overdue = data.assignments.filter(
       (a) => a.isPublished && new Date(a.dueDate) < new Date(),
     ).length;
-    const homeworkCount = data.assignments.filter(
-      (a) => a.type === "homework",
-    ).length;
+    const homeworkCount = Array.isArray(data.homework)
+      ? data.homework.length
+      : 0;
     const quizCount = data.assignments.filter((a) => a.type === "quiz").length;
     const examCount = data.assignments.filter((a) => a.type === "exam").length;
     const totalSubmissions = data.assignmentResults.reduce(

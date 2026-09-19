@@ -16,6 +16,7 @@ import {
   FaCalendarAlt,
   FaIdCard,
   FaHotel,
+  FaBullhorn,
 } from "react-icons/fa";
 import { FaBookJournalWhills, FaUserGroup } from "react-icons/fa6";
 import { FiUsers } from "react-icons/fi";
@@ -78,7 +79,7 @@ export default function StaffMenu() {
     }
     setUser(null);
     clearSessionKeepPrefs();
-    navigate("/admin/login", { replace: true });
+    navigate("/login", { replace: true });
   };
 
   const menu = useMemo(() => {
@@ -96,8 +97,11 @@ export default function StaffMenu() {
       {
         name: "Attendance",
         icon: <FaUserAlt />,
-        path: "/staff/attendance",
         module: "attendance",
+        children: [
+          { name: "Attendance", path: "/staff/attendance" },
+          { name: "Leave Request", path: "/staff/leave-request" },
+        ],
       },
       {
         name: "Fees",
@@ -125,8 +129,16 @@ export default function StaffMenu() {
       {
         name: "Transport",
         icon: <FaBusAlt />,
-        path: "/staff/transport",
         module: "transport",
+        children: [
+          { name: "Transport", path: "/staff/transport" },
+          { name: "Route Manage", path: "/staff/transport-route" },
+          { name: "Bus Manage", path: "/staff/transport-bus" },
+          { name: "Driver Manage", path: "/staff/transport-driver" },
+          { name: "Stop Manage", path: "/staff/transport-stop" },
+          { name: "Attendant Manage", path: "/staff/transport-attendant" },
+          { name: "Vendor Manage", path: "/staff/transport-vendor" },
+        ],
       },
       {
         name: "Hostel Management",
@@ -203,6 +215,7 @@ export default function StaffMenu() {
       },
       { name: "Notices", icon: <FaBell />, path: "/staff/notice", module: "notices" },
       { name: "Events", icon: <FaCalendar />, path: "/staff/event", module: "events" },
+      { name: "Marketing AI", icon: <FaBullhorn />, path: "/staff/marketing", module: "marketing" },
       { name: "Calendar", icon: <FaCalendarAlt />, path: "/staff/calendar", module: "events" },
     ];
 

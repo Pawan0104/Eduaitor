@@ -16,6 +16,7 @@ import {
   FaPassport,
   FaComments,
   FaHeadset,
+  FaBullhorn,
 } from "react-icons/fa";
 import { GiOpenBook, GiSchoolBag } from "react-icons/gi";
 import { HiAcademicCap } from "react-icons/hi2";
@@ -61,6 +62,7 @@ export const COLOR_MAP = {
   Library: { bg: "#F0FDFA", icon: "#0D9488", dot: "#99F6E4" },
   Blog: { bg: "#F0FDFA", icon: "#0D9488", dot: "#99F6E4" },
   Blogs: { bg: "#F0FDFA", icon: "#0D9488", dot: "#99F6E4" },
+  "Marketing AI": { bg: "#FDF4FF", icon: "#C026D3", dot: "#F5D0FE" },
   Group: { bg: "#F0FDF4", icon: "#22C55E", dot: "#BBF7D0" },
   "Transport Management": { bg: "#F8FAFC", icon: "#64748B", dot: "#CBD5E1" },
   Notifications: { bg: "#F3F4F6", icon: "#262a8c", dot: "#E5E7EB" },
@@ -101,7 +103,7 @@ export default function TeacherMenu() {
     }
     setUser(null);
     clearSessionKeepPrefs();
-    navigate("/admin/login", { replace: true });
+    navigate("/login", { replace: true });
   };
 
   const allMenu = [
@@ -116,6 +118,7 @@ export default function TeacherMenu() {
       children: [
         { name: "Mark Attendance", path: "/teacher/attendance/mark" },
         { name: "Attendance Report", path: "/teacher/attendance/report" },
+        { name: "Leave Request", path: "/teacher/leave-request" },
       ],
     },
     { name: "My Classes", icon: <HiAcademicCap />, path: "/teacher/class", module: "classes" },
@@ -133,18 +136,23 @@ export default function TeacherMenu() {
       name: "Exams",
       icon: <GiOpenBook />,
       module: "exams",
-      children: [{ name: "Marks Entry", path: "/teacher/marks-entry" }],
+      children: [
+        { name: "Class Test", path: "/teacher/class-test" },
+        { name: "Exam Papers", path: "/teacher/exam-papers" },
+        { name: "Marks Entry", path: "/teacher/exam" },
+        { name: "Report Card", path: "/teacher/report-card" },
+      ],
     },
     { name: "Timetable", icon: <FaClock />, path: "/teacher/timetable", module: "timetable" },
     { name: "Diary", icon: <FaBookOpen />, path: "/teacher/diary", module: "diary" },
     { name: "Homework", icon: <FaClipboardList />, path: "/teacher/homework", module: "homework" },
-    { name: "Pages taught", icon: <FaBookOpen />, path: "/teacher/page-progress", module: "daily_learning" },
-    { name: "Daily learning", icon: <FaClipboardList />, path: "/teacher/daily-learning", module: "daily_learning" },
+    { name: "Pages taught", icon: <FaBookOpen />, path: "/teacher/page-progress", module: "assignments" },
     { name: "Group", icon: <FaUsers />, path: "/teacher/group", module: "groups" },
     { name: "Notices", icon: <FaBell />, path: "/teacher/notice", module: "notices" },
     { name: "Events", icon: <FaCalendar />, path: "/teacher/event", module: "events" },
     { name: "Calendar", icon: <FaCalendarAlt />, path: "/teacher/calendar" },
     { name: "Blog", icon: <FaBlog />, path: "/teacher/blogs", module: "blogs" },
+    { name: "Marketing AI", icon: <FaBullhorn />, path: "/teacher/marketing", module: "marketing" },
     { name: "Gate Pass", icon: <FaPassport />, path: "/teacher/gatepass", module: "gatepass" },
     { name: "Messages", icon: <FaComments />, path: "/teacher/messages", module: "message" },
     { name: "Help / Support", icon: <FaHeadset />, path: "/teacher/help" },

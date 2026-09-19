@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import axios from "axios";
 import {
   FaPlus,
@@ -15,6 +15,9 @@ import {
 import { FiX, FiCheckCircle, FiAlertTriangle } from "react-icons/fi";
 import { toast } from "react-toastify";
 import { useNavigate } from "react-router-dom";
+import MessageButton from "../components/MessageButton";
+import UserAvatar from "../components/UserAvatar";
+import ClassTimetablePreview from "../components/ClassTimetablePreview";
 import { useAuth } from "../context/AuthContext";
 import LoadingSpinner from "../components/LoadingSpinner";
 
@@ -53,6 +56,59 @@ export default function ClassPage() {
   const [confirmSave, setConfirmSave] = useState(false);
   const [confirmDiscard, setConfirmDiscard] = useState(false);
   const [deleteId, setDeleteId] = useState(null);
+
+  const [view, setView] = useState(isTeacher ? "classes" : "classes");
+  const [ttModal, setTtModal] = useState(null);
+  const [weekModal, setWeekModal] = useState(null);
+  const [students, setStudents] = useState([]);
+  const [studentsLoading, setStudentsLoading] = useState(false);
+  const [assignedClasses, setAssignedClasses] = useState([]);
+  const [selectedClass, setSelectedClass] = useState("");
+  const directoryRef = useRef(null);
+
+  const fetchTeacherStudents = async () => {
+    setStudentsLoading(true);
+    try {
+      const res = await axios.get(`${API}/students/teacher/my-students`, {
+        withCredentials: true,
+      });
+      setStudents(res.data.data || []);
+      setAssignedClasses(res.data.assignedClasses || []);
+      if (selectedClass) {
+        const stillExists = (res.data.assignedClasses || []).some(
+          (c) => c._id === selectedClass,
+        );
+        if (!stillExists) setSelectedClass("");
+      }
+    } catch {
+      toast.error("Failed to load students");
+    } finally {
+      setStudentsLoading(false);
+    }
+  };
+
+  const filteredStudents = selectedClass
+    ? students.filter((st) => st.classId?._id === selectedClass)
+    : students;
+
+  const openStudents = () => {
+    if (students.length === 0) fetchTeacherStudents();
+    setView("students");
+    directoryRef.current?.scrollIntoView({
+      behavior: "smooth",
+      block: "start",
+    });
+  };
+
+  const openDirectory = () => {
+    setView("classes");
+    directoryRef.current?.scrollIntoView({
+      behavior: "smooth",
+      block: "start",
+    });
+  };
+
+  const openTtDay = (row) => setTtModal(row);
 
   const isMobile = window.innerWidth <= 768;
 
@@ -209,11 +265,21 @@ export default function ClassPage() {
       toast.error("Class name is required");
       return;
     }
+    const seenRooms = new Map();
     for (const d of form.details) {
-      if (!d.roomNumber.trim()) {
+      const room = String(d.roomNumber || "").trim();
+      if (!room) {
         toast.error("Room number is required for every entry");
         return;
       }
+      const key = room.toLowerCase();
+      if (seenRooms.has(key)) {
+        toast.error(
+          `Room "${seenRooms.get(key)}" cannot be used more than once`,
+        );
+        return;
+      }
+      seenRooms.set(key, room);
     }
     setConfirmSave(true);
   };
@@ -314,36 +380,54 @@ export default function ClassPage() {
       </div>
 
       {/* Stat Cards */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className={`grid grid-cols-2 ${isTeacher ? "" : "lg:grid-cols-4"} gap-4`}>
         {[
           {
             icon: <FaSchool />,
             label: "TOTAL CLASSES",
             value: classes.length,
             bg: "bg-blue-50 text-blue-500",
+            onClick: isTeacher ? openDirectory : undefined,
           },
-          {
-            icon: <FaBook />,
-            label: "TOTAL SECTIONS",
-            value: totalSections,
-            bg: "bg-purple-50 text-purple-500",
-          },
-          {
-            icon: <FaChalkboardTeacher />,
-            label: "WITH TEACHERS",
-            value: withTeachers,
-            bg: "bg-green-50 text-green-500",
-          },
-          {
-            icon: <FaUserGraduate />,
-            label: "TOTAL STUDENTS",
-            value: totalStudents,
-            bg: "bg-orange-50 text-orange-500",
-          },
+          ...(isTeacher
+            ? [
+                {
+                  icon: <FaUserGraduate />,
+                  label: "TOTAL STUDENTS",
+                  value: totalStudents,
+                  bg: "bg-orange-50 text-orange-500",
+                  onClick: openStudents,
+                },
+              ]
+            : [
+                {
+                  icon: <FaBook />,
+                  label: "TOTAL SECTIONS",
+                  value: totalSections,
+                  bg: "bg-purple-50 text-purple-500",
+                },
+                {
+                  icon: <FaChalkboardTeacher />,
+                  label: "WITH TEACHERS",
+                  value: withTeachers,
+                  bg: "bg-green-50 text-green-500",
+                },
+                {
+                  icon: <FaUserGraduate />,
+                  label: "TOTAL STUDENTS",
+                  value: totalStudents,
+                  bg: "bg-orange-50 text-orange-500",
+                },
+              ]),
         ].map((s, i) => (
           <div
             key={i}
-            className="bg-[rgb(var(--surface))]  text-[rgb(var(--text))]  rounded-xl border border-gray-100 shadow-sm px-5 py-4 flex items-center gap-4"
+            onClick={s.onClick}
+            className={`bg-[rgb(var(--surface))] text-[rgb(var(--text))] rounded-xl border border-gray-100 shadow-sm px-5 py-4 flex items-center gap-4 ${
+              s.onClick
+                ? "cursor-pointer hover:shadow-md hover:-translate-y-0.5 transition"
+                : ""
+            }`}
           >
             <div
               className={`w-11 h-11 rounded-xl flex items-center justify-center text-lg shrink-0 ${s.bg}`}
@@ -362,9 +446,147 @@ export default function ClassPage() {
         ))}
       </div>
 
-      <h2 className="text-lg font-semibold text-[rgb(var(--text))]">Class Directory</h2>
+      {isTeacher && view === "students" ? (
+        <>
+          {/* Students view — same layout as My Students */}
+          <div className="mb-6">
+            <h2 className="text-lg sm:text-xl font-semibold text-[rgb(var(--text))] flex items-center gap-3">
+              <button
+                onClick={openDirectory}
+                className="flex items-center gap-2 px-3 py-1.5 rounded-xl
+                  bg-[rgb(var(--surface))] shadow-sm border border-[rgb(var(--border))]
+                  text-sm font-bold text-[rgb(var(--text))] active:scale-95 transition-transform"
+              >
+                <FaArrowLeft size={14} /> Classes
+              </button>
+              All Students
+            </h2>
+            <p className="text-sm text-[rgb(var(--text-muted))]">
+              Students from your assigned classes
+            </p>
+          </div>
 
-      {/* Class Cards */}
+          {/* CLASS FILTER */}
+          {assignedClasses.length > 0 && (
+            <div className="bg-[rgb(var(--surface))] rounded-xl border border-[rgb(var(--border))] shadow-sm p-4 sm:p-6 mb-6">
+              <p className="text-sm font-medium mb-2 text-[rgb(var(--text))]">
+                Filter by Class
+              </p>
+              <select
+                value={selectedClass}
+                onChange={(e) => setSelectedClass(e.target.value)}
+                className="border border-[rgb(var(--border))] bg-[rgb(var(--bg))] text-[rgb(var(--text))]
+                  rounded-lg px-4 py-2 w-full sm:w-72 outline-none
+                  focus:ring-2 focus:ring-[rgb(var(--primary))] focus:border-[rgb(var(--border-strong))]"
+              >
+                <option value="">-- All Classes --</option>
+                {assignedClasses.map((cls) => (
+                  <option key={cls._id} value={cls._id}>
+                    {cls.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
+
+          {/* STUDENT DIRECTORY */}
+          <div className="bg-[rgb(var(--surface))] rounded-xl border border-[rgb(var(--border))] shadow-sm p-4 sm:p-6">
+            <h3 className="text-lg sm:text-xl font-semibold text-[rgb(var(--text))] mb-4">
+              Student Directory
+            </h3>
+
+            {studentsLoading ? (
+              <div className="flex justify-center py-10">
+                <LoadingSpinner label="Loading students…" />
+              </div>
+            ) : students.length === 0 ? (
+              <div className="flex flex-col items-center justify-center py-16 text-[rgb(var(--text-muted))]">
+                <img
+                  src="https://cdn-icons-png.flaticon.com/512/3135/3135755.png"
+                  className="w-14 mb-3 opacity-30"
+                  alt="empty"
+                />
+                <p className="text-sm sm:text-base">No students found in your assigned classes</p>
+              </div>
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="w-full min-w-150 text-sm">
+                  <thead>
+                    <tr className="bg-[rgb(var(--bg))] border-b border-[rgb(var(--border))]">
+                      <th className="p-3 text-left text-[rgb(var(--text-muted))] font-semibold text-xs uppercase tracking-wide">Name</th>
+                      <th className="p-3 text-left text-[rgb(var(--text-muted))] font-semibold text-xs uppercase tracking-wide">Class</th>
+                      <th className="p-3 text-left text-[rgb(var(--text-muted))] font-semibold text-xs uppercase tracking-wide">Father</th>
+                      <th className="p-3 text-left text-[rgb(var(--text-muted))] font-semibold text-xs uppercase tracking-wide">Mobile</th>
+                      <th className="p-3 text-center text-[rgb(var(--text-muted))] font-semibold text-xs uppercase tracking-wide">Action</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {filteredStudents.map((student) => (
+                      <tr
+                        key={student._id}
+                        className="border-t border-[rgb(var(--border))] hover:bg-[rgb(var(--bg))] transition-colors"
+                      >
+                        <td className="p-3 font-medium text-[rgb(var(--text))]">
+                          <div className="flex items-center gap-2.5 min-w-0">
+                            <UserAvatar
+                              name={`${student.firstName || ""} ${student.lastName || ""}`}
+                              photoUrl={student.documents?.studentPhoto?.url}
+                              size="sm"
+                            />
+                            <span className="truncate">
+                              {student.firstName} {student.lastName}
+                            </span>
+                          </div>
+                        </td>
+                        <td className="p-3 text-[rgb(var(--text-muted))]">{student.classId?.name || "-"}</td>
+                        <td className="p-3 text-[rgb(var(--text-muted))]">{student.fatherName}</td>
+                        <td className="p-3 text-[rgb(var(--text-muted))]">{student.fatherMobile}</td>
+                        <td className="p-3">
+                          <div className="flex justify-center gap-1">
+                            <MessageButton
+                              targetId={student._id}
+                              targetModel="Student"
+                              iconOnly={true}
+                              className="!bg-[rgb(var(--primary))]/10 !text-[rgb(var(--primary))] hover:!bg-[rgb(var(--primary))]/20 !rounded-md !p-2"
+                            />
+                            <button
+                              onClick={() => navigate(`/teacher/student-view/${student._id}`)}
+                              className="bg-[rgb(var(--primary))]/10 text-[rgb(var(--primary))] p-2 rounded-md
+                                hover:bg-[rgb(var(--primary))]/20 transition-colors"
+                              title="View Student"
+                            >
+                              <FaEye />
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                    {filteredStudents.length === 0 && selectedClass && (
+                      <tr>
+                        <td colSpan="5" className="text-center py-6 text-[rgb(var(--text-muted))]">
+                          No students enrolled in{" "}
+                          <span className="font-medium text-[rgb(var(--text))]">
+                            Class {assignedClasses.find((c) => c._id === selectedClass)?.name}
+                          </span>
+                        </td>
+                      </tr>
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+        </>
+      ) : (
+        <>
+          <h2
+            ref={directoryRef}
+            className="text-lg font-semibold text-[rgb(var(--text))] scroll-mt-6"
+          >
+            Class Directory
+          </h2>
+
+          {/* Class Cards */}
       {loading ? (
         <LoadingSpinner label="Loading classes…" />
       ) : classes.length === 0 ? (
@@ -375,8 +597,161 @@ export default function ClassPage() {
         </div>
       ) : (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-5">
-          {classes.map((cls) =>
-            cls.details.map((detail, dIndex) => {
+          {classes.map((cls) => {
+            if (isTeacher) {
+              /* ── TEACHER: ONE CARD PER CLASS (sections aggregated) ── */
+              const details = cls.details || [];
+              const totalStudents = details.reduce(
+                (s, d) => s + (d.studentCount || 0),
+                0,
+              );
+              const totalCapacity = details.reduce(
+                (s, d) => s + (d.capacity || 0),
+                0,
+              );
+              const pct = totalCapacity
+                ? Math.min((totalStudents / totalCapacity) * 100, 100)
+                : 0;
+              const rooms = [
+                ...new Set(
+                  details.map((d) => d.roomNumber).filter(Boolean),
+                ),
+              ].join(", ");
+              const isClassTeacher = details.some(
+                (d) => d.teacherId?._id === user?.teacher_id,
+              );
+              const allSubjectTeachers = details.flatMap(
+                (d) => d.subjectTeachers || [],
+              );
+              const subjectIds = [
+                ...new Set(
+                  allSubjectTeachers.map(
+                    (st) => st.subjectId?._id || st.subjectId,
+                  ),
+                ),
+              ];
+              const shortLabel =
+                cls.name.replace(/\D/g, "") ||
+                cls.name.slice(0, 2).toUpperCase();
+
+              return (
+                <div
+                  key={cls._id}
+                  onClick={() => navigate(`/teacher/class-view/${cls._id}`)}
+                  className={`cursor-pointer bg-[rgb(var(--surface))] text-[rgb(var(--text))] rounded-2xl border shadow-sm p-5 space-y-4 hover:shadow-md hover:-translate-y-0.5 transition
+                    ${isClassTeacher ? "border-indigo-300 ring-1 ring-indigo-200" : "border-gray-100"}`}
+                >
+                  {/* Header */}
+                  <div className="flex items-center gap-3">
+                    <div className="w-12 h-12 rounded-xl text-white flex items-center justify-center font-bold text-sm shrink-0 bg-[rgb(var(--primary))]">
+                      {shortLabel}
+                    </div>
+                    <div>
+                      <h3 className="font-bold text-[rgb(var(--text))] text-sm leading-tight">
+                        {cls.name}
+                      </h3>
+                      <p className="text-xs text-[rgb(var(--text))]">
+                        {details.length} section
+                        {details.length === 1 ? "" : "s"}
+                        {rooms ? ` · Room ${rooms}` : ""}
+                      </p>
+                    </div>
+                    {isClassTeacher && (
+                      <span className="ml-auto text-[10px] font-semibold px-2 py-0.5 rounded-full bg-[rgb(var(--primary))] text-[rgb(var(--text))]">
+                        Class Teacher
+                      </span>
+                    )}
+                  </div>
+
+                  {/* Meta */}
+                  <div className="space-y-1.5">
+                    <div className="flex items-center gap-2 text-sm text-[rgb(var(--text))]">
+                      <FaUserGraduate
+                        size={13}
+                        className="shrink-0 text-gray-400"
+                      />
+                      <span>{totalStudents} students</span>
+                    </div>
+                    <div className="flex items-center gap-2 text-sm text-[rgb(var(--text))]">
+                      <FaBook size={13} className="shrink-0 text-gray-400" />
+                      <span>{subjectIds.length} subjects</span>
+                    </div>
+                  </div>
+
+                  {/* Capacity Bar */}
+                  <div>
+                    <div className="flex justify-between text-xs text-[rgb(var(--text))] mb-1.5">
+                      <span className="font-medium">Capacity</span>
+                      <span>
+                        {totalStudents}/{totalCapacity || "—"}
+                      </span>
+                    </div>
+                    <div className="h-2 bg-gray-100 rounded-full overflow-hidden">
+                      <div
+                        className={`h-2 rounded-full transition-all ${pct >= 90 ? "bg-red-400" : pct >= 70 ? "bg-amber-400" : "bg-linear-to-r from-pink-400 to-indigo-400"}`}
+                        style={{ width: `${pct}%` }}
+                      />
+                    </div>
+                  </div>
+
+                  {/* Sections */}
+                  {details.length > 0 && (
+                    <div className="flex flex-wrap gap-1.5">
+                      {details.map((d, i) => (
+                        <span
+                          key={i}
+                          className="text-[11px] font-medium px-2.5 py-0.5 rounded-full border bg-[rgb(var(--primary))] text-[rgb(var(--text))] border-indigo-100"
+                        >
+                          {d.sectionId?.name || "No Section"} ·{" "}
+                          {d.studentCount || 0} students
+                          {d.roomNumber ? ` · Room ${d.roomNumber}` : ""}
+                        </span>
+                      ))}
+                    </div>
+                  )}
+
+                  {/* Subjects */}
+                  {allSubjectTeachers.length > 0 && (
+                    <div className="flex flex-wrap gap-1.5">
+                      {allSubjectTeachers.slice(0, 4).map((st, i) => {
+                        const isMySubject =
+                          st.teacherId?._id === user?.teacher_id;
+                        return (
+                          <span
+                            key={i}
+                            className={`text-[11px] font-medium px-2.5 py-0.5 rounded-full border ${
+                              isMySubject
+                                ? "bg-green-50 text-green-700 border-green-200"
+                                : " bg-[rgb(var(--primary))] text-[rgb(var(--text))] border-indigo-100"
+                            }`}
+                          >
+                            {getSubjectName(st.subjectId?._id || st.subjectId)}
+                            {isMySubject && " ✓"}
+                          </span>
+                        );
+                      })}
+                      {allSubjectTeachers.length > 4 && (
+                        <span className="text-[11px] font-medium px-2.5 py-0.5 rounded-full bg-[rgb(var(--primary))] text-[rgb(var(--text))]">
+                          +{allSubjectTeachers.length - 4}
+                        </span>
+                      )}
+                    </div>
+                  )}
+
+                  {/* Timetable launcher — Today + Full Week */}
+                  <ClassTimetablePreview
+                    classId={cls._id}
+                    className={cls.name}
+                    details={details}
+                    myTeacherId={user?.teacher_id}
+                    onToday={openTtDay}
+                    onWeek={setWeekModal}
+                  />
+                </div>
+              );
+            }
+
+            return cls.details.map((detail, dIndex) => {
               const pct = detail.capacity
                 ? Math.min((detail.studentCount / detail.capacity) * 100, 100)
                 : 0;
@@ -537,9 +912,11 @@ export default function ClassPage() {
                   </div>
                 </div>
               );
-            }),
-          )}
+            });
+          })}
         </div>
+      )}
+        </>
       )}
 
       {/* Modals — only render for admin */}
@@ -841,6 +1218,256 @@ export default function ClassPage() {
             />
           )}
         </>
+      )}
+
+      {/* Teacher: day schedule popup */}
+      {ttModal && (
+        <div
+          className="fixed inset-0 z-60 bg-black/40 flex items-center justify-center p-4"
+          onClick={() => setTtModal(null)}
+        >
+          <div
+            className="bg-[rgb(var(--surface))] text-[rgb(var(--text))] rounded-2xl w-full max-w-2xl max-h-[85vh] overflow-hidden shadow-xl flex flex-col"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100">
+              <div>
+                <h2 className="text-lg font-bold">
+                  {ttModal.className} — {ttModal.weekday}
+                </h2>
+                <p className="text-sm text-[rgb(var(--text))]">
+                  {ttModal.dateLabel}
+                </p>
+              </div>
+              <button
+                onClick={() => setTtModal(null)}
+                className="text-[rgb(var(--text))] hover:text-[rgb(var(--text-muted))]"
+              >
+                <FiX size={20} />
+              </button>
+            </div>
+
+            <div className="overflow-y-auto">
+              {ttModal.periods.length === 0 ? (
+                <div className="p-10 text-center text-gray-400 text-sm">
+                  No classes scheduled for this day.
+                </div>
+              ) : (
+                <table className="w-full text-sm">
+                  <thead className="bg-[rgb(var(--surface))] sticky top-0">
+                    <tr className="text-left text-xs font-semibold text-[rgb(var(--text))]">
+                      <th className="px-6 py-3">Time</th>
+                      <th className="px-6 py-3">Section</th>
+                      <th className="px-6 py-3">Subject</th>
+                      <th className="px-6 py-3">Teacher</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {ttModal.periods.map((p, idx) => (
+                      <tr
+                        key={idx}
+                        className={`border-t ${
+                          p.isMine ? "bg-green-50/50" : ""
+                        }`}
+                      >
+                        <td className="px-6 py-3 font-mono text-xs">
+                          {p.timeRange || "—"}
+                        </td>
+                        <td className="px-6 py-3">
+                          {p.sectionName || "—"}
+                        </td>
+                        <td className="px-6 py-3 font-medium">
+                          {p.type === "lunch" ? (
+                            <span className="text-orange-500">Lunch</span>
+                          ) : p.type === "activity" ? (
+                            <span className="text-emerald-600">
+                              {p.subject}
+                            </span>
+                          ) : p.type === "test" ? (
+                            <span>
+                              <span className="text-[10px] font-bold text-violet-600 bg-violet-50 border border-violet-200 rounded-full px-1.5 py-0.5 mr-1.5">
+                                Test
+                              </span>
+                              {p.subject}
+                            </span>
+                          ) : (
+                            p.subject
+                          )}
+                        </td>
+                        <td className="px-6 py-3">
+                          {p.teacherName || (
+                            <span className="italic text-[rgb(var(--text))]">
+                              —
+                            </span>
+                          )}
+                          {p.isMine && (
+                            <span className="ml-1.5 text-[10px] font-semibold text-green-600">
+                              You
+                            </span>
+                          )}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              )}
+            </div>
+
+            <div className="px-6 py-3 border-t border-gray-100 flex justify-end">
+              <button
+                onClick={() => setTtModal(null)}
+                className="px-4 py-2 bg-[rgb(var(--primary))] text-[rgb(var(--text))] rounded-lg text-sm font-medium"
+              >
+                Close
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Teacher: full week timetable popup */}
+      {weekModal && weekModal.length > 0 && (
+        <div
+          className="fixed inset-0 z-60 bg-black/40 flex items-center justify-center p-4"
+          onClick={() => setWeekModal(null)}
+        >
+          <div
+            className="bg-[rgb(var(--surface))] text-[rgb(var(--text))] rounded-2xl w-full max-w-5xl max-h-[85vh] overflow-hidden shadow-xl flex flex-col"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100">
+              <div>
+                <h2 className="text-lg font-bold">
+                  Weekly Timetable — {weekModal[0]?.className}
+                </h2>
+                <p className="text-sm text-[rgb(var(--text))]">
+                  {weekModal.length} teaching days · {weekModal[0]?.periods?.length || 0}–{Math.max(...weekModal.map((r) => r.periods.length))} periods per day
+                </p>
+              </div>
+              <button
+                onClick={() => setWeekModal(null)}
+                className="text-[rgb(var(--text))] hover:text-[rgb(var(--text-muted))]"
+              >
+                <FiX size={20} />
+              </button>
+            </div>
+
+            <div className="overflow-auto">
+              {(() => {
+                const cols = [];
+                const seen = {};
+                weekModal.forEach((row) =>
+                  row.periods.forEach((p) => {
+                    if (!seen[p.start]) {
+                      seen[p.start] = p;
+                      cols.push(p);
+                    }
+                  }),
+                );
+                cols.sort((a, b) => a.start.localeCompare(b.start));
+
+                const cellCls = (p) =>
+                  p.type === "lunch"
+                    ? "bg-orange-50 text-orange-600 border-orange-200"
+                    : p.type === "test"
+                      ? p.isMine
+                        ? "bg-emerald-50 text-emerald-700 border-emerald-300"
+                        : "bg-violet-50 text-violet-700 border-violet-300"
+                      : p.isMine
+                        ? "bg-green-50 text-green-700 border-green-300"
+                        : "bg-[rgb(var(--surface))] text-[rgb(var(--text))] border-[rgb(var(--border))]";
+
+                return (
+                  <table className="w-full text-sm min-w-[680px]">
+                    <thead className="bg-[rgb(var(--surface))] sticky top-0">
+                      <tr className="text-left text-xs font-semibold text-[rgb(var(--text))]">
+                        <th className="px-4 py-3 w-24">Day</th>
+                        {cols.map((c) => (
+                          <th key={c.start} className="px-2 py-3 text-center">
+                            {c.timeRange}
+                          </th>
+                        ))}
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {weekModal.map((row) => (
+                        <tr
+                          key={row.weekday}
+                          className={`border-t ${row.isToday ? "bg-green-50/40" : ""}`}
+                        >
+                          <td className="px-4 py-2.5 align-top">
+                            <p className="font-bold text-[rgb(var(--text))]">
+                              {row.weekday}
+                            </p>
+                            <p className="text-[10px] text-[rgb(var(--text))]">
+                              {row.dateLabel}
+                            </p>
+                          </td>
+                          {cols.map((c) => {
+                            const items = row.periods.filter(
+                              (p) => p.start === c.start,
+                            );
+                            return (
+                              <td key={c.start} className="px-2 py-2.5 align-top">
+                                {items.length === 0 ? (
+                                  <span className="text-[11px] italic opacity-50">
+                                    —
+                                  </span>
+                                ) : (
+                                  <div className="space-y-1">
+                                    {items.map((p, i) => (
+                                      <div
+                                        key={i}
+                                        className={`rounded-lg border px-2 py-1 text-[11px] leading-tight ${cellCls(p)}`}
+                                      >
+                                        <p className="font-semibold">
+                                          {p.type === "test" && (
+                                            <span className="text-[9px] font-bold uppercase tracking-wide mr-1">
+                                              Test
+                                            </span>
+                                          )}
+                                          {p.subject}
+                                        </p>
+                                        {p.teacherName && (
+                                          <p className="opacity-75 truncate">
+                                            {p.teacherName}
+                                            {p.isMine && (
+                                              <span className="ml-0.5 font-bold text-green-600">
+                                                · You
+                                              </span>
+                                            )}
+                                          </p>
+                                        )}
+                                        {p.sectionName && (
+                                          <p className="opacity-60 text-[10px]">
+                                            {p.sectionName}
+                                          </p>
+                                        )}
+                                      </div>
+                                    ))}
+                                  </div>
+                                )}
+                              </td>
+                            );
+                          })}
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                );
+              })()}
+            </div>
+
+            <div className="px-6 py-3 border-t border-gray-100 flex justify-end">
+              <button
+                onClick={() => setWeekModal(null)}
+                className="px-4 py-2 bg-[rgb(var(--primary))] text-[rgb(var(--text))] rounded-lg text-sm font-medium"
+              >
+                Close
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );

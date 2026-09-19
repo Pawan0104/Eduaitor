@@ -16,7 +16,7 @@ export { MENU_ICON_META as STUDENT_ICON_META } from "../utils/menuIcons";
 const DEFAULT_FREQUENT = [
   "Homework",
   "Assignment",
-  "Daily learning",
+  "Assignment Result",
   "Attendance",
   "Group",
   "Notices",

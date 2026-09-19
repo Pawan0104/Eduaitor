@@ -1599,7 +1599,7 @@ async function main() {
           subscribed_modules: JSON.stringify([
             "students","teachers","classes","attendance","exams","fees","timetable",
             "syllabus","transport","gpsTracking","library","hostel","house","commerce",
-            "diary","homework","daily_learning","assignments","events","notices",
+            "diary","homework","assignments","events","notices",
             "groups","blogs","staff","gatepass","message","certificates",
           ]),
         },

@@ -424,7 +424,7 @@ function AdminFeeHistory() {
                       <td className="px-4 py-3">
                         <button
                           type="button"
-                          onClick={() => navigate(`/admin/fees/receipt/${item._id}`)}
+                          onClick={() => navigate(`/fees/receipt/${item._id}`)}
                           className="text-xs font-bold text-emerald-700 hover:underline"
                         >
                           Receipt

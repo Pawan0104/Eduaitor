@@ -6,6 +6,7 @@ import {
   FaWallet,
   FaBusAlt,
   FaCalendarAlt,
+  FaCalendarCheck,
   FaBell,
   FaCalendar,
   FaBlog,
@@ -18,7 +19,7 @@ import {
   FaKey,
   FaHotel,
 } from "react-icons/fa";
-import { GiOpenBook } from "react-icons/gi";
+import { GiOpenBook, GiSchoolBag } from "react-icons/gi";
 import { toast } from "react-toastify";
 import { useAuth } from "../context/AuthContext";
 import axios from "axios";
@@ -51,6 +52,7 @@ const COLOR_MAP = {
   "Transport & GPS": { bg: "#F0FDFA", icon: "#0D9488", dot: "#99F6E4" },
   "Help / Support": { bg: "#FFFBEB", icon: "#D97706", dot: "#FDE68A" },
   Homework: { bg: "#FFFBEB", icon: "#D97706", dot: "#FDE68A" },
+  Attendance: { bg: "#F0FDF4", icon: "#10B981", dot: "#A7F3D0" },
   "Learned today": { bg: "#ECFDF5", icon: "#059669", dot: "#A7F3D0" },
   "Daily learning": { bg: "#EEF2FF", icon: "#4F46E5", dot: "#C7D2FE" },
   "Syllabus Books": { bg: "#F0FDF4", icon: "#10B981", dot: "#A7F3D0" },
@@ -90,11 +92,12 @@ export default function ParentMenu() {
     }
     setUser(null);
     clearSessionKeepPrefs();
-    navigate("/admin/login", { replace: true });
+    navigate("/login", { replace: true });
   };
 
   const subscribed = user?.subscribed_modules || [];
   const hasHostel = !subscribed.length || subscribed.includes("hostel");
+  const hasLeaveRequest = !subscribed.length || subscribed.includes("leaveRequest");
 
   const menu = [
     // Dashboard disabled — welcome/menu hub covers the same actions
@@ -117,10 +120,28 @@ export default function ParentMenu() {
     { name: "Notices", icon: <FaBell />, path: "/parent/notice" },
     { name: "Events", icon: <FaCalendar />, path: "/parent/event" },
     { name: "Calendar", icon: <FaCalendarAlt />, path: "/parent/calendar" },
+    ...(hasLeaveRequest
+      ? [
+          {
+            name: "Attendance",
+            icon: <FaCalendarCheck />,
+            children: [
+              { name: "Attendance", path: "/parent/attendance" },
+              { name: "Leave Request", path: "/parent/leave-request" },
+            ],
+          },
+        ]
+      : [{ name: "Attendance", icon: <FaCalendarCheck />, path: "/parent/attendance" }]),
     { name: "Blogs", icon: <FaBlog />, path: "/parent/blogs" },
     { name: "Homework", icon: <FaClipboardList />, path: "/parent/homework" },
-    { name: "Learned today", icon: <FaBookOpen />, path: "/parent/learning-today" },
-    { name: "Daily learning", icon: <FaClipboardList />, path: "/parent/daily-learning" },
+    {
+      name: "Assignments",
+      icon: <GiSchoolBag />,
+      children: [
+        { name: "My Assignments", path: "/parent/assignment" },
+        { name: "Assignment Result", path: "/parent/assignment/result" },
+      ],
+    },
     { name: "Syllabus Books", icon: <FaBookDead />, path: "/parent/syllabus-books" },
     { name: "Help / Support", icon: <FaHeadset />, path: "/parent/help" },
   ];

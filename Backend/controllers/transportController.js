@@ -1,7 +1,7 @@
 import mongoose from "mongoose";
 import Student from "../models/student.js";
 import School from "../models/school.js";
-import { Driver, Bus, TransportRoute, Activity } from "../models/transport.js";
+import { Driver, Bus, TransportRoute, Activity, TransportStop, Attendant, Vendor } from "../models/transport.js";
 import { createNotificationHelper } from "./notificationController.js";
 import { uploadToCloudinary } from "../utils/uploadToCloudinary.js";
 
@@ -806,6 +806,16 @@ export const createBus = async (req, res) => {
       gpsDeviceId,
       lastLatitude,
       lastLongitude,
+      /* expanded (Module 3) */
+      vehicleType,
+      make,
+      fuelType,
+      ownershipType,
+      cctvDeviceId,
+      panicButton,
+      speedGovernor,
+      currentOdometer,
+      documents,
     } = req.body;
 
     if (!school_id) return missingSchoolId(res);
@@ -818,6 +828,22 @@ export const createBus = async (req, res) => {
       capacity,
       driver: resolveId(driver),
       route: resolveId(route),
+      vehicleType: vehicleType || undefined,
+      make: make || undefined,
+      fuelType: fuelType || undefined,
+      ownershipType: ownershipType || undefined,
+      cctvDeviceId: cctvDeviceId || undefined,
+      panicButton: panicButton !== undefined ? Boolean(panicButton) : undefined,
+      speedGovernor:
+        speedGovernor && typeof speedGovernor === "object"
+          ? {
+              installed: Boolean(speedGovernor.installed),
+              limitKmh: Number(speedGovernor.limitKmh) || 60,
+            }
+          : undefined,
+      currentOdometer:
+        currentOdometer !== undefined ? Number(currentOdometer) || 0 : undefined,
+      documents: documents && typeof documents === "object" ? documents : undefined,
       gpsEnabled: Boolean(gpsEnabled),
       gpsDeviceId: gpsDeviceId ? String(gpsDeviceId).trim() : "",
       lastLatitude:
@@ -880,6 +906,16 @@ export const updateBus = async (req, res) => {
       lastLatitude,
       lastLongitude,
       gpsSpeedKmh,
+      /* expanded (Module 3) */
+      vehicleType,
+      make,
+      fuelType,
+      ownershipType,
+      cctvDeviceId,
+      panicButton,
+      speedGovernor,
+      currentOdometer,
+      documents,
     } = req.body;
 
     if (!school_id) return missingSchoolId(res);
@@ -943,6 +979,37 @@ export const updateBus = async (req, res) => {
     if (regNo !== undefined) bus.regNo = regNo.trim();
     if (model !== undefined) bus.model = model.trim();
     if (capacity !== undefined) bus.capacity = Number(capacity);
+
+    /* ── EXPANDED FIELDS (Module 3) ── */
+    if (vehicleType !== undefined) bus.vehicleType = vehicleType;
+    if (make !== undefined) bus.make = make;
+    if (fuelType !== undefined) bus.fuelType = fuelType;
+    if (ownershipType !== undefined) bus.ownershipType = ownershipType;
+    if (cctvDeviceId !== undefined) bus.cctvDeviceId = String(cctvDeviceId || "").trim();
+    if (panicButton !== undefined) bus.panicButton = Boolean(panicButton);
+    if (speedGovernor && typeof speedGovernor === "object") {
+      bus.speedGovernor = {
+        installed: Boolean(speedGovernor.installed),
+        limitKmh: Number(speedGovernor.limitKmh) || 60,
+      };
+    }
+    if (currentOdometer !== undefined) bus.currentOdometer = Number(currentOdometer) || 0;
+    if (documents && typeof documents === "object") {
+      for (const key of ["rc", "insurance", "fitness", "permit", "puc", "roadTax"]) {
+        if (documents[key] && typeof documents[key] === "object") {
+          const cur = bus.documents?.[key] || {};
+          bus.documents = {
+            ...bus.documents,
+            [key]: {
+              number: documents[key].number ?? cur.number ?? "",
+              expiry: documents[key].expiry ?? cur.expiry ?? null,
+              file: documents[key].file ?? cur.file ?? {},
+              alerted: documents[key].alerted ?? cur.alerted ?? false,
+            },
+          };
+        }
+      }
+    }
 
     /* ── NEXT SERVICE + AUTO STATUS ── */
     if (nextService !== undefined) {
@@ -1383,20 +1450,66 @@ export const createRoute = async (req, res) => {
       startTime,
       endTime,
       stopsList,
+      /* expanded (Module 1) */
+      routeName,
+      routeCode,
+      routeType,
+      campus,
+      direction,
+      startLocation,
+      endLocation,
+      totalDistanceKm,
+      estimatedDurationMins,
+      operatingDays,
+      primaryVehicle,
+      backupVehicle,
+      primaryDriver,
+      backupDriver,
+      attendant,
+      routeCapacity,
+      occupancy,
+      feeCategory,
+      stopSequences,
+      routeStatus,
     } = req.body;
 
     if (!school_id) return missingSchoolId(res);
     if (!name?.trim())
       return res.status(400).json({ message: "Route name is required" });
 
-    const busId = resolveId(bus);
-    const driverId = resolveId(driver);
+    const busId = resolveId(bus || primaryVehicle);
+    const driverId = resolveId(driver || primaryDriver);
 
     const route = new TransportRoute({
       schoolId: toId(school_id),
       name: name.trim(),
+      routeName: routeName || name.trim(),
+      routeCode: routeCode || undefined,
+      routeType: routeType || undefined,
+      campus: campus || undefined,
+      direction: direction || undefined,
+      startLocation: startLocation || undefined,
+      endLocation: endLocation || undefined,
+      totalDistanceKm:
+        totalDistanceKm !== undefined ? Number(totalDistanceKm) || 0 : undefined,
+      estimatedDurationMins:
+        estimatedDurationMins !== undefined
+          ? Number(estimatedDurationMins) || 0
+          : undefined,
+      operatingDays: Array.isArray(operatingDays) ? operatingDays : undefined,
       bus: busId,
+      primaryVehicle: busId,
+      backupVehicle: resolveId(backupVehicle),
       driver: driverId,
+      primaryDriver: driverId,
+      backupDriver: resolveId(backupDriver),
+      attendant: resolveId(attendant),
+      routeCapacity:
+        routeCapacity !== undefined ? Number(routeCapacity) || 0 : undefined,
+      occupancy: occupancy !== undefined ? Number(occupancy) || 0 : 0,
+      feeCategory: feeCategory || undefined,
+      routeStatus: routeStatus || undefined,
+      stopSequences: Array.isArray(stopSequences) ? stopSequences : undefined,
       stops: Number(stops) || 0,
       students: Number(students) || 0,
       startTime: startTime || "",
@@ -1482,6 +1595,27 @@ export const updateRoute = async (req, res) => {
       endTime,
       stopsList,
       status,
+      /* expanded (Module 1) */
+      routeName,
+      routeCode,
+      routeType,
+      campus,
+      direction,
+      startLocation,
+      endLocation,
+      totalDistanceKm,
+      estimatedDurationMins,
+      operatingDays,
+      primaryVehicle,
+      backupVehicle,
+      primaryDriver,
+      backupDriver,
+      attendant,
+      routeCapacity,
+      occupancy,
+      feeCategory,
+      stopSequences,
+      routeStatus,
     } = req.body;
 
     if (!school_id) return missingSchoolId(res);
@@ -1505,6 +1639,40 @@ export const updateRoute = async (req, res) => {
     if (stopsList !== undefined)
       route.stopsList = Array.isArray(stopsList) ? stopsList : [];
     if (status !== undefined) route.status = status;
+
+    /* ── EXPANDED FIELDS (Module 1) ── */
+    if (routeName !== undefined) route.routeName = routeName;
+    if (routeCode !== undefined) route.routeCode = routeCode;
+    if (routeType !== undefined) route.routeType = routeType;
+    if (campus !== undefined) route.campus = campus;
+    if (direction !== undefined) route.direction = direction;
+    if (startLocation !== undefined) route.startLocation = startLocation;
+    if (endLocation !== undefined) route.endLocation = endLocation;
+    if (totalDistanceKm !== undefined) route.totalDistanceKm = Number(totalDistanceKm) || 0;
+    if (estimatedDurationMins !== undefined)
+      route.estimatedDurationMins = Number(estimatedDurationMins) || 0;
+    if (operatingDays !== undefined)
+      route.operatingDays = Array.isArray(operatingDays) ? operatingDays : route.operatingDays;
+    if (primaryVehicle !== undefined) {
+      route.primaryVehicle = resolveId(primaryVehicle);
+      if (primaryVehicle) route.bus = resolveId(primaryVehicle);
+    }
+    if (backupVehicle !== undefined) route.backupVehicle = resolveId(backupVehicle);
+    if (primaryDriver !== undefined) {
+      route.primaryDriver = resolveId(primaryDriver);
+      if (primaryDriver) route.driver = resolveId(primaryDriver);
+    }
+    if (backupDriver !== undefined) route.backupDriver = resolveId(backupDriver);
+    if (attendant !== undefined) route.attendant = resolveId(attendant);
+    if (routeCapacity !== undefined) route.routeCapacity = Number(routeCapacity) || 0;
+    if (occupancy !== undefined) route.occupancy = Number(occupancy) || 0;
+    if (feeCategory !== undefined) route.feeCategory = feeCategory;
+    if (stopSequences !== undefined)
+      route.stopSequences = Array.isArray(stopSequences) ? stopSequences : [];
+    if (routeStatus !== undefined) {
+      route.routeStatus = routeStatus;
+      if (["Active", "Suspended"].includes(routeStatus)) route.status = routeStatus;
+    }
 
     route.bus = busId;
     route.driver = driverId;
@@ -1829,5 +1997,454 @@ export const getParentTransport = async (req, res) => {
   } catch (err) {
     console.error("getParentTransport error:", err);
     res.status(500).json({ success: false, message: "Internal server error" });
+  }
+};
+
+/* ════════════════════════════════════════════════════════════════════════
+   MODULE 2 — STOPS
+   ════════════════════════════════════════════════════════════════════════ */
+
+// GET /transport/stops?status=
+export const getStops = async (req, res) => {
+  try {
+    const school_id = req.user?.school_id;
+    if (!school_id) return missingSchoolId(res);
+
+    const q = { schoolId: toId(school_id) };
+    if (req.query.status) q.status = req.query.status;
+
+    const stops = await TransportStop.find(q)
+      .sort({ stopName: 1 })
+      .lean();
+
+    res.json({ success: true, data: stops });
+  } catch (err) {
+    serverError(res, err);
+  }
+};
+
+// POST /transport/stops
+export const createStop = async (req, res) => {
+  try {
+    const school_id = req.user?.school_id;
+    if (!school_id) return missingSchoolId(res);
+
+    const {
+      stopCode,
+      stopName,
+      latitude,
+      longitude,
+      address,
+      geoFenceRadius,
+      pickupTime,
+      dropTime,
+      maxStudents,
+      status,
+    } = req.body;
+
+    if (!stopName?.trim())
+      return res.status(400).json({ success: false, message: "stopName is required" });
+
+    const stop = await TransportStop.create({
+      schoolId: toId(school_id),
+      stopCode: stopCode || undefined,
+      stopName: stopName.trim(),
+      latitude: latitude !== undefined && latitude !== "" ? Number(latitude) : null,
+      longitude: longitude !== undefined && longitude !== "" ? Number(longitude) : null,
+      address: address || "",
+      geoFenceRadius:
+        geoFenceRadius !== undefined ? Number(geoFenceRadius) || 100 : 100,
+      pickupTime: pickupTime || "",
+      dropTime: dropTime || "",
+      maxStudents: maxStudents !== undefined ? Number(maxStudents) || 0 : 0,
+      currentStudents: 0,
+      status: status || "Active",
+    });
+
+    res.json({ success: true, data: stop });
+  } catch (err) {
+    serverError(res, err);
+  }
+};
+
+// PUT /transport/stops/:id
+export const updateStop = async (req, res) => {
+  try {
+    const school_id = req.user?.school_id;
+    const { id } = req.params;
+    if (!school_id) return missingSchoolId(res);
+
+    const stop = await TransportStop.findOne({
+      _id: id,
+      schoolId: toId(school_id),
+    });
+    if (!stop) return notFound(res, "Stop");
+
+    const {
+      stopCode,
+      stopName,
+      latitude,
+      longitude,
+      address,
+      geoFenceRadius,
+      pickupTime,
+      dropTime,
+      maxStudents,
+      currentStudents,
+      status,
+    } = req.body;
+
+    if (stopCode !== undefined) stop.stopCode = stopCode;
+    if (stopName !== undefined) {
+      if (!stopName.trim())
+        return res.status(400).json({ success: false, message: "stopName is required" });
+      stop.stopName = stopName.trim();
+    }
+    if (latitude !== undefined && latitude !== "") stop.latitude = Number(latitude);
+    if (longitude !== undefined && longitude !== "") stop.longitude = Number(longitude);
+    if (address !== undefined) stop.address = address;
+    if (geoFenceRadius !== undefined) stop.geoFenceRadius = Number(geoFenceRadius) || 100;
+    if (pickupTime !== undefined) stop.pickupTime = pickupTime;
+    if (dropTime !== undefined) stop.dropTime = dropTime;
+    if (maxStudents !== undefined) stop.maxStudents = Number(maxStudents) || 0;
+    if (currentStudents !== undefined) stop.currentStudents = Number(currentStudents) || 0;
+    if (status !== undefined) stop.status = status;
+
+    await stop.save();
+    res.json({ success: true, data: stop });
+  } catch (err) {
+    serverError(res, err);
+  }
+};
+
+// DELETE /transport/stops/:id
+export const deleteStop = async (req, res) => {
+  try {
+    const school_id = req.user?.school_id;
+    const { id } = req.params;
+    if (!school_id) return missingSchoolId(res);
+
+    const stop = await TransportStop.findOneAndDelete({
+      _id: id,
+      schoolId: toId(school_id),
+    });
+    if (!stop) return notFound(res, "Stop");
+
+    res.json({ success: true, message: "Stop deleted" });
+  } catch (err) {
+    serverError(res, err);
+  }
+};
+
+/* ════════════════════════════════════════════════════════════════════════
+   MODULE 5 — ATTENDANTS
+   ════════════════════════════════════════════════════════════════════════ */
+
+// GET /transport/attendants
+export const getAttendants = async (req, res) => {
+  try {
+    const school_id = req.user?.school_id;
+    if (!school_id) return missingSchoolId(res);
+
+    const attendants = await Attendant.find({ schoolId: toId(school_id) })
+      .populate("vehicle", "busId regNo")
+      .populate("route", "name routeId")
+      .sort({ createdAt: -1 })
+      .lean();
+
+    res.json({ success: true, data: attendants });
+  } catch (err) {
+    serverError(res, err);
+  }
+};
+
+// POST /transport/attendants
+export const createAttendant = async (req, res) => {
+  try {
+    const school_id = req.user?.school_id;
+    if (!school_id) return missingSchoolId(res);
+
+    const {
+      name,
+      phone,
+      gender,
+      bloodGroup,
+      vehicle,
+      route,
+      trainingRecords,
+      verification,
+      status,
+    } = req.body;
+
+    if (!name?.trim())
+      return res.status(400).json({ success: false, message: "name is required" });
+
+    const attendant = await Attendant.create({
+      schoolId: toId(school_id),
+      name: name.trim(),
+      phone: phone || "",
+      gender: gender || "Male",
+      bloodGroup: bloodGroup || "",
+      vehicle: resolveId(vehicle),
+      route: resolveId(route),
+      trainingRecords: Array.isArray(trainingRecords) ? trainingRecords : [],
+      verification:
+        verification && typeof verification === "object" ? verification : {},
+      status: status || "Active",
+    });
+
+    await Activity.create({
+      schoolId: toId(school_id),
+      route: resolveId(route),
+      status: `Attendant added: ${attendant.name}`,
+      time: new Date().toLocaleTimeString(),
+    });
+
+    res.json({ success: true, data: attendant });
+  } catch (err) {
+    serverError(res, err);
+  }
+};
+
+// PUT /transport/attendants/:id
+export const updateAttendant = async (req, res) => {
+  try {
+    const school_id = req.user?.school_id;
+    const { id } = req.params;
+    if (!school_id) return missingSchoolId(res);
+
+    const attendant = await Attendant.findOne({
+      _id: id,
+      schoolId: toId(school_id),
+    });
+    if (!attendant) return notFound(res, "Attendant");
+
+    const {
+      name,
+      phone,
+      gender,
+      bloodGroup,
+      vehicle,
+      route,
+      trainingRecords,
+      verification,
+      status,
+    } = req.body;
+
+    if (name !== undefined) {
+      if (!name.trim())
+        return res.status(400).json({ success: false, message: "name is required" });
+      attendant.name = name.trim();
+    }
+    if (phone !== undefined) attendant.phone = phone;
+    if (gender !== undefined) attendant.gender = gender;
+    if (bloodGroup !== undefined) attendant.bloodGroup = bloodGroup;
+    if (vehicle !== undefined) attendant.vehicle = resolveId(vehicle);
+    if (route !== undefined) attendant.route = resolveId(route);
+    if (trainingRecords !== undefined)
+      attendant.trainingRecords = Array.isArray(trainingRecords) ? trainingRecords : [];
+    if (verification !== undefined && typeof verification === "object")
+      attendant.verification = { ...attendant.verification, ...verification };
+    if (status !== undefined) attendant.status = status;
+
+    await attendant.save();
+    res.json({ success: true, data: attendant });
+  } catch (err) {
+    serverError(res, err);
+  }
+};
+
+// PATCH /transport/attendants/:id/attendance   body: { date, status, note }
+export const updateAttendantAttendance = async (req, res) => {
+  try {
+    const school_id = req.user?.school_id;
+    const { id } = req.params;
+    if (!school_id) return missingSchoolId(res);
+
+    const { date, status, note } = req.body;
+    if (!date) return res.status(400).json({ success: false, message: "date required (YYYY-MM-DD)" });
+    if (!["Present", "Absent", "On Leave"].includes(status))
+      return res.status(400).json({ success: false, message: "Invalid attendance status" });
+
+    const attendant = await Attendant.findOne({
+      _id: id,
+      schoolId: toId(school_id),
+    });
+    if (!attendant) return notFound(res, "Attendant");
+
+    const idx = attendant.attendances.findIndex((a) => a.date === date);
+    if (idx >= 0) {
+      attendant.attendances[idx].status = status;
+      attendant.attendances[idx].note = note || "";
+    } else {
+      attendant.attendances.push({ date, status, note: note || "" });
+    }
+
+    await attendant.save();
+    res.json({ success: true, data: attendant });
+  } catch (err) {
+    serverError(res, err);
+  }
+};
+
+// DELETE /transport/attendants/:id
+export const deleteAttendant = async (req, res) => {
+  try {
+    const school_id = req.user?.school_id;
+    const { id } = req.params;
+    if (!school_id) return missingSchoolId(res);
+
+    const attendant = await Attendant.findOneAndDelete({
+      _id: id,
+      schoolId: toId(school_id),
+    });
+    if (!attendant) return notFound(res, "Attendant");
+
+    res.json({ success: true, message: "Attendant deleted" });
+  } catch (err) {
+    serverError(res, err);
+  }
+};
+
+/* ════════════════════════════════════════════════════════════════════════
+   MODULE 6 — VENDORS
+   ════════════════════════════════════════════════════════════════════════ */
+
+// GET /transport/vendors
+export const getVendors = async (req, res) => {
+  try {
+    const school_id = req.user?.school_id;
+    if (!school_id) return missingSchoolId(res);
+
+    const vendors = await Vendor.find({ schoolId: toId(school_id) })
+      .populate("vehicles", "busId regNo make vehicleType")
+      .sort({ createdAt: -1 })
+      .lean();
+
+    res.json({ success: true, data: vendors });
+  } catch (err) {
+    serverError(res, err);
+  }
+};
+
+// POST /transport/vendors
+export const createVendor = async (req, res) => {
+  try {
+    const school_id = req.user?.school_id;
+    if (!school_id) return missingSchoolId(res);
+
+    const {
+      vendorName,
+      vendorType,
+      contactPerson,
+      phone,
+      email,
+      address,
+      contracts,
+      sla,
+      compliance,
+      vehicles,
+      status,
+    } = req.body;
+
+    if (!vendorName?.trim())
+      return res.status(400).json({ success: false, message: "vendorName is required" });
+
+    const vendor = await Vendor.create({
+      schoolId: toId(school_id),
+      vendorName: vendorName.trim(),
+      vendorType: vendorType || "Repair",
+      contactPerson: contactPerson || "",
+      phone: phone || "",
+      email: email || "",
+      address: address || "",
+      contracts: Array.isArray(contracts) ? contracts : [],
+      sla: sla && typeof sla === "object" ? sla : {},
+      compliance: compliance && typeof compliance === "object" ? compliance : {},
+      vehicles: Array.isArray(vehicles) ? vehicles.map((v) => resolveId(v)).filter(Boolean) : [],
+      status: status || "Active",
+    });
+
+    res.json({ success: true, data: vendor });
+  } catch (err) {
+    serverError(res, err);
+  }
+};
+
+// PUT /transport/vendors/:id
+export const updateVendor = async (req, res) => {
+  try {
+    const school_id = req.user?.school_id;
+    const { id } = req.params;
+    if (!school_id) return missingSchoolId(res);
+
+    const vendor = await Vendor.findOne({
+      _id: id,
+      schoolId: toId(school_id),
+    });
+    if (!vendor) return notFound(res, "Vendor");
+
+    const {
+      vendorName,
+      vendorType,
+      contactPerson,
+      phone,
+      email,
+      address,
+      contracts,
+      sla,
+      compliance,
+      vehicles,
+      payments,
+      status,
+    } = req.body;
+
+    if (vendorName !== undefined) {
+      if (!vendorName.trim())
+        return res.status(400).json({ success: false, message: "vendorName is required" });
+      vendor.vendorName = vendorName.trim();
+    }
+    if (vendorType !== undefined) vendor.vendorType = vendorType;
+    if (contactPerson !== undefined) vendor.contactPerson = contactPerson;
+    if (phone !== undefined) vendor.phone = phone;
+    if (email !== undefined) vendor.email = email;
+    if (address !== undefined) vendor.address = address;
+    if (contracts !== undefined)
+      vendor.contracts = Array.isArray(contracts) ? contracts : [];
+    if (sla !== undefined && typeof sla === "object")
+      vendor.sla = { ...vendor.sla, ...sla };
+    if (compliance !== undefined && typeof compliance === "object")
+      vendor.compliance = { ...vendor.compliance, ...compliance };
+    if (vehicles !== undefined)
+      vendor.vehicles = Array.isArray(vehicles)
+        ? vehicles.map((v) => resolveId(v)).filter(Boolean)
+        : [];
+    if (payments !== undefined)
+      vendor.payments = Array.isArray(payments) ? payments : [];
+    if (status !== undefined) vendor.status = status;
+
+    await vendor.save();
+    res.json({ success: true, data: vendor });
+  } catch (err) {
+    serverError(res, err);
+  }
+};
+
+// DELETE /transport/vendors/:id
+export const deleteVendor = async (req, res) => {
+  try {
+    const school_id = req.user?.school_id;
+    const { id } = req.params;
+    if (!school_id) return missingSchoolId(res);
+
+    const vendor = await Vendor.findOneAndDelete({
+      _id: id,
+      schoolId: toId(school_id),
+    });
+    if (!vendor) return notFound(res, "Vendor");
+
+    res.json({ success: true, message: "Vendor deleted" });
+  } catch (err) {
+    serverError(res, err);
   }
 };

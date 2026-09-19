@@ -194,7 +194,7 @@ export default function ChatPage() {
 
   // ── Role based path ────────────────────────────────────────
   let path = "";
-  if (user?.role === "super_admin") path = "/admin";
+  if (user?.role === "super_admin") path = "/";
   else if (user?.role === "school_admin") path = "/school";
   else if (user?.role === "teacher_admin") path = "/teacher";
   else if (user?.role === "student_admin")

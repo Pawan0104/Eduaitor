@@ -30,6 +30,9 @@ const TYPE_COLORS = {
   },
   fee: { bg: "bg-rose-100", text: "text-rose-600", dot: "bg-rose-500" },
   diary: { bg: "bg-sky-100", text: "text-sky-600", dot: "bg-sky-500" },
+  assignment: { bg: "bg-amber-100", text: "text-amber-700", dot: "bg-amber-500" },
+  homework: { bg: "bg-amber-100", text: "text-amber-600", dot: "bg-amber-500" },
+  daily_learning: { bg: "bg-indigo-100", text: "text-indigo-700", dot: "bg-indigo-500" },
 };
 
 const timeAgo = (dateStr) => {
@@ -65,7 +68,7 @@ const Topbar = ({ menuPath = "/" }) => {
   if (role === "school_admin") basePath = "/school";
   else if (role === "teacher_admin") basePath = "/teacher";
   else if (role === "staff_admin") basePath = "/staff";
-  else if (role === "super_admin") basePath = "/admin";
+  else if (role === "super_admin") basePath = "/";
   else if (role === "student_admin")
     basePath = loginAs === "parent" ? "/parent" : "/student";
 
@@ -168,7 +171,7 @@ const Topbar = ({ menuPath = "/" }) => {
       toast.error(t("topbar.logoutFailed"));
     }
     clearSessionKeepPrefs();
-    navigate("/admin/login", { replace: true });
+    navigate("/login", { replace: true });
   };
 
   useEffect(() => {

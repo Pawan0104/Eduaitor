@@ -1,16 +1,15 @@
-import { Routes, Route, Navigate } from "react-router-dom";
+import { Routes, Route, Navigate, useLocation } from "react-router-dom";
 import Login from "./components/Login";
 import ForgotPassword from "./pages/ForgotPassword";
 import ResetPassword from "./pages/ResetPassword";
 import ProtectedRoute from "./components/ProtectedRoute";
-import AdminLayout from "./components/AdminLayout";
+import AdminLayout, { getMenuPath } from "./components/AdminLayout";
+import { useAuth } from "./context/AuthContext";
 
 import SuperAdminMenu from "./pages/SuperAdminMenu";
 import PlatformAnalytics from "./pages/PlatformAnalytics";
 import AccessControl from "./pages/AccessControl";
-import RoleManagement from "./pages/RoleManagement";
 import Schools from "./pages/Schools";
-import SchoolManagement from "./pages/SchoolManagement";
 import SchoolSubscription from "./pages/SchoolSubscription";
 import SchoolView from "./components/SchoolView";
 import SchoolDetail from "./pages/SchoolDetail";
@@ -42,7 +41,14 @@ import DriverManagement from "./pages/DriverManagement";
 import BusManagement from "./pages/BusManagement";
 import BusGpsTracking from "./pages/BusGpsTracking";
 import RouteManagement from "./pages/RouteManagement";
+import TransportStops from "./pages/TransportStops";
+import TransportAttendants from "./pages/TransportAttendants";
+import TransportVendors from "./pages/TransportVendors";
 import ExamCreate from "./pages/ExamCreate";
+import ClassTest from "./pages/ClassTest";
+import SmartExamScheduler from "./pages/SmartExamScheduler";
+import ExamPapers from "./pages/ExamPapers";
+import ProxyTeacher from "./pages/ProxyTeacher";
 import LibraryManagement from "./pages/LibraryManagement";
 import HostelManagement from "./pages/HostelManagement";
 import HostelBuildings from "./pages/HostelBuildings";
@@ -65,8 +71,6 @@ import HomeworkSchool from "./pages/HomeworkSchool";
 import HomeworkTeacher from "./pages/HomeworkTeacher";
 import HomeworkParent from "./pages/HomeworkParent";
 import TeacherPageProgress from "./pages/TeacherPageProgress";
-import ParentLearningToday from "./pages/ParentLearningToday";
-import DailyLearningHub from "./pages/DailyLearningHub";
 import PrincipalResultView from "./pages/PrincipalResultView";
 import StaffAttendance from "./pages/StaffAttendance";
 import StaffMenu from "./pages/StaffMenu";
@@ -74,7 +78,6 @@ import StaffMenu from "./pages/StaffMenu";
 import TeacherMenu from "./pages/TeacherMenu";
 import TeacherStudents from "./pages/TeacherStudents";
 import Assignment from "./pages/Assignment";
-import Attendance from "./pages/Attendance";
 import AttendanceReportTeacher from "./pages/AttendanceReportTeacher";
 import DiaryTeacher from "./pages/DiaryTeacher";
 import TeacherAssignmentResult from "./pages/TeacherAssignmentResult";
@@ -104,22 +107,40 @@ import ChangePassword from "./components/ChangePassword";
 import NotificationPage from "./pages/NotificationPage";
 import Blogs from "./pages/Blogs";
 import BlogDetail from "./components/BlogDetail";
-import AttendanceWithTabs from "./pages/AttendanceWithTabs";
+import ClassAttendanceMarking from "./pages/ClassAttendanceMarking";
 import StudentAttendanceDetail from "./pages/StudentAttendanceDetail";
 import StaffManagement from "./pages/StaffManagement";
 import SchoolStaffRoles from "./pages/SchoolStaffRoles";
 import ParentGatepass from "./pages/ParentGatepass";
 import ParentHostelVisit from "./pages/ParentHostelVisit";
 import TeacherGatepass from "./pages/TeacherGatepass";
+import ParentLeaveRequest from "./pages/ParentLeaveRequest";
+import ManageLeaveRequests from "./pages/ManageLeaveRequests";
 import MessagesPage from "./pages/messagesingal/MessagePage";
 import NewMessagePage from "./pages/messagesingal/NewMessagePage";
 import ChatPage from "./pages/messagesingal/ChatPage";
 import HelpSupport from "./pages/HelpSupport";
+import MarketingDashboard from "./pages/marketing/MarketingDashboard";
+import MarketingSuggestions from "./pages/marketing/MarketingSuggestions";
+import MarketingCreate from "./pages/marketing/MarketingCreate";
+import MarketingApprovals from "./pages/marketing/MarketingApprovals";
+import MarketingAccounts from "./pages/marketing/MarketingAccounts";
+import SuperAdminAutopilot from "./pages/marketing/SuperAdminAutopilot";
+import OauthCallback from "./pages/marketing/OauthCallback";
 import BulkStudentUpload from "./pages/BulkStudentUpload";
 import LeadManagement from "./pages/LeadManagement";
 
 // message files -
 
+
+const HomeRedirect = () => {
+  const { user } = useAuth();
+  const location = useLocation();
+  if (!user) {
+    return <Navigate to="/login" state={{ from: location }} replace />;
+  }
+  return <Navigate to={getMenuPath(user.role, user.loginAs)} replace />;
+};
 
 const App = () => {
   return (
@@ -129,9 +150,9 @@ const App = () => {
         <Route path="/blogs/:id" element={<BlogDetail />} />
 
         {/* Login */}
-        <Route path="/admin/login" element={<Login />} />
-        <Route path="/admin/forgot-password" element={<ForgotPassword />} />
-        <Route path="/admin/reset-password" element={<ResetPassword />} />
+        <Route path="/login" element={<Login />} />
+        <Route path="/forgot-password" element={<ForgotPassword />} />
+        <Route path="/reset-password" element={<ResetPassword />} />
 
         <Route
           path="/change-password"
@@ -144,7 +165,7 @@ const App = () => {
 
         {/* Protected Routes */}
         <Route
-          path="/admin"
+          path="/"
           element={
             <ProtectedRoute allowedRoles={["super_admin"]}>
               <AdminLayout />
@@ -152,21 +173,20 @@ const App = () => {
           }
         >
           <Route path="menu" element={<SuperAdminMenu />} />
-          <Route path="dashboard" element={<Navigate to="/admin/menu" replace />} />
+          <Route path="dashboard" element={<Navigate to="/menu" replace />} />
           <Route path="platform-analytics" element={<PlatformAnalytics />} />
           <Route path="access-control" element={<AccessControl />} />
-          <Route path="roles" element={<RoleManagement />} />
           <Route path="schools" element={<Schools />} />
-          <Route path="add-school" element={<AddSchool />} />
-          <Route path="school-manage" element={<SchoolManagement />} />
-          <Route path="school-detail" element={<SchoolDetail />} />
-          <Route path="subscription-plan" element={<SchoolSubscription />} />
-          <Route path="/admin/school-view/:id" element={<SchoolDetail />} />
+<Route path="add-school" element={<AddSchool />} />
+          <Route path="school-view/:id" element={<SchoolDetail />} />
           <Route path="syllabus-catalog" element={<SyllabusCatalogAdmin />} />
           <Route path="messages" element={<MessagesPage />} />
           <Route path="messages/:threadId" element={<ChatPage />} />
+          <Route path="marketing" element={<SuperAdminAutopilot />} />
+          <Route path="marketing/accounts" element={<MarketingAccounts />} />
+          <Route path="marketing/oauth/callback" element={<OauthCallback />} />
 
-          <Route path="*" element={<Navigate to="/admin/menu" />} />
+          <Route path="*" element={<Navigate to="/menu" />} />
         </Route>
 
         <Route
@@ -205,6 +225,7 @@ const App = () => {
             element={<StudentAttendanceDetail />}
           />
           <Route path="staff-attendance" element={<StaffAttendance />} />
+          <Route path="access-control" element={<SchoolStaffRoles />} />
           <Route path="staff-roles" element={<SchoolStaffRoles />} />
           <Route path="timetable" element={<TimeTable />} />
           <Route path="fee-structure" element={<FeeStructure />} />
@@ -225,7 +246,13 @@ const App = () => {
           <Route path="transport-bus" element={<BusManagement />} />
           <Route path="transport-gps" element={<BusGpsTracking />} />
           <Route path="transport-route" element={<RouteManagement />} />
-          <Route path="exam-structure" element={<ExamCreate />} />
+          <Route path="transport-stop" element={<TransportStops />} />
+          <Route path="transport-attendant" element={<TransportAttendants />} />
+          <Route path="transport-vendor" element={<TransportVendors />} />
+          <Route path="exam-scheduler" element={<SmartExamScheduler />} />
+          <Route path="exam-papers" element={<ExamPapers />} />
+          <Route path="class-test" element={<ClassTest />} />
+          <Route path="proxy-teacher" element={<ProxyTeacher />} />
           <Route path="exam-marks-entry" element={<TeacherExam />} />
           <Route path="exam-marks" element={<PrincipalResultView />} />
           <Route path="report-card" element={<ReportCard />} />
@@ -247,6 +274,13 @@ const App = () => {
           <Route path="messages/:threadId" element={<ChatPage />} />
           <Route path="help" element={<HelpSupport />} />
           <Route path="/school/gatepass" element={<TeacherGatepass />}  />
+          <Route path="leave-request" element={<ManageLeaveRequests pageTitle="Leave Requests" />} />
+          <Route path="marketing" element={<MarketingDashboard />} />
+          <Route path="marketing/suggestions" element={<MarketingSuggestions />} />
+          <Route path="marketing/create" element={<MarketingCreate />} />
+          <Route path="marketing/approvals" element={<MarketingApprovals />} />
+          <Route path="marketing/accounts" element={<MarketingAccounts />} />
+          <Route path="marketing/oauth/callback" element={<OauthCallback />} />
           <Route path="*" element={<Navigate to="/school/menu" />} />
         </Route>
 
@@ -272,8 +306,10 @@ const App = () => {
             element={<TeacherAssignmentResult />}
           />
           <Route path="exam" element={<TeacherExam />} />
+          <Route path="exam-papers" element={<ExamPapers />} />
+          <Route path="class-test" element={<ClassTest />} />
           <Route path="report-card" element={<ReportCard />} />
-          <Route path="attendance/mark" element={<AttendanceWithTabs />} />
+          <Route path="attendance/mark" element={<ClassAttendanceMarking />} />
           <Route
             path="attendance/student/:studentId"
             element={<StudentAttendanceDetail />}
@@ -286,7 +322,6 @@ const App = () => {
           <Route path="diary" element={<DiaryTeacher />} />
           <Route path="homework" element={<HomeworkTeacher />} />
           <Route path="page-progress" element={<TeacherPageProgress />} />
-          <Route path="daily-learning" element={<DailyLearningHub />} />
           <Route path="event" element={<Event />} />
           <Route path="event/:id" element={<EventView />} />
           <Route path="notice" element={<Notice />} />
@@ -295,11 +330,17 @@ const App = () => {
           <Route path="timetable" element={<ReadTimetable />} />
           <Route path="blogs" element={<Blogs />} />
            <Route path="gatepass" element={<TeacherGatepass />} />
+           <Route path="leave-request" element={<ManageLeaveRequests pageTitle="Leave Requests" />} />
            <Route path="messages" element={<MessagesPage />} />
           <Route path="messages/new" element={<NewMessagePage />} />
           <Route path="messages/:threadId" element={<ChatPage />} />
           <Route path="help" element={<HelpSupport />} />
-
+          <Route path="marketing" element={<MarketingDashboard />} />
+          <Route path="marketing/suggestions" element={<MarketingSuggestions />} />
+          <Route path="marketing/create" element={<MarketingCreate />} />
+          <Route path="marketing/approvals" element={<MarketingApprovals />} />
+          <Route path="marketing/accounts" element={<MarketingAccounts />} />
+          <Route path="marketing/oauth/callback" element={<OauthCallback />} />
           <Route path="*" element={<Navigate to="/teacher/menu" />} />
         </Route>
 
@@ -333,10 +374,14 @@ const App = () => {
           <Route path="calendar" element={<TeacherCalendar />} />
           <Route path="blogs" element={<Blogs />} />
            <Route path="gatepass" element={<ParentGatepass />} />
+           <Route path="leave-request" element={<ParentLeaveRequest />} />
            <Route path="hostel-visit" element={<ParentHostelVisit />} />
            <Route path="homework" element={<HomeworkParent />} />
-           <Route path="learning-today" element={<ParentLearningToday />} />
-           <Route path="daily-learning" element={<DailyLearningHub />} />
+           <Route path="assignment" element={<ParentAssignment />} />
+           <Route
+             path="assignment/result"
+             element={<ParentAssignmentResult />}
+           />
            <Route path="syllabus-books" element={<SyllabusBooksViewer />} />
            <Route path="messages" element={<MessagesPage />} />
           <Route path="messages/new" element={<NewMessagePage />} />
@@ -374,7 +419,6 @@ const App = () => {
           <Route path="id-card" element={<IdCard />} />
           <Route path="diary" element={<DiaryParent />} />
           <Route path="homework" element={<HomeworkParent />} />
-          <Route path="daily-learning" element={<DailyLearningHub />} />
           <Route path="syllabus-books" element={<SyllabusBooksViewer />} />
           <Route path="library" element={<ParentLibrary />} />
           <Route path="group" element={<Group />} />
@@ -425,12 +469,18 @@ const App = () => {
           <Route path="house" element={<HouseAllocation />} />
           <Route path="transport" element={<Transport />} />
           <Route path="transport-driver" element={<DriverManagement />} />
+          <Route path="transport-bus" element={<BusManagement />} />
+          <Route path="transport-route" element={<RouteManagement />} />
+          <Route path="transport-stop" element={<TransportStops />} />
+          <Route path="transport-attendant" element={<TransportAttendants />} />
+          <Route path="transport-vendor" element={<TransportVendors />} />
           <Route path="hostel" element={<HostelManagement />} />
           <Route path="hostel/buildings" element={<HostelBuildings />} />
           <Route path="hostel/rooms" element={<HostelRooms />} />
           <Route path="hostel/residents" element={<HostelResidents />} />
           <Route path="hostel/visitors" element={<HostelVisitors />} />
           <Route path="gatepass" element={<TeacherGatepass />} />
+          <Route path="leave-request" element={<ManageLeaveRequests pageTitle="Leave Requests" />} />
           <Route path="timetable" element={<ReadTimetable />} />
           <Route path="syllabus" element={<Syllabus />} />
           <Route path="diary" element={<DiaryPrincipal />} />
@@ -450,12 +500,18 @@ const App = () => {
           <Route path="messages" element={<MessagesPage />} />
           <Route path="messages/new" element={<NewMessagePage />} />
           <Route path="messages/:threadId" element={<ChatPage />} />
+          <Route path="marketing" element={<MarketingDashboard />} />
+          <Route path="marketing/suggestions" element={<MarketingSuggestions />} />
+          <Route path="marketing/create" element={<MarketingCreate />} />
+          <Route path="marketing/approvals" element={<MarketingApprovals />} />
+          <Route path="marketing/accounts" element={<MarketingAccounts />} />
+          <Route path="marketing/oauth/callback" element={<OauthCallback />} />
 
           <Route path="*" element={<Navigate to="/staff/menu" />} />
         </Route>
 
         {/* Default redirect */}
-        <Route path="*" element={<Navigate to="/admin/login" />} />
+        <Route path="*" element={<HomeRedirect />} />
       </Routes>
     </div>
   );

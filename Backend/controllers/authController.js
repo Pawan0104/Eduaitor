@@ -12,6 +12,7 @@ import {
 import SchoolStaffRole from "../models/schoolStaffRole.js";
 import {
   findChildrenByParentUsername,
+  findChildrenByParentUsernameAllSchools,
   normalizeParentUsername,
   toChildSummary,
 } from "../utils/parentChildren.js";
@@ -26,6 +27,40 @@ const cookieOptions = {
   httpOnly: true,
   secure: process.env.NODE_ENV === "production",
   sameSite: process.env.NODE_ENV === "production" ? "none" : "lax",
+};
+
+const withSchoolNames = async (children) => {
+  const schoolIds = [
+    ...new Set(children.map((c) => String(c?.schoolId || "")).filter(Boolean)),
+  ];
+  if (!schoolIds.length) return children;
+  const schools = await School.find({ _id: { $in: schoolIds } })
+    .select("school_name")
+    .lean();
+  const byId = new Map(schools.map((s) => [String(s._id), s.school_name || ""]));
+  return children.map((c) => ({
+    ...c,
+    schoolName: byId.get(String(c.schoolId || "")) || "",
+  }));
+};
+
+const linkedSchoolSummaries = (children) => {
+  const map = new Map();
+  for (const c of children) {
+    const sid = String(c?.schoolId || "");
+    if (!sid) continue;
+    if (!map.has(sid)) {
+      map.set(sid, {
+        schoolId: sid,
+        schoolName: c.schoolName || "School",
+        childCount: 0,
+      });
+    }
+    map.get(sid).childCount += 1;
+  }
+  return [...map.values()].sort((a, b) =>
+    String(a.schoolName).localeCompare(String(b.schoolName)),
+  );
 };
 
 function buildParentSession(activeStudent, children, school, subscribed_modules) {
@@ -64,6 +99,7 @@ function buildParentSession(activeStudent, children, school, subscribed_modules)
       photo_url: activeStudent.documents?.studentPhoto?.url || null,
       children: childSummaries,
       activeChildId: activeStudent._id,
+      linkedSchools: linkedSchoolSummaries(childSummaries),
     },
   };
 }
@@ -272,10 +308,10 @@ export const loginUser = async (req, res) => {
         }
 
         if (matchedParentStudent) {
-          const children = await findChildrenByParentUsername(
+          const childrenRaw = await findChildrenByParentUsernameAllSchools(
             parentUsername,
-            matchedParentStudent.schoolId,
           );
+          const children = await withSchoolNames(childrenRaw);
           // Prefer matched student as active; fall back to first sibling
           const active =
             children.find(
@@ -702,10 +738,10 @@ export const getParentChildren = async (req, res) => {
     const parentUsername = normalizeParentUsername(
       req.user.parent_username || req.user.username,
     );
-    const children = await findChildrenByParentUsername(
+    const childrenRaw = await findChildrenByParentUsernameAllSchools(
       parentUsername,
-      req.user.school_id,
     );
+    const children = await withSchoolNames(childrenRaw);
     return res.json({
       success: true,
       activeChildId: req.user.student_id,
@@ -732,10 +768,10 @@ export const switchParentChild = async (req, res) => {
     const parentUsername = normalizeParentUsername(
       req.user.parent_username || req.user.username,
     );
-    const children = await findChildrenByParentUsername(
+    const childrenRaw = await findChildrenByParentUsernameAllSchools(
       parentUsername,
-      req.user.school_id,
     );
+    const children = await withSchoolNames(childrenRaw);
     const active = children.find((c) => String(c._id) === String(studentId));
     if (!active) {
       return res.status(403).json({

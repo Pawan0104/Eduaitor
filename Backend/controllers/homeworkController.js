@@ -1,6 +1,10 @@
 import Homework from "../models/homework.js";
 import Student from "../models/student.js";
+import { uploadToCloudinary } from "../utils/uploadToCloudinary.js";
 import { createNotificationHelper } from "./notificationController.js";
+
+/* Roles allowed to manage (create/review/update/delete) homework */
+const MANAGER_ROLES = ["teacher_admin", "school_admin", "staff_admin"];
 
 const populateHomework = (query) =>
   query
@@ -35,6 +39,8 @@ function myStatusView(homework, studentId) {
           status: entry.status,
           markedDoneBy: entry.markedDoneBy,
           markedDoneAt: entry.markedDoneAt,
+          note: entry.note || "",
+          photos: entry.photos || [],
           teacherRemark: entry.teacherRemark || "",
           completedAt: entry.completedAt,
         }
@@ -42,11 +48,11 @@ function myStatusView(homework, studentId) {
   };
 }
 
-/* ── Teacher: assign homework ─────────────────────────────── */
+/* ── Teacher/Admin/Staff: assign homework ───────────────────────── */
 export const createHomework = async (req, res) => {
   try {
-    if (req.user.role !== "teacher_admin") {
-      return res.status(403).json({ error: "Only teachers can assign homework" });
+    if (!MANAGER_ROLES.includes(req.user.role)) {
+      return res.status(403).json({ error: "Not allowed to assign homework" });
     }
 
     const { classId, sectionId, subjectId, title, description, dueDate } = req.body;
@@ -57,7 +63,7 @@ export const createHomework = async (req, res) => {
     }
 
     const schoolId = req.user.school_id;
-    const teacherId = req.user.teacher_id;
+    const teacherId = req.user.role === "teacher_admin" ? req.user.teacher_id : null;
 
     const students = await Student.find({ schoolId, classId, sectionId })
       .select("_id")
@@ -72,6 +78,7 @@ export const createHomework = async (req, res) => {
     const homework = await Homework.create({
       schoolId,
       teacherId,
+      createdById: req.user._id,
       classId,
       sectionId,
       subjectId: subjectId || undefined,
@@ -108,13 +115,18 @@ export const createHomework = async (req, res) => {
   }
 };
 
-/* ── Teacher: list own homework ───────────────────────────── */
+/* ── Teacher/Admin/Staff: list own homework ─────────────────────── */
 export const getTeacherHomework = async (req, res) => {
   try {
     const list = await populateHomework(
       Homework.find({
         schoolId: req.user.school_id,
-        teacherId: req.user.teacher_id,
+        $or: [
+          { createdById: req.user._id },
+          ...(req.user.teacher_id
+            ? [{ teacherId: req.user.teacher_id }]
+            : []),
+        ],
       }).sort({ createdAt: -1 }),
     );
     res.json(list);
@@ -126,6 +138,12 @@ export const getTeacherHomework = async (req, res) => {
 /* ── School/staff: list school homework ───────────────────── */
 export const getSchoolHomework = async (req, res) => {
   try {
+    if (req.user.role === "student_admin") {
+      return res
+        .status(403)
+        .json({ error: "Students/parents cannot view the school-wide homework list" });
+    }
+
     const { classId, sectionId, teacherId } = req.query;
     const filter = { schoolId: req.user.school_id };
     if (classId) filter.classId = classId;
@@ -141,7 +159,7 @@ export const getSchoolHomework = async (req, res) => {
   }
 };
 
-/* ── Teacher: single homework with student statuses ───────── */
+/* ── Single homework; students/parents get their own slice only ── */
 export const getHomeworkById = async (req, res) => {
   try {
     const homework = await populateHomework(Homework.findById(req.params.id));
@@ -150,6 +168,12 @@ export const getHomeworkById = async (req, res) => {
     }
     if (String(homework.schoolId) !== String(req.user.school_id)) {
       return res.status(403).json({ error: "Access denied" });
+    }
+    if (req.user.role === "student_admin") {
+      if (!req.user.student_id) {
+        return res.status(403).json({ error: "Access denied" });
+      }
+      return res.json(myStatusView(homework, req.user.student_id));
     }
     res.json(homework);
   } catch (err) {
@@ -163,6 +187,25 @@ export const getMyHomework = async (req, res) => {
     const studentId = req.user.student_id;
     if (!studentId) {
       return res.status(400).json({ error: "Student not linked to account" });
+    }
+
+    // Late-resolve: students moved into a class/section after homework was
+    // assigned still see it (adds them to the snapshot at read time).
+    const student = await Student.findById(studentId).select("classId sectionId");
+    if (student?.classId && student?.sectionId) {
+      const missing = await Homework.find({
+        schoolId: req.user.school_id,
+        classId: student.classId,
+        sectionId: student.sectionId,
+        "students.studentId": { $ne: studentId },
+      }).select("_id");
+
+      if (missing.length) {
+        await Homework.updateMany(
+          { _id: { $in: missing.map((h) => h._id) } },
+          { $addToSet: { students: { studentId, status: "assigned" } } },
+        );
+      }
     }
 
     const list = await populateHomework(
@@ -213,6 +256,25 @@ export const markHomeworkDone = async (req, res) => {
     entry.status = "marked_done";
     entry.markedDoneBy = markedBy;
     entry.markedDoneAt = new Date();
+
+    if (typeof req.body.note === "string" && req.body.note.trim()) {
+      entry.note = req.body.note.trim().slice(0, 2000);
+    }
+
+    if (req.files && req.files.length) {
+      const uploaded = [];
+      for (const file of req.files.slice(0, 3)) {
+        const result = await uploadToCloudinary(file, "homework");
+        uploaded.push({
+          url: result.url,
+          public_id: result.public_id,
+          name: file.originalname,
+          type: file.mimetype,
+        });
+      }
+      entry.photos = uploaded;
+    }
+
     await homework.save();
 
     const student = await Student.findById(studentId)
@@ -247,11 +309,11 @@ export const markHomeworkDone = async (req, res) => {
   }
 };
 
-/* ── Teacher: remark and/or approve ───────────────────────── */
+/* ── Teacher/Admin/Staff: remark and/or approve ───────────── */
 export const reviewHomework = async (req, res) => {
   try {
-    if (req.user.role !== "teacher_admin") {
-      return res.status(403).json({ error: "Only teachers can review homework" });
+    if (!MANAGER_ROLES.includes(req.user.role)) {
+      return res.status(403).json({ error: "Not allowed to review homework" });
     }
 
     const { studentId, remark, approve } = req.body;
@@ -259,11 +321,15 @@ export const reviewHomework = async (req, res) => {
       return res.status(400).json({ error: "studentId is required" });
     }
 
-    const homework = await Homework.findOne({
-      _id: req.params.id,
-      schoolId: req.user.school_id,
-      teacherId: req.user.teacher_id,
-    });
+    const filter = { _id: req.params.id, schoolId: req.user.school_id };
+    if (req.user.role === "teacher_admin") {
+      filter.$or = [
+        { teacherId: req.user.teacher_id },
+        { createdById: req.user._id },
+      ];
+    }
+
+    const homework = await Homework.findOne(filter);
 
     if (!homework) {
       return res.status(404).json({ error: "Homework not found" });
@@ -330,11 +396,11 @@ export const reviewHomework = async (req, res) => {
   }
 };
 
-/* ── Teacher: update homework details ─────────────────────── */
+/* ── Teacher/Admin/Staff: update homework details ─────────── */
 export const updateHomework = async (req, res) => {
   try {
-    if (req.user.role !== "teacher_admin") {
-      return res.status(403).json({ error: "Only teachers can update homework" });
+    if (!MANAGER_ROLES.includes(req.user.role)) {
+      return res.status(403).json({ error: "Not allowed to update homework" });
     }
 
     const allowed = ["title", "description", "dueDate", "subjectId"];
@@ -343,15 +409,18 @@ export const updateHomework = async (req, res) => {
       if (req.body[key] !== undefined) updates[key] = req.body[key];
     }
 
-    const homework = await Homework.findOneAndUpdate(
-      {
-        _id: req.params.id,
-        schoolId: req.user.school_id,
-        teacherId: req.user.teacher_id,
-      },
-      updates,
-      { new: true },
-    );
+    const filter = {
+      _id: req.params.id,
+      schoolId: req.user.school_id,
+    };
+    if (req.user.role === "teacher_admin") {
+      filter.$or = [
+        { teacherId: req.user.teacher_id },
+        { createdById: req.user._id },
+      ];
+    }
+
+    const homework = await Homework.findOneAndUpdate(filter, updates, { new: true });
 
     if (!homework) {
       return res.status(404).json({ error: "Homework not found" });
@@ -364,18 +433,25 @@ export const updateHomework = async (req, res) => {
   }
 };
 
-/* ── Teacher: delete homework ─────────────────────────────── */
+/* ── Teacher/Admin/Staff: delete homework ─────────────────── */
 export const deleteHomework = async (req, res) => {
   try {
-    if (req.user.role !== "teacher_admin") {
-      return res.status(403).json({ error: "Only teachers can delete homework" });
+    if (!MANAGER_ROLES.includes(req.user.role)) {
+      return res.status(403).json({ error: "Not allowed to delete homework" });
     }
 
-    const deleted = await Homework.findOneAndDelete({
+    const filter = {
       _id: req.params.id,
       schoolId: req.user.school_id,
-      teacherId: req.user.teacher_id,
-    });
+    };
+    if (req.user.role === "teacher_admin") {
+      filter.$or = [
+        { teacherId: req.user.teacher_id },
+        { createdById: req.user._id },
+      ];
+    }
+
+    const deleted = await Homework.findOneAndDelete(filter);
 
     if (!deleted) {
       return res.status(404).json({ error: "Homework not found" });

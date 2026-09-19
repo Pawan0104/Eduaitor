@@ -44,19 +44,19 @@ const Dashboard = () => {
 
   const campusSummaries = [
     {
-      title: "Roles",
+      title: "Access Control",
       tone: "violet",
-      path: "/admin/roles",
+      path: "/access-control",
       rows: [
-        ["Total", roles.length],
-        ["Active", activeRoles],
-        ["Inactive", inactiveRoles],
+        ["Schools", "Module access"],
+        ["Configure", "Per school"],
+        ["View", "List"],
       ],
     },
     {
       title: "Users",
       tone: "blue",
-      path: "/admin/access-control",
+      path: "/access-control",
       rows: [
         ["Total", users.length],
         ["Active", activeUsers],
@@ -66,7 +66,7 @@ const Dashboard = () => {
     {
       title: "Schools",
       tone: "green",
-      path: "/admin/schools",
+      path: "/schools",
       rows: [
         ["Directory", "All schools"],
         ["Add", "New school"],
@@ -76,7 +76,7 @@ const Dashboard = () => {
     {
       title: "Platform",
       tone: "orange",
-      path: "/admin/syllabus-catalog",
+      path: "/syllabus-catalog",
       rows: [
         ["Catalog", "Syllabus"],
         ["Messages", "Inbox"],
@@ -86,10 +86,9 @@ const Dashboard = () => {
   ];
 
   const campusModules = [
-    { label: "Roles", path: "/admin/roles", icon: FaUserShield },
-    { label: "Access", path: "/admin/access-control", icon: FaUsers },
-    { label: "Schools", path: "/admin/schools", icon: FaSchool },
-    { label: "Syllabus", path: "/admin/syllabus-catalog", icon: FaBook },
+    { label: "Access Control", path: "/access-control", icon: FaUsers },
+    { label: "Schools", path: "/schools", icon: FaSchool },
+    { label: "Syllabus", path: "/syllabus-catalog", icon: FaBook },
   ];
 
   return (
@@ -129,8 +128,8 @@ const Dashboard = () => {
       {layout === "campus" ? (
         <RoleCampusDashboard
           roleLabel="Super Admin"
-          profilePath="/admin/dashboard"
-          menuPath="/admin/dashboard"
+          profilePath="/dashboard"
+          menuPath="/dashboard"
           summaries={campusSummaries}
           modules={campusModules}
           showStatBars
@@ -148,33 +147,16 @@ const Dashboard = () => {
       ) : (
         <div className="grid grid-cols-1 gap-6 md:grid-cols-2 xl:grid-cols-3">
           <div
-            onClick={() => navigate("/admin/roles")}
+            onClick={() => navigate("/access-control")}
             className="cursor-pointer rounded-xl bg-[rgb(var(--surface))] p-6 text-[rgb(var(--text))] shadow transition hover:shadow-lg"
           >
             <div className="mb-4 flex items-center justify-between">
-              <h2 className="text-lg font-semibold">Roles</h2>
-              <FaUserShield className="text-3xl text-indigo-500" />
-            </div>
-            <p className="mb-3 text-3xl font-bold">{roles.length}</p>
-            <div className="flex gap-6 text-sm text-gray-600">
-              <span className="text-green-600">Active: {activeRoles}</span>
-              <span className="text-red-500">Inactive: {inactiveRoles}</span>
-            </div>
-          </div>
-
-          <div
-            onClick={() => navigate("/admin/access-control")}
-            className="cursor-pointer rounded-xl bg-[rgb(var(--surface))] p-6 text-[rgb(var(--text))] shadow transition hover:shadow-lg"
-          >
-            <div className="mb-4 flex items-center justify-between">
-              <h2 className="text-lg font-semibold">Users</h2>
+              <h2 className="text-lg font-semibold">Access Control</h2>
               <FaUsers className="text-3xl text-blue-500" />
             </div>
-            <p className="mb-3 text-3xl font-bold">{users.length}</p>
-            <div className="flex gap-6 text-sm text-[rgb(var(--text))]">
-              <span className="text-green-600">Active: {activeUsers}</span>
-              <span className="text-red-500">Inactive: {inactiveUsers}</span>
-            </div>
+            <p className="mb-3 text-sm text-[rgb(var(--text))]">
+              Configure module access per school
+            </p>
           </div>
         </div>
       )}

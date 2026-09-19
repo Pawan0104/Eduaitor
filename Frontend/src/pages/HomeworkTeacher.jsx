@@ -178,6 +178,31 @@ function ReviewModal({ homework, onClose, onSaved }) {
                     </span>
                   </div>
 
+                  {s.note ? (
+                    <div className="rounded-xl bg-slate-50 border border-slate-200 px-3 py-2">
+                      <p className="text-[11px] font-semibold text-slate-600 mb-0.5">
+                        Student note
+                      </p>
+                      <p className="text-xs text-slate-700 whitespace-pre-wrap">
+                        {s.note}
+                      </p>
+                    </div>
+                  ) : null}
+
+                  {s.photos?.length > 0 && (
+                    <div className="flex gap-2 flex-wrap">
+                      {s.photos.map((p, i) => (
+                        <a key={i} href={p.url} target="_blank" rel="noreferrer">
+                          <img
+                            src={p.url}
+                            className="h-20 w-20 object-cover rounded-lg border border-slate-200"
+                            alt={p.name || "homework photo"}
+                          />
+                        </a>
+                      ))}
+                    </div>
+                  )}
+
                   <textarea
                     rows={2}
                     className={fieldCls(false)}

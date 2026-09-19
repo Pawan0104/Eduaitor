@@ -8,8 +8,8 @@ import {
   FaChartLine,
   FaHeadset,
   FaBookDead,
+  FaBullhorn,
 } from "react-icons/fa";
-import { FaSchoolFlag } from "react-icons/fa6";
 import { toast } from "react-toastify";
 import { useAuth } from "../context/AuthContext";
 import axios from "axios";
@@ -28,9 +28,11 @@ const COLOR_MAP = {
   "Platform Analytics": { bg: "#EEF2FF", icon: "#4F46E5", dot: "#C7D2FE" },
   "Access Control": { bg: "#FDF4FF", icon: "#A855F7", dot: "#E9D5FF" },
   School: { bg: "#EFF6FF", icon: "#3B82F6", dot: "#BFDBFE" },
-  "School Detail": { bg: "#F0FDF4", icon: "#22C55E", dot: "#BBF7D0" },
   "Help Requests": { bg: "#FFFBEB", icon: "#D97706", dot: "#FDE68A" },
   "Syllabus Catalog": { bg: "#F0FDF4", icon: "#10B981", dot: "#A7F3D0" },
+  "Marketing AI": { bg: "#FDF2F8", icon: "#DB2777", dot: "#FBCFE8" },
+  "Marketing Autopilot": { bg: "#FDF2F8", icon: "#DB2777", dot: "#FBCFE8" },
+  "Connect Accounts": { bg: "#EEF2FF", icon: "#4F46E5", dot: "#C7D2FE" },
 };
 const DEFAULT_COLOR = { bg: "#F3F4F6", icon: "#6B7280", dot: "#E5E7EB" };
 
@@ -278,49 +280,48 @@ export default function SuperAdminMenu() {
     }
     setUser(null);
     clearSessionKeepPrefs();
-    navigate("/admin/login", { replace: true });
+    navigate("/login", { replace: true });
   };
 
   const menu = [
     // Dashboard disabled — welcome/menu hub covers the same actions
-    // { name: "Dashboard", icon: <FaTachometerAlt />, path: "/admin/dashboard" },
+    // { name: "Dashboard", icon: <FaTachometerAlt />, path: "/dashboard" },
     // {
     //   name: "Platform Analytics",
     //   icon: <FaChartLine />,
-    //   path: "/admin/platform-analytics",
+    //   path: "/platform-analytics",
     // },
     {
       name: "Access Control",
       icon: <FaUserShield />,
-      children: [
-        { name: "Access", path: "/admin/access-control" },
-        { name: "Role Management", path: "/admin/roles" },
-      ],
+      path: "/access-control",
     },
     {
       name: "School",
       icon: <FaSchool />,
       children: [
-        { name: "All Schools", path: "/admin/schools" },
-        { name: "Add School", path: "/admin/add-school" },
-        { name: "School Management", path: "/admin/school-manage" },
-        { name: "School Subscription Plan", path: "/admin/subscription-plan" },
+        { name: "All Schools", path: "/schools" },
+        { name: "Add School", path: "/add-school" },
+        { name: "School Subscription Plan", path: "/subscription-plan" },
       ],
-    },
-    {
-      name: "School Detail",
-      icon: <FaSchoolFlag />,
-      path: "/admin/school-detail",
     },
     {
       name: "Syllabus Catalog",
       icon: <FaBookDead />,
-      path: "/admin/syllabus-catalog",
+      path: "/syllabus-catalog",
     },
     {
       name: "Help Requests",
       icon: <FaHeadset />,
-      path: "/admin/messages",
+      path: "/messages",
+    },
+    {
+      name: "Marketing AI",
+      icon: <FaBullhorn />,
+      children: [
+        { name: "Marketing Autopilot", path: "/marketing" },
+        { name: "Connect Accounts", path: "/marketing/accounts" },
+      ],
     },
   ];
 

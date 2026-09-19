@@ -450,7 +450,7 @@
 
 
 import { useState, useEffect } from "react";
-import { useLocation } from "react-router-dom";
+import { useLocation, useNavigate } from "react-router-dom";
 import axios from "axios";
 import { toast } from "react-toastify";
 import CreateNotification from "../components/CreateNotification.jsx";
@@ -464,6 +464,7 @@ const TYPE_COLORS = {
   fee:        { bg: "bg-rose-100",    text: "text-rose-600"    },
   diary:      { bg: "bg-sky-100",     text: "text-sky-600"     },
   homework:   { bg: "bg-amber-100",   text: "text-amber-700"   },
+  assignment: { bg: "bg-amber-100",   text: "text-amber-700"   },
   daily_learning: { bg: "bg-indigo-100", text: "text-indigo-700" },
   transport:  { bg: "bg-blue-100",    text: "text-blue-700"    },
   gatepass:   { bg: "bg-orange-100",  text: "text-orange-700"  },
@@ -474,6 +475,37 @@ const formatDate = (dateString) => {
   return new Date(dateString).toLocaleDateString("en-US", {
     month: "short", day: "numeric", year: "numeric",
   });
+};
+
+export const taskLinkFor = (notificationType, user) => {
+  if (!notificationType) return null;
+  const base =
+    user?.role === "teacher_admin"
+      ? "/teacher"
+      : user?.role === "staff_admin"
+        ? "/staff"
+        : user?.role === "student_admin"
+          ? user?.loginAs === "parent"
+            ? "/parent"
+            : "/student"
+          : null;
+  if (!base) return null;
+  switch (notificationType) {
+    case "assignment":
+    case "daily_learning":
+      return base === "/staff" ? "/staff/assignments" : `${base}/assignment`;
+    case "homework":
+      return `${base}/homework`;
+    case "fee":
+      return base === "/parent" ? "/parent/fees" : null;
+    case "exam":
+    case "result":
+      return base === "/parent" || base === "/student" ? `${base}/exam-result` : null;
+    case "diary":
+      return base === "/student" ? "/student/diary" : null;
+    default:
+      return null;
+  }
 };
 
 // Extract a clean filename for display when attachment.name is missing
@@ -501,6 +533,7 @@ const NotificationPage = () => {
   const API      = import.meta.env.VITE_API_URL;
   const { user } = useAuth();
   const location = useLocation();
+  const navigate = useNavigate();
 
   const currentUserId =
     user?._id ||
@@ -932,6 +965,24 @@ useEffect(() => {
               <h1 className="text-xl md:text-2xl font-bold text-[rgb(var(--text))] mt-4 mb-3 leading-snug">
                 {selectedNotif.title}
               </h1>
+
+              {(() => {
+                const link = taskLinkFor(selectedNotif.notificationType, user);
+                if (!link) return null;
+                return (
+                  <button
+                    onClick={() => navigate(link)}
+                    className="inline-flex items-center gap-1.5 text-sm font-semibold text-white bg-[rgb(var(--primary))] px-4 py-2 rounded-xl mb-4 hover:opacity-90 transition active:scale-95"
+                  >
+                    Open{" "}
+                    {selectedNotif.notificationType === "daily_learning" ||
+                    selectedNotif.notificationType === "assignment"
+                      ? "Assignment"
+                      : "Page"}
+                    →
+                  </button>
+                );
+              })()}
 
               <div className="flex flex-wrap items-center gap-3 text-xs md:text-sm text-[rgb(var(--text-muted))] mb-6">
                 {selectedNotif.startingDate && (

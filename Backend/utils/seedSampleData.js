@@ -516,6 +516,7 @@ const upsertLeads = async (school, schoolConfig, teachers, staffMembers) => {
 
   for (const [index, leadConfig] of schoolConfig.leads.entries()) {
     const assignee = assignees[index % assignees.length];
+    const leadNumber = `LEAD${String(school.slug || index).replace(/[^a-z0-9]/gi, "")}${index + 1}`;
 
     await Lead.findOneAndUpdate(
       { schoolId: school._id, studentName: leadConfig.studentName, parentMobile: leadConfig.parentMobile },
@@ -527,6 +528,7 @@ const upsertLeads = async (school, schoolConfig, teachers, staffMembers) => {
           assignedTo: assignee,
           createdBy: school._id,
           status: index % 2 === 0 ? "New" : "Contacted",
+          leadNumber,
         },
       },
       { upsert: true, new: true, setDefaultsOnInsert: true },

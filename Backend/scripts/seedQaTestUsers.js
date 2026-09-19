@@ -153,7 +153,6 @@ const upsertTeacher = async (schoolId) => {
           "diary",
           "homework",
           "assignments",
-          "daily_learning",
           "notices",
           "events",
           "groups",

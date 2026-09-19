@@ -59,7 +59,7 @@ function SummaryBar({ data, type }) {
           <StatPill label="Total"   value={total}   color="border-slate-200 text-[rgb(var(--text))]" />
           <StatPill label="Present" value={present} color="bg-emerald-50 border-emerald-200 text-emerald-700" />
           <StatPill label="Absent"  value={absent}  color="bg-red-50 border-red-200 text-red-700" />
-          <StatPill label="Late"    value={late}    color="bg-amber-50 border-amber-200 text-amber-700" />
+          <StatPill label="Leave"   value={late}    color="bg-amber-50 border-amber-200 text-amber-700" />
         </div>
       </div>
     );

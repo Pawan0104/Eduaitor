@@ -17,6 +17,7 @@ import {
 } from "./utils/schoolModules.js";
 import {
   findChildrenByParentUsername,
+  findChildrenByParentUsernameAllSchools,
   toChildSummary,
 } from "./utils/parentChildren.js";
 import {
@@ -59,6 +60,8 @@ const productionAllowedOrigins = () => {
     "https://eduaitorschool.netlify.app",
     "https://eduaitor.com",
     "https://www.eduaitor.com",
+    "http://eduaitor.com",
+    "http://www.eduaitor.com",
     "capacitor://localhost",
     "http://localhost",
     "https://localhost",
@@ -154,6 +157,8 @@ import eventRoute from "./routes/eventRoute.js";
 import noticeRoute from "./routes/noticeRoute.js";
 import transportRoute from "./routes/transportRoute.js";
 import examRoute from "./routes/examRoute.js";
+import classTestRoute from "./routes/classTestRoute.js";
+import examScheduleRoute from "./routes/examScheduleRoute.js";
 import libraryRoute from "./routes/libraryRoute.js";
 import hostelRoute from "./routes/hostelRoute.js";
 import houseRoute from "./routes/houseRoute.js";
@@ -170,7 +175,6 @@ import calendarRoute from "./routes/caledarRoute.js";
 import diaryRoute from "./routes/diaryRoute.js";
 import homeworkRoute from "./routes/homeworkRoute.js";
 import learningProgressRoute from "./routes/learningProgressRoute.js";
-import dailyLearningRoute from "./routes/dailyLearningRoute.js";
 import messageRoute from "./routes/messageRoute.js";
 import groupRoute from "./routes/groupRoute.js";
 import notificationRoute from "./routes/notificationRoute.js";
@@ -180,14 +184,24 @@ import staffRoute from "./routes/staffRoute.js";
 import staffAttendanceRoute from "./routes/staffAttendanceRoute.js";
 import schoolStaffRoleRoute from "./routes/schoolStaffRoleRoute.js";
 import gatepassRoute from "./routes/gatepassRoute.js";
+import leaveRequestRoute from "./routes/leaveRequestRoute.js";
 import leadRoute from "./routes/leadRoute.js";
 import messageSingalRoute from "./routes/messageSingalRoute.js";
 
 import { authMiddleware } from "./auth/auth.js";
 import { startNotificationCron } from "./cron/notificationCron.js";
 import { startEventReminderCron } from "./cron/eventReminderCron.js";
+import { startMarketingScheduler, startDailyAutopilotCron } from "./cron/marketingScheduler.js";
+import marketingPostRoutes from "./routes/marketingPostRoute.js";
+import marketingAccountRoutes from "./routes/marketingAccountRoute.js";
+import marketingTemplateRoutes from "./routes/marketingTemplateRoute.js";
+import marketingOAuthRoutes from "./routes/marketingOAuthRoute.js";
+import examPaperRoute from "./routes/examPaperRoute.js";
+import questionBankRoute from "./routes/questionBankRoute.js";
 startNotificationCron();
 startEventReminderCron();
+startMarketingScheduler();
+startDailyAutopilotCron();
 app.get("/api/auth/me", authMiddleware, async (req, res) => {
   // async added
   try {
@@ -365,11 +379,28 @@ app.get("/api/auth/me", authMiddleware, async (req, res) => {
           req.user.parent_username ||
           req.user.username ||
           studentDoc.parentCredentials?.username;
-        const siblingDocs = await findChildrenByParentUsername(
+        const siblingDocs = await findChildrenByParentUsernameAllSchools(
           parent_username,
-          req.user.school_id,
         );
-        children = siblingDocs.map(toChildSummary);
+        const schoolIds = [
+          ...new Set(
+            siblingDocs
+              .map((c) => String(c?.schoolId || ""))
+              .filter(Boolean),
+          ),
+        ];
+        const linkedSchools = await School.find({ _id: { $in: schoolIds } })
+          .select("school_name")
+          .lean();
+        const schoolNameById = new Map(
+          linkedSchools.map((s) => [String(s._id), s.school_name || ""]),
+        );
+        children = siblingDocs.map((c) =>
+          toChildSummary({
+            ...c,
+            schoolName: schoolNameById.get(String(c.schoolId || "")) || "",
+          }),
+        );
         activeChildId = req.user.student_id;
       }
 
@@ -462,6 +493,8 @@ app.use("/api/events", eventRoute);
 app.use("/api/notices", noticeRoute);
 app.use("/api/transport", transportRoute);
 app.use("/api/exam", examRoute);
+app.use("/api/classtest", classTestRoute);
+app.use("/api/exam-schedule", examScheduleRoute);
 app.use("/api/library", libraryRoute);
 app.use("/api/hostel", hostelRoute);
 app.use("/api/house", houseRoute);
@@ -478,7 +511,6 @@ app.use("/api/calendar", calendarRoute);
 app.use("/api/diary", diaryRoute);
 app.use("/api/homework", homeworkRoute);
 app.use("/api/learning-progress", learningProgressRoute);
-app.use("/api/daily-learning", dailyLearningRoute);
 app.use("/api/messages", messageRoute);
 app.use("/api/groups", groupRoute);
 app.use("/api/notifications", notificationRoute);
@@ -488,14 +520,27 @@ app.use("/api/staff", staffRoute);
 app.use("/api/staff-attendance", staffAttendanceRoute);
 app.use("/api/school-staff-roles", schoolStaffRoleRoute);
 app.use("/api/gatepass", gatepassRoute);
+app.use("/api/leave-request", leaveRequestRoute);
 app.use("/api/leads", leadRoute);
 app.use("/api/message-signal", messageSingalRoute);
+
+// ─── Marketing AI ─────────────────────────────────────────────
+app.use("/api/marketing", marketingPostRoutes);
+app.use("/api/marketing/accounts", marketingAccountRoutes);
+app.use("/api/marketing", marketingTemplateRoutes);
+app.use("/api/marketing/oauth", marketingOAuthRoutes);
+app.use("/api/exam-papers", examPaperRoute);
+app.use("/api/question-bank", questionBankRoute);
 
 const frontendDist = path.join(__dirname, "../Frontend/dist");
 const serveFrontend = fs.existsSync(path.join(frontendDist, "index.html"));
 
 if (serveFrontend) {
   app.use(express.static(frontendDist));
+  // The frontend is built with Vite base "/admin/", so its assets are
+  // referenced as /admin/assets/... Map that prefix to the dist root so the
+  // SPA loads and deep links can refresh (Express SPA catch-all below).
+  app.use("/admin", express.static(frontendDist));
   app.get(/.*/, (req, res) => {
     if (req.path.startsWith("/api/")) {
       return res

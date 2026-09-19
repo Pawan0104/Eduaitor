@@ -45,7 +45,7 @@ const STATUS = {
     swatch: "#F97316",
   },
   Late: {
-    label: "Late",
+    label: "Leave",
     bg: "#FFFBEB",
     fg: "#B45309",
     border: "#FDE68A",

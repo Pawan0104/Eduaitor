@@ -18,6 +18,15 @@ const studentStatusSchema = new mongoose.Schema(
       default: null,
     },
     markedDoneAt: Date,
+    note: { type: String, default: "" },
+    photos: [
+      {
+        url: String,
+        public_id: String,
+        name: String,
+        type: String,
+      },
+    ],
     teacherRemark: { type: String, default: "" },
     completedAt: Date,
     completedBy: { type: mongoose.Schema.Types.ObjectId },
@@ -35,8 +44,8 @@ const homeworkSchema = new mongoose.Schema(
     teacherId: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "Teacher",
-      required: true,
     },
+    createdById: { type: mongoose.Schema.Types.ObjectId, ref: "User" },
     classId: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "Class",

@@ -16,7 +16,6 @@ export const MODULES = [
   { key: "commerce",   label: "School Commerce Suite", default: false },
   { key: "diary",      label: "Diary",                 default: false },
   { key: "homework",   label: "Homework",              default: false },
-  { key: "daily_learning", label: "Daily Learning",    default: false },
   { key: "assignments",label: "Assignments",           default: false },
   { key: "events",     label: "Events & Calendar",     default: false },
   { key: "notices",    label: "Notices",               default: false },
@@ -24,7 +23,9 @@ export const MODULES = [
   { key: "blogs",      label: "Blogs",                 default: false },
   { key: "staff",      label: "Staff",                 default: false },
   { key: "leads",      label: "Lead Management",       default: false },
+  { key: "marketing",  label: "Marketing AI",           default: true  },
   { key: "gatepass",   label: "Gate Passes",           default: false },
+  { key: "leaveRequest",   label: "Leave Requests",           default: false },
   { key: "message",   label: "Messages",           default: false },
 ];
 

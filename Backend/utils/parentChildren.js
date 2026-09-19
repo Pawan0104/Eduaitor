@@ -18,6 +18,8 @@ export function toChildSummary(student) {
     username:
       student.studentCredentials?.username || student.studentId || "",
     photo_url: student.documents?.studentPhoto?.url || null,
+    schoolId: student.schoolId || null,
+    schoolName: student.schoolName || "",
   };
 }
 
@@ -30,6 +32,28 @@ export async function findChildrenByParentUsername(parentUsername, schoolId) {
 
   const list = await Student.find({
     schoolId,
+    "parentCredentials.username": username,
+  })
+    .populate("classId", "name className")
+    .populate("sectionId", "name sectionName")
+    .select(
+      "firstName lastName rollNo studentId classId sectionId documents.studentPhoto parentCredentials studentCredentials.username schoolId",
+    )
+    .sort({ firstName: 1, lastName: 1 })
+    .lean();
+
+  return list;
+}
+
+/**
+ * All students across all schools sharing the same parent username.
+ * Useful for parent accounts linked to multiple schools.
+ */
+export async function findChildrenByParentUsernameAllSchools(parentUsername) {
+  const username = normalizeParentUsername(parentUsername);
+  if (!username) return [];
+
+  const list = await Student.find({
     "parentCredentials.username": username,
   })
     .populate("classId", "name className")

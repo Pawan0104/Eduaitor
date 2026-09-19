@@ -31,6 +31,25 @@ import {
   updateRouteStatus,
   deleteRoute,
 
+  // Stops (Module 2)
+  getStops,
+  createStop,
+  updateStop,
+  deleteStop,
+
+  // Attendants (Module 5)
+  getAttendants,
+  createAttendant,
+  updateAttendant,
+  updateAttendantAttendance,
+  deleteAttendant,
+
+  // Vendors (Module 6)
+  getVendors,
+  createVendor,
+  updateVendor,
+  deleteVendor,
+
   // Super Admin
   getAdminDrivers,
   getAdminBuses,
@@ -185,5 +204,50 @@ router.patch("/routes/:id/status", ...transportGuard, updateRouteStatus);
 
 // DELETE /transport/routes/:id         query: ?school_id=
 router.delete("/routes/:id", ...transportGuard, deleteRoute);
+
+// ── STOPS (Module 2) ─────────────────────────────────────────────────────────
+
+// GET  /transport/stops
+router.get("/stops", ...transportGuard, getStops);
+
+// POST /transport/stops
+router.post("/stops", ...transportGuard, createStop);
+
+// PUT  /transport/stops/:id
+router.put("/stops/:id", ...transportGuard, updateStop);
+
+// DELETE /transport/stops/:id
+router.delete("/stops/:id", ...transportGuard, deleteStop);
+
+// ── ATTENDANTS (Module 5) ───────────────────────────────────────────────────────
+
+// GET  /transport/attendants
+router.get("/attendants", ...transportGuard, getAttendants);
+
+// POST /transport/attendants
+router.post("/attendants", ...transportGuard, createAttendant);
+
+// PUT  /transport/attendants/:id
+router.put("/attendants/:id", ...transportGuard, updateAttendant);
+
+// PATCH /transport/attendants/:id/attendance   body: { date, status, note }
+router.patch("/attendants/:id/attendance", ...transportGuard, updateAttendantAttendance);
+
+// DELETE /transport/attendants/:id
+router.delete("/attendants/:id", ...transportGuard, deleteAttendant);
+
+// ── VENDORS (Module 6) ──────────────────────────────────────────────────────────
+
+// GET  /transport/vendors
+router.get("/vendors", ...transportGuard, getVendors);
+
+// POST /transport/vendors
+router.post("/vendors", ...transportGuard, createVendor);
+
+// PUT  /transport/vendors/:id
+router.put("/vendors/:id", ...transportGuard, updateVendor);
+
+// DELETE /transport/vendors/:id
+router.delete("/vendors/:id", ...transportGuard, deleteVendor);
 
 export default router;
