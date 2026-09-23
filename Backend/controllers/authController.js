@@ -17,9 +17,11 @@ import {
   toChildSummary,
 } from "../utils/parentChildren.js";
 
+const TOKEN_TTL_SECONDS = 7 * 24 * 60 * 60; // 7 days: users stay logged in until they log out
+
 const generateToken = (payload) => {
   return jwt.sign(payload, process.env.JWT_SECRET, {
-    expiresIn: "1d",
+    expiresIn: TOKEN_TTL_SECONDS,
   });
 };
 
@@ -27,6 +29,7 @@ const cookieOptions = {
   httpOnly: true,
   secure: process.env.NODE_ENV === "production",
   sameSite: process.env.NODE_ENV === "production" ? "none" : "lax",
+  maxAge: TOKEN_TTL_SECONDS * 1000,
 };
 
 const withSchoolNames = async (children) => {
