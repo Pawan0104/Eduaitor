@@ -13,7 +13,6 @@ import {
   FaStore,
   FaIdCard,
   FaHeadset,
-  FaClipboardList,
   FaBookDead,
   FaBookOpen,
   FaKey,
@@ -51,7 +50,6 @@ const COLOR_MAP = {
   "Exam Results": { bg: "#FFF7ED", icon: "#EF4444", dot: "#FEE2E2" },
   "Transport & GPS": { bg: "#F0FDFA", icon: "#0D9488", dot: "#99F6E4" },
   "Help / Support": { bg: "#FFFBEB", icon: "#D97706", dot: "#FDE68A" },
-  Homework: { bg: "#FFFBEB", icon: "#D97706", dot: "#FDE68A" },
   Attendance: { bg: "#F0FDF4", icon: "#10B981", dot: "#A7F3D0" },
   "Learned today": { bg: "#ECFDF5", icon: "#059669", dot: "#A7F3D0" },
   "Daily learning": { bg: "#EEF2FF", icon: "#4F46E5", dot: "#C7D2FE" },
@@ -133,7 +131,6 @@ export default function ParentMenu() {
         ]
       : [{ name: "Attendance", icon: <FaCalendarCheck />, path: "/parent/attendance" }]),
     { name: "Blogs", icon: <FaBlog />, path: "/parent/blogs" },
-    { name: "Homework", icon: <FaClipboardList />, path: "/parent/homework" },
     {
       name: "Assignments",
       icon: <GiSchoolBag />,

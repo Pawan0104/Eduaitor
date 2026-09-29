@@ -171,12 +171,6 @@ export default function StaffMenu() {
         module: "diary",
       },
       {
-        name: "Homework",
-        icon: <FaClipboardList />,
-        path: "/staff/homework",
-        module: "homework",
-      },
-      {
         name: "Exams",
         icon: <GiOpenBook />,
         module: "exams",

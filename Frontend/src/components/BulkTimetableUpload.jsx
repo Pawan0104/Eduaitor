@@ -48,14 +48,24 @@ export default function BulkTimetableUpload({ onComplete, compact = false }) {
         withCredentials: true,
         responseType: "blob",
       });
-      const url = window.URL.createObjectURL(new Blob([res.data]));
+      // Keep the server-sent MIME type; re-wrapping in `new Blob([blob])`
+      // silently drops it to an empty type.
+      const blob =
+        res.data instanceof Blob
+          ? res.data
+          : new Blob([res.data], {
+              type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            });
+
+      const url = window.URL.createObjectURL(blob);
       const link = document.createElement("a");
       link.href = url;
       link.setAttribute("download", "timetable_bulk_upload_template.xlsx");
       document.body.appendChild(link);
       link.click();
       link.remove();
-      window.URL.revokeObjectURL(url);
+      // Revoking in the same tick can cancel the download before it starts.
+      setTimeout(() => window.URL.revokeObjectURL(url), 1000);
     } catch {
       toast.error("Could not download template");
     }

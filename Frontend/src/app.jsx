@@ -67,9 +67,6 @@ import AttendanceReportPrincipal from "./pages/AttendanceReportPrincipal";
 import Calendar from "./pages/Calendar";
 import Group from "./pages/Group";
 import DiaryPrincipal from "./pages/DiaryPrincipal";
-import HomeworkSchool from "./pages/HomeworkSchool";
-import HomeworkTeacher from "./pages/HomeworkTeacher";
-import HomeworkParent from "./pages/HomeworkParent";
 import TeacherPageProgress from "./pages/TeacherPageProgress";
 import PrincipalResultView from "./pages/PrincipalResultView";
 import StaffAttendance from "./pages/StaffAttendance";
@@ -236,7 +233,6 @@ const App = () => {
           <Route path="defaulters" element={<Defaulters />} />
           <Route path="group" element={<Group />} />
           <Route path="diary" element={<DiaryPrincipal />} />
-          <Route path="homework" element={<HomeworkSchool />} />
           <Route path="event" element={<Event />} />
           <Route path="event/:id" element={<EventView />} />
           <Route path="notice" element={<Notice />} />
@@ -320,7 +316,6 @@ const App = () => {
           />
           <Route path="syllabus" element={<Syllabus />} />
           <Route path="diary" element={<DiaryTeacher />} />
-          <Route path="homework" element={<HomeworkTeacher />} />
           <Route path="page-progress" element={<TeacherPageProgress />} />
           <Route path="event" element={<Event />} />
           <Route path="event/:id" element={<EventView />} />
@@ -376,7 +371,6 @@ const App = () => {
            <Route path="gatepass" element={<ParentGatepass />} />
            <Route path="leave-request" element={<ParentLeaveRequest />} />
            <Route path="hostel-visit" element={<ParentHostelVisit />} />
-           <Route path="homework" element={<HomeworkParent />} />
            <Route path="assignment" element={<ParentAssignment />} />
            <Route
              path="assignment/result"
@@ -418,7 +412,6 @@ const App = () => {
           <Route path="report-card" element={<ReportCard />} />
           <Route path="id-card" element={<IdCard />} />
           <Route path="diary" element={<DiaryParent />} />
-          <Route path="homework" element={<HomeworkParent />} />
           <Route path="syllabus-books" element={<SyllabusBooksViewer />} />
           <Route path="library" element={<ParentLibrary />} />
           <Route path="group" element={<Group />} />
@@ -484,7 +477,6 @@ const App = () => {
           <Route path="timetable" element={<ReadTimetable />} />
           <Route path="syllabus" element={<Syllabus />} />
           <Route path="diary" element={<DiaryPrincipal />} />
-          <Route path="homework" element={<HomeworkSchool />} />
           <Route path="exams" element={<ExamCreate />} />
           <Route path="exam-marks" element={<TeacherExam />} />
           <Route path="report-card" element={<ReportCard />} />

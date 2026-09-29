@@ -389,7 +389,7 @@ export default function Notice() {
           {isAdmin
             ? `Manage and publish notices for students, parents, and staff.`
             : isTeacher
-              ? `See the notice for student, parent, staff.`
+              ? `See and create notices for students, parents, and staff.`
               : isStudent
                 ? `See the notice for the student.`
                 : `No notice available`}
@@ -440,7 +440,7 @@ export default function Notice() {
             ))}
           </div>
         )}
-        {user?.role === "school_admin" && (
+        {(user?.role === "school_admin" || user?.role === "teacher_admin") && (
           <button
             onClick={openCreate}
             className="flex items-center gap-2 text-[rgb(var(--text))] bg-[rgb(var(--primary))] text-sm font-semibold px-5 py-2.5 rounded-xl transition shrink-0"

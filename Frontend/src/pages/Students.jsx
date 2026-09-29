@@ -1,16 +1,17 @@
 import { useEffect, useState } from "react";
 import axios from "axios";
-import { FaPlus, FaArrowLeft, FaEye, FaEdit, FaUsers, FaFileExcel, FaFilePdf } from "react-icons/fa";
-import { MdPersonOutline } from "react-icons/md";
-import { PiChartPieSliceBold } from "react-icons/pi";
+import { FaPlus, FaArrowLeft, FaEye, FaEdit, FaFileExcel, FaFilePdf } from "react-icons/fa";
 import { useNavigate, useLocation } from "react-router-dom";
 import { toast } from "react-toastify";
 import { FiTrash2 } from "react-icons/fi";
 import * as XLSX from "xlsx";
 import MessageButton from "../components/MessageButton";
 import UserAvatar from "../components/UserAvatar";
+import Pagination from "../components/Pagination";
 
 const API = import.meta.env.VITE_API_URL;
+
+const CATEGORY_OPTIONS = ["General", "OBC", "SC", "ST", "Minority"];
 
 const Students = () => {
   const navigate = useNavigate();
@@ -19,8 +20,17 @@ const Students = () => {
   const [students, setStudents] = useState([]);
   const [selectedClass, setSelectedClass] = useState("");
   const [searchQuery, setSearchQuery] = useState("");
+  const [filterCategory, setFilterCategory] = useState("");
+  const [filterGender, setFilterGender] = useState("");
   const [classes, setClasses] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [page, setPage] = useState(1);
+  const [limit, setLimit] = useState(10);
+  const [pagination, setPagination] = useState({
+    total: 0,
+    page: 1,
+    totalPages: 1,
+  });
 
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [confirmAction, setConfirmAction] = useState(null);
@@ -38,12 +48,28 @@ const Students = () => {
     }
   };
 
-  const fetchStudents = async () => {
+  const fetchStudents = async (pageNo = page, pageLimit = limit) => {
     try {
       setLoading(true);
-      const res = await axios.get(`${API}/students`, { withCredentials: true });
+      const params = { page: pageNo, limit: pageLimit };
+      if (selectedClass) params.classId = selectedClass;
+      if (filterGender) params.gender = filterGender;
+      if (filterCategory) params.category = filterCategory;
+      if (searchQuery.trim()) params.search = searchQuery.trim();
+
+      const res = await axios.get(`${API}/students`, {
+        params,
+        withCredentials: true,
+      });
 
       setStudents(res.data.data);
+      setPagination(
+        res.data.pagination || {
+          total: res.data.data.length,
+          page: pageNo,
+          totalPages: 1,
+        },
+      );
     } catch {
       toast.error("Failed to load students");
     } finally {
@@ -54,6 +80,7 @@ const Students = () => {
   useEffect(() => {
     fetchStudents();
     fetchClasses();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   useEffect(() => {
@@ -61,40 +88,32 @@ const Students = () => {
       fetchStudents();
       navigate(location.pathname, { replace: true, state: {} });
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [location.state?.refresh]);
 
-  /* ================= STATS ================= */
+  useEffect(() => {
+    fetchStudents(page, limit);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [page, limit, selectedClass, filterGender, filterCategory, searchQuery]);
 
-  const totalStudents = students.length;
+  const handleFilterChange = (setter) => (value) => {
+    setter(value);
+    setPage(1);
+  };
 
-  const maleCount = students.filter((s) => s.gender === "Male").length;
-  const femaleCount = students.filter((s) => s.gender === "Female").length;
+  const filteredStudents = students;
 
-  const present = totalStudents;
+  const hasActiveFilters = Boolean(
+    searchQuery.trim() || selectedClass || filterCategory || filterGender,
+  );
 
-  const classCount = new Set(
-    students.map((s) => s.classId?._id).filter(Boolean),
-  ).size;
-
-  const filteredStudents = students.filter((s) => {
-    if (selectedClass && s.classId?._id !== selectedClass) return false;
-
-    const q = searchQuery.trim().toLowerCase();
-    if (!q) return true;
-
-    const admissionNo = String(s.studentId || "").toLowerCase();
-    const fullName = `${s.firstName || ""} ${s.lastName || ""}`.toLowerCase();
-    const father = String(s.fatherName || "").toLowerCase();
-    const mobile = String(s.fatherMobile || "").toLowerCase();
-
-    // Prefer exact/partial admission number match; also allow name/mobile
-    return (
-      admissionNo.includes(q) ||
-      fullName.includes(q) ||
-      father.includes(q) ||
-      mobile.includes(q)
-    );
-  });
+  const clearAllFilters = () => {
+    setSearchQuery("");
+    setSelectedClass("");
+    setFilterCategory("");
+    setFilterGender("");
+    setPage(1);
+  };
 
   const handleDelete = (id) => {
     setConfirmMessage("Are you sure you want to delete this student?");
@@ -116,8 +135,8 @@ const Students = () => {
     }
   };
 
-  const buildExportRows = () =>
-    filteredStudents.map((s, index) => ({
+  const buildExportRows = (rows) =>
+    rows.map((s, index) => ({
       "S.No": index + 1,
       "Admission No": s.studentId || "",
       "First Name": s.firstName || "",
@@ -134,13 +153,33 @@ const Students = () => {
       Address: s.address || "",
     }));
 
-  const exportExcel = () => {
-    if (filteredStudents.length === 0) {
+  const fetchExportRows = async () => {
+    const params = { all: true };
+    if (selectedClass) params.classId = selectedClass;
+    if (filterGender) params.gender = filterGender;
+    if (filterCategory) params.category = filterCategory;
+    if (searchQuery.trim()) params.search = searchQuery.trim();
+
+    try {
+      const res = await axios.get(`${API}/students`, {
+        params,
+        withCredentials: true,
+      });
+      return buildExportRows(res.data.data || []);
+    } catch {
+      toast.error("Failed to fetch students for export");
+      return null;
+    }
+  };
+
+  const exportExcel = async () => {
+    const rows = await fetchExportRows();
+    if (!rows) return;
+    if (rows.length === 0) {
       toast.error("No students to export");
       return;
     }
 
-    const rows = buildExportRows();
     const worksheet = XLSX.utils.json_to_sheet(rows);
     const workbook = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(workbook, worksheet, "Students");
@@ -160,13 +199,14 @@ const Students = () => {
     toast.success("Excel downloaded");
   };
 
-  const exportPdf = () => {
-    if (filteredStudents.length === 0) {
+  const exportPdf = async () => {
+    const rows = await fetchExportRows();
+    if (!rows) return;
+    if (rows.length === 0) {
       toast.error("No students to export");
       return;
     }
 
-    const rows = buildExportRows();
     const headers = Object.keys(rows[0]);
     const stamp = new Date().toLocaleString();
 
@@ -210,22 +250,42 @@ const Students = () => {
     <thead><tr>${tableHead}</tr></thead>
     <tbody>${tableBody}</tbody>
   </table>
-  <script>
-    window.onload = function () {
-      window.print();
-    };
-  </script>
 </body>
 </html>`;
 
-    const win = window.open("", "_blank");
-    if (!win) {
-      toast.error("Popup blocked. Allow popups to export PDF.");
+    const frame = document.createElement("iframe");
+    frame.setAttribute("aria-hidden", "true");
+    frame.style.position = "fixed";
+    frame.style.right = "0";
+    frame.style.bottom = "0";
+    frame.style.width = "0";
+    frame.style.height = "0";
+    frame.style.border = "0";
+    document.body.appendChild(frame);
+
+    const frameWindow = frame.contentWindow;
+    if (!frameWindow) {
+      frame.remove();
+      toast.error("Could not prepare the export.");
       return;
     }
-    win.document.open();
-    win.document.write(html);
-    win.document.close();
+
+    frameWindow.document.open();
+    frameWindow.document.write(html);
+    frameWindow.document.close();
+
+    let cleaned = false;
+    const cleanup = () => {
+      if (cleaned) return;
+      cleaned = true;
+      frame.remove();
+    };
+
+    frameWindow.addEventListener("afterprint", cleanup);
+    frameWindow.focus();
+    frameWindow.print();
+
+    setTimeout(cleanup, 60000);
     toast.info("Use Print → Save as PDF in the dialog");
   };
 
@@ -267,42 +327,53 @@ const Students = () => {
         </button>
       </div>
 
-      {/* STATS */}
-
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 mb-6 bg-(rgb(var(--surface))) p-4 rounded-xl shadow">
-        <StatCard
-          title="TOTAL STUDENTS"
-          value={totalStudents}
-          icon={<FaUsers size={20} />}
-          color="blue"
-        />
-
-        <StatCard
-          title="PRESENT"
-          value={present}
-          icon={<MdPersonOutline size={20} />}
-          color="green"
-        />
-
-        <StatCard
-          title="MALE / FEMALE"
-          value={`${maleCount} / ${femaleCount}`}
-          icon={<PiChartPieSliceBold size={20} />}
-          color="purple"
-        />
-      </div>
-
-      {/* CLASS FILTER + SEARCH */}
+      {/* FILTERS */}
 
       <div className="bg-[rgb(var(--surface))] rounded-xl shadow p-4 sm:p-6 mb-6">
-        <div className="grid gap-4 sm:grid-cols-2">
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-4">
+          <p className="text-sm font-semibold text-[rgb(var(--text))]">
+            Filter Students
+            <span className="ml-2 text-xs font-normal text-[rgb(var(--text-muted))]">
+              {filteredStudents.length} of {students.length} shown
+            </span>
+          </p>
+          {hasActiveFilters && (
+            <button
+              type="button"
+              onClick={clearAllFilters}
+              className="self-start px-3 py-1.5 rounded-lg text-xs font-semibold border border-[rgb(var(--border))] text-[rgb(var(--text))] hover:bg-[rgb(var(--bg))]"
+            >
+              Clear filters
+            </button>
+          )}
+        </div>
+
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+          <div className="sm:col-span-2 lg:col-span-1">
+            <p className="text-sm font-medium mb-2 text-[rgb(var(--text))]">
+              Search
+            </p>
+            <input
+              type="search"
+              value={searchQuery}
+              onChange={(e) => handleFilterChange(setSearchQuery)(e.target.value)}
+              placeholder="Name, admission no, father, mobile..."
+              className="border rounded-lg px-4 py-2 w-full text-[rgb(var(--text))] bg-[rgb(var(--surface))]"
+              aria-label="Search students"
+            />
+            <p className="text-xs text-[rgb(var(--text-muted))] mt-1.5">
+              Matches student, father, mother or guardian name and any mobile
+              number
+            </p>
+          </div>
+
           <div>
             <p className="text-sm font-medium mb-2 text-[rgb(var(--text))]">
               Select Class
             </p>
             <select
               value={selectedClass}
-              onChange={(e) => setSelectedClass(e.target.value)}
+              onChange={(e) => handleFilterChange(setSelectedClass)(e.target.value)}
               className="border rounded-lg px-4 py-2 w-full text-[rgb(var(--text))] bg-[rgb(var(--surface))]"
             >
               <option value="">-- All Classes --</option>
@@ -316,19 +387,35 @@ const Students = () => {
 
           <div>
             <p className="text-sm font-medium mb-2 text-[rgb(var(--text))]">
-              Search by Admission No.
+              Gender
             </p>
-            <input
-              type="search"
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="e.g. STU0001"
+            <select
+              value={filterGender}
+              onChange={(e) => handleFilterChange(setFilterGender)(e.target.value)}
               className="border rounded-lg px-4 py-2 w-full text-[rgb(var(--text))] bg-[rgb(var(--surface))]"
-              aria-label="Search by admission number"
-            />
-            <p className="text-xs text-[rgb(var(--text-muted))] mt-1.5">
-              Also matches student name, father name, or mobile
+            >
+              <option value="">-- All Genders --</option>
+              <option value="Male">Male</option>
+              <option value="Female">Female</option>
+            </select>
+          </div>
+
+          <div>
+            <p className="text-sm font-medium mb-2 text-[rgb(var(--text))]">
+              Category
             </p>
+            <select
+              value={filterCategory}
+              onChange={(e) => handleFilterChange(setFilterCategory)(e.target.value)}
+              className="border rounded-lg px-4 py-2 w-full text-[rgb(var(--text))] bg-[rgb(var(--surface))]"
+            >
+              <option value="">-- All Categories --</option>
+              {CATEGORY_OPTIONS.map((cat) => (
+                <option key={cat} value={cat}>
+                  {cat}
+                </option>
+              ))}
+            </select>
           </div>
         </div>
       </div>
@@ -457,6 +544,18 @@ const Students = () => {
             </table>
           </div>
         )}
+
+        <Pagination
+          page={pagination.page || page}
+          totalPages={pagination.totalPages || 1}
+          total={pagination.total || 0}
+          limit={limit}
+          onPageChange={setPage}
+          onLimitChange={(size) => {
+            setLimit(size);
+            setPage(1);
+          }}
+        />
       </div>
       {confirmOpen && (
         <div className="fixed inset-0 flex items-center justify-center p-4 z-50 border-bg-[rgb(var(--border-strong))]">
@@ -493,26 +592,6 @@ const Students = () => {
 export default Students;
 
 /* ================= COMPONENTS ================= */
-
-const StatCard = ({ title, value, icon, color }) => {
-  const colors = {
-    blue: "bg-blue-100 text-blue-600",
-    green: "bg-green-100 text-green-600",
-    purple: "bg-purple-100 text-purple-600",
-  };
-
-  return (
-    <div className="bg-[rgb(var(--surface))] rounded-xl shadow p-5 flex items-center gap-4">
-      <div className={`${colors[color]} p-3 rounded-lg`}>{icon}</div>
-
-      <div>
-        <p className="text-xs sm:text-sm text-[rgb(var(--text-muted))]">{title}</p>
-
-        <p className="text-xl sm:text-2xl font-bold">{value}</p>
-      </div>
-    </div>
-  );
-};
 
 const EmptyState = ({ text }) => (
   <div className="flex flex-col items-center justify-center py-16 text-[rgb(var(--text))]">

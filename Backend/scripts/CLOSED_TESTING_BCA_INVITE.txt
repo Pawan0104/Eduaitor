@@ -1,0 +1,58 @@
+EduAitor — Closed Testing Invite (BCA Parents)
+==============================================
+
+Send this message to the 12 parents (WhatsApp / email).
+
+----- COPY BELOW -----
+
+Hello,
+
+You are invited to EduAitor closed testing for Bright Children Academy (BCA).
+
+Login:
+https://www.eduaitor.com/admin/login
+
+Steps:
+1) Open the link
+2) Choose Parent login
+3) Username = your mobile number (from the welcome email)
+4) Password = #Parent@2026
+5) Select school: Bright Children Academy
+
+Please try:
+- Login successfully
+- See your child’s profile
+- Open dashboard / basic screens
+- Note anything broken or confusing
+
+Reply with:
+- Device (phone/laptop) + browser
+- What worked
+- What failed (screenshot if possible)
+
+Thank you!
+EduAitor team
+
+----- END -----
+
+Parent accounts (username = mobile, password = #Parent@2026):
+aryaeduhub@gmail.com              9876510000
+basant181442@gmail.com            9876510001
+coolpawant09@gmail.com            9876510002
+kanta456sharma@gmail.com          9876510003
+kgupta112511@gmail.com            9876510004
+nexbigstep@gmail.com              9876510005
+pawan.eduaitor@gmail.com          9876510006
+rishitiwari1286@gmail.com         9876510007
+shilpaverma1212@gmail.com         9876510008
+sonusrivastava1512@gmail.com      9876510009
+suveers6886@gmail.com             9876510010
+suveersamsung@gmail.com           9876510011
+
+Test owner smoke (verified live):
+- https://www.eduaitor.com/ecosystem  → OK
+- https://www.eduaitor.com/admin/login → OK
+- Parent lookup + login API for 9876510006 → OK
+
+Feedback tracker suggestion:
+Date | Parent email | Device | Issue | Severity | Status

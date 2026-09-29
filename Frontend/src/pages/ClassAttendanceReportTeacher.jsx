@@ -219,7 +219,7 @@ export default function ClassAttendanceReportTeacher() {
         setClasses(res.data.classes ?? []);
         // Auto-select the teacher's only class+section
         const cls     = res.data.classes[0];
-        const detail  = cls.details[0];
+        const detail  = cls.details?.[0] || {};
         setSelClass(cls._id);
         setSelSection(detail.sectionId?._id ?? detail.sectionId);
       } catch {

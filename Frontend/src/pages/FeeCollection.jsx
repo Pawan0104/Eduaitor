@@ -471,13 +471,27 @@ function FeeCollection() {
                   </tr>
                 </thead>
                 <tbody className=" divide-y divide-gray-100">
-                  {filteredStudents.map((student) => (
+                  {filteredStudents.map((student) => {
+                    const isSelected =
+                      !!selectedStudent?._id &&
+                      String(selectedStudent._id) === String(student._id);
+                    return (
                     <tr
                       key={student._id}
-                      className=""
+                      className={`transition-colors ${
+                        isSelected
+                          ? "bg-[rgba(var(--primary),0.12)]"
+                          : "hover:bg-[rgba(var(--primary),0.05)]"
+                      }`}
                     >
                       <td className="px-6 py-4 whitespace-nowrap">
-                        <div className="text-sm font-bold text-[rgb(var(--primary))]">
+                        <div
+                          className={`text-sm ${
+                            isSelected
+                              ? "font-extrabold text-[rgb(var(--primary))]"
+                              : "font-bold text-[rgb(var(--primary))]"
+                          }`}
+                        >
                           {student.studentId}
                         </div>
                         <div className="text-xs text-[rgb(var(--text))]">
@@ -536,7 +550,8 @@ function FeeCollection() {
                         </button>
                       </td>
                     </tr>
-                  ))}
+                    );
+                  })}
                 </tbody>
               </table>
             </div>

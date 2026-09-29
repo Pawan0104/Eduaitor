@@ -256,13 +256,26 @@ export const getHouseStudents = async (req, res, next) => {
       });
     }
 
-    const { houseId, unassigned, search } = req.query;
+    const { houseId, unassigned, search, classId, sectionId, gender } =
+      req.query;
     const filter = { schoolId };
 
     if (unassigned === "true" || unassigned === "1") {
       filter.$or = [{ houseId: null }, { houseId: { $exists: false } }];
     } else if (houseId) {
       filter.houseId = houseId;
+    }
+
+    if (classId && mongoose.Types.ObjectId.isValid(String(classId))) {
+      filter.classId = classId;
+    }
+
+    if (sectionId && mongoose.Types.ObjectId.isValid(String(sectionId))) {
+      filter.sectionId = sectionId;
+    }
+
+    if (gender === "Male" || gender === "Female") {
+      filter.gender = gender;
     }
 
     if (search?.trim()) {

@@ -30,7 +30,6 @@ import { toast } from "react-toastify";
 import { useAuth } from "../context/AuthContext";
 import { useLanguage } from "../context/LanguageContext";
 import axios from "axios";
-import { SchoolHomeStrip } from "../components/RoleMenuShell";
 import BlogFeed from "../components/BlogFeed";
 import { ModuleGrid, useMenuExitGuard } from "../components/RoleMenuShell";
 import { clearSessionKeepPrefs } from "../utils/clearSessionKeepPrefs";
@@ -69,8 +68,6 @@ export const COLOR_MAP = {
   "Fee Management": { bg: "#FFFBEB", icon: "#D97706", dot: "#FDE68A" },
 
   Diary: { bg: "#FDF4FF", icon: "#C026D3", dot: "#F5D0FE" },
-
-  Homework: { bg: "#FFFBEB", icon: "#D97706", dot: "#FDE68A" },
 
   Events: { bg: "#FFF1F2", icon: "#E11D48", dot: "#FECDD3" },
 
@@ -120,7 +117,6 @@ function GreetingHeader({ name, role, loginAs }) {
 
   return (
     <div className="flex flex-col gap-2.5 mb-1">
-      <SchoolHomeStrip />
       <div
         className="app-greeting skin-wave-header relative overflow-hidden rounded-[1.35rem] px-5 pb-11 pt-5 lg:pb-7"
         style={{
@@ -511,11 +507,6 @@ export default function SchoolMenu() {
       name: "Diary",
       icon: <FaBookOpen />,
       path: "/school/diary",
-    },
-    {
-      name: "Homework",
-      icon: <FaClipboardList />,
-      path: "/school/homework",
     },
     {
       name: "Events",

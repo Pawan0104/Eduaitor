@@ -1,0 +1,41 @@
+EduAitor Closed Testing — Tester Checklist
+==========================================
+
+Forward this to parents (WhatsApp / email).
+
+----- COPY BELOW -----
+
+✅ EduAitor Closed Testing Checklist
+School: Bright Children Academy (BCA)
+
+🔗 Login: https://www.eduaitor.com/admin/login
+
+How to login
+1) Open the link
+2) Choose Parent
+3) Username = your mobile number (from invite email)
+4) Password = #Parent@2026
+5) Select school: Bright Children Academy
+
+Please complete and reply ✅ / ❌ for each:
+
+[ ] 1. Page opens (no 403 / blank error)
+[ ] 2. Parent login succeeds
+[ ] 3. Correct school shows (BCA)
+[ ] 4. Child name / profile is visible
+[ ] 5. Dashboard / home opens
+[ ] 6. Can open at least 2–3 menus/screens
+[ ] 7. Logout works
+[ ] 8. Login again works
+[ ] 9. Tried on phone
+[ ] 10. Tried on laptop/desktop (if available)
+
+When you reply, include:
+• Device (Android/iPhone/Windows/Mac)
+• Browser (Chrome/Safari/etc.)
+• Anything confusing or broken
+• Screenshot if something fails
+
+Thank you for helping us test EduAitor!
+
+----- END -----

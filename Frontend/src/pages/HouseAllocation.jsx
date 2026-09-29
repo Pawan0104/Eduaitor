@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import axios from "axios";
 import {
   FaPlus,
@@ -6,8 +6,6 @@ import {
   FaEdit,
   FaArrowLeft,
   FaRandom,
-  FaUsers,
-  FaHome,
 } from "react-icons/fa";
 import { toast } from "react-toastify";
 import { useNavigate } from "react-router-dom";
@@ -27,19 +25,17 @@ const HouseAllocation = () => {
   const isMobile = window.innerWidth <= 768;
 
   const [houses, setHouses] = useState([]);
-  const [summary, setSummary] = useState({
-    totalHouses: 0,
-    activeHouses: 0,
-    assignedStudents: 0,
-    unassignedStudents: 0,
-  });
   const [students, setStudents] = useState([]);
+  const [classes, setClasses] = useState([]);
   const [loading, setLoading] = useState(true);
   const [allocating, setAllocating] = useState(false);
 
   const [filterHouse, setFilterHouse] = useState("");
   const [showUnassigned, setShowUnassigned] = useState(false);
   const [search, setSearch] = useState("");
+  const [filterClass, setFilterClass] = useState("");
+  const [filterSection, setFilterSection] = useState("");
+  const [filterGender, setFilterGender] = useState("");
 
   const [formModal, setFormModal] = useState(false);
   const [isEdit, setIsEdit] = useState(false);
@@ -55,14 +51,13 @@ const HouseAllocation = () => {
   const fetchHouses = async () => {
     const res = await axios.get(`${API}/house`, { withCredentials: true });
     setHouses(res.data.data || []);
-    setSummary(
-      res.data.summary || {
-        totalHouses: 0,
-        activeHouses: 0,
-        assignedStudents: 0,
-        unassignedStudents: 0,
-      },
-    );
+  };
+
+  const fetchClasses = async () => {
+    const res = await axios.get(`${API}/classes/all`, {
+      withCredentials: true,
+    });
+    setClasses(res.data.classes || []);
   };
 
   const fetchStudents = async () => {
@@ -70,6 +65,9 @@ const HouseAllocation = () => {
     if (showUnassigned) params.unassigned = "true";
     else if (filterHouse) params.houseId = filterHouse;
     if (search.trim()) params.search = search.trim();
+    if (filterClass) params.classId = filterClass;
+    if (filterSection) params.sectionId = filterSection;
+    if (filterGender) params.gender = filterGender;
 
     const res = await axios.get(`${API}/house/students`, {
       params,
@@ -82,6 +80,7 @@ const HouseAllocation = () => {
     try {
       setLoading(true);
       await fetchHouses();
+      await fetchClasses();
       await fetchStudents();
     } catch (err) {
       toast.error(err.response?.data?.message || "Failed to load houses");
@@ -96,7 +95,34 @@ const HouseAllocation = () => {
 
   useEffect(() => {
     if (!loading) fetchStudents().catch(() => {});
-  }, [filterHouse, showUnassigned, search]);
+  }, [filterHouse, showUnassigned, search, filterClass, filterSection, filterGender]);
+
+  const handleClassFilterChange = (value) => {
+    setFilterClass(value);
+    setFilterSection("");
+  };
+
+  const sections = useMemo(() => {
+    if (!filterClass) return [];
+    const cls = classes.find((c) => c._id === filterClass);
+    if (!cls) return [];
+    return (cls.details || [])
+      .map((d) => d.sectionId)
+      .filter((s) => s && s._id);
+  }, [classes, filterClass]);
+
+  const hasActiveFilters = Boolean(
+    search.trim() || filterHouse || showUnassigned || filterClass || filterSection || filterGender,
+  );
+
+  const clearAllFilters = () => {
+    setSearch("");
+    setFilterHouse("");
+    setShowUnassigned(false);
+    setFilterClass("");
+    setFilterSection("");
+    setFilterGender("");
+  };
 
   const openAdd = () => {
     setIsEdit(false);
@@ -246,25 +272,6 @@ const HouseAllocation = () => {
         </div>
       </div>
 
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
-        <StatCard title="HOUSES" value={summary.totalHouses} icon={<FaHome />} />
-        <StatCard
-          title="ACTIVE"
-          value={summary.activeHouses}
-          icon={<FaHome />}
-        />
-        <StatCard
-          title="ASSIGNED"
-          value={summary.assignedStudents}
-          icon={<FaUsers />}
-        />
-        <StatCard
-          title="UNASSIGNED"
-          value={summary.unassignedStudents}
-          icon={<FaUsers />}
-        />
-      </div>
-
       {/* HOUSES */}
       <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4 mb-8">
         {houses.map((house) => (
@@ -323,16 +330,33 @@ const HouseAllocation = () => {
 
       {/* STUDENTS */}
       <div className="bg-[rgb(var(--surface))] rounded-xl shadow">
-        <div className="p-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 border-b border-slate-100">
-          <h2 className="text-lg font-semibold">Students</h2>
-          <div className="flex flex-wrap gap-2">
+        <div className="p-4 border-b border-slate-100">
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+            <h2 className="text-lg font-semibold">Students</h2>
+            <div className="flex items-center gap-2">
+              <span className="text-xs text-[rgb(var(--text-light))]">
+                {students.length} shown
+              </span>
+              {hasActiveFilters && (
+                <button
+                  onClick={clearAllFilters}
+                  className="px-2.5 py-1.5 rounded-lg text-xs font-medium border border-slate-200 text-slate-600 hover:bg-slate-50"
+                >
+                  Clear filters
+                </button>
+              )}
+            </div>
+          </div>
+
+          <div className="mt-3 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-2">
             <input
               type="text"
-              placeholder="Search student..."
+              placeholder="Search name or student ID..."
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              className="border rounded-lg px-3 py-2 text-sm w-full sm:w-48 bg-[rgb(var(--surface))]"
+              className="border rounded-lg px-3 py-2 text-sm w-full bg-[rgb(var(--surface))]"
             />
+
             <select
               value={showUnassigned ? "unassigned" : filterHouse}
               onChange={(e) => {
@@ -344,15 +368,54 @@ const HouseAllocation = () => {
                   setFilterHouse(e.target.value);
                 }
               }}
-              className="border rounded-lg px-3 py-2 text-sm bg-[rgb(var(--surface))]"
+              className="border rounded-lg px-3 py-2 text-sm w-full bg-[rgb(var(--surface))]"
             >
-              <option value="">All students</option>
+              <option value="">All houses</option>
               <option value="unassigned">Unassigned only</option>
               {houses.map((h) => (
                 <option key={h._id} value={h._id}>
                   {h.name}
                 </option>
               ))}
+            </select>
+
+            <select
+              value={filterClass}
+              onChange={(e) => handleClassFilterChange(e.target.value)}
+              className="border rounded-lg px-3 py-2 text-sm w-full bg-[rgb(var(--surface))]"
+            >
+              <option value="">All classes</option>
+              {classes.map((c) => (
+                <option key={c._id} value={c._id}>
+                  {c.name}
+                </option>
+              ))}
+            </select>
+
+            <select
+              value={filterSection}
+              onChange={(e) => setFilterSection(e.target.value)}
+              disabled={!filterClass}
+              className="border rounded-lg px-3 py-2 text-sm w-full bg-[rgb(var(--surface))] disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              <option value="">
+                {filterClass ? "All sections" : "Select a class first"}
+              </option>
+              {sections.map((s) => (
+                <option key={s._id} value={s._id}>
+                  {s.name}
+                </option>
+              ))}
+            </select>
+
+            <select
+              value={filterGender}
+              onChange={(e) => setFilterGender(e.target.value)}
+              className="border rounded-lg px-3 py-2 text-sm w-full bg-[rgb(var(--surface))]"
+            >
+              <option value="">All genders</option>
+              <option value="Male">Male</option>
+              <option value="Female">Female</option>
             </select>
           </div>
         </div>
@@ -567,16 +630,6 @@ const HouseAllocation = () => {
     </div>
   );
 };
-
-const StatCard = ({ title, value, icon }) => (
-  <div className="bg-[rgb(var(--surface))] rounded-xl shadow p-4 border-l-4 border-l-indigo-500">
-    <div className="flex items-center justify-between">
-      <p className="text-xs font-medium">{title}</p>
-      <span className="text-indigo-500">{icon}</span>
-    </div>
-    <p className="text-2xl font-bold mt-1">{value}</p>
-  </div>
-);
 
 const Field = ({ label, value, onChange, placeholder }) => (
   <div>

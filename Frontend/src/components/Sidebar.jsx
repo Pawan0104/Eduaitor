@@ -278,12 +278,6 @@ const Sidebar = ({ closeSidebar }) => {
       path: "/school/diary",
       module: "diary",
     },
-    {
-      name: "Homework",
-      icon: <FaClipboardList />,
-      path: "/school/homework",
-      module: "homework",
-    },
     { name: "Events", icon: <FaCalendar />, path: "/school/event" },
     { name: "Notices", icon: <FaBell />, path: "/school/notice" },
     { name: "Calendar", icon: <FaCalendarAlt />, path: "/school/calendar" },
@@ -400,7 +394,7 @@ const Sidebar = ({ closeSidebar }) => {
       icon: <GiSchoolBag />,
       module: "assignments",
       children: [
-        { name: "My Assignments", path: "/teacher/assignment" },
+        { name: "Create Assignment", path: "/teacher/assignment" },
         { name: "Assignment Result", path: "/teacher/assignment/result" },
       ],
     },
@@ -426,12 +420,6 @@ const Sidebar = ({ closeSidebar }) => {
       icon: <FaBookOpen />,
       path: "/teacher/diary",
       module: "diary",
-    },
-    {
-      name: "Homework",
-      icon: <FaClipboardList />,
-      path: "/teacher/homework",
-      module: "homework",
     },
     {
       name: "Pages taught",
@@ -555,12 +543,6 @@ const Sidebar = ({ closeSidebar }) => {
       module: "hostel",
     },
     {
-      name: "Homework",
-      icon: <FaClipboardList />,
-      path: "/parent/homework",
-      module: "homework",
-    },
-    {
       name: "Attendance",
       icon: <FaUsers />,
       module: "attendance",
@@ -648,12 +630,6 @@ const Sidebar = ({ closeSidebar }) => {
       icon: <FaBookOpen />,
       path: "/student/diary",
       module: "diary",
-    },
-    {
-      name: "Homework",
-      icon: <FaClipboardList />,
-      path: "/student/homework",
-      module: "homework",
     },
     {
       name: "Syllabus Books",
@@ -766,12 +742,6 @@ const Sidebar = ({ closeSidebar }) => {
       icon: <FaBookOpen />,
       path: "/staff/diary",
       module: "diary",
-    },
-    {
-      name: "Homework",
-      icon: <FaClipboardList />,
-      path: "/staff/homework",
-      module: "homework",
     },
     {
       name: "Exams",

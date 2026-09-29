@@ -24,6 +24,18 @@ const studentSchema = new mongoose.Schema(
     dob: Date,
     gender: String,
     bloodGroup: String,
+
+    // Reservation category + (for Minority) the specific community.
+    category: {
+      type: String,
+      enum: ["General", "OBC", "SC", "ST", "Minority"],
+      default: "General",
+    },
+    community: {
+      type: String,
+      default: "",
+    },
+
     admissionDate: Date,
 
     studentId: {

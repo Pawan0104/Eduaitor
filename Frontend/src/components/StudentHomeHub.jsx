@@ -1,10 +1,15 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { FaChevronDown, FaChevronUp, FaSearch, FaTimes } from "react-icons/fa";
+import { FaChevronDown, FaChevronUp, FaPlus, FaSearch, FaTimes } from "react-icons/fa";
 import { useAuth } from "../context/AuthContext";
 import { useLanguage } from "../context/LanguageContext";
 import UserAvatar from "./UserAvatar";
-import { ModuleGrid, SchoolHomeStrip } from "./RoleMenuShell";
+import {
+  getMenuPinned,
+  getMenuPinnedKey,
+  MenuPinEditor,
+  ModuleGrid,
+} from "./RoleMenuShell";
 import { getMenuIconMeta } from "../utils/menuIcons";
 
 const FREQUENT_KEY = "menuFrequentClicks";
@@ -14,7 +19,6 @@ const FREQUENT_LIMIT = 8;
 export { MENU_ICON_META as STUDENT_ICON_META } from "../utils/menuIcons";
 
 const DEFAULT_FREQUENT = [
-  "Homework",
   "Assignment",
   "Assignment Result",
   "Attendance",
@@ -43,15 +47,22 @@ function recordUse(name) {
   }
 }
 
-function pickFrequent(menu, limit = FREQUENT_LIMIT) {
+function pickFrequent(menu, limit = FREQUENT_LIMIT, pinned = []) {
   const byName = Object.fromEntries(menu.map((m) => [m.name, m]));
   const scores = getScores();
-  const ranked = [...menu].sort(
-    (a, b) => (scores[b.name] || 0) - (scores[a.name] || 0),
-  );
   const picked = [];
   const seen = new Set();
 
+  for (const name of pinned) {
+    if (picked.length >= limit) break;
+    if (byName[name]) {
+      picked.push(byName[name]);
+      seen.add(name);
+    }
+  }
+  const ranked = [...menu]
+    .filter((i) => !seen.has(i.name))
+    .sort((a, b) => (scores[b.name] || 0) - (scores[a.name] || 0));
   for (const item of ranked) {
     if (picked.length >= limit) break;
     if ((scores[item.name] || 0) > 0) {
@@ -90,7 +101,6 @@ export function StudentGreetingHeader({ name }) {
 
   return (
     <div className="flex flex-col gap-2.5">
-      <SchoolHomeStrip />
       <div className="student-home-header relative overflow-hidden rounded-[1.5rem] px-5 pb-14 pt-5">
         <div className="pointer-events-none absolute -right-10 -top-12 h-40 w-40 rounded-full bg-white/20" />
         <div className="pointer-events-none absolute -bottom-8 left-8 h-24 w-24 rounded-full bg-white/10" />
@@ -167,9 +177,19 @@ export default function StudentHomeHub({
   const { user } = useAuth();
   const [showAll, setShowAll] = useState(false);
   const [query, setQuery] = useState("");
+  const [pinEditorOpen, setPinEditorOpen] = useState(false);
+  const [pinned, setPinned] = useState(() =>
+    getMenuPinned(user?.role, user?.loginAs),
+  );
   const [isNarrow, setIsNarrow] = useState(
     () => typeof window !== "undefined" && window.innerWidth < 1024,
   );
+
+  useEffect(() => {
+    const onPin = () => setPinned(getMenuPinned(user?.role, user?.loginAs));
+    window.addEventListener("menuPinnedChange", onPin);
+    return () => window.removeEventListener("menuPinnedChange", onPin);
+  }, [user?.role, user?.loginAs]);
 
   useEffect(() => {
     const onResize = () => setIsNarrow(window.innerWidth < 1024);
@@ -177,7 +197,10 @@ export default function StudentHomeHub({
     return () => window.removeEventListener("resize", onResize);
   }, []);
 
-  const frequent = useMemo(() => pickFrequent(menu, FREQUENT_LIMIT), [menu]);
+  const frequent = useMemo(
+    () => pickFrequent(menu, FREQUENT_LIMIT, pinned),
+    [menu, pinned],
+  );
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
@@ -252,14 +275,33 @@ export default function StudentHomeHub({
           </div>
         )}
 
-        <h2
-          className="mb-3.5 text-[13px] font-extrabold"
-          style={{ color: "rgb(var(--text))" }}
-        >
-          {showAll
-            ? t("menu.allModules", "All modules")
-            : t("menu.frequentActivities", "Frequent Activities")}
-        </h2>
+        <div className="mb-3.5 flex items-center justify-between gap-2">
+          <h2
+            className="text-[13px] font-extrabold"
+            style={{ color: "rgb(var(--text))" }}
+          >
+            {showAll
+              ? t("menu.allModules", "All modules")
+              : t("menu.frequentActivities", "Frequent Activities")}
+          </h2>
+          {!showAll && (
+            <button
+              type="button"
+              onClick={() => setPinEditorOpen(true)}
+              className="flex h-7 w-7 items-center justify-center rounded-full border text-[12px] font-black active:scale-95 transition-transform"
+              style={{
+                color: "rgb(var(--primary))",
+                borderColor:
+                  "color-mix(in srgb, rgb(var(--primary)) 35%, rgb(var(--border)))",
+                background:
+                  "color-mix(in srgb, rgb(var(--primary)) 10%, rgb(var(--surface)))",
+              }}
+              aria-label={t("menu.adjustFrequent", "Adjust frequently used")}
+            >
+              <FaPlus size={9} />
+            </button>
+          )}
+        </div>
 
         {displayItems.length === 0 ? (
           <p
@@ -311,6 +353,28 @@ export default function StudentHomeHub({
           {showAll ? <FaChevronUp size={14} /> : <FaChevronDown size={14} />}
         </button>
       </div>
+      {pinEditorOpen && (
+        <MenuPinEditor
+          menu={menu}
+          colorMap={colorMap}
+          pinned={pinned}
+          onToggle={(name) => {
+            const next = pinned.includes(name)
+              ? pinned.filter((n) => n !== name)
+              : [...pinned, name];
+            try {
+              localStorage.setItem(
+                getMenuPinnedKey(user?.role, user?.loginAs),
+                JSON.stringify(next),
+              );
+              window.dispatchEvent(new Event("menuPinnedChange"));
+            } catch {
+              /* ignore */
+            }
+          }}
+          onClose={() => setPinEditorOpen(false)}
+        />
+      )}
     </div>
   );
 }

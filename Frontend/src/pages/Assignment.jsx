@@ -248,6 +248,15 @@ export default function Assignment() {
   };
 
   const pickChapter = async (ch) => {
+    // Auto-fill the title from the chapter (teacher can still edit it below)
+    setDetails((d) => {
+      const prevAuto = selectedChapter?.name
+        ? `${selectedChapter.name} Assignment`
+        : null;
+      const isStillAuto = d.title === prevAuto;
+      const next = d.title?.trim() ? (isStillAuto ? `${ch.name} Assignment` : d.title) : `${ch.name} Assignment`;
+      return { ...d, title: next };
+    });
     setSelectedChapter(ch);
     setSelectedTopics([]);
     setTopics([]);
@@ -273,6 +282,31 @@ export default function Assignment() {
         ? prev.filter((x) => x._id !== t._id)
         : [...prev, t],
     );
+  };
+
+  // Steps can be clicked to jump back (or forward once prerequisites are met)
+  const canGotoStep = (i) => {
+    if (i <= step) return true;
+    switch (i) {
+      case STEP_SUBJECT:
+        return Boolean(selectedClass);
+      case STEP_CHAPTER:
+        return Boolean(selectedClass && selectedSubject);
+      case STEP_TOPIC:
+        return Boolean(selectedChapter);
+      case STEP_DETAILS:
+        return Boolean(selectedChapter);
+      case STEP_QUESTIONS:
+        return Boolean(selectedChapter && details.title?.trim());
+      default:
+        return false;
+    }
+  };
+
+  const gotoStep = (i) => {
+    if (!canGotoStep(i)) return;
+    setStep(i);
+    setError("");
   };
 
   /* ── AI GENERATE ── */
@@ -368,7 +402,6 @@ export default function Assignment() {
   /* ── SUBMIT ── */
   const handleSaveClick = () => {
     if (!details.title.trim()) return toast.warn("Title is required");
-    if (!details.dueDate) return toast.warn("Due date is required");
     if (!approvedQuestions.length)
       return toast.warn("Approve at least 1 question");
     setConfirmSave(true);
@@ -834,7 +867,12 @@ export default function Assignment() {
           />
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div className="sm:col-span-2">
-              <label className="text-[rgb(var(--text))] mb-2">Title *</label>
+              <label className="text-[rgb(var(--text))] mb-2">
+                Title *{" "}
+                <span className="normal-case text-[rgb(var(--text))] font-medium">
+                  (auto-filled from chapter — you can edit)
+                </span>
+              </label>
               <input
                 className="border w-full p-2 rounded-xl bg-[rgb(var(--surface))] text-[rgb(var(--text))]"
                 placeholder="e.g. Chapter 3 Homework"
@@ -859,42 +897,13 @@ export default function Assignment() {
               />
             </div>
             <div>
-              <label className="text-[rgb(var(--text))] mr-2">Type</label>
-              <select
-                className="  bg-[rgb(var(--surface))] text-[rgb(var(--text))] border p-1"
-                value={details.type}
-                onChange={(e) => {
-                  setDetails({ ...details, type: e.target.value });
-                  if (isEditMode) setIsDirty(true);
-                }}
-              >
-                <option value="homework">Homework</option>
-                <option value="quiz">Quiz</option>
-                <option value="exam">Exam</option>
-              </select>
-            </div>
-            <div>
-              <label className="text-[rgb(var(--text))]">Due Date *</label>
+              <label className="text-[rgb(var(--text))]">Due Date</label>
               <input
                 type="date"
                 className="w-full border rounded-xl bg-[rgb(var(--surface))] text-[rgb(var(--text))]"
                 value={details.dueDate}
                 onChange={(e) => {
                   setDetails({ ...details, dueDate: e.target.value });
-                  if (isEditMode) setIsDirty(true);
-                }}
-              />
-            </div>
-            <div>
-              <label className="text-[rgb(var(--text))]">Duration (minutes)</label>
-              <input
-                type="number"
-                className="bg-[rgb(var(--surface))] w-full mb-2 border p-2 rounded-xl text-[rgb(var(--text))]"
-                placeholder="e.g. 60"
-                min={1}
-                value={details.duration}
-                onChange={(e) => {
-                  setDetails({ ...details, duration: e.target.value });
                   if (isEditMode) setIsDirty(true);
                 }}
               />
@@ -919,7 +928,6 @@ export default function Assignment() {
           <button
             onClick={() => {
               if (!details.title.trim()) return toast.warn("Title is required");
-              if (!details.dueDate) return toast.warn("Due date is required");
               setStep(STEP_QUESTIONS);
             }}
             className="bg-[rgb(var(--primary))] p-2 rounded-xl text-[rgb(var(--text))] w-full flex items-center justify-center gap-2 mt-2"
@@ -958,7 +966,7 @@ export default function Assignment() {
             </span>
             <div>
               <h1 className="text-2xl font-bold text-[rgb(var(--text))]">
-                {isEditMode ? "Edit Assignment" : "Assignments"}
+                {isEditMode ? "Edit Assignment" : "Create Assignment"}
               </h1>
               <p className="text-sm text-[rgb(var(--text))]">
                 {isEditMode
@@ -1001,12 +1009,17 @@ export default function Assignment() {
                 <div className="flex items-center gap-0.5 mb-2">
                   {STEPS.map((s, i) => (
                     <div key={i} className="flex items-center flex-1">
-                      <div
+                      <button
+                        type="button"
+                        onClick={() => gotoStep(i)}
+                        disabled={!canGotoStep(i)}
+                        title={`Go to ${s}${canGotoStep(i) ? "" : " (locked)"}`}
                         className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold shrink-0 transition-all duration-300
-                        ${i < step ? "bg-[rgb(var(--primary))]  text-[rgb(var(--text))]" : i === step ? "bg-indigo-100 text-indigo-700 ring-2 ring-indigo-400" : " border text-[rgb(var(--text))]"}`}
+                        ${i < step ? "bg-[rgb(var(--primary))]  text-[rgb(var(--text))]" : i === step ? "bg-indigo-100 text-indigo-700 ring-2 ring-indigo-400" : " border text-[rgb(var(--text))]"}
+                        ${canGotoStep(i) ? "cursor-pointer hover:scale-110" : "cursor-not-allowed opacity-50"}`}
                       >
                         {i < step ? "✓" : i + 1}
-                      </div>
+                      </button>
                       {i < STEPS.length - 1 && (
                         <div
                           className={`h-0.5 flex-1 mx-0.5 rounded transition-all duration-500 ${i < step ? "bg-indigo-400" : "bg-gray-200"}`}

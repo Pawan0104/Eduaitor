@@ -124,15 +124,15 @@ function ExamCreate() {
   const handleSectionChange = (sectionId) => {
     const selectedClass = classes.find((c) => c._id === formData.className);
 
-    const selectedSection = selectedClass?.details.find(
-      (d) => d.sectionId._id === sectionId,
+    const selectedSection = selectedClass?.details?.find(
+      (d) => d.sectionId?._id === sectionId,
     );
 
     if (selectedSection) {
       const subjects = [];
       const teachers = [];
 
-      selectedSection.subjectTeachers.forEach((st) => {
+      (selectedSection.subjectTeachers || []).forEach((st) => {
         if (st.subjectId) {
           subjects.push({
             _id: st.subjectId._id,

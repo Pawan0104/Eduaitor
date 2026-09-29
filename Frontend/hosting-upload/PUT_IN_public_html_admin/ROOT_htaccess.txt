@@ -1,0 +1,24 @@
+# Place this file at DOMAIN ROOT: public_html/.htaccess
+# (merge carefully if you already have rules for a marketing homepage)
+#
+# Your React app files live in: public_html/admin/
+# This sends /admin/login, /school/*, /teacher/*, etc. to that app,
+# while still serving real files (JS/CSS) under /admin/assets/.
+
+<IfModule mod_mime.c>
+  AddType application/javascript .js .mjs
+  AddType text/css .css
+</IfModule>
+
+<IfModule mod_rewrite.c>
+  RewriteEngine On
+  RewriteBase /
+
+  # Serve any real file/folder as-is (includes /admin/assets/*.js)
+  RewriteCond %{REQUEST_FILENAME} -f [OR]
+  RewriteCond %{REQUEST_FILENAME} -d
+  RewriteRule ^ - [L]
+
+  # All Eduaitor app routes → React index under /admin/
+  RewriteRule ^(admin|school|teacher|parent|student|staff)(/|$) /admin/index.html [L]
+</IfModule>

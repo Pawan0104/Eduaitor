@@ -1,0 +1,22 @@
+DATA SAFETY (fill in Play Console form)
+
+App collects / processes (typical for EduAItor ERP):
+- Account info: login ID / phone / email (school-provided accounts)
+- Personal info: student / staff / parent names linked to school records
+- App activity: attendance actions, fee views, reports opened
+- Device / network: needed for API connectivity
+
+Data is used for:
+- App functionality (required)
+- Account management
+- Analytics (only if you enable analytics SDKs — currently not required)
+
+Encryption in transit: YES (HTTPS to eduaitor-api.onrender.com)
+Users can request deletion: YES (via school admin / privacy@eduaitor.com)
+
+Children:
+- App may be used by schools that manage under-13 student records.
+- Declare "App is designed for schools / education" and follow Families policy if targeting kids as direct users.
+- Parents typically use the parent login; students may not be direct end-users depending on school setup.
+
+Complete the Play Console Data safety questionnaire carefully — answers must match your Privacy Policy.

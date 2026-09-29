@@ -1,0 +1,10 @@
+# This folder holds static images but shares an SPA route name.
+# Serve the React app for bare /ecosystem instead of 403.
+<IfModule mod_rewrite.c>
+  RewriteEngine On
+  RewriteCond %{REQUEST_FILENAME} -f
+  RewriteRule ^ - [L]
+  RewriteRule ^$ /index.html [L]
+</IfModule>
+DirectoryIndex /index.html
+Options -Indexes

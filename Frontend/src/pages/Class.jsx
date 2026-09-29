@@ -229,7 +229,7 @@ export default function ClassPage() {
     const f = {
       name: cls.name,
       status: cls.status,
-      details: cls.details.map((d) => ({
+      details: (cls.details || []).map((d) => ({
         _id: d._id,
         sectionId: d.sectionId?._id || "",
         roomNumber: d.roomNumber,
@@ -327,15 +327,16 @@ export default function ClassPage() {
 
   /* ── stats ── */
   const totalStudents = classes.reduce(
-    (sum, c) => sum + c.details.reduce((s, d) => s + (d.studentCount || 0), 0),
+    (sum, c) =>
+      sum + (c.details || []).reduce((s, d) => s + (d.studentCount || 0), 0),
     0,
   );
   const totalSections = classes.reduce(
-    (sum, c) => sum + c.details.filter((d) => d.sectionId).length,
+    (sum, c) => sum + (c.details || []).filter((d) => d.sectionId).length,
     0,
   );
   const withTeachers = classes.reduce(
-    (sum, c) => sum + c.details.filter((d) => d.teacherId).length,
+    (sum, c) => sum + (c.details || []).filter((d) => d.teacherId).length,
     0,
   );
 
@@ -751,7 +752,7 @@ export default function ClassPage() {
               );
             }
 
-            return cls.details.map((detail, dIndex) => {
+            return (cls.details || []).map((detail, dIndex) => {
               const pct = detail.capacity
                 ? Math.min((detail.studentCount / detail.capacity) * 100, 100)
                 : 0;

@@ -198,6 +198,7 @@ import marketingTemplateRoutes from "./routes/marketingTemplateRoute.js";
 import marketingOAuthRoutes from "./routes/marketingOAuthRoute.js";
 import examPaperRoute from "./routes/examPaperRoute.js";
 import questionBankRoute from "./routes/questionBankRoute.js";
+import errorHandler from "./middlewares/errorHandler.js";
 startNotificationCron();
 startEventReminderCron();
 startMarketingScheduler();
@@ -563,6 +564,11 @@ if (serveFrontend) {
     });
   });
 }
+
+// Global JSON error handler — must be the LAST middleware so every thrown /
+// passed-on error returns `{ success:false, message }` instead of Express's
+// default HTML page (which the SPA reported as a bare "Operation failed").
+app.use(errorHandler);
 
 // Server
 const PORT = process.env.PORT || 5000;

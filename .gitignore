@@ -13,3 +13,19 @@ node_modules
 .env.*
 !.env.example
 !**/.env.example
+
+# Captured auth sessions from manual API testing
+cookie.txt
+body.txt
+**/cookie.txt
+**/body.txt
+
+# Plaintext credentials — never commit
+Docs/Eduaitor_Login_Credentials.md
+Docs/Eduaitor_Login_Credentials.docx
+
+# Nested git repo — committing it would store a broken gitlink and lose contents
+eduaitorcpanel-deploy/
+
+# Mail-relay production secret — commit only config.example.php
+**/mail-relay/config.php

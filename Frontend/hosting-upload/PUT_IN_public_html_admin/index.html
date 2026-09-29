@@ -1,0 +1,58 @@
+<!doctype html>
+<html lang="en" data-skin="classic" class="theme-light">
+  <head>
+    <meta charset="UTF-8" />
+    <link rel="icon" type="image/png" href="/admin/app-icon.png" />
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1.0, viewport-fit=cover"
+    />
+    <meta name="theme-color" content="#05080f" />
+    <title>Eduaitor</title>
+    <style>
+      /* Instant black frame before JS — avoids white flash on APK cold start */
+      html, body {
+        margin: 0;
+        background: #05080f;
+      }
+    </style>
+    <script>
+      (function () {
+        try {
+          var skin = localStorage.getItem("uiSkin");
+          if (!skin) {
+            skin =
+              localStorage.getItem("dashboardLayout") === "campus"
+                ? "campus"
+                : "classic";
+          }
+          if (skin !== "classic" && skin !== "campus" && skin !== "forest") {
+            skin = "classic";
+          }
+          document.documentElement.setAttribute("data-skin", skin);
+          var theme = localStorage.getItem("theme") || "theme-light";
+          if (
+            theme !== "theme-light" &&
+            theme !== "theme-dark" &&
+            theme !== "theme-blue" &&
+            theme !== "theme-green"
+          ) {
+            theme = "theme-light";
+          }
+          document.documentElement.classList.remove(
+            "theme-light",
+            "theme-dark",
+            "theme-blue",
+            "theme-green",
+          );
+          document.documentElement.classList.add(theme);
+        } catch (e) {}
+      })();
+    </script>
+    <script type="module" crossorigin src="/admin/assets/index-DvRTfPih.js"></script>
+    <link rel="stylesheet" crossorigin href="/admin/assets/index-DwAiT-j-.css">
+  </head>
+  <body>
+    <div id="root"></div>
+  </body>
+</html>

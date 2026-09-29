@@ -7,6 +7,13 @@ export function clearSessionKeepPrefs() {
     localStorage.getItem("dashboardLayout") ||
     localStorage.getItem("schoolDashboardLayout");
   const savedUiSkin = localStorage.getItem("uiSkin");
+  const pinnedPrefs = [];
+  for (let i = localStorage.length - 1; i >= 0; i--) {
+    const key = localStorage.key(i);
+    if (key && key.startsWith("menuPinned_")) {
+      pinnedPrefs.push([key, localStorage.getItem(key)]);
+    }
+  }
   localStorage.clear();
   sessionStorage.clear();
   if (savedLang) localStorage.setItem("app_lang", savedLang);
@@ -17,4 +24,7 @@ export function clearSessionKeepPrefs() {
     localStorage.setItem("schoolDashboardLayout", savedDashLayout);
   }
   if (savedUiSkin) localStorage.setItem("uiSkin", savedUiSkin);
+  for (const [key, value] of pinnedPrefs) {
+    if (value) localStorage.setItem(key, value);
+  }
 }

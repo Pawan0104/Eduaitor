@@ -31,7 +31,6 @@ const TYPE_COLORS = {
   fee: { bg: "bg-rose-100", text: "text-rose-600", dot: "bg-rose-500" },
   diary: { bg: "bg-sky-100", text: "text-sky-600", dot: "bg-sky-500" },
   assignment: { bg: "bg-amber-100", text: "text-amber-700", dot: "bg-amber-500" },
-  homework: { bg: "bg-amber-100", text: "text-amber-600", dot: "bg-amber-500" },
   daily_learning: { bg: "bg-indigo-100", text: "text-indigo-700", dot: "bg-indigo-500" },
 };
 
@@ -273,15 +272,18 @@ const Topbar = ({ menuPath = "/" }) => {
             )}
           </button>
         )}
-        <button
-          type="button"
-          onClick={() => menuPath && navigate(menuPath)}
-          className="hidden lg:flex min-w-0 items-center gap-2 pl-0.5 text-left sm:gap-2.5 sm:pl-2"
-          aria-label={t("nav.home", "Home")}
-          disabled={!menuPath}
-        >
-          <BrandMark user={user} />
-        </button>
+        {/* Home / brand — visible on all sizes so the school name stays in the top bar */}
+        {menuPath && (
+          <button
+            type="button"
+            onClick={() => menuPath && navigate(menuPath)}
+            className={`flex min-w-0 items-center gap-2 pr-0.5 text-left sm:gap-2.5 sm:pr-2 max-w-[42vw] lg:max-w-none`}
+            aria-label={t("nav.home", "Home")}
+            disabled={!menuPath}
+          >
+            <BrandMark user={user} />
+          </button>
+        )}
       </div>
 
       {/* RIGHT */}

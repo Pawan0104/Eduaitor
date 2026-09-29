@@ -1,0 +1,23 @@
+EduAItor is an AI-powered School Operating System that helps schools run daily operations from one app — for administrators, teachers, staff, and parents.
+
+WHAT YOU CAN DO
+• Mark and track class attendance in real time
+• Manage students, staff, and parent contacts
+• Collect and follow up on school fees
+• Share homework, circulars, and notices
+• View attendance trends and school reports
+• Role-based access for Principal, Teacher, Staff, and Parent
+
+BUILT FOR SCHOOLS
+EduAItor brings admissions, academics, attendance, fees, communication, and analytics into one secure platform so your team spends less time on paperwork and more time on teaching.
+
+WHO IT’S FOR
+• School admins & principals — dashboards, reports, and control
+• Teachers — attendance, homework, and class tools
+• Parents — child’s attendance, homework, fees, and school updates
+
+GET STARTED
+Sign in with the credentials provided by your school. Need help? Visit www.eduaitor.com or email support@eduaitor.com.
+
+Privacy Policy: https://www.eduaitor.com/privacy-policy
+Website: https://www.eduaitor.com

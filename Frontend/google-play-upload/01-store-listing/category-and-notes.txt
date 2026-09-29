@@ -1,0 +1,16 @@
+App name (Play listing title, max 30 chars):
+EduAItor - School ERP
+
+Short description (max 80 chars):
+AI school ERP for admins, teachers & parents — attendance, fees, reports.
+
+Suggested category:
+Education
+
+Suggested tags:
+school erp, attendance, school management, edtech, parent app, teacher app
+
+Default language:
+English (en-US)
+
+Also add Hindi (hi-IN) later if you want India discovery boost.

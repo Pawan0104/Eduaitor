@@ -2,7 +2,6 @@ import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import {
   FaBell,
-  FaBookOpen,
   FaCalendarAlt,
   FaChevronRight,
   FaClipboardList,
@@ -40,13 +39,6 @@ function fmtShort(dateLike) {
   } catch {
     return "";
   }
-}
-
-function hwStatus(hw) {
-  if (hw?.myStatus && typeof hw.myStatus === "object") {
-    return String(hw.myStatus.status || "").toLowerCase();
-  }
-  return String(hw?.status || "").toLowerCase();
 }
 
 function isAssignmentDone(a) {
@@ -194,7 +186,7 @@ function ItemCard({ title, subtitle, tag, tone = "info", onClick }) {
 }
 
 /**
- * Urgent actions — separate cards for assignments, homework, notices, etc.
+ * Urgent actions — separate cards for assignments, notices, etc.
  */
 export default function UrgentActions({ className = "" }) {
   const navigate = useNavigate();
@@ -202,7 +194,6 @@ export default function UrgentActions({ className = "" }) {
   const { t } = useLanguage();
   const [raw, setRaw] = useState({
     assignments: [],
-    homework: [],
     notices: [],
     events: [],
     notifications: [],
@@ -235,7 +226,6 @@ export default function UrgentActions({ className = "" }) {
         learner
           ? api.get("/assignment/student/list").catch(() => null)
           : Promise.resolve(null),
-        learner ? api.get("/homework/my").catch(() => null) : Promise.resolve(null),
         learner || role === "school_admin" || role === "teacher_admin"
           ? api.get("/notices").catch(() => null)
           : Promise.resolve(null),
@@ -244,7 +234,7 @@ export default function UrgentActions({ className = "" }) {
           : Promise.resolve(null),
       ];
 
-      const [notifRes, assignRes, hwRes, noticeRes, eventRes] =
+      const [notifRes, assignRes, noticeRes, eventRes] =
         await Promise.all(tasks);
 
       if (cancelled) return;
@@ -258,9 +248,6 @@ export default function UrgentActions({ className = "" }) {
           : Array.isArray(assignRes?.data)
             ? assignRes.data
             : [],
-        homework: Array.isArray(hwRes?.data)
-          ? hwRes.data
-          : hwRes?.data?.data || [],
         notices: Array.isArray(noticeRes?.data?.notices)
           ? noticeRes.data.notices
           : Array.isArray(noticeRes?.data)
@@ -315,31 +302,6 @@ export default function UrgentActions({ className = "" }) {
       }
     }
     assignments.sort((a, b) => a.priority - b.priority);
-
-    const homework = [];
-    for (const hw of raw.homework) {
-      const status = hwStatus(hw);
-      if (status === "completed" || status === "marked_done") continue;
-      const diff = dayDiffFromToday(hw.dueDate);
-      if (diff === null || diff > DUE_WINDOW_DAYS) continue;
-      const overdue = diff < 0;
-      homework.push({
-        id: hw._id,
-        title: hw.title || t("urgent.homework", "Homework"),
-        subtitle: overdue
-          ? t("urgent.homeworkOverdue", "Homework overdue")
-          : t("urgent.dueOn", "Due {d}").replace("{d}", fmtShort(hw.dueDate)),
-        tag: overdue
-          ? t("urgent.overdue", "Overdue")
-          : diff === 0
-            ? t("urgent.dueToday", "Due today")
-            : t("urgent.dueSoon", "Due soon"),
-        tone: overdue ? "danger" : diff === 0 ? "warn" : "info",
-        path: `${base}/homework`,
-        priority: overdue ? 0 : diff === 0 ? 1 : 2 + diff,
-      });
-    }
-    homework.sort((a, b) => a.priority - b.priority);
 
     const rankedNotices = raw.notices.slice(0, 20).map((n) => {
       const fresh = isWithinHours(n.createdAt, 24 * 7);
@@ -436,7 +398,6 @@ export default function UrgentActions({ className = "" }) {
 
     return {
       assignments: assignments.slice(0, 4),
-      homework: homework.slice(0, 4),
       notices: notices.slice(0, 4),
       events: events.slice(0, 4),
       notifications: notifications.slice(0, 4),
@@ -465,7 +426,6 @@ export default function UrgentActions({ className = "" }) {
 
   const hasAny =
     groups.assignments.length > 0 ||
-    groups.homework.length > 0 ||
     groups.notices.length > 0 ||
     groups.events.length > 0 ||
     groups.notifications.length > 0;
@@ -530,20 +490,6 @@ export default function UrgentActions({ className = "" }) {
               onAction={() => navigate(`${groups.base}/assignment`)}
             >
               {renderItems(groups.assignments)}
-            </SectionCard>
-          )}
-
-          {groups.homework.length > 0 && (
-            <SectionCard
-              title={t("urgent.homework", "Homework")}
-              subtitle={t("urgent.homeworkHint", "Pending home work")}
-              count={groups.homework.length}
-              icon={<FaBookOpen />}
-              accent="#F97316"
-              actionLabel={t("common.viewAll", "View all")}
-              onAction={() => navigate(`${groups.base}/homework`)}
-            >
-              {renderItems(groups.homework)}
             </SectionCard>
           )}
 

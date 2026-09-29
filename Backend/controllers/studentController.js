@@ -13,6 +13,11 @@ import {
   removeStudentFromOldGroups,
 } from "../utils/groupSync.js";
 import { ensureDefaultHouses } from "../utils/ensureDefaultHouses.js";
+import {
+  parsePagination,
+  applyPagination,
+  sendPaginated,
+} from "../utils/pagination.js";
 import bcrypt from "bcryptjs";
 import { resolveParentCredentialsForCreate } from "../utils/parentChildren.js";
 import { notifyCredentialsAsync } from "../services/credentials/notifyCredentials.js";
@@ -295,6 +300,18 @@ export const createStudent = async (req, res) => {
         message: "Father mobile (parent username) is required",
       });
     }
+    if (!String(safeBody.guardianName || "").trim()) {
+      return res.status(400).json({
+        success: false,
+        message: "Guardian name is required",
+      });
+    }
+    if (!String(safeBody.guardianRelation || "").trim()) {
+      return res.status(400).json({
+        success: false,
+        message: "Guardian relation is required",
+      });
+    }
 
     let studentId;
     try {
@@ -407,20 +424,50 @@ export const createStudent = async (req, res) => {
       safeBody.sectionId,
     );
 
-    const student = await Student.create({
+    // Create with a bounded retry. `generateStudentId` is read-then-write, so two
+    // simultaneous admissions can pick the same number and the second one fails
+    // the unique index. That is a race, not a user error — so when the admission
+    // number was AUTO-generated we transparently re-generate and retry. A number
+    // the user typed themselves is never retried (a real duplicate must surface).
+    const isAutoAdmission =
+      !normalizeAdmissionNumber(safeBody.studentId || safeBody.admissionNumber);
+
+    const buildStudentDoc = (nextId) => ({
       ...safeBody,
       schoolId,
-      studentId,
+      studentId: nextId,
+      studentCredentials: { ...studentCredentials, username: nextId },
       totalDue,
       totalPaid: 0,
       documents,
       extraDocuments,
-      studentCredentials,
       parentCredentials,
       houseId,
       idCardIssuedAt: new Date(),
       convertedFromLeadId,
     });
+
+    let student = null;
+    for (let attempt = 0; attempt < 5; attempt += 1) {
+      try {
+        student = await Student.create(buildStudentDoc(studentId));
+        break;
+      } catch (createErr) {
+        const isAdmissionClash =
+          createErr?.code === 11000 &&
+          (createErr?.keyPattern?.studentId ||
+            createErr?.keyPattern?.["studentCredentials.username"]);
+
+        if (isAdmissionClash && isAutoAdmission && attempt < 4) {
+          const nextId = await generateStudentId(schoolId);
+          if (nextId && nextId !== studentId) {
+            studentId = nextId;
+            continue;
+          }
+        }
+        throw createErr;
+      }
+    }
 
     if (convertedFromLeadId) {
       await Lead.findOneAndUpdate(
@@ -504,7 +551,11 @@ export const createStudent = async (req, res) => {
       });
     }
 
-    if (error?.code === 11000 && error?.keyPattern?.studentId) {
+    if (
+      error?.code === 11000 &&
+      (error?.keyPattern?.studentId ||
+        error?.keyPattern?.["studentCredentials.username"])
+    ) {
       return res.status(400).json({
         success: false,
         message: "Admission number already exists",
@@ -514,6 +565,54 @@ export const createStudent = async (req, res) => {
     res.status(error.statusCode || 500).json({
       success: false,
       message: error.message || "Failed to create student",
+    });
+  }
+};
+
+/* ================= NEXT ROLL NUMBER ================= */
+
+/**
+ * Next auto-increment roll number for a class (+ optional section).
+ * Scoped to the school so two schools can both have roll "1".
+ */
+export const getNextRollNo = async (req, res) => {
+  try {
+    const schoolId = req.user?.school_id;
+    if (!schoolId) {
+      return res.status(400).json({
+        success: false,
+        message: "School ID is required",
+      });
+    }
+
+    const { classId, sectionId } = req.query;
+
+    const query = { schoolId, rollNo: { $exists: true, $ne: "" } };
+
+    if (classId && isValidObjectId(classId)) {
+      query.classId = classId;
+      if (sectionId && isValidObjectId(sectionId)) {
+        query.sectionId = sectionId;
+      }
+    }
+
+    const rows = await Student.find(query)
+      .select("rollNo")
+      .lean();
+
+    // Only plain integers participate in the sequence; anything custom
+    // (e.g. "A-01") is left alone and never blocks allocation.
+    const max = rows.reduce((acc, r) => {
+      const n = parseInt(String(r.rollNo ?? "").trim(), 10);
+      return Number.isFinite(n) && n > acc ? n : acc;
+    }, 0);
+
+    return res.json({ success: true, data: max + 1 });
+  } catch (error) {
+    console.error("Get next roll number error:", error);
+    return res.status(500).json({
+      success: false,
+      message: error.message || "Failed to resolve next roll number",
     });
   }
 };
@@ -531,17 +630,72 @@ export const getStudents = async (req, res) => {
       });
     }
 
-    const students = await Student.find({ schoolId })
-      .populate("classId", "name className")
-      .populate("sectionId", "name sectionName")
-      .populate("transport", "name routeId")
-      .populate("houseId", "name code color")
-      .sort({ createdAt: -1 });
+    const { page, limit, skip, paginate } = parsePagination(req.query);
+    const { search, classId, gender, category } = req.query;
 
-    res.json({
-      success: true,
-      data: students,
-    });
+    const filter = { schoolId };
+
+    if (classId && mongoose.Types.ObjectId.isValid(String(classId))) {
+      filter.classId = classId;
+    }
+
+    if (gender === "Male" || gender === "Female") {
+      filter.gender = gender;
+    }
+
+    if (category) {
+      if (category === "General") {
+        filter.$or = [
+          { category: "General" },
+          { category: { $exists: false } },
+          { category: null },
+        ];
+      } else {
+        filter.category = category;
+      }
+    }
+
+    if (search?.trim()) {
+      const q = search.trim().replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+      const rx = new RegExp(q, "i");
+      const searchOr = [
+        { firstName: rx },
+        { lastName: rx },
+        { studentId: rx },
+        { rollNo: rx },
+        { fatherName: rx },
+        { motherName: rx },
+        { guardianName: rx },
+        { fatherMobile: rx },
+        { motherMobile: rx },
+        { guardianMobile: rx },
+      ];
+
+      if (filter.$or) {
+        filter.$and = [{ $or: filter.$or }, { $or: searchOr }];
+        delete filter.$or;
+      } else {
+        filter.$or = searchOr;
+      }
+    }
+
+    const total = await Student.countDocuments(filter);
+
+    const students = await applyPagination(
+      Student.find(filter)
+        .populate("classId", "name className")
+        .populate("sectionId", "name sectionName")
+        .populate("transport", "name routeId")
+        .populate("houseId", "name code color")
+        .sort({ createdAt: -1 }),
+      { page, limit, skip, paginate },
+    );
+
+    if (!paginate) {
+      return res.json({ success: true, data: students });
+    }
+
+    return res.json(sendPaginated(res, { items: students, total, page, limit }));
   } catch (error) {
     console.error("Get students error:", error);
 
@@ -889,7 +1043,11 @@ export const updateStudent = async (req, res) => {
   } catch (error) {
     console.error("Update student error:", error);
 
-    if (error?.code === 11000 && error?.keyPattern?.studentId) {
+    if (
+      error?.code === 11000 &&
+      (error?.keyPattern?.studentId ||
+        error?.keyPattern?.["studentCredentials.username"])
+    ) {
       return res.status(400).json({
         success: false,
         message: "Admission number already exists",
@@ -1053,15 +1211,6 @@ export const getStudentsByTeacher = async (req, res) => {
       (id) => new mongoose.Types.ObjectId(id),
     );
 
-    // Fetch students in those classes
-    const students = await Student.find({
-      schoolId: schoolObjId,
-      classId: { $in: classIdArray },
-    })
-      .populate("classId", "name")
-      .populate("sectionId", "name")
-      .sort({ createdAt: -1 });
-
     // Fetch all class docs for the dropdown (includes empty classes)
     const allClassDocs = await Class.find({
       _id: { $in: classIdArray },
@@ -1069,11 +1218,90 @@ export const getStudentsByTeacher = async (req, res) => {
       .select("_id name")
       .sort({ name: 1 });
 
-    res.json({
-      success: true,
-      data: students,
-      assignedClasses: allClassDocs,
-    });
+    const { page, limit, skip, paginate } = parsePagination(req.query);
+    const { search, classId, gender, category } = req.query;
+
+    const filter = {
+      schoolId: schoolObjId,
+      classId: { $in: classIdArray },
+    };
+
+    if (classId) {
+      if (
+        mongoose.Types.ObjectId.isValid(String(classId)) &&
+        allClassIds.has(String(classId))
+      ) {
+        filter.classId = classId;
+      } else {
+        return res.json({
+          success: true,
+          data: [],
+          assignedClasses: allClassDocs,
+          pagination: { total: 0, page: 1, limit, totalPages: 0, hasNextPage: false, hasPrevPage: false },
+        });
+      }
+    }
+
+    if (gender === "Male" || gender === "Female") {
+      filter.gender = gender;
+    }
+
+    if (category) {
+      if (category === "General") {
+        filter.$or = [
+          { category: "General" },
+          { category: { $exists: false } },
+          { category: null },
+        ];
+      } else {
+        filter.category = category;
+      }
+    }
+
+    if (search?.trim()) {
+      const q = search.trim().replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+      const rx = new RegExp(q, "i");
+      const searchOr = [
+        { firstName: rx },
+        { lastName: rx },
+        { studentId: rx },
+        { rollNo: rx },
+        { fatherName: rx },
+        { motherName: rx },
+        { guardianName: rx },
+        { fatherMobile: rx },
+        { motherMobile: rx },
+        { guardianMobile: rx },
+      ];
+
+      if (filter.$or) {
+        filter.$and = [{ $or: filter.$or }, { $or: searchOr }];
+        delete filter.$or;
+      } else {
+        filter.$or = searchOr;
+      }
+    }
+
+    const total = await Student.countDocuments(filter);
+
+    const students = await applyPagination(
+      Student.find(filter)
+        .populate("classId", "name")
+        .populate("sectionId", "name")
+        .sort({ createdAt: -1 }),
+      { page, limit, skip, paginate },
+    );
+
+    if (!paginate) {
+      return res.json({
+        success: true,
+        data: students,
+        assignedClasses: allClassDocs,
+      });
+    }
+
+    const meta = sendPaginated(res, { items: students, total, page, limit });
+    return res.json({ ...meta, assignedClasses: allClassDocs });
   } catch (error) {
     console.error("getStudentsByTeacher error:", error);
     res.status(500).json({ success: false, message: error.message });

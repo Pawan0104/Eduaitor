@@ -463,7 +463,6 @@ const TYPE_COLORS = {
   attendance: { bg: "bg-amber-100",   text: "text-amber-600"   },
   fee:        { bg: "bg-rose-100",    text: "text-rose-600"    },
   diary:      { bg: "bg-sky-100",     text: "text-sky-600"     },
-  homework:   { bg: "bg-amber-100",   text: "text-amber-700"   },
   assignment: { bg: "bg-amber-100",   text: "text-amber-700"   },
   daily_learning: { bg: "bg-indigo-100", text: "text-indigo-700" },
   transport:  { bg: "bg-blue-100",    text: "text-blue-700"    },
@@ -494,8 +493,6 @@ export const taskLinkFor = (notificationType, user) => {
     case "assignment":
     case "daily_learning":
       return base === "/staff" ? "/staff/assignments" : `${base}/assignment`;
-    case "homework":
-      return `${base}/homework`;
     case "fee":
       return base === "/parent" ? "/parent/fees" : null;
     case "exam":

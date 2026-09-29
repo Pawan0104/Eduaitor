@@ -1,0 +1,19 @@
+Play Console Internal testing upload (first release):
+
+  eduaitor-internal-testing-v1.0.aab
+
+Package: eduaitor.app
+versionCode: 1
+versionName: 1.0
+
+Follow ../INTERNAL-TESTING-STEPS.md
+
+To rebuild later from Frontend:
+  npm run aab:release
+
+Output:
+  android\app\build\outputs\bundle\release\app-release.aab
+
+Keep private (never commit / never lose):
+  android\eduaitor-upload.jks
+  android\key.properties

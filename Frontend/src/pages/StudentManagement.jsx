@@ -32,12 +32,46 @@ const busFeeQuarterOptions = [
   { label: "Dec-March", value: "december-march" },
 ];
 
+// Reservation category (Indian school admission forms).
+const CATEGORY_OPTIONS = ["General", "OBC", "SC", "ST", "Minority"];
+
+// Only asked when category === "Minority".
+const COMMUNITY_OPTIONS = [
+  "Muslim",
+  "Christian",
+  "Sikh",
+  "Jain",
+  "Buddhist",
+  "Parsi",
+  "Other",
+];
+
+// Blood group is optional, but must look sane when provided.
+const BLOOD_GROUP_RE = /^(A|B|AB|O)[\s-]?(pos|neg|\+|-)?$/i;
+
+const GUARDIAN_RELATION_OPTIONS = [
+  "Father",
+  "Mother",
+  "Step Father",
+  "Step Mother",
+  "Grand Father",
+  "Grand Mother",
+  "Uncle",
+  "Aunt",
+  "Brother",
+  "Sister",
+  "Legal Guardian",
+  "Other",
+];
+
 const emptyForm = {
   firstName: "",
   lastName: "",
   dob: "",
   gender: "",
   bloodGroup: "",
+  category: "",
+  community: "",
   admissionDate: "",
   studentId: "",
 
@@ -175,40 +209,6 @@ const StudentManagement = () => {
 
     return Number(value).toFixed(2);
   };
-  const getFinalAnnualTotal = () =>
-    feeStructure.reduce((sum, fee) => {
-      // If it's mandatory, add it.
-      // If it's optional, only add it if isOptionalFeeSelected returns true.
-      if (!fee.isOptional || isOptionalFeeSelected(fee)) {
-        return sum + (Number(fee.amount) || 0);
-      }
-      return sum;
-    }, 0);
-
-  useEffect(() => {
-    const annualTotal = getFinalAnnualTotal();
-    let discountedTotal = annualTotal;
-
-    // Calculate Discount
-    const discountVal = Number(form.discountValue) || 0;
-    if (form.discountType === "Percentage") {
-      discountedTotal = annualTotal - annualTotal * (discountVal / 100);
-    } else if (form.discountType === "Rupees") {
-      discountedTotal = annualTotal - discountVal;
-    }
-
-    setForm((prev) => ({
-      ...prev,
-      totalFee: annualTotal.toFixed(2),
-      finalFee: Math.max(0, discountedTotal).toFixed(2), // Max 0 to prevent negative fees
-    }));
-  }, [
-    form.selectedOptionalFees,
-    form.useTransport,
-    form.discountType,
-    form.discountValue,
-    feeStructure,
-  ]);
 
   const calcBusFeeAmount = (amount) =>
     Number(form.busFeeFrequency === "quarterly" ? amount / 3 : amount).toFixed(
@@ -259,15 +259,6 @@ const StudentManagement = () => {
       return sum;
     }, 0);
 
-  const getMandatoryAnnualTotal = () =>
-    feeStructure.reduce((sum, fee) => {
-      if (fee?.isOptional) {
-        return sum;
-      }
-
-      return sum + (Number(fee.amount) || 0);
-    }, 0);
-
   const normalizeFeeFrequency = (value) =>
     ["monthly", "quarterly", "half-yearly", "annually"].includes(value)
       ? value
@@ -292,6 +283,50 @@ const StudentManagement = () => {
   };
 
   const progress = (step / steps.length) * 100;
+
+  /* NEXT ROLL NUMBER (per class + section) */
+  const fetchNextRollNo = async (classId, sectionId) => {
+    if (!classId) return 1;
+
+    try {
+      const params = { classId };
+      if (sectionId) params.sectionId = sectionId;
+
+      const res = await axios.get(`${API}/students/next-roll-no`, {
+        params,
+        withCredentials: true,
+      });
+
+      const next = Number(res.data?.data);
+      return Number.isFinite(next) && next > 0 ? next : 1;
+    } catch (err) {
+      console.error("Failed to resolve next roll number:", err);
+      return 1;
+    }
+  };
+
+  // Auto-fill the roll number whenever the class/section changes (create only —
+  // never overwrite an existing roll number while editing).
+  useEffect(() => {
+    if (isEdit) return;
+    if (step !== 5) return;
+    if (!form.classId) return;
+
+    let cancelled = false;
+
+    fetchNextRollNo(form.classId, form.sectionId).then((next) => {
+      if (cancelled) return;
+      setForm((prev) => {
+        // Respect a roll number the user already typed for this class.
+        if (prev.rollNo && String(prev.rollNo).trim()) return prev;
+        return { ...prev, rollNo: String(next) };
+      });
+    });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [form.classId, form.sectionId, step, isEdit]);
 
   /* FETCH CLASS */
   useEffect(() => {
@@ -515,6 +550,8 @@ const StudentManagement = () => {
           dob: toDateInput(student.dob),
           gender: student.gender || "",
           bloodGroup: student.bloodGroup || "",
+      category: student.category || "",
+      community: student.community || "",
           admissionDate: toDateInput(student.admissionDate),
           studentId: student.studentId || "",
           fatherName: student.fatherName || "",
@@ -580,7 +617,6 @@ const StudentManagement = () => {
       if (value !== "" && Number(value) < 0) return;
       nextValue = value;
     }
-
     if (name === "dob") {
       const today = new Date();
       today.setHours(0, 0, 0, 0);
@@ -629,6 +665,8 @@ const StudentManagement = () => {
         discountValue: "",
         totalFee: "",
         finalFee: "",
+        // Regenerate for the newly picked class on create.
+        ...(isEdit ? {} : { rollNo: "" }),
       }),
       ...(name === "busFeeFrequency" && {
         busFeeQuarter: value === "quarterly" ? form.busFeeQuarter : "",
@@ -716,7 +754,15 @@ const StudentManagement = () => {
 
   useEffect(() => {
     const annual = getIncludedAnnualTotal();
-    const discount = Number(form.discountValue) || 0;
+    const rawDiscount = Number(form.discountValue) || 0;
+
+    // Clamp the discount to something that can never wipe the whole fee:
+    // percentage to 0–100%, rupees to 0–annual total. Without this an
+    // over-typed value silently produced finalFee = 0.
+    const discount =
+      form.discountType === "Percentage"
+        ? Math.min(Math.max(rawDiscount, 0), 100)
+        : Math.min(Math.max(rawDiscount, 0), annual);
 
     let final = annual;
 
@@ -730,8 +776,8 @@ const StudentManagement = () => {
 
     setForm((prev) => ({
       ...prev,
-      totalFee: annual,
-      finalFee: final >= 0 ? final : 0,
+      totalFee: Number(annual.toFixed(2)),
+      finalFee: Number(Math.max(0, final).toFixed(2)),
     }));
   }, [
     feeStructure,
@@ -776,8 +822,17 @@ const StudentManagement = () => {
         }
       }
       if (!form.gender) errors.push("Gender required");
-      if (!form.bloodGroup?.trim()) errors.push("Blood Group required");
       if (!form.admissionDate) errors.push("Admission Date required");
+
+      // Blood group is optional — only validate the format when provided.
+      if (form.bloodGroup?.trim() && !BLOOD_GROUP_RE.test(form.bloodGroup.trim())) {
+        errors.push("Invalid Blood Group");
+      }
+
+      if (!form.category) errors.push("Category required");
+      if (form.category === "Minority" && !form.community) {
+        errors.push("Community required");
+      }
     }
 
     if (step === 2) {
@@ -785,11 +840,16 @@ const StudentManagement = () => {
       if (!form.fatherMobile?.trim()) errors.push("Father mobile required");
       if (!form.motherName?.trim()) errors.push("Mother name required");
       if (!form.motherMobile?.trim()) errors.push("Mother mobile required");
+      if (!form.guardianName?.trim()) errors.push("Guardian name required");
+      if (!form.guardianRelation?.trim())
+        errors.push("Guardian relation required");
       if (!form.address?.trim()) errors.push("Address required");
       if (form.fatherMobile && !/^\d{10}$/.test(String(form.fatherMobile)))
         errors.push("Invalid Father Mobile Number");
       if (form.motherMobile && !/^\d{10}$/.test(String(form.motherMobile)))
         errors.push("Invalid Mother Mobile Number");
+      if (form.guardianMobile?.trim() && !/^\d{10}$/.test(String(form.guardianMobile).trim()))
+        errors.push("Invalid Guardian Mobile Number");
       // Emails are optional — validate format only when filled
       const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/i;
       if (form.fatherEmail?.trim() && !emailRegex.test(form.fatherEmail.trim()))
@@ -867,6 +927,8 @@ const StudentManagement = () => {
         if (lowerErr.includes("age must be above 3 years")) errorMap.dob = err;
         if (lowerErr.includes("gender")) errorMap.gender = err;
         if (lowerErr.includes("blood group")) errorMap.bloodGroup = err;
+        if (lowerErr.includes("category")) errorMap.category = err;
+        if (lowerErr.includes("community")) errorMap.community = err;
         if (lowerErr.includes("admission date")) errorMap.admissionDate = err;
         if (lowerErr.includes("father name")) errorMap.fatherName = err;
         if (
@@ -1063,7 +1125,22 @@ const forbidden = [
     } catch (err) {
       console.error("Submit error:", err);
       console.error("Response data:", err?.response?.data);
-      toast.error(err?.response?.data?.message || "Operation failed");
+
+      // Surface the real reason when we have one. A network/abort failure has no
+      // response at all, so fall back to an explicit, actionable message rather
+      // than a vague "Operation failed".
+      const serverMessage = err?.response?.data?.message;
+      if (serverMessage) {
+        toast.error(serverMessage);
+      } else if (err?.response) {
+        toast.error(
+          `Save failed (HTTP ${err.response.status}). Please try again.`,
+        );
+      } else if (err?.message) {
+        toast.error(`Save failed: ${err.message}`);
+      } else {
+        toast.error("Save failed. Please check your connection and try again.");
+      }
     }
   };
 
@@ -1264,13 +1341,31 @@ const forbidden = [
                   error={errors.gender}
                 />
                 <Input
-                  label="Blood Group *"
+                  label="Blood Group"
                   placeholder="Enter blood group (eg. O+, A-...)"
                   name="bloodGroup"
                   value={form.bloodGroup}
                   onChange={handleChange}
                   error={errors.bloodGroup}
                 />
+                <Select
+                  label="Category *"
+                  name="category"
+                  value={form.category}
+                  options={CATEGORY_OPTIONS}
+                  onChange={handleChange}
+                  error={errors.category}
+                />
+                {form.category === "Minority" && (
+                  <Select
+                    label="Community *"
+                    name="community"
+                    value={form.community}
+                    options={COMMUNITY_OPTIONS}
+                    onChange={handleChange}
+                    error={errors.community}
+                  />
+                )}
                 <Input
                   type="date"
                   label="Admission Date *"
@@ -1350,6 +1445,7 @@ const forbidden = [
                   name="guardianName"
                   value={form.guardianName}
                   onChange={handleChange}
+                  error={errors.guardianName}
                 />
                 <Input
                   label="Guardian Mobile"
@@ -1360,13 +1456,15 @@ const forbidden = [
                   maxLength={10}
                   value={form.guardianMobile}
                   onChange={handleChange}
+                  error={errors.guardianMobile}
                 />
-                <Input
-                  label="Relation"
-                  placeholder="Enter relation with child"
+                <Select
+                  label="Guardian Relation *"
                   name="guardianRelation"
                   value={form.guardianRelation}
                   onChange={handleChange}
+                  error={errors.guardianRelation}
+                  options={GUARDIAN_RELATION_OPTIONS}
                 />
 
                 <Input
@@ -1574,6 +1672,11 @@ const forbidden = [
                   value={form.rollNo}
                   onChange={handleChange}
                   error={errors.rollNo}
+                  placeholder={
+                    form.classId
+                      ? "Auto-assigned — you can still edit"
+                      : "Select a class first"
+                  }
                 />
 
                 <Select
@@ -1737,8 +1840,11 @@ const forbidden = [
                     <div className="flex justify-between font-bold border-t mt-2 pt-2">
                       <span>Annual Total</span>
                       <span>
-                        {/* Use the final total here instead of mandatory only */}
-                        ₹{Number(getFinalAnnualTotal()).toFixed(2)}
+                        {/* Must match getIncludedAnnualTotal() — the same base
+                            the Final Fee discount is applied to. Using a
+                            different base here is what made discounts look like
+                            they "zeroed" the fee. */}
+                        ₹{Number(getIncludedAnnualTotal()).toFixed(2)}
                       </span>
                     </div>
 
@@ -1777,6 +1883,8 @@ const forbidden = [
                   name="totalFee"
                   value={form.totalFee}
                   onChange={handleChange}
+                  readOnly
+                  error={errors.totalFee}
                 />
 
                 <Select
@@ -1794,6 +1902,7 @@ const forbidden = [
                   type="number"
                   inputMode="decimal"
                   min="0"
+                  max={form.discountType === "Percentage" ? 100 : undefined}
                   step="any"
                   value={form.discountValue}
                   onChange={handleChange}
@@ -2260,6 +2369,10 @@ const ReviewStep = ({
         <Field label="Date of birth" value={form.dob} />
         <Field label="Gender" value={form.gender} />
         <Field label="Blood group" value={form.bloodGroup} />
+        <Field label="Category" value={form.category} />
+        {form.category === "Minority" && (
+          <Field label="Community" value={form.community} />
+        )}
         <Field label="Admission date" value={form.admissionDate} />
       </Section>
 

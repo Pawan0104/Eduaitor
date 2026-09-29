@@ -1,0 +1,9 @@
+# This folder holds static images but shares an SPA route name.
+<IfModule mod_rewrite.c>
+  RewriteEngine On
+  RewriteCond %{REQUEST_FILENAME} -f
+  RewriteRule ^ - [L]
+  RewriteRule ^$ /index.html [L]
+</IfModule>
+DirectoryIndex /index.html
+Options -Indexes

@@ -249,11 +249,11 @@ export default function PlatformAnalytics() {
     const totalSchools = schools.length;
     const activeSchools = schools.filter((school) => school.status === "Active").length;
     const totalStudents = schools.reduce(
-      (sum, school) => sum + (school.details.studentsCount || 0),
+      (sum, school) => sum + (school.details?.studentsCount || 0),
       0,
     );
     const totalTeachers = schools.reduce(
-      (sum, school) => sum + (school.details.teachersCount || 0),
+      (sum, school) => sum + (school.details?.teachersCount || 0),
       0,
     );
     const expiringSoon = schools.filter((school) => {
@@ -496,10 +496,10 @@ export default function PlatformAnalytics() {
                 </div>
 
                 <div className="mt-5 grid grid-cols-2 gap-3 lg:grid-cols-4">
-                  <MiniMetric label="Students" value={school.details.studentsCount} />
-                  <MiniMetric label="Teachers" value={school.details.teachersCount} />
-                  <MiniMetric label="Classes" value={school.details.classesCount} />
-                  <MiniMetric label="Defaulters" value={school.details.defaultersCount} warn={school.details.defaultersCount > 0} />
+                  <MiniMetric label="Students" value={school.details?.studentsCount} />
+                  <MiniMetric label="Teachers" value={school.details?.teachersCount} />
+                  <MiniMetric label="Classes" value={school.details?.classesCount} />
+                  <MiniMetric label="Defaulters" value={school.details?.defaultersCount} warn={(school.details?.defaultersCount || 0) > 0} />
                 </div>
 
                 <div className="mt-5 rounded-2xl bg-white p-4 shadow-sm">

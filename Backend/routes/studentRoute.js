@@ -9,6 +9,7 @@ import {
   deleteStudent,
   getAllStudents,
   getStudentsByTeacher,
+  getNextRollNo,
 } from "../controllers/studentController.js";
 import uploadSpreadsheet from "../middlewares/uploadSpreadsheet.js";
 import {
@@ -43,6 +44,9 @@ router.post("/", authMiddleware, withUpload, createStudent);
 router.get("/", authMiddleware, getStudents);
 
 router.get("/teacher/my-students", authMiddleware, getStudentsByTeacher);
+
+// Must stay above `/:id` so Express does not treat "next-roll-no" as an id.
+router.get("/next-roll-no", authMiddleware, getNextRollNo);
 
 router.put("/:id", authMiddleware, withUpload, updateStudent);
 

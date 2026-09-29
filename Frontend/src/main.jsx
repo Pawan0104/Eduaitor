@@ -24,8 +24,11 @@ initUiSkin();
 initNativeShell().catch(() => {});
 
 /* basename derived from Vite's public base (e.g. "/admin/") so BrowserRouter
-   matches the URL prefix the app is served under. */
-const basename = (import.meta.env.BASE_URL || "/").replace(/\/+$/, "") || "/";
+   matches the URL prefix the app is served under. Relative bases like "./"
+   (APK builds) must fall back to "/" — a "." basename breaks routing. */
+const basename = (import.meta.env.BASE_URL || "").startsWith("/")
+  ? import.meta.env.BASE_URL.replace(/\/+$/, "") || "/"
+  : "/";
 
 createRoot(document.getElementById("root")).render(
   <BrowserRouter basename={basename}>

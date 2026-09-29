@@ -144,7 +144,7 @@ export default function ClassAttendanceMarking() {
         }
         setIsClassTeacher(true);
         const cls     = res.data.classes[0];
-        const detail  = cls.details[0];
+        const detail  = cls.details?.[0] || {};
         setAssignedClass({ _id: cls._id, name: cls.name });
         setAssignedSection({
           _id:  detail.sectionId?._id  ?? detail.sectionId,

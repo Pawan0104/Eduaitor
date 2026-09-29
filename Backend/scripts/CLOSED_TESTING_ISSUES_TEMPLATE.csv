@@ -1,0 +1,25 @@
+Date,Parent Email,Mobile,Device,Browser,Checklist Item Failed,Issue Summary,Severity (High/Med/Low),Screenshot (Y/N),Status (Open/Fixed/Ignored),Owner,Notes
+2026-08-27,example@gmail.com,9876510000,Android,Chrome,Login,Cannot login - wrong school picker,High,Y,Open,Pawan,First report
+,,,,,,,,,,,
+,,,,,,,,,,,
+,,,,,,,,,,,
+,,,,,,,,,,,
+,,,,,,,,,,,
+,,,,,,,,,,,
+,,,,,,,,,,,
+,,,,,,,,,,,
+,,,,,,,,,,,
+,,,,,,,,,,,
+,,,,,,,,,,,
+,,,,,,,,,,,
+
+Severity guide:
+High = cannot login / blank screen / data missing for child
+Med = confusing UI / slow / wrong label
+Low = cosmetic / typo / minor polish
+
+Daily owner routine:
+1) Add every tester reply as a new row
+2) Fix High issues same day if possible
+3) Update Status when fixed
+4) After 3-5 days review Open High/Med count before next phase

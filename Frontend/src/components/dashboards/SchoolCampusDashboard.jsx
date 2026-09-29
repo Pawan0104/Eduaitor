@@ -1,6 +1,5 @@
 import {
   FiBook,
-  FiBookOpen,
   FiCalendar,
   FiCheckSquare,
   FiClipboard,
@@ -16,7 +15,6 @@ import { FaUserGraduate } from "react-icons/fa6";
 import RoleCampusDashboard from "./RoleCampusDashboard";
 
 const MODULE_TILES = [
-  { label: "Homework", path: "/school/homework", icon: FiBookOpen },
   { label: "Syllabus", path: "/school/syllabus", icon: FiBook },
   { label: "Attendance", path: "/school/attendance", icon: FiCheckSquare },
   { label: "Fee Report", path: "/school/fee-history", icon: FiCreditCard },

@@ -1,30 +1,55 @@
 import { useEffect, useState } from "react";
 import axios from "axios";
-import { FaArrowLeft, FaEye, FaUsers } from "react-icons/fa";
-import { MdPersonOutline } from "react-icons/md";
-import { PiChartPieSliceBold } from "react-icons/pi";
+import { FaArrowLeft, FaEye } from "react-icons/fa";
 import { useNavigate } from "react-router-dom";
 import { toast } from "react-toastify";
 import MessageButton from "../components/MessageButton";
 import UserAvatar from "../components/UserAvatar";
+import Pagination from "../components/Pagination";
 
 const API = import.meta.env.VITE_API_URL;
+
+const CATEGORY_OPTIONS = ["General", "OBC", "SC", "ST", "Minority"];
 
 const TeacherStudents = () => {
   const navigate = useNavigate();
   const [students, setStudents] = useState([]);
   const [assignedClasses, setAssignedClasses] = useState([]);
   const [selectedClass, setSelectedClass] = useState("");
+  const [searchQuery, setSearchQuery] = useState("");
+  const [filterGender, setFilterGender] = useState("");
+  const [filterCategory, setFilterCategory] = useState("");
+  const [page, setPage] = useState(1);
+  const [limit, setLimit] = useState(10);
+  const [pagination, setPagination] = useState({
+    total: 0,
+    page: 1,
+    totalPages: 1,
+  });
   const [loading, setLoading] = useState(true);
   const isMobile = window.innerWidth <= 768;
 
-  const fetchStudents = async () => {
+  const fetchStudents = async (pageNo = page, pageLimit = limit) => {
     try {
+      const params = { page: pageNo, limit: pageLimit };
+      if (selectedClass) params.classId = selectedClass;
+      if (filterGender) params.gender = filterGender;
+      if (filterCategory) params.category = filterCategory;
+      if (searchQuery.trim()) params.search = searchQuery.trim();
+
       const res = await axios.get(`${API}/students/teacher/my-students`, {
+        params,
         withCredentials: true,
       });
       setStudents(res.data.data || []);
       setAssignedClasses(res.data.assignedClasses || []);
+      setPagination(
+        res.data.pagination || {
+          total: (res.data.data || []).length,
+          page: pageNo,
+          totalPages: 1,
+        },
+      );
     } catch {
       toast.error("Failed to load students");
     } finally {
@@ -32,17 +57,29 @@ const TeacherStudents = () => {
     }
   };
 
+  const handleFilterChange = (setter) => (value) => {
+    setter(value);
+    setPage(1);
+  };
+
   useEffect(() => {
-    fetchStudents();
-  }, []);
+    fetchStudents(page, limit);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [page, limit, selectedClass, filterGender, filterCategory, searchQuery]);
 
-  const totalStudents = students.length;
-  const maleCount = students.filter((s) => s.gender === "Male").length;
-  const femaleCount = students.filter((s) => s.gender === "Female").length;
+  const hasActiveFilters = Boolean(
+    searchQuery.trim() || selectedClass || filterGender || filterCategory,
+  );
 
-  const filteredStudents = selectedClass
-    ? students.filter((s) => s.classId?._id === selectedClass)
-    : students;
+  const clearAllFilters = () => {
+    setSearchQuery("");
+    setSelectedClass("");
+    setFilterGender("");
+    setFilterCategory("");
+    setPage(1);
+  };
+
+  const filteredStudents = students;
 
   if (loading) {
     return (
@@ -78,50 +115,106 @@ const TeacherStudents = () => {
         </p>
       </div>
 
-      {/* STATS */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 mb-6">
-        <StatCard
-          title="TOTAL STUDENTS"
-          value={totalStudents}
-          icon={<FaUsers size={20} />}
-          color="blue"
-        />
-        <StatCard
-          title="MALE"
-          value={maleCount}
-          icon={<MdPersonOutline size={20} />}
-          color="green"
-        />
-        <StatCard
-          title="MALE / FEMALE"
-          value={`${maleCount} / ${femaleCount}`}
-          icon={<PiChartPieSliceBold size={20} />}
-          color="purple"
-        />
-      </div>
-
-      {/* CLASS FILTER */}
-      {assignedClasses.length > 0 && (
-        <div className="bg-[rgb(var(--surface))] rounded-xl border border-[rgb(var(--border))] shadow-sm p-4 sm:p-6 mb-6">
-          <p className="text-sm font-medium mb-2 text-[rgb(var(--text))]">
-            Filter by Class
+      {/* FILTERS */}
+      <div className="bg-[rgb(var(--surface))] rounded-xl border border-[rgb(var(--border))] shadow-sm p-4 sm:p-6 mb-6">
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-4">
+          <p className="text-sm font-semibold text-[rgb(var(--text))]">
+            Filter Students
+            <span className="ml-2 text-xs font-normal text-[rgb(var(--text-muted))]">
+              {filteredStudents.length} of {students.length} shown
+            </span>
           </p>
-          <select
-            value={selectedClass}
-            onChange={(e) => setSelectedClass(e.target.value)}
-            className="border border-[rgb(var(--border))] bg-[rgb(var(--bg))] text-[rgb(var(--text))]
-              rounded-lg px-4 py-2 w-full sm:w-72 outline-none
-              focus:ring-2 focus:ring-[rgb(var(--primary))] focus:border-[rgb(var(--border-strong))]"
-          >
-            <option value="">-- All Classes --</option>
-            {assignedClasses.map((cls) => (
-              <option key={cls._id} value={cls._id}>
-                {cls.name}
-              </option>
-            ))}
-          </select>
+          {hasActiveFilters && (
+            <button
+              type="button"
+              onClick={clearAllFilters}
+              className="self-start px-3 py-1.5 rounded-lg text-xs font-semibold border border-[rgb(var(--border))] text-[rgb(var(--text))] hover:bg-[rgb(var(--bg))]"
+            >
+              Clear filters
+            </button>
+          )}
         </div>
-      )}
+
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+          <div>
+            <p className="text-sm font-medium mb-2 text-[rgb(var(--text))]">
+              Search
+            </p>
+            <input
+              type="search"
+              value={searchQuery}
+              onChange={(e) => handleFilterChange(setSearchQuery)(e.target.value)}
+              placeholder="Name, admission no, father, mobile..."
+              className="border border-[rgb(var(--border))] bg-[rgb(var(--bg))] text-[rgb(var(--text))]
+                rounded-lg px-4 py-2 w-full outline-none
+                focus:ring-2 focus:ring-[rgb(var(--primary))] focus:border-[rgb(var(--border-strong))]"
+              aria-label="Search students"
+            />
+            <p className="text-xs text-[rgb(var(--text-muted))] mt-1.5">
+              Matches student, father, mother or guardian name and any mobile
+              number
+            </p>
+          </div>
+
+          <div>
+            <p className="text-sm font-medium mb-2 text-[rgb(var(--text))]">
+              Class
+            </p>
+            <select
+              value={selectedClass}
+              onChange={(e) => handleFilterChange(setSelectedClass)(e.target.value)}
+              disabled={assignedClasses.length === 0}
+              className="border border-[rgb(var(--border))] bg-[rgb(var(--bg))] text-[rgb(var(--text))]
+                rounded-lg px-4 py-2 w-full outline-none disabled:opacity-50 disabled:cursor-not-allowed
+                focus:ring-2 focus:ring-[rgb(var(--primary))] focus:border-[rgb(var(--border-strong))]"
+            >
+              <option value="">-- All Classes --</option>
+              {assignedClasses.map((cls) => (
+                <option key={cls._id} value={cls._id}>
+                  {cls.name}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          <div>
+            <p className="text-sm font-medium mb-2 text-[rgb(var(--text))]">
+              Gender
+            </p>
+            <select
+              value={filterGender}
+              onChange={(e) => handleFilterChange(setFilterGender)(e.target.value)}
+              className="border border-[rgb(var(--border))] bg-[rgb(var(--bg))] text-[rgb(var(--text))]
+                rounded-lg px-4 py-2 w-full outline-none
+                focus:ring-2 focus:ring-[rgb(var(--primary))] focus:border-[rgb(var(--border-strong))]"
+            >
+              <option value="">-- All Genders --</option>
+              <option value="Male">Male</option>
+              <option value="Female">Female</option>
+            </select>
+          </div>
+
+          <div>
+            <p className="text-sm font-medium mb-2 text-[rgb(var(--text))]">
+              Category
+            </p>
+            <select
+              value={filterCategory}
+              onChange={(e) => handleFilterChange(setFilterCategory)(e.target.value)}
+              className="border border-[rgb(var(--border))] bg-[rgb(var(--bg))] text-[rgb(var(--text))]
+                rounded-lg px-4 py-2 w-full outline-none
+                focus:ring-2 focus:ring-[rgb(var(--primary))] focus:border-[rgb(var(--border-strong))]"
+            >
+              <option value="">-- All Categories --</option>
+              {CATEGORY_OPTIONS.map((cat) => (
+                <option key={cat} value={cat}>
+                  {cat}
+                </option>
+              ))}
+            </select>
+          </div>
+        </div>
+      </div>
 
       {/* DIRECTORY */}
       <div className="bg-[rgb(var(--surface))] rounded-xl border border-[rgb(var(--border))] shadow-sm p-4 sm:p-6">
@@ -130,7 +223,13 @@ const TeacherStudents = () => {
         </h2>
 
         {students.length === 0 ? (
-          <EmptyState text="No students found in your assigned classes" />
+          <EmptyState
+            text={
+              hasActiveFilters
+                ? "No students match the selected filters"
+                : "No students found in your assigned classes"
+            }
+          />
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full min-w-150 text-sm">
@@ -184,13 +283,10 @@ const TeacherStudents = () => {
                     </td>
                   </tr>
                 ))}
-                {filteredStudents.length === 0 && selectedClass && (
+                {filteredStudents.length === 0 && hasActiveFilters && (
                   <tr>
                     <td colSpan="5" className="text-center py-6 text-[rgb(var(--text-muted))]">
-                      No students enrolled in{" "}
-                      <span className="font-medium text-[rgb(var(--text))]">
-                        Class {assignedClasses.find((c) => c._id === selectedClass)?.name}
-                      </span>
+                      No students match the selected filters
                     </td>
                   </tr>
                 )}
@@ -198,29 +294,24 @@ const TeacherStudents = () => {
             </table>
           </div>
         )}
+
+        <Pagination
+          page={pagination.page || page}
+          totalPages={pagination.totalPages || 1}
+          total={pagination.total || 0}
+          limit={limit}
+          onPageChange={setPage}
+          onLimitChange={(size) => {
+            setLimit(size);
+            setPage(1);
+          }}
+        />
       </div>
     </div>
   );
 };
 
 export default TeacherStudents;
-
-const StatCard = ({ title, value, icon, color }) => {
-  const colors = {
-    blue:   "bg-[rgb(var(--primary))]/10 text-[rgb(var(--primary))]",
-    green:  "bg-[rgb(var(--primary))]/15 text-[rgb(var(--primary-light))]",
-    purple: "bg-[rgb(var(--accent))]/10 text-[rgb(var(--accent))]",
-  };
-  return (
-    <div className="bg-[rgb(var(--surface))] rounded-xl border border-[rgb(var(--border))] shadow-sm p-5 flex items-center gap-4">
-      <div className={`${colors[color]} p-3 rounded-lg`}>{icon}</div>
-      <div>
-        <p className="text-xs sm:text-sm text-[rgb(var(--text-muted))]">{title}</p>
-        <p className="text-xl sm:text-2xl font-bold text-[rgb(var(--text))]">{value}</p>
-      </div>
-    </div>
-  );
-};
 
 const EmptyState = ({ text }) => (
   <div className="flex flex-col items-center justify-center py-16 text-[rgb(var(--text-muted))]">

@@ -1,10 +1,12 @@
-import React, { useEffect, useMemo, useRef, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { useNavigate } from "react-router-dom";
 import {
   FaCheck,
   FaChevronDown,
   FaChevronUp,
+  FaMinus,
+  FaPlus,
   FaSearch,
   FaThLarge,
   FaTimes,
@@ -80,7 +82,33 @@ export const DEFAULT_COLOR = { bg: "#F3F4F6", icon: "#6B7280", dot: "#E5E7EB" };
 const FREQUENT_KEY = "menuFrequentClicks";
 const FREQUENT_LIMIT = 6;
 
-function getFrequentScores() {
+export const MENU_PINNED_PREFIX = "menuPinned_";
+
+export function getMenuPinnedKey(role, loginAs) {
+  return `${MENU_PINNED_PREFIX}${role || "anon"}${loginAs ? "_" + loginAs : ""}`;
+}
+
+export function getMenuPinned(role, loginAs) {
+  try {
+    const raw = JSON.parse(
+      localStorage.getItem(getMenuPinnedKey(role, loginAs)) || "null",
+    );
+    return Array.isArray(raw) ? raw.filter((n) => typeof n === "string") : [];
+  } catch {
+    return [];
+  }
+}
+
+export function setMenuPinned(role, loginAs, names) {
+  try {
+    localStorage.setItem(getMenuPinnedKey(role, loginAs), JSON.stringify(names));
+  } catch {
+    /* ignore */
+  }
+  window.dispatchEvent(new Event("menuPinnedChange"));
+}
+
+export function getFrequentScores() {
   try {
     return JSON.parse(localStorage.getItem(FREQUENT_KEY) || "{}") || {};
   } catch {
@@ -100,22 +128,34 @@ function recordMenuUse(name) {
   }
 }
 
-/** Prefer most-used modules; fill remaining slots from menu order. */
-function pickFrequentItems(menu, limit = FREQUENT_LIMIT) {
-  const scores = getFrequentScores();
-  const ranked = [...menu].sort(
-    (a, b) => (scores[b.name] || 0) - (scores[a.name] || 0),
-  );
+/** Prefer pinned modules (user order); fill remaining slots by usage, then menu order. */
+function pickFrequentItems(menu, limit = FREQUENT_LIMIT, pinned = []) {
   const picked = [];
   const seen = new Set();
 
-  for (const item of ranked) {
-    if (picked.length >= limit) break;
-    if ((scores[item.name] || 0) > 0) {
+  for (const name of pinned) {
+    const item = menu.find((m) => m.name === name);
+    if (item) {
       picked.push(item);
       seen.add(item.name);
     }
+    if (picked.length >= limit) break;
   }
+
+  if (picked.length < limit) {
+    const scores = getFrequentScores();
+    const ranked = [...menu]
+      .filter((i) => !seen.has(i.name))
+      .sort((a, b) => (scores[b.name] || 0) - (scores[a.name] || 0));
+    for (const item of ranked) {
+      if (picked.length >= limit) break;
+      if ((scores[item.name] || 0) > 0) {
+        picked.push(item);
+        seen.add(item.name);
+      }
+    }
+  }
+
   for (const item of menu) {
     if (picked.length >= limit) break;
     if (!seen.has(item.name)) {
@@ -196,7 +236,6 @@ export function GreetingHeader({ name, role, loginAs }) {
 
   return (
     <div className="flex flex-col gap-2.5">
-      <SchoolHomeStrip />
       <div className="app-greeting skin-wave-header relative overflow-hidden rounded-[1.35rem] px-5 pb-11 pt-5 lg:pb-7">
         <div className="pointer-events-none absolute -right-8 -top-10 h-36 w-36 rounded-full bg-white/15" />
         <div className="pointer-events-none absolute -bottom-6 left-10 h-20 w-20 rounded-full bg-white/10" />
@@ -939,6 +978,121 @@ export function MenuStylePicker({ className = "" }) {
 }
 
 /**
+ * Bottom-sheet editor for customizing the "Frequently used" modules.
+ * Each module row shows a + or − button to pin/unpin it into the frequent grid.
+ */
+export function MenuPinEditor({
+  menu,
+  colorMap,
+  pinned,
+  onToggle,
+  onClose,
+}) {
+  const { t } = useLanguage();
+  const pinnedSet = useMemo(() => new Set(pinned), [pinned]);
+  const rows = useMemo(() => {
+    return [...menu].sort((a, b) => {
+      const inA = pinnedSet.has(a.name) ? 0 : 1;
+      const inB = pinnedSet.has(b.name) ? 0 : 1;
+      return inA - inB;
+    });
+  }, [menu, pinnedSet]);
+
+  useEffect(() => {
+    const onKey = (e) => {
+      if (e.key === "Escape") onClose();
+    };
+    window.addEventListener("keydown", onKey);
+    document.body.style.overflow = "hidden";
+    return () => {
+      window.removeEventListener("keydown", onKey);
+      document.body.style.overflow = "";
+    };
+  }, [onClose]);
+
+  return createPortal(
+    <div
+      className="fixed inset-0 z-[120] flex items-end justify-center"
+      role="dialog"
+      aria-modal="true"
+    >
+      <div
+        className="absolute inset-0"
+        style={{ background: "rgba(15,23,42,0.45)" }}
+        onClick={onClose}
+      />
+      <div
+        className="relative w-full max-w-md mx-auto flex max-h-[78vh] flex-col rounded-t-[1.75rem] border px-4 pb-6 pt-3 shadow-2xl"
+        style={{
+          background: "rgb(var(--bg))",
+          borderColor: "rgb(var(--border))",
+        }}
+      >
+        <div className="mx-auto mb-2 h-1.5 w-10 rounded-full" style={{ background: "rgb(var(--border))" }} />
+        <div className="flex items-center justify-between pl-1 pr-0.5 pb-2">
+          <h3 className="text-[15px] font-extrabold" style={{ color: "rgb(var(--text))" }}>
+            {t("menu.adjustFrequent", "Frequently used")}
+          </h3>
+          <button
+            type="button"
+            onClick={onClose}
+            className="flex h-8 w-8 items-center justify-center rounded-full border"
+            style={{ background: "rgb(var(--surface))", borderColor: "rgb(var(--border))" }}
+            aria-label={t("common.close", "Close")}
+          >
+            <FaCheck size={13} style={{ color: "rgb(var(--text-muted))" }} />
+          </button>
+        </div>
+        <p className="mb-3 pl-1 text-[12px] font-medium" style={{ color: "rgb(var(--text-muted))" }}>
+          {t("menu.pinHint", "Add or remove modules shown here")}
+        </p>
+        <div className="menu-uplift-card -mx-1 flex-1 overflow-y-auto rounded-2xl px-2 py-2">
+          {rows.map((item) => {
+            const color = colorMap[item.name] ?? DEFAULT_COLOR;
+            const active = pinnedSet.has(item.name);
+            return (
+              <button
+                key={item.name}
+                type="button"
+                onClick={() => onToggle(item.name)}
+                className="flex w-full items-center gap-3 rounded-xl px-2 py-2.5 text-left hover:opacity-90 active:scale-[0.99] transition"
+                style={{ borderBottom: "0.5px solid rgb(var(--border))" }}
+              >
+                <span
+                  className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl text-[17px]"
+                  style={{ background: color.bg }}
+                >
+                  {getMenuIconMeta(item.name)?.emoji}
+                </span>
+                <span className="min-w-0 flex-1 truncate text-[13.5px] font-bold" style={{ color: "rgb(var(--text))" }}>
+                  {item.name}
+                </span>
+                {active ? (
+                  <span
+                    className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-white"
+                    style={{ background: "#EF4444" }}
+                  >
+                    <FaMinus size={10} />
+                  </span>
+                ) : (
+                  <span
+                    className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-white"
+                    style={{ background: "#22C55E" }}
+                  >
+                    <FaPlus size={10} />
+                  </span>
+                )}
+              </button>
+            );
+          })}
+        </div>
+      </div>
+    </div>,
+    document.body,
+  );
+}
+
+/**
  * Shared app-style module grid for role menu hubs.
  * Mobile: uplifted card with frequent modules + View all.
  * Desktop: full searchable grid.
@@ -953,11 +1107,16 @@ export function ModuleGrid({
   onCollapse,
 }) {
   const { t } = useLanguage();
+  const { user } = useAuth();
+  const role = user?.role;
+  const loginAs = user?.loginAs;
   const isMobile = useIsMobileLayout();
   const [query, setQuery] = useState("");
   const [showAll, setShowAll] = useState(expandAll);
   const [styleId, setStyleId] = useState(getSavedMenuStyle);
   const [freqTick, setFreqTick] = useState(0);
+  const [pinned, setPinned] = useState(() => getMenuPinned(role, loginAs));
+  const [pinEditorOpen, setPinEditorOpen] = useState(false);
   const cols = useGridColumns(styleId);
   const folderRef = useRef(null);
 
@@ -974,6 +1133,12 @@ export function ModuleGrid({
   }, []);
 
   useEffect(() => {
+    const onPinned = () => setPinned(getMenuPinned(role, loginAs));
+    window.addEventListener("menuPinnedChange", onPinned);
+    return () => window.removeEventListener("menuPinnedChange", onPinned);
+  }, [role, loginAs]);
+
+  useEffect(() => {
     if (expandAll) setShowAll(true);
   }, [expandAll]);
 
@@ -983,12 +1148,30 @@ export function ModuleGrid({
   }, [query]);
 
   const frequent = useMemo(
-    () => pickFrequentItems(menu, FREQUENT_LIMIT),
-    [menu, freqTick],
+    () => pickFrequentItems(menu, FREQUENT_LIMIT, pinned),
+    [menu, freqTick, pinned],
   );
   const frequentNames = useMemo(
     () => new Set(frequent.map((i) => i.name)),
     [frequent],
+  );
+
+  const togglePin = useCallback(
+    (name) => {
+      const next = pinned.includes(name)
+        ? pinned.filter((n) => n !== name)
+        : [...pinned, name];
+      try {
+        localStorage.setItem(
+          getMenuPinnedKey(role, loginAs),
+          JSON.stringify(next),
+        );
+        window.dispatchEvent(new Event("menuPinnedChange"));
+      } catch {
+        /* ignore */
+      }
+    },
+    [pinned, role, loginAs],
   );
 
   const filtered = useMemo(() => {
@@ -1191,7 +1374,8 @@ export function ModuleGrid({
   /* ── Mobile: uplifted card with frequent + View all ── */
   if (isMobile) {
     return (
-      <div className="relative z-10 -mt-7 flex flex-col lg:mt-0">
+      <>
+        <div className="relative z-10 -mt-7 flex flex-col lg:mt-0">
         <div className="menu-uplift-card flex flex-col gap-4 rounded-[1.75rem] border px-4 pb-5 pt-5 sm:px-5">
           {!showAll ? (
             <>
@@ -1210,15 +1394,32 @@ export function ModuleGrid({
                     {t("menu.frequentHint", "Your most opened modules")}
                   </p>
                 </div>
-                <span
-                  className="text-[11px] font-bold tabular-nums px-2 py-0.5 rounded-full shrink-0"
-                  style={{
-                    color: "rgb(var(--primary))",
-                    background: "rgba(var(--primary),0.1)",
-                  }}
-                >
-                  {frequent.length}
-                </span>
+                <div className="flex items-center gap-2 shrink-0">
+                  <button
+                    type="button"
+                    onClick={() => setPinEditorOpen(true)}
+                    className="flex h-7 w-7 items-center justify-center rounded-full border text-[12px] font-black active:scale-95 transition-transform"
+                    style={{
+                      color: "rgb(var(--primary))",
+                      borderColor:
+                        "color-mix(in srgb, rgb(var(--primary)) 35%, rgb(var(--border)))",
+                      background:
+                        "color-mix(in srgb, rgb(var(--primary)) 10%, rgb(var(--surface)))",
+                    }}
+                    aria-label={t("menu.adjustFrequent", "Adjust frequently used")}
+                  >
+                    <FaPlus size={9} />
+                  </button>
+                  <span
+                    className="text-[11px] font-bold tabular-nums px-2 py-0.5 rounded-full"
+                    style={{
+                      color: "rgb(var(--primary))",
+                      background: "rgba(var(--primary),0.1)",
+                    }}
+                  >
+                    {frequent.length}
+                  </span>
+                </div>
               </div>
 
               {renderGrid(frequent, 0)}
@@ -1302,6 +1503,16 @@ export function ModuleGrid({
         {!showAll && <UrgentActions className="mt-1" />}
         {animStyle}
       </div>
+        {pinEditorOpen && (
+          <MenuPinEditor
+            menu={menu}
+            colorMap={colorMap}
+            pinned={pinned}
+            onToggle={togglePin}
+            onClose={() => setPinEditorOpen(false)}
+          />
+        )}
+      </>
     );
   }
 
