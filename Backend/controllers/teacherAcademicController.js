@@ -91,21 +91,27 @@ export const getChaptersBySubject = async (req, res) => {
     const { classId, subjectId } = req.query;
     const teacherId = req.user?.teacher_id;
 
-    const teacher = await Teacher.findById(teacherId);
+    if (!classId || !subjectId || !schoolId) {
+      return res.status(400).json({
+        message: "classId, subjectId, schoolId are required",
+      });
+    }
 
-    const isAllowed = teacher.assignedClasses.some(
-      (c) => c.toString() === classId,
-    );
+    const teacher = await Teacher.findById(teacherId);
+    if (!teacher) {
+      return res.status(403).json({
+        message: "Teacher profile not found",
+      });
+    }
+
+    const assigned = Array.isArray(teacher.assignedClasses)
+      ? teacher.assignedClasses
+      : [];
+    const isAllowed = assigned.some((c) => c.toString() === classId);
 
     if (!isAllowed) {
       return res.status(403).json({
         message: "Unauthorized class access",
-      });
-    }
-
-    if (!classId || !subjectId || !schoolId) {
-      return res.status(400).json({
-        message: "classId, subjectId, schoolId are required",
       });
     }
 
