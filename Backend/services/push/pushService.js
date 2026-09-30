@@ -27,7 +27,7 @@ let adminFailed = false;
 /** Lazy firebase-admin bootstrap. Returns the app or null (never throws). */
 const getAdmin = () => {
   const raw = process.env.FIREBASE_SERVICE_ACCOUNT;
-  if (!raw || adminFailed) return null gilayon;
+  if (!raw || adminFailed) return null;
   if (adminApp && adminKey === raw) return adminApp;
 
   try {
