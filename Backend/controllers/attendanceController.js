@@ -129,10 +129,22 @@ export const getExistingAttendance = async (req, res) => {
   const { classId, sectionId, subjectId, date } = req.query;
   const schoolId = req.user.school_id;
 
+  if (!date) {
+    return res
+      .status(400)
+      .json({ success: false, message: "date is required (YYYY-MM-DD)" });
+  }
+
+  const dayStart = new Date(date);
+  if (Number.isNaN(dayStart.getTime())) {
+    return res
+      .status(400)
+      .json({ success: false, message: "date is invalid. Use YYYY-MM-DD" });
+  }
+
   try {
-    const dayStart = new Date(date);
     dayStart.setHours(0, 0, 0, 0);
-    const dayEnd = new Date(date);
+    const dayEnd = new Date(dayStart);
     dayEnd.setHours(23, 59, 59, 999);
 
     const records = await Attendance.find({
