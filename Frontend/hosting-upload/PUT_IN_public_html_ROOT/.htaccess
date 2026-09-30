@@ -1,5 +1,13 @@
 # SPA + static assets for Apache shared hosting (domain root)
 
+<IfModule mod_rewrite.c>
+  # Force HTTPS so the browser origin is always https://eduaitor.com
+  # (the API CORS allowlist accepts https only)
+  RewriteEngine On
+  RewriteCond %{HTTPS} off
+  RewriteRule ^ https://%{HTTP_HOST}%{REQUEST_URI} [L,R=301]
+</IfModule>
+
 <IfModule mod_mime.c>
   AddType application/javascript .js .mjs
   AddType text/css .css
