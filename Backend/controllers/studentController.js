@@ -300,17 +300,22 @@ export const createStudent = async (req, res) => {
         message: "Father mobile (parent username) is required",
       });
     }
-    if (!String(safeBody.guardianName || "").trim()) {
-      return res.status(400).json({
-        success: false,
-        message: "Guardian name is required",
-      });
-    }
-    if (!String(safeBody.guardianRelation || "").trim()) {
-      return res.status(400).json({
-        success: false,
-        message: "Guardian relation is required",
-      });
+    // Guardian is optional. When a guardian name is provided, the guardian's
+    // mobile and relation become mandatory so the record is never half-filled.
+    if (String(safeBody.guardianName || "").trim()) {
+      if (!String(safeBody.guardianMobile || "").trim()) {
+        return res.status(400).json({
+          success: false,
+          message: "Guardian mobile is required when a guardian name is provided",
+        });
+      }
+      if (!String(safeBody.guardianRelation || "").trim()) {
+        return res.status(400).json({
+          success: false,
+          message:
+            "Guardian relation is required when a guardian name is provided",
+        });
+      }
     }
 
     let studentId;

@@ -654,6 +654,12 @@ const StudentManagement = () => {
     setForm((prev) => ({
       ...prev,
       [name]: nextValue,
+      // Clearing the guardian name hides the dependent fields, so drop their
+      // values too — otherwise a half-filled guardian gets submitted silently.
+      ...(name === "guardianName" && !String(nextValue || "").trim() && {
+        guardianMobile: "",
+        guardianRelation: "",
+      }),
       ...(name === "classId" && {
         sectionId: "",
         transport: "",
@@ -840,9 +846,14 @@ const StudentManagement = () => {
       if (!form.fatherMobile?.trim()) errors.push("Father mobile required");
       if (!form.motherName?.trim()) errors.push("Mother name required");
       if (!form.motherMobile?.trim()) errors.push("Mother mobile required");
-      if (!form.guardianName?.trim()) errors.push("Guardian name required");
-      if (!form.guardianRelation?.trim())
-        errors.push("Guardian relation required");
+      // Guardian is optional. Only validate mobile/relation once a guardian
+      // name is entered — the fields are revealed conditionally in the form.
+      if (form.guardianName?.trim()) {
+        if (!form.guardianMobile?.trim())
+          errors.push("Guardian mobile required");
+        if (!form.guardianRelation?.trim())
+          errors.push("Guardian relation required");
+      }
       if (!form.address?.trim()) errors.push("Address required");
       if (form.fatherMobile && !/^\d{10}$/.test(String(form.fatherMobile)))
         errors.push("Invalid Father Mobile Number");
@@ -1441,31 +1452,36 @@ const forbidden = [
 
                 <Input
                   label="Guardian Name"
-                  placeholder="Enter full name"
+                  placeholder="Enter full name (optional)"
                   name="guardianName"
                   value={form.guardianName}
                   onChange={handleChange}
                   error={errors.guardianName}
                 />
-                <Input
-                  label="Guardian Mobile"
-                  placeholder="10-digit mobile number"
-                  name="guardianMobile"
-                  type="tel"
-                  inputMode="numeric"
-                  maxLength={10}
-                  value={form.guardianMobile}
-                  onChange={handleChange}
-                  error={errors.guardianMobile}
-                />
-                <Select
-                  label="Guardian Relation *"
-                  name="guardianRelation"
-                  value={form.guardianRelation}
-                  onChange={handleChange}
-                  error={errors.guardianRelation}
-                  options={GUARDIAN_RELATION_OPTIONS}
-                />
+
+                {form.guardianName?.trim() && (
+                  <>
+                    <Input
+                      label="Guardian Mobile *"
+                      placeholder="10-digit mobile number"
+                      name="guardianMobile"
+                      type="tel"
+                      inputMode="numeric"
+                      maxLength={10}
+                      value={form.guardianMobile}
+                      onChange={handleChange}
+                      error={errors.guardianMobile}
+                    />
+                    <Select
+                      label="Guardian Relation *"
+                      name="guardianRelation"
+                      value={form.guardianRelation}
+                      onChange={handleChange}
+                      error={errors.guardianRelation}
+                      options={GUARDIAN_RELATION_OPTIONS}
+                    />
+                  </>
+                )}
 
                 <Input
                   label="Address *"
@@ -2383,9 +2399,13 @@ const ReviewStep = ({
         <Field label="Mother name" value={form.motherName} />
         <Field label="Mother mobile" value={form.motherMobile} />
         <Field label="Mother email" value={form.motherEmail} />
-        <Field label="Guardian name" value={form.guardianName} />
-        <Field label="Guardian mobile" value={form.guardianMobile} />
-        <Field label="Relation" value={form.guardianRelation} />
+{form.guardianName?.trim() && (
+              <>
+                <Field label="Guardian name" value={form.guardianName} />
+                <Field label="Guardian mobile" value={form.guardianMobile} />
+                <Field label="Relation" value={form.guardianRelation} />
+              </>
+            )}
         <Field label="Address" value={form.address} />
       </Section>
 
