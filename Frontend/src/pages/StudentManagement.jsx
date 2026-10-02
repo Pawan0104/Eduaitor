@@ -125,6 +125,83 @@ const emptyForm = {
   extraDocuments: [],
 };
 
+const toDateInputValue = (date) => date.toISOString().slice(0, 10);
+
+// QA helper: fills the currently visible step with sample data so the wizard can
+// be walked end-to-end without typing. Test-only — never auto-applied.
+const DUMMY_DATA_BY_STEP = {
+  1: () => ({
+    firstName: "Test",
+    lastName: "Student",
+    dob: "2015-06-15",
+    gender: "Male",
+    bloodGroup: "B+",
+    category: "General",
+    community: "",
+    admissionDate: toDateInputValue(new Date()),
+  }),
+  2: () => ({
+    fatherName: "Ramesh Test",
+    fatherMobile: "9876543210",
+    fatherEmail: "ramesh.test@example.com",
+    motherName: "Sunita Test",
+    motherMobile: "9876543211",
+    motherEmail: "sunita.test@example.com",
+    guardianName: "Anita Guardian",
+    guardianMobile: "9876543212",
+    guardianRelation: "Aunt",
+    address: "12 Test Park Lane, Test City, Test State 500001",
+  }),
+  3: () => ({
+    previousSchoolName: "Test Public School",
+    previousSchoolClass: "Class 4",
+    previousSchoolResult: "Pass",
+  }),
+  5: (classes) => ({
+    classId: classes?.[0]?._id || classes?.[0]?.id || "",
+    rollNo: "1",
+    studentType: "Day Scholar",
+  }),
+  6: () => ({
+    discountType: "Percentage",
+    discountValue: "10",
+  }),
+  7: () => ({
+    username: "9876543210",
+    password: "Test@1234",
+  }),
+};
+
+// 1x1 transparent PNG — lets QA clear the required-document step without
+// hunting for real files. Uploads are disposable test artefacts.
+const createDummyImageFile = (label) => {
+  const pngBytes = [
+    0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0x00, 0x00, 0x00, 0x0d, 0x49,
+    0x48, 0x44, 0x52, 0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x01, 0x08, 0x06,
+    0x00, 0x00, 0x00, 0x1f, 0x15, 0xc4, 0x89, 0x00, 0x00, 0x00, 0x0d, 0x49, 0x44,
+    0x41, 0x54, 0x08, 0xd7, 0x63, 0xf8, 0xcf, 0xc0, 0x00, 0x00, 0x03, 0x01, 0x01,
+    0x00, 0x18, 0xdd, 0x8d, 0xb0, 0x00, 0x00, 0x00, 0x00, 0x49, 0x45, 0x4e, 0x44,
+    0xae, 0x42, 0x60, 0x82,
+  ];
+  // NOTE: this file declares a `File` upload component further down, which
+  // shadows the global File constructor — so qualify as window.File.
+  return new window.File([new Uint8Array(pngBytes)], label, {
+    type: "image/png",
+  });
+};
+
+const DUMMY_DOCUMENT_FIELDS = [
+  "studentPhoto",
+  "fatherPhoto",
+  "motherPhoto",
+  "guardianPhoto",
+  "birthCertificate",
+  "transferCertificate",
+  "studentAadhar",
+  "fatherAadhar",
+  "motherAadhar",
+];
+
 const createExtraDocument = () => {
   const uniqueSuffix = `${Date.now()}-${Math.floor(Math.random() * 100000)}`;
   return {
@@ -138,6 +215,35 @@ const createExtraDocument = () => {
     existingUrl: null,
   };
 };
+
+const DUMMY_STEP_HINTS = {
+  1: "name, date of birth, gender, blood group, category and admission date",
+  2: "parent, guardian and address details",
+  3: "previous school details",
+  4: "sample photo, Aadhar and certificate files",
+  5: "class, roll number and student type",
+  6: "discount settings — fee totals recalculate automatically",
+  7: "parent login username and password",
+  8: "every field on all steps at once",
+};
+
+const DummyFillBar = ({ onFill, step }) => (
+  <div className="mb-6 flex flex-wrap items-center justify-between gap-3 rounded-lg border border-dashed border-amber-400 bg-amber-50 px-4 py-3">
+    <div className="min-w-0">
+      <p className="text-sm font-semibold text-amber-900">Test data</p>
+      <p className="text-xs text-amber-800">
+        Fills {DUMMY_STEP_HINTS[step] || "this step"} with sample values.
+      </p>
+    </div>
+    <button
+      type="button"
+      onClick={onFill}
+      className="shrink-0 rounded-lg border border-amber-500 bg-white px-4 py-2 text-sm font-medium text-amber-900 transition hover:bg-amber-100 focus:outline-none focus:ring-2 focus:ring-amber-500 focus:ring-offset-1"
+    >
+      Fill dummy data
+    </button>
+  </div>
+);
 
 const StudentManagement = () => {
   const { id } = useParams();
@@ -599,6 +705,53 @@ const StudentManagement = () => {
   }, [id]);
 
   /* CHANGE */
+  const fillDummyData = () => {
+    if (isEdit) return;
+
+    // Review step has no inputs of its own — fill everything so the whole
+    // wizard can be checked in one click.
+    if (step === 8) {
+      setForm((prev) => ({
+        ...prev,
+        ...DUMMY_DATA_BY_STEP[1](),
+        ...DUMMY_DATA_BY_STEP[2](),
+        ...DUMMY_DATA_BY_STEP[3](),
+        ...DUMMY_DATA_BY_STEP[5](classes),
+        ...DUMMY_DATA_BY_STEP[6](),
+        ...DUMMY_DATA_BY_STEP[7](),
+        ...Object.fromEntries(
+          DUMMY_DOCUMENT_FIELDS.map((field) => [
+            field,
+            createDummyImageFile(`${field}-test.png`),
+          ]),
+        ),
+      }));
+      setErrors({});
+      return;
+    }
+
+    if (step === 4) {
+      setForm((prev) => ({
+        ...prev,
+        ...Object.fromEntries(
+          DUMMY_DOCUMENT_FIELDS.map((field) => [
+            field,
+            createDummyImageFile(`${field}-test.png`),
+          ]),
+        ),
+      }));
+      setErrors({});
+      return;
+    }
+
+    const builder = DUMMY_DATA_BY_STEP[step];
+    if (!builder) return;
+
+    setForm((prev) => ({ ...prev, ...builder(classes) }));
+    // Stale per-field errors would otherwise stay on screen next to filled inputs.
+    setErrors({});
+  };
+
   const handleChange = (e) => {
     const { name, value } = e.target;
 
@@ -1299,8 +1452,10 @@ const forbidden = [
 
             {/* STEP 1 */}
 
-            {step === 1 && (
-              <div className="grid md:grid-cols-2 gap-6">
+{step === 1 && (
+                <>
+                  <DummyFillBar onFill={fillDummyData} step={step} />
+                  <div className="grid md:grid-cols-2 gap-6">
                 <Input
                   label="Admission Number"
                   placeholder={
@@ -1387,11 +1542,14 @@ const forbidden = [
                   max={new Date().toISOString().split("T")[0]}
                 />
               </div>
-            )}
+                </>
+              )}
             {/* STEP 2 */}
 
-            {step === 2 && (
-              <div className="space-y-6">
+{step === 2 && (
+                <>
+                  <DummyFillBar onFill={fillDummyData} step={step} />
+                  <div className="space-y-6">
                 <Input
                   label="Father Name *"
                   placeholder="Enter full name"
@@ -1491,13 +1649,15 @@ const forbidden = [
                   onChange={handleChange}
                   error={errors.address}
                 />
-              </div>
-            )}
-
+</div>
+                </>
+              )}
             {/* STEP 3 */}
 
-            {step === 3 && (
-              <div className="grid gap-6">
+{step === 3 && (
+                <>
+                  <DummyFillBar onFill={fillDummyData} step={step} />
+                  <div className="grid gap-6">
                 <Input
                   label="Previous School Name"
                   placeholder="Enter previous school name"
@@ -1519,13 +1679,15 @@ const forbidden = [
                   value={form.previousSchoolResult}
                   onChange={handleChange}
                 />
-              </div>
-            )}
-
+</div>
+                </>
+              )}
             {/* STEP 4 */}
 
-            {step === 4 && (
-              <div className="grid gap-4">
+{step === 4 && (
+                <>
+                  <DummyFillBar onFill={fillDummyData} step={step} />
+                  <div className="grid gap-4">
                 <File
                   label="Student Photo *"
                   name="studentPhoto"
@@ -1653,14 +1815,17 @@ const forbidden = [
                   )}
                 </div>
               </div>
-            )}
+                </>
+              )}
 
             {/* STEP 5 */}
 
-            {step === 5 && (
-              <div className="grid gap-4">
-                <Select
-                  label="Class *"
+{step === 5 && (
+                <>
+                  <DummyFillBar onFill={fillDummyData} step={step} />
+                  <div className="grid gap-4">
+                    <Select
+                      label="Class *"
                   name="classId"
                   value={form.classId}
                   options={classes.map((c) => ({
@@ -1703,14 +1868,17 @@ const forbidden = [
                   onChange={handleChange}
                 />
               </div>
-            )}
+                </>
+              )}
 
             {/* STEP 5 */}
 
             {/* STEP 6 */}
             {step === 6 && (
-              <div className="grid gap-4">
-                {feeStructure.length === 0 && form.classId && (
+                <>
+                  <DummyFillBar onFill={fillDummyData} step={step} />
+                  <div className="grid gap-4">
+                    {feeStructure.length === 0 && form.classId && (
                   <div className="text-sm text-[rgb(var(--text))] ">
                     No fee structure found for this class
                   </div>
@@ -1932,27 +2100,34 @@ const forbidden = [
                   readOnly
                 />
               </div>
-            )}
+                </>
+              )}
 
             {/* STEP 6 PARENT LOGIN */}
-            {step === 7 && (
-              <ParentLoginStep
-                form={form}
-                handleChange={handleChange}
-                isEdit={isEdit}
-              />
-            )}
+{step === 7 && (
+                <>
+                  <DummyFillBar onFill={fillDummyData} step={step} />
+                  <ParentLoginStep
+                    form={form}
+                    handleChange={handleChange}
+                    isEdit={isEdit}
+                  />
+                </>
+              )}
 
             {/* STEP 8 REVIEW */}
             {step === 8 && (
-              <ReviewStep
-                form={form}
-                classes={classes}
-                sections={sections}
-                transportRoutes={transportRoutes}
-                feeStructure={feeStructure}
-                freqFilter={freqFilter}
-              />
+              <>
+                <DummyFillBar onFill={fillDummyData} step={step} />
+                <ReviewStep
+                  form={form}
+                  classes={classes}
+                  sections={sections}
+                  transportRoutes={transportRoutes}
+                  feeStructure={feeStructure}
+                  freqFilter={freqFilter}
+                />
+              </>
             )}
 
             {/* NAV */}
