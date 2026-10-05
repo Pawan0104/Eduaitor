@@ -1,7 +1,7 @@
 import mongoose from "mongoose";
 import bcrypt from "bcryptjs";
 import net from "net";
-import { resolveSrv, resolveTxt } from "dns/promises";
+import { resolveSrv, resolveTxt, lookup } from "dns/promises";
 import { URL } from "url";
 import { startNotificationCron } from "../cron/notificationCron.js";
 import { seedSampleData } from "../utils/seedSampleData.js";
@@ -60,71 +60,107 @@ const redactAtlasSecrets = (value) => {
  * Resolves the Atlas hosts and TCP-probes each one. Hostnames/ports only -
  * no credentials, no URI echo.
  */
-const runAtlasPreflight = async (uri) => {
-  const log = (...args) => console.log(ATLAS_DIAG_TAG, ...args);
+const runAtlasPreflight = async () => {
+  // stderr, not stdout: stdout is block-buffered when piped and this process
+  // ends in process.exit(1), which discards unflushed stdout.
+  const log = (...args) => console.error(ATLAS_DIAG_TAG, ...args);
+
+  const uri = process.env.MONGO_URI;
+  if (!uri) {
+    log("MONGO_URI is not set; skipping startup reachability diagnostic");
+    return;
+  }
 
   try {
-    // Lift credentials for scrubbing before anything can be logged.
     resetAtlasUriSecrets(uri);
-    const isSrv = uri.startsWith("mongodb+srv://");
+
+    // Hostname only. The URI, query string, username and password are never
+    // read into a loggable variable.
     const parsed = new URL(uri);
-    // parsed.username / parsed.password are deliberately never read or logged.
     const hostname = parsed.hostname;
-    log(
-      `preflight start scheme=${isSrv ? "mongodb+srv" : "mongodb"} host=${hostname}`,
-    );
 
-    let targets = [];
-    if (isSrv) {
-      const records = await resolveSrv(`_mongodb._tcp.${hostname}`);
-      targets = records.map((r) => ({ host: r.name, port: r.port || 27017 }));
-      log(`SRV lookup _mongodb._tcp.${hostname} -> ${targets.length} record(s)`);
-    } else {
-      targets = parsed.host.split(",").map((entry) => {
-        const [h, p] = entry.split(":");
-        return { host: h, port: Number(p) || 27017 };
-      });
-      log(`non-SRV URI -> ${targets.length} host(s) parsed from authority`);
+    if (!uri.startsWith("mongodb+srv://")) {
+      log(
+        `SRV hostname=${hostname} SKIPPED reason=not-an-srv-uri`,
+      );
+      return;
     }
 
-    for (const t of targets) {
-      log(`resolved host=${t.host} port=${t.port}`);
+    log(`SRV hostname=${hostname}`);
+
+    // A. SRV + TXT resolution.
+    let records = [];
+    try {
+      records = await resolveSrv(`_mongodb._tcp.${hostname}`);
+      log(`SRV records=${records.length}`);
+      for (const r of records) {
+        log(`SRV target=${r.name} port=${r.port}`);
+      }
+    } catch (srvErr) {
+      log(`SRV FAILED code=${srvErr?.code} message=${redactAtlasSecrets(srvErr?.message)}`);
+      return;
     }
 
-    for (const t of targets) {
-      // Sequential on purpose: parallel probes can look like a burst of
-      // abuse to Atlas network filters.
+    if (records.length === 0) {
+      log("SRV returned 0 records; no targets to probe");
+      return;
+    }
+
+    try {
+      const txt = await resolveTxt(hostname);
+      log(`TXT records=${txt.length}`);
+      for (const entry of txt) {
+        for (const part of entry) {
+          // TXT is advisory; never echoed in full in case it carries values.
+          log(`TXT key=${part.split("=")[0]}`);
+        }
+      }
+    } catch (txtErr) {
+      log(`TXT FAILED code=${txtErr?.code} message=${redactAtlasSecrets(txtErr?.message)}`);
+    }
+
+    for (const r of records) {
+      const target = r.name;
+      const port = r.port;
+
+      // C. Forward DNS for the SRV target itself.
+      try {
+        const resolved = await lookup(target);
+        log(`DNS target=${target} address=${resolved.address} family=${resolved.family}`);
+      } catch (dnsErr) {
+        log(`DNS target=${target} FAILED code=${dnsErr?.code}`);
+      }
+
+      // B. TCP reachability on the port the SRV record returned, 5s cap.
       await new Promise((resolve) => {
         let settled = false;
-        const socket = net.connect({ host: t.host, port: t.port });
-        const finish = (...args) => {
+        const socket = net.connect({ host: target, port });
+        const done = (line) => {
           if (settled) return;
           settled = true;
           try {
             socket.destroy();
           } catch {
-            /* socket already torn down */
+            /* already torn down */
           }
-          log(...args);
+          log(line);
           resolve();
         };
         socket.setTimeout(5000);
-        socket.once("connect", () => finish(`TCP OK ${t.host}:${t.port}`));
+        socket.once("connect", () => done(`TCP target=${target}:${port} SUCCESS`));
         socket.once("timeout", () =>
-          finish(`TCP TIMEOUT after 5000ms ${t.host}:${t.port}`),
+          done(`TCP target=${target}:${port} FAILED code=ETIMEDOUT message=socket timeout after 5000ms`),
         );
         socket.once("error", (err) =>
-          finish(
-            `TCP FAIL ${t.host}:${t.port} code=${err.code} name=${err.name} message=${redactAtlasSecrets(err.message)}`,
+          done(
+            `TCP target=${target}:${port} FAILED code=${err?.code} message=${redactAtlasSecrets(err?.message)}`,
           ),
         );
       });
     }
-
-    log("preflight complete");
   } catch (err) {
     log(
-      `preflight aborted name=${err?.name} code=${err?.code} message=${redactAtlasSecrets(err?.message)}`,
+      `startup diagnostic FAILED name=${err?.name} code=${err?.code} message=${redactAtlasSecrets(err?.message)}`,
     );
   }
 };
@@ -217,10 +253,10 @@ const connectDB = async () => {
         throw new Error("MONGO_URI is missing while USE_ATLAS_DB=true");
       }
 
-      // [ATLAS-DIAGNOSTIC] TEMPORARY - DNS + TCP reachability probe. Runs
-      // before the driver so DNS and TCP faults are distinguishable from
-      // TLS/auth faults. Does not alter the connect options below.
-      await runAtlasPreflight(atlasUri);
+      // [ATLAS-DIAGNOSTIC] TEMPORARY - standalone startup reachability
+      // diagnostic (SRV + TXT + DNS lookup + TCP). Reads MONGO_URI from
+      // process.env itself and logs hostnames/ports/codes only.
+      await runAtlasPreflight();
 
       try {
         const conn = await mongoose.connect(atlasUri, {
