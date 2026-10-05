@@ -27,6 +27,26 @@ const TYPES = [
   },
 ];
 
+const buildQuery = ({
+  issueDate,
+  leavingDate,
+  reason,
+  conduct,
+  remarks,
+  certificateNo,
+}) => {
+  const params = new URLSearchParams({
+    issueDate,
+    leavingDate,
+    reason,
+    conduct,
+    remarks,
+  });
+  const no = String(certificateNo || "").trim();
+  if (no) params.set("certificateNo", no);
+  return params;
+};
+
 export default function Certificates() {
   const navigate = useNavigate();
   const [type, setType] = useState("transfer");
@@ -44,8 +64,95 @@ export default function Certificates() {
   const [remarks, setRemarks] = useState("");
   const [certificateNo, setCertificateNo] = useState("");
   const [loadingList, setLoadingList] = useState(true);
-  const [generating, setGenerating] = useState(false);
+  const [previewing, setPreviewing] = useState(false);
+  const [previewError, setPreviewError] = useState("");
   const [certificate, setCertificate] = useState(null);
+
+  // The generate endpoint is a stateless GET — it writes nothing and derives the
+  // certificate number from type + student + year. So the preview can be built
+  // automatically the moment a type and student are chosen, and kept in sync as
+  // the option fields change. No separate "generate" step is needed.
+  useEffect(() => {
+    if (!studentId) {
+      setCertificate(null);
+      setPreviewError("");
+      setPreviewing(false);
+      return;
+    }
+
+    const controller = new AbortController();
+
+    // Debounced so typing in Remarks/Reason does not fire a request per keystroke.
+    const timer = setTimeout(async () => {
+      setPreviewing(true);
+      try {
+        const { data } = await axios.get(
+          `${API}/certificates/generate/${type}/${studentId}?${buildQuery({
+            issueDate,
+            leavingDate,
+            reason,
+            conduct,
+            remarks,
+            certificateNo,
+          })}`,
+          { withCredentials: true, signal: controller.signal },
+        );
+        setCertificate(data.certificate);
+        setPreviewError("");
+      } catch (err) {
+        if (axios.isCancel(err)) return;
+        setCertificate(null);
+        setPreviewError(
+          err.response?.data?.message || "Could not build preview",
+        );
+      } finally {
+        if (!controller.signal.aborted) setPreviewing(false);
+      }
+    }, 400);
+
+    return () => {
+      clearTimeout(timer);
+      controller.abort();
+    };
+  }, [
+    type,
+    studentId,
+    issueDate,
+    leavingDate,
+    reason,
+    conduct,
+    remarks,
+    certificateNo,
+  ]);
+
+  // Explicit re-fetch, e.g. after editing the template under Document designs.
+  const refreshPreview = async () => {
+    if (!studentId) {
+      toast.error("Select a student");
+      return;
+    }
+    try {
+      setPreviewing(true);
+      const { data } = await axios.get(
+        `${API}/certificates/generate/${type}/${studentId}?${buildQuery({
+          issueDate,
+          leavingDate,
+          reason,
+          conduct,
+          remarks,
+          certificateNo,
+        })}`,
+        { withCredentials: true },
+      );
+      setCertificate(data.certificate);
+      setPreviewError("");
+      toast.success("Preview refreshed");
+    } catch (err) {
+      toast.error(err.response?.data?.message || "Could not build preview");
+    } finally {
+      setPreviewing(false);
+    }
+  };
 
   useEffect(() => {
     const load = async () => {
@@ -99,7 +206,7 @@ export default function Certificates() {
   const printCertificateSheet = () => {
     const html = getCertificateSheetHtml();
     if (!html) {
-      toast.error("Generate a certificate first");
+      toast.error("Select a student first — the preview builds automatically");
       return;
     }
     const win = window.open("", "_blank", "noopener,noreferrer,width=900,height=1200");
@@ -118,7 +225,7 @@ export default function Certificates() {
   const downloadCertificate = () => {
     const el = document.querySelector(".certificate-sheet");
     if (!el) {
-      toast.error("Generate a certificate first");
+      toast.error("Select a student first — the preview builds automatically");
       return;
     }
     const html = getCertificateSheetHtml();
@@ -132,35 +239,6 @@ export default function Certificates() {
     a.remove();
     URL.revokeObjectURL(url);
     toast.success("Certificate downloaded — open the file and use Print → Save as PDF");
-  };
-
-  const generate = async () => {
-    if (!studentId) {
-      toast.error("Select a student");
-      return;
-    }
-    try {
-      setGenerating(true);
-      const params = new URLSearchParams({
-        issueDate,
-        leavingDate,
-        reason,
-        conduct,
-        remarks,
-      });
-      if (certificateNo.trim()) params.set("certificateNo", certificateNo.trim());
-      const { data } = await axios.get(
-        `${API}/certificates/generate/${type}/${studentId}?${params}`,
-        { withCredentials: true },
-      );
-      setCertificate(data.certificate);
-      toast.success("Certificate ready — print or save as PDF");
-    } catch (err) {
-      toast.error(err.response?.data?.message || "Generation failed");
-      setCertificate(null);
-    } finally {
-      setGenerating(false);
-    }
   };
 
   return (
@@ -179,7 +257,7 @@ export default function Certificates() {
               Certificates
             </h1>
             <p className="text-sm text-[rgb(var(--text-muted))]">
-              Generate Transfer or Character certificates for students
+              Live preview of Transfer or Character certificates
             </p>
           </div>
         </div>
@@ -357,19 +435,38 @@ export default function Certificates() {
             />
           </label>
 
+          <p className="text-xs text-[rgb(var(--text-muted))]">
+            The preview builds itself as soon as you pick a certificate type and
+            student, and updates whenever you change anything below.
+          </p>
           <button
             type="button"
-            disabled={generating || !studentId}
-            onClick={generate}
-            className="w-full rounded-xl bg-[rgb(var(--primary))] py-3 text-sm font-bold text-white disabled:opacity-50"
+            disabled={previewing || !studentId}
+            onClick={refreshPreview}
+            className="w-full rounded-xl border border-[rgb(var(--border))] bg-[rgb(var(--bg))] py-3 text-sm font-bold text-[rgb(var(--text))] transition hover:bg-[rgba(var(--primary),0.06)] disabled:opacity-50"
           >
-            {generating ? "Generating…" : "Generate certificate"}
+            {previewing ? "Refreshing…" : "Refresh preview"}
           </button>
         </div>
 
         <div className="space-y-3">
-          <div className="flex items-center justify-between print:hidden">
-            <p className="text-sm font-bold text-[rgb(var(--text))]">Preview</p>
+          <div className="flex flex-wrap items-center justify-between gap-2 print:hidden">
+            <div className="flex items-center gap-2">
+              <p className="text-sm font-bold text-[rgb(var(--text))]">
+                Preview
+              </p>
+              {previewing ? (
+                <span className="inline-flex items-center gap-1.5 rounded-full bg-[rgba(var(--primary),0.10)] px-2.5 py-1 text-xs font-semibold text-[rgb(var(--text-muted))]">
+                  <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-[rgb(var(--primary))]" />
+                  Updating…
+                </span>
+              ) : null}
+              {certificate && !previewing ? (
+                <span className="rounded-full bg-emerald-500/10 px-2.5 py-1 text-xs font-semibold text-emerald-700">
+                  Live — ready to print
+                </span>
+              ) : null}
+            </div>
             {certificate && (
               <div className="flex flex-wrap gap-2">
                 <button
@@ -390,12 +487,32 @@ export default function Certificates() {
             )}
           </div>
 
-          {!certificate ? (
+          {previewError ? (
+            <div className="flex min-h-[420px] flex-col items-center justify-center gap-3 rounded-2xl border border-dashed border-red-300 bg-red-50/60 p-8 text-center print:hidden">
+              <p className="text-sm font-bold text-red-800">
+                Preview unavailable
+              </p>
+              <p className="text-sm text-red-700">{previewError}</p>
+              <button
+                type="button"
+                onClick={refreshPreview}
+                className="rounded-xl bg-[rgb(var(--primary))] px-4 py-2 text-sm font-bold text-white"
+              >
+                Try again
+              </button>
+            </div>
+          ) : !certificate ? (
             <div className="flex min-h-[420px] items-center justify-center rounded-2xl border border-dashed border-[rgb(var(--border))] bg-[rgb(var(--surface))] p-8 text-center text-sm text-[rgb(var(--text-muted))] print:hidden">
-              Select a student and generate a certificate to preview it here.
+              {studentId
+                ? "Building preview…"
+                : "Select a certificate type and a student — the preview appears here automatically."}
             </div>
           ) : (
-            <div className="overflow-auto rounded-2xl bg-slate-200/80 p-3 print:bg-white print:p-0">
+            <div
+              className={`overflow-auto rounded-2xl bg-slate-200/80 p-3 transition-opacity print:bg-white print:p-0 ${
+                previewing ? "opacity-60" : "opacity-100"
+              }`}
+            >
               <CertificatePreview certificate={certificate} />
             </div>
           )}
