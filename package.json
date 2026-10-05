@@ -6,7 +6,7 @@
   },
   "scripts": {
     "postinstall": "npm --prefix Backend install --omit=dev",
-    "start": "npm --prefix Backend start"
+    "start": "node Backend/server.js"
   },
   "dependencies": {
     "razorpay": "^2.9.8"
