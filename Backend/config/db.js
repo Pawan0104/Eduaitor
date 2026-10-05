@@ -1,6 +1,5 @@
 import mongoose from "mongoose";
 import bcrypt from "bcryptjs";
-import { MongoMemoryServer } from "mongodb-memory-server";
 import { resolveSrv, resolveTxt } from "dns/promises";
 import { URL } from "url";
 import { startNotificationCron } from "../cron/notificationCron.js";
@@ -110,6 +109,10 @@ const connectDB = async () => {
     console.warn("Using in-memory MongoDB for local development...");
 
     if (!memoryServer) {
+      // Imported lazily on purpose. This package is a dev-only fallback and its
+      // postinstall downloads a ~100MB MongoDB binary, which is slow and fragile
+      // on shared hosting. Production always takes the Atlas branch above.
+      const { MongoMemoryServer } = await import("mongodb-memory-server");
       memoryServer = await MongoMemoryServer.create();
     }
 
