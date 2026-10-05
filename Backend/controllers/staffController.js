@@ -154,9 +154,8 @@ export const createStaff = async (req, res, next) => {
     if (staffRole === "other" && !staffRoleCustom?.trim()) {
       return res.status(400).json({ success: false, message: "Please specify the custom job title" });
     }
-    if (!customRoleId) {
-      return res.status(400).json({ success: false, message: "Custom role is required" });
-    }
+    // Module access is assigned directly per person; a custom role is optional
+    // and the submitted module list is used when no role is chosen.
 
     // ── 3. CHECK EMAIL UNIQUE IN SCHOOL ───────────
     const normalizedEmail = normalizeEmail(email);
@@ -193,7 +192,6 @@ export const createStaff = async (req, res, next) => {
       schoolId,
       customRoleId,
       permissionsRaw: permissions,
-      requireRole: true,
       reqUser: req.user,
     });
     if (resolved.error) {

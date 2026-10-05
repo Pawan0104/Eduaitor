@@ -5,6 +5,7 @@ import {
   findOverlappingPeriodSlots,
   validateScheduleConflicts,
   findProxyConflicts,
+  getDayBusySlots,
 } from "../utils/timetableValidation.js";
 import { getUpcomingClassTests } from "./classTestController.js";
 
@@ -309,6 +310,37 @@ export const getTeacherDaySchedule = async (req, res) => {
     });
   } catch (err) {
     console.error("getTeacherDaySchedule Error:", err);
+    res.status(500).json({ success: false, message: err.message });
+  }
+};
+
+/* ── BUSY TEACHERS FOR A DAY ──
+   Lets the Teacher Substitution screen hide teachers who already have a
+   class during a period, instead of only failing on save. */
+export const getDayTeacherBusyMap = async (req, res) => {
+  try {
+    if (!canManageProxy(req))
+      return res.status(403).json({ success: false, message: "Not authorized" });
+
+    const schoolId = req.user?.school_id;
+    const { date } = req.query;
+
+    if (!schoolId || !date)
+      return res
+        .status(400)
+        .json({ success: false, message: "date is required" });
+
+    const day = DAY_NAMES[new Date(date).getDay()];
+    const slots = await getDayBusySlots({ schoolId, day });
+
+    res.json({
+      success: true,
+      day,
+      date,
+      slots,
+    });
+  } catch (err) {
+    console.error("getDayTeacherBusyMap Error:", err);
     res.status(500).json({ success: false, message: err.message });
   }
 };

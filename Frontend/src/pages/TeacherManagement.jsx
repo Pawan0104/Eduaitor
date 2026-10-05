@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import axios from "axios";
 import { toast } from "react-toastify";
 import { useParams, useNavigate, useSearchParams } from "react-router-dom";
-import { FaArrowLeft, FaShieldAlt, FaPlus } from "react-icons/fa";
+import { FaArrowLeft, FaPlus } from "react-icons/fa";
 import { FiX } from "react-icons/fi";
 import { MODULES } from "../constants/module.js";
 import { useAuth } from "../context/AuthContext";
@@ -41,9 +41,14 @@ const emptyForm = {
 
   assignedClasses: [],
   role: "",
-  customRoleId: "",
   username: "",
   password: "",
+
+  // Module access is granted per person, with no role indirection.
+  permissions: [],
+
+  // A teacher may additionally act as a hostel warden.
+  isHostelWarden: false,
 };
 
 const TEACHER_DRAFT_PREFIX = "eduaitor:teacher-create-draft:";
@@ -131,19 +136,75 @@ const TeacherManagement = () => {
 
   // Dropdowns
   const [subjects, setSubjects] = useState([]);
-  const [classes, setClasses] = useState([]);
-  const [accessRoles, setAccessRoles] = useState([]);
-  const [loading, setLoading] = useState(true);
+const [classes, setClasses] = useState([]);
+    const [loading, setLoading] = useState(true);
   const [showAddSubject, setShowAddSubject] = useState(false);
   const [newSubjectName, setNewSubjectName] = useState("");
   const [savingSubject, setSavingSubject] = useState(false);
   const isMobile = window.innerWidth <= 768;
   const progress = (step / steps.length) * 100;
 
-  const selectedAccessRole = accessRoles.find(
-    (r) => String(r._id) === String(form.customRoleId),
+/* Only modules the school is actually subscribed to can be granted. */
+  const schoolModules = MODULES.filter((m) =>
+    (user?.subscribed_modules || []).includes(m.key),
   );
-  const rolePermissions = selectedAccessRole?.permissions || [];
+
+  const togglePermission = (key) => {
+    setForm((prev) => {
+      const current = Array.isArray(prev.permissions) ? prev.permissions : [];
+      return {
+        ...prev,
+        permissions: current.includes(key)
+          ? current.filter((k) => k !== key)
+          : [...current, key],
+      };
+    });
+    setErrors((prev) => ({ ...prev, permissions: undefined }));
+  };
+
+  /* The warden option only makes sense once the school actually runs a hostel. */
+  const [hasHostels, setHasHostels] = useState(false);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    const checkHostels = async () => {
+      try {
+        const res = await axios.get(`${API}/hostel/`, {
+          withCredentials: true,
+        });
+        const list = res.data?.data;
+        if (!cancelled) {
+          setHasHostels(Array.isArray(list) && list.length > 0);
+        }
+      } catch {
+        // No hostel module access, or no hostels yet.
+        if (!cancelled) setHasHostels(false);
+      }
+    };
+
+    checkHostels();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  /* Warden duty is authorised through the "hostel" module, so the checkbox
+     keeps that module in sync with the flag in both directions. */
+  const toggleWarden = () => {
+    setForm((prev) => {
+      const next = !prev.isHostelWarden;
+      const perms = Array.isArray(prev.permissions) ? prev.permissions : [];
+
+      return {
+        ...prev,
+        isHostelWarden: next,
+        permissions: next
+          ? [...new Set([...perms, "hostel"])]
+          : perms.filter((k) => k !== "hostel"),
+      };
+    });
+  };
 
   /* RESTORE CREATE DRAFT (skip when editing) */
   useEffect(() => {
@@ -173,33 +234,13 @@ const TeacherManagement = () => {
       try {
         setLoading(true);
 
-        const [subjectsRes, classesRes, rolesRes] = await Promise.all([
+        const [subjectsRes, classesRes] = await Promise.all([
           axios.get(`${API}/subjects/all`, { withCredentials: true }),
           axios.get(`${API}/classes/all`, { withCredentials: true }),
-          axios.get(`${API}/school-staff-roles`, { withCredentials: true }),
         ]);
 
         setSubjects(subjectsRes.data.subjects || []);
         setClasses(classesRes.data.classes || []);
-        const roles = rolesRes.data.data || [];
-        setAccessRoles(roles);
-
-        // Default new teachers to the "Teacher" starter role when present
-        if (!id) {
-          const teacherRole =
-            roles.find(
-              (r) =>
-                r.isActive !== false &&
-                String(r.name).toLowerCase() === "teacher",
-            ) || roles.find((r) => r.isActive !== false);
-          if (teacherRole) {
-            setForm((prev) =>
-              prev.customRoleId
-                ? prev
-                : { ...prev, customRoleId: String(teacherRole._id) },
-            );
-          }
-        }
       } catch (error) {
         toast.error("Failed to load dropdown data");
         console.error(error);
@@ -227,12 +268,13 @@ const TeacherManagement = () => {
         setForm({
           ...emptyForm,
           ...t,
-          dob: t.dob ? t.dob.split("T")[0] : "",
-          joiningDate: t.joiningDate ? t.joiningDate.split("T")[0] : "",
-          customRoleId: t.customRoleId
-            ? String(t.customRoleId._id || t.customRoleId)
-            : "",
-          // Normalize to plain IDs in case they come back as populated objects
+dob: t.dob ? t.dob.split("T")[0] : "",
+            joiningDate: t.joiningDate ? t.joiningDate.split("T")[0] : "",
+            // Module access now lives on the teacher record itself.
+            permissions: Array.isArray(t.permissions) ? t.permissions : [],
+              isHostelWarden: Boolean(t.isHostelWarden),
+customRoleId: "",
+            // Normalize to plain IDs in case they come back as populated objects
           assignedClasses: (t.assignedClasses || []).map((c) =>
             typeof c === "object" ? c._id : c,
           ),
@@ -309,6 +351,19 @@ const TeacherManagement = () => {
 
   const isDirty = () => Object.values(form).some((v) => v !== "" && v !== null);
 
+  /* A photo counts as provided if a NEW file was just picked (Blob)
+     or an existing one is already stored on the teacher record. */
+
+  const hasTeacherPhoto = () => {
+    const p = form.photo;
+
+    if (!p) return false;
+
+    if (typeof p === "object" && p instanceof Blob) return true;
+
+    return Boolean(p.url || p.public_id || p.secure_url);
+  };
+
   /* VALIDATION */
 
   const validateStep = () => {
@@ -344,6 +399,11 @@ const TeacherManagement = () => {
 
       if (form.email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email))
         errors.push("Invalid email format");
+
+      if (!(form.governmentId || "").trim())
+        errors.push("Government ID required");
+
+      if (!hasTeacherPhoto()) errors.push("Teacher Photo required");
     }
 
     if (step === 2) {
@@ -387,13 +447,23 @@ const TeacherManagement = () => {
           }
         }
       }
+
+      // Employment details are mandatory for every teacher.
+      if (!form.employmentType) errors.push("Employment Type required");
+
+      if (form.salary === "" || form.salary === null || form.salary === undefined) {
+        errors.push("Salary required");
+      } else if (Number(form.salary) < 0) {
+        errors.push("Salary cannot be negative");
+      }
     }
 
     if (step === 4) {
       if (!form.username) errors.push("Username required");
       if (!isEdit && !form.password) errors.push("Password required");
       if (!form.role) errors.push("Job title required");
-      if (!form.customRoleId) errors.push("Access role required");
+      if (!(form.permissions || []).length)
+        errors.push("Select at least one module");
     }
 
     return errors;
@@ -419,9 +489,13 @@ const TeacherManagement = () => {
           errorMap.phone = err;
         if (lowerErr.includes("email") || lowerErr.includes("invalid email"))
           errorMap.email = err;
+        if (lowerErr.includes("government id")) errorMap.governmentId = err;
+        if (lowerErr.includes("teacher photo")) errorMap.photo = err;
         if (lowerErr.includes("qualification")) errorMap.qualification = err;
         if (lowerErr.includes("subject")) errorMap.subjects = err;
         if (lowerErr.includes("designation")) errorMap.designation = err;
+      if (lowerErr.includes("employment type")) errorMap.employmentType = err;
+      if (lowerErr.includes("salary")) errorMap.salary = err;
         if (
           lowerErr.includes("joining date") ||
           lowerErr.includes("18 years old on the joining date")
@@ -430,8 +504,8 @@ const TeacherManagement = () => {
         }
         if (lowerErr.includes("username")) errorMap.username = err;
         if (lowerErr.includes("password")) errorMap.password = err;
-        if (lowerErr.includes("job title")) errorMap.role = err;
-        if (lowerErr.includes("access role")) errorMap.customRoleId = err;
+if (lowerErr.includes("job title")) errorMap.role = err;
+      if (lowerErr.includes("at least one module")) errorMap.permissions = err;
       });
 
       setErrors(errorMap);
@@ -540,10 +614,10 @@ const TeacherManagement = () => {
         ];
         if (forbidden.includes(key)) return;
 
-        if (key === "subjects" || key === "assignedClasses") {
-          data.append(key, JSON.stringify(value));
-          return;
-        }
+if (key === "subjects" || key === "assignedClasses" || key === "permissions") {
+            data.append(key, JSON.stringify(value));
+            return;
+          }
 
         if (value === null || value === "" || value === undefined) return;
 
@@ -731,7 +805,7 @@ const TeacherManagement = () => {
                 />
                 <Input
                   type="date"
-                  label="Date of Birth"
+                  label="Date of Birth *"
                   name="dob"
                   value={form.dob}
                   onChange={handleChange}
@@ -764,11 +838,12 @@ const TeacherManagement = () => {
                   error={errors.email}
                 />
                 <Input
-                  label="Government ID"
+                  label="Government ID *"
                   name="governmentId"
                   value={form.governmentId}
                   onChange={handleChange}
                   placeholder="Aadhaar/PAN/etc"
+                  error={errors.governmentId}
                 />
                 <Input
                   label="Address"
@@ -779,9 +854,10 @@ const TeacherManagement = () => {
                   className="md:col-span-2"
                 />
                 <File
-                  label="Teacher Photo"
+                  label="Teacher Photo *"
                   name="photo"
                   onChange={handleFileChange}
+                  error={errors.photo}
                 />
               </div>
             )}
@@ -890,19 +966,21 @@ const TeacherManagement = () => {
                   max={new Date().toISOString().split("T")[0]}
                 />
                 <Select
-                  label="Employment Type"
+                  label="Employment Type *"
                   name="employmentType"
                   value={form.employmentType}
                   options={["Full Time", "Part Time", "Contract"]}
                   onChange={handleChange}
+                  error={errors.employmentType}
                 />
                 <Input
                   type="number"
-                  label="Salary"
+                  label="Salary *"
                   name="salary"
                   value={form.salary}
                   onChange={handleChange}
                   placeholder="Monthly salary"
+                  error={errors.salary}
                 />
               </div>
             )}
@@ -941,78 +1019,100 @@ const TeacherManagement = () => {
 
                 <div>
                   <label className="block text-sm font-medium mb-1">
-                    Access Role <span className="text-red-500">*</span>
+                    Module Access <span className="text-red-500">*</span>
                   </label>
-                  <select
-                    name="customRoleId"
-                    value={form.customRoleId}
-                    onChange={handleChange}
-                    className={`w-full border px-3 py-2 rounded-lg ${
-                      errors.customRoleId ? "border-red-500" : ""
+
+                  {hasHostels && (
+                    <label className="flex items-start gap-2 mb-3 px-3 py-2 rounded-lg border border-[rgb(var(--border))] cursor-pointer hover:bg-[rgba(var(--primary),0.05)]">
+                      <input
+                        type="checkbox"
+                        checked={Boolean(form.isHostelWarden)}
+                        onChange={toggleWarden}
+                        className="w-4 h-4 mt-0.5 accent-[rgb(var(--primary))]"
+                      />
+                      <span>
+                        <span className="text-sm font-medium text-[rgb(var(--text))]">
+                          Also assign as Hostel Warden
+                        </span>
+                        <span className="block text-[11px] text-[rgb(var(--text-muted))]">
+                          Adds Hostel module access automatically. Remove it to
+                          revoke both.
+                        </span>
+                      </span>
+                    </label>
+                  )}
+
+                  <div
+                    className={`rounded-xl border p-3 bg-[rgb(var(--surface))] ${
+                      errors.permissions ? "border-red-500" : ""
                     }`}
                   >
-                    <option value="">Select access role</option>
-                    {accessRoles
-                      .filter(
-                        (r) =>
-                          r.isActive !== false ||
-                          String(r._id) === String(form.customRoleId),
-                      )
-                      .map((r) => (
-                        <option key={r._id} value={r._id}>
-                          {r.name}
-                          {r.isActive === false ? " (inactive)" : ""}
-                          {` — ${(r.permissions || []).length} modules`}
-                        </option>
-                      ))}
-                  </select>
-                  {errors.customRoleId && (
-                    <p className="text-xs text-red-500 mt-1">
-                      {errors.customRoleId}
-                    </p>
-                  )}
-                  <p className="text-xs text-gray-500 mt-1">
-                    Module access comes from Staff Roles — not chosen per
-                    teacher.{" "}
-                    <button
-                      type="button"
-                      onClick={() => navigate(`${basePath}/staff-roles`)}
-                      className="text-[rgb(var(--primary))] font-semibold underline"
-                    >
-                      Manage roles
-                    </button>
-                  </p>
-                </div>
+                    <div className="flex items-center justify-between mb-2">
+                      <p className="text-xs text-[rgb(var(--text-muted))]">
+                        {(form.permissions || []).length} of {schoolModules.length}
+                        {" "}selected
+                      </p>
+                      <div className="flex gap-2">
+                        <button
+                          type="button"
+                          onClick={() =>
+                            setForm((prev) => ({
+                              ...prev,
+                              permissions: schoolModules.map((m) => m.key),
+                            }))
+                          }
+                          className="text-[11px] font-semibold text-[rgb(var(--primary))] underline"
+                        >
+                          Select all
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() =>
+                            setForm((prev) => ({ ...prev, permissions: [] }))
+                          }
+                          className="text-[11px] font-semibold text-gray-500 underline"
+                        >
+                          Clear
+                        </button>
+                      </div>
+                    </div>
 
-                {form.customRoleId && (
-                  <div className="md:col-span-2 rounded-xl border p-3 bg-[rgba(var(--primary),0.05)]">
-                    <p className="text-sm font-semibold flex items-center gap-2 mb-2">
-                      <FaShieldAlt className="text-[rgb(var(--primary))]" />
-                      Modules from{" "}
-                      {selectedAccessRole?.name || "selected role"} (
-                      {rolePermissions.length})
-                    </p>
-                    <div className="flex flex-wrap gap-1.5">
-                      {rolePermissions.map((key) => {
-                        const label =
-                          MODULES.find((m) => m.key === key)?.label || key;
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2 max-h-64 overflow-y-auto">
+                      {schoolModules.map((m) => {
+                        const checked = (form.permissions || []).includes(
+                          m.key,
+                        );
                         return (
-                          <span
-                            key={key}
-                            className="px-2 py-0.5 rounded-lg text-[11px] font-medium border bg-white"
+                          <label
+                            key={m.key}
+                            className="flex items-center gap-2 text-xs cursor-pointer px-2 py-1.5 rounded-lg hover:bg-[rgba(var(--primary),0.06)]"
                           >
-                            {label}
-                          </span>
+                            <input
+                              type="checkbox"
+                              checked={checked}
+                              onChange={() => togglePermission(m.key)}
+                              className="w-4 h-4 accent-[rgb(var(--primary))]"
+                            />
+                            <span className="text-[rgb(var(--text))]">
+                              {m.label}
+                            </span>
+                          </label>
                         );
                       })}
-                      {rolePermissions.length === 0 && (
-                        <span className="text-xs text-gray-500">
-                          No modules on this role
-                        </span>
+                      {schoolModules.length === 0 && (
+                        <p className="text-xs text-gray-500">
+                          No modules available for your school.
+                        </p>
                       )}
                     </div>
                   </div>
-                )}
+
+                  {errors.permissions && (
+                    <p className="text-xs text-red-500 mt-1">
+                      {errors.permissions}
+                    </p>
+                  )}
+                </div>
 
                 <Input
                   label="Username *"
@@ -1070,10 +1170,10 @@ const TeacherManagement = () => {
                     value={form.employmentType}
                   />
                   <ReviewField label="Job Title" value={form.role} />
-                  <ReviewField
-                    label="Access Role"
-                    value={selectedAccessRole?.name || "—"}
-                  />
+<ReviewField
+                      label="Module Access"
+                      value={`${(form.permissions || []).length} module(s) selected`}
+                    />
                   <ReviewField label="Username" value={form.username} />
                   <ReviewField
                     label="Assigned Classes"

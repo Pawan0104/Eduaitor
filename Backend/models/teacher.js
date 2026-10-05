@@ -68,6 +68,16 @@ const teacherSchema = new mongoose.Schema(
       default: [],
     },
 
+    /**
+     * Set when this teacher also acts as a hostel warden.
+     * Warden duties are authorised through the "hostel" module permission,
+     * so this flag only records the extra responsibility.
+     */
+    isHostelWarden: {
+      type: Boolean,
+      default: false,
+    },
+
     role: {
       type: String,
       default: "teacher_admin",

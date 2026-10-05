@@ -203,6 +203,91 @@ export const validateScheduleConflicts = async ({
 };
 
 /**
+ * Every teaching assignment a school has on a given day, flattened.
+ * Used by the "Teacher Substitution" screen to hide teachers who are
+ * already busy during the period being replaced.
+ *
+ * @param {object} args
+ *   schoolId - school the timetables belong to
+ *   day      - weekday label (e.g. "Monday")
+ * @returns array of {
+ *   teacherId, classId, detailId, periodId,
+ *   start, end,          - minutes since midnight (-1 when unknown)
+ *   timeLabel, classLabel
+ * }
+ */
+export const getDayBusySlots = async ({ schoolId, day }) => {
+  if (!schoolId || !day) return [];
+
+  const dayKey = String(day).trim().toLowerCase();
+
+  const [allTimetables, schoolClasses] = await Promise.all([
+    Timetable.find({ schoolId }).lean(),
+    Class.find({ schoolId }).select("name details").lean(),
+  ]);
+
+  const classLabel = new Map();
+  schoolClasses.forEach((c) => {
+    (c.details || []).forEach((d) => {
+      const key = `${String(c._id)}|${String(d._id)}`;
+      const label = `${c.name}${d.sectionId?.name ? ` - ${d.sectionId.name}` : ""}`;
+      classLabel.set(key, label);
+    });
+  });
+
+  const slots = [];
+
+  for (const tt of allTimetables) {
+    const timeMap = buildTimeMap(tt.periodConfigs || []);
+    const key = `${String(tt.classId)}|${tt.detailId ? String(tt.detailId) : ""}`;
+    const label =
+      classLabel.get(key) ||
+      schoolClasses.find((c) => String(c._id) === String(tt.classId))?.name ||
+      "another class";
+
+    const dayData = (tt.schedule || []).find(
+      (s) => String(s.day || "").trim().toLowerCase() === dayKey,
+    );
+    if (!dayData) continue;
+
+    for (const p of dayData.periods || []) {
+      // A substitute already covering the slot counts as busy too.
+      // Both the assigned teacher and any substitute covering the slot are
+      // occupied — recording only one would let an absent teacher be offered
+      // as a substitute for another class at the same time.
+      const busyForPeriod = [p.teacherId, p.substituteTeacherId]
+        .filter(Boolean)
+        .map((t) => String(t._id || t));
+      if (busyForPeriod.length === 0) continue;
+
+      const cfg = timeMap.get(String(p.periodId));
+
+      for (const teacherId of busyForPeriod) {
+        slots.push({
+          teacherId,
+          classId: tt.classId,
+          detailId: tt.detailId || null,
+          periodId: p.periodId,
+          start: cfg?.start ?? -1,
+          end: cfg?.end ?? -1,
+          timeLabel: cfg?.label || "",
+          classLabel: label,
+        });
+      }
+    }
+  }
+
+  return slots;
+};
+
+/** Does a busy slot clash with the given [start, end] window? */
+export const busySlotOverlaps = (slot, startMin, endMin) =>
+  rangesOverlap(startMin, endMin, slot.start, slot.end);
+
+/** "HH:MM" -> minutes since midnight (-1 if invalid). Exported for clients. */
+export { toTimeMin, rangesOverlap };
+
+/**
  * Proxy-teacher check — used by the school-admin "Proxy Teacher" flow.
  * Confirms that a proxy/substitute teacher is NOT already teaching or
  * covering another period in the same school at the same day + overlapping

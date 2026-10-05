@@ -84,18 +84,15 @@ export const createTeacher = async (req, res) => {
     let hashedPassword = await bcrypt.hash(req.body.password, 10);
     req.body.password = hashedPassword;
 
-    const customRoleId = req.body.customRoleId;
-    if (!customRoleId) {
-      return res.status(400).json({
-        success: false,
-        message: "Access role is required",
-      });
-    }
+    // Module access is assigned directly per person. A custom role stays
+    // supported for API back-compat, but when it is omitted the submitted
+    // module list (permissions) is used instead of being rejected.
+    const customRoleId = req.body.customRoleId || null;
 
     const resolved = await resolveRolePermissions({
       schoolId,
       customRoleId,
-      requireRole: true,
+      permissionsRaw: req.body.permissions,
       reqUser: req.user,
       entityLabel: "teacher",
     });
@@ -152,6 +149,12 @@ export const createTeacher = async (req, res) => {
       permissions: _omitPerms,
       ...restBody
     } = req.body;
+
+    // A hostel warden must be able to act in the hostel module, so keep the
+    // permission in sync with the flag even if the client omitted it.
+    if (restBody.isHostelWarden && !resolved.permissions.includes("hostel")) {
+      resolved.permissions = [...resolved.permissions, "hostel"];
+    }
 
     const teacher = await Teacher.create({
       ...restBody,
@@ -407,8 +410,30 @@ export const updateTeacher = async (req, res) => {
 
     if (!photo) delete updateData.photo;
 
-    // Access role → permissions (required when provided; keep existing if omitted)
-    if (bodyRoleId) {
+    // Module access is assigned directly per person. When the client submits a
+    // module list it always wins, and any legacy role link is cleared so a
+    // role sync can never silently overwrite the chosen modules.
+    const hasDirectPerms =
+      _bodyPerms !== undefined && _bodyPerms !== null && _bodyPerms !== "";
+
+    if (hasDirectPerms) {
+      const resolved = await resolveRolePermissions({
+        schoolId: safeSchoolId,
+        customRoleId: null,
+        permissionsRaw: _bodyPerms,
+        reqUser: req.user,
+        entityLabel: "teacher",
+      });
+      if (resolved.error) {
+        return res.status(400).json({
+          success: false,
+          message: resolved.error,
+        });
+      }
+      updateData.customRoleId = null;
+      updateData.permissions = resolved.permissions;
+    } else if (bodyRoleId) {
+      // Legacy role-driven access, kept for API back-compat only.
       const resolved = await resolveRolePermissions({
         schoolId: safeSchoolId,
         customRoleId: bodyRoleId,
@@ -433,6 +458,16 @@ export const updateTeacher = async (req, res) => {
       if (!resolved.error) {
         updateData.permissions = resolved.permissions;
       }
+    }
+
+    // A hostel warden must be able to act in the hostel module. Only touch
+    // permissions that this request actually resolved.
+    if (
+      updateData.isHostelWarden &&
+      Array.isArray(updateData.permissions) &&
+      !updateData.permissions.includes("hostel")
+    ) {
+      updateData.permissions = [...updateData.permissions, "hostel"];
     }
 
     if (updateData.email !== undefined) {

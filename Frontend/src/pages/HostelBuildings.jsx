@@ -21,8 +21,9 @@ const EMPTY_FORM = {
   address: "",
   totalFloors: "1",
   capacity: "",
-  wardenId: "",
-  wardenName: "",
+wardenId: "",
+    wardenType: "staff",
+    wardenName: "",
   wardenPhone: "",
   description: "",
   status: "Active",
@@ -52,9 +53,27 @@ const HostelBuildings = () => {
 
   const fetchStaff = async () => {
     try {
-      const res = await axios.get(`${API}/staff`, { withCredentials: true });
-      const all = res.data.data || [];
-      const wardens = all.filter((s) => s.staffRole === "hostel_warden");
+      // Wardens can be staff members or teachers flagged as hostel wardens.
+      const [staffRes, teacherRes] = await Promise.all([
+        axios.get(`${API}/staff`, { withCredentials: true }),
+        axios
+          .get(`${API}/teachers`, { withCredentials: true })
+          .catch(() => ({ data: { data: [] } })),
+      ]);
+
+      const all = staffRes.data.data || [];
+      const staffWardens = all.filter((s) => s.staffRole === "hostel_warden");
+
+      const teacherWardens = (teacherRes.data.data || [])
+        .filter((t) => t.isHostelWarden)
+        .map((t) => ({
+          ...t,
+          staffRole: "hostel_warden",
+          wardenSource: "teacher",
+        }));
+
+      const wardens = [...staffWardens, ...teacherWardens];
+
       setStaffList(wardens.length > 0 ? wardens : all);
     } catch {
       setStaffList([]);
@@ -98,8 +117,9 @@ const HostelBuildings = () => {
       address: hostel.address || "",
       totalFloors: String(hostel.totalFloors ?? 1),
       capacity: hostel.capacity ? String(hostel.capacity) : "",
-      wardenId: hostel.wardenId?._id || hostel.wardenId || "",
-      wardenName: hostel.wardenName || "",
+wardenId: hostel.wardenId?._id || hostel.wardenId || "",
+        wardenType: hostel.wardenType || "staff",
+        wardenName: hostel.wardenName || "",
       wardenPhone: hostel.wardenPhone || "",
       description: hostel.description || "",
       status: hostel.status || "Active",
@@ -129,8 +149,9 @@ const HostelBuildings = () => {
       address: form.address.trim(),
       totalFloors: floors || 0,
       capacity: capacityNum,
-      wardenId: form.wardenId || null,
-      wardenName: form.wardenName.trim(),
+wardenId: form.wardenId || null,
+        wardenType: form.wardenId ? form.wardenType || "staff" : "staff",
+        wardenName: form.wardenName.trim(),
       wardenPhone: form.wardenPhone.trim(),
       description: form.description.trim(),
       status: form.status,
@@ -432,16 +453,17 @@ const HostelFormModal = ({ isEdit, form, setForm, staffList, onClose, onSubmit, 
   const set = (key) => (e) =>
     setForm((p) => ({ ...p, [key]: e.target.value }));
 
-  const handleWardenSelect = (e) => {
-    const id = e.target.value;
-    const staff = staffList.find((s) => String(s._id) === String(id));
-    setForm((p) => ({
-      ...p,
-      wardenId: id,
-      wardenName: staff?.fullName || "",
-      wardenPhone: staff?.phone || "",
-    }));
-  };
+const handleWardenSelect = (e) => {
+      const id = e.target.value;
+      const staff = staffList.find((s) => String(s._id) === String(id));
+      setForm((p) => ({
+        ...p,
+        wardenId: id,
+        wardenType: staff?.wardenSource === "teacher" ? "teacher" : "staff",
+        wardenName: staff?.fullName || "",
+        wardenPhone: staff?.phone || "",
+      }));
+    };
 
   return (
     <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50">

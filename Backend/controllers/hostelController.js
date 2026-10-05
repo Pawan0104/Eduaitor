@@ -87,6 +87,7 @@ export const createHostel = async (req, res, next) => {
       wardenName,
       wardenPhone,
       wardenId,
+      wardenType,
       description,
       status,
     } = req.body;
@@ -112,6 +113,7 @@ export const createHostel = async (req, res, next) => {
       wardenName: wardenName?.trim() || "",
       wardenPhone: wardenPhone?.trim() || "",
       wardenId: wardenId || null,
+      wardenType: wardenType === "teacher" ? "teacher" : "staff",
       description: description?.trim() || "",
       status: status || "Active",
     };
@@ -163,6 +165,7 @@ export const updateHostel = async (req, res, next) => {
       wardenName,
       wardenPhone,
       wardenId,
+      wardenType,
       description,
       status,
     } = req.body;
@@ -196,6 +199,10 @@ export const updateHostel = async (req, res, next) => {
     }
     if (wardenId !== undefined) {
       hostel.wardenId = wardenId || null;
+      if (!wardenId) hostel.wardenType = "staff";
+    }
+    if (wardenType !== undefined) {
+      hostel.wardenType = wardenType === "teacher" ? "teacher" : "staff";
     }
     if (description !== undefined) {
       hostel.description = String(description).trim();

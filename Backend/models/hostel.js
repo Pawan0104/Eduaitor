@@ -50,8 +50,15 @@ const hostelSchema = new mongoose.Schema(
     },
     wardenId: {
       type: mongoose.Schema.Types.ObjectId,
-      ref: "Staff",
+      // Not a hard "Staff" ref: a warden may be a Staff member or a
+      // teacher (teachers can be flagged as wardens via isHostelWarden).
+      // Use wardenType to know which collection the id belongs to.
       default: null,
+    },
+    wardenType: {
+      type: String,
+      enum: ["staff", "teacher"],
+      default: "staff",
     },
     description: {
       type: String,

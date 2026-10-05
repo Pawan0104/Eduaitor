@@ -34,6 +34,7 @@ export default function ProxyTeacher() {
 
   const [day, setDay] = useState("");
   const [schedule, setSchedule] = useState([]);
+  const [busySlots, setBusySlots] = useState([]);
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [loaded, setLoaded] = useState(false);
@@ -60,13 +61,25 @@ export default function ProxyTeacher() {
         params: { teacherId, date },
         withCredentials: true,
       });
-      setDay(res.data.day);
-      setSchedule(
-        (res.data.periods || []).map((p) => ({
-          ...p,
-          originalSubId: p.substituteTeacherId || "",
-        })),
-      );
+setDay(res.data.day);
+        setSchedule(
+          (res.data.periods || []).map((p) => ({
+            ...p,
+            originalSubId: p.substituteTeacherId || "",
+          })),
+        );
+
+        // Teachers already busy at each period's time, so they can be
+        // hidden from that period's substitute list.
+        try {
+          const busyRes = await axios.get(`${API}/timetable/proxy-busy-map`, {
+            params: { date },
+            withCredentials: true,
+          });
+          setBusySlots(busyRes.data.slots || []);
+        } catch {
+          setBusySlots([]);
+        }
     } catch (err) {
       toast.error(err?.response?.data?.message || "Failed to load schedule");
       setSchedule([]);
@@ -129,17 +142,66 @@ export default function ProxyTeacher() {
         { date, teacherId, replacements },
         { withCredentials: true },
       );
-      toast.success(`Proxy teachers assigned (${res.data.updated})`);
+      toast.success(`Substitutions assigned (${res.data.updated})`);
       loadSchedule();
     } catch (err) {
-      toast.error(err?.response?.data?.message || "Failed to assign proxy");
+      toast.error(err?.response?.data?.message || "Failed to assign substitute");
     } finally {
       setSaving(false);
     }
   };
 
-  const teacherName = (id) =>
-    teachers.find((t) => String(t._id) === String(id))?.fullName || "";
+const teacherName = (id) =>
+      teachers.find((t) => String(t._id) === String(id))?.fullName || "";
+
+  /* "HH:MM" -> minutes since midnight */
+  const toTimeMin = (t) => {
+    if (typeof t !== "string" || !t) return -1;
+    const [h, m] = t.split(":").map(Number);
+    if (Number.isNaN(h) || Number.isNaN(m)) return -1;
+    return h * 60 + m;
+  };
+
+  /* A teacher cannot substitute a period they are already teaching in that
+     same window. Their own slot (the one being replaced) does not count. */
+  const availableSubstitutesFor = (p) => {
+    const start = toTimeMin(p.start);
+    const end = toTimeMin(p.end);
+
+    const selfSlot = (s) =>
+      String(s.classId) === String(p.classId) &&
+      String(s.detailId || "") === String(p.detailId || "") &&
+      String(s.periodId) === String(p.periodId);
+
+    const blocked = new Set();
+
+    if (start >= 0 && end >= 0) {
+      busySlots.forEach((s) => {
+        if (s.start < 0 || s.end < 0) return;
+        if (selfSlot(s)) return;
+        if (start < s.end && s.start < end) blocked.add(String(s.teacherId));
+      });
+    }
+
+    const list = teachers.filter(
+      (t) =>
+        String(t._id) !== String(teacherId) && !blocked.has(String(t._id)),
+    );
+
+    // Keep the current choice listed even if it is now busy, otherwise the
+    // select would render blank and the admin could not see or clear it.
+    const chosen = String(p.substituteTeacherId || "");
+    if (
+      chosen &&
+      !list.some((t) => String(t._id) === chosen) &&
+      String(p.substituteTeacherId) !== String(teacherId)
+    ) {
+      const match = teachers.find((t) => String(t._id) === chosen);
+      if (match) list.push(match);
+    }
+
+    return list;
+  };
 
   const originalTeacherOf = (p) =>
     p.isProxy ? p.teacherName : teacherName(teacherId);
@@ -159,10 +221,10 @@ export default function ProxyTeacher() {
       )}
 
       <div>
-        <h1 className="text-2xl font-bold text-[rgb(var(--text))]">Proxy Teacher</h1>
-        <p className="text-sm text-[rgb(var(--text))] mt-0.5">
-          When a teacher is unavailable, substitute their periods with a proxy teacher
-        </p>
+<h1 className="text-2xl font-bold text-[rgb(var(--text))]">Teacher Substitution</h1>
+          <p className="text-sm text-[rgb(var(--text))] mt-0.5">
+            When a teacher is unavailable, assign substitute teachers to their periods
+          </p>
       </div>
 
       {/* Control bar */}
@@ -218,7 +280,7 @@ export default function ProxyTeacher() {
               ) : (
                 <FaExchangeAlt size={12} />
               )}
-              <span>Save Proxy Assignments ({changedCount()})</span>
+              <span>Save Substitution Assignments ({changedCount()})</span>
             </button>
           )}
         </div>
@@ -294,25 +356,38 @@ export default function ProxyTeacher() {
 
                 <div>
                   <label className="block text-[10px] font-semibold mb-1">
-                    {p.status === "teacher-absent" ? "Proxy Teacher" : "Mark absent & choose proxy"}
+                    {p.status === "teacher-absent" ? "Substitute Teacher" : "Mark absent & choose substitute"}
                   </label>
                   <div className="flex items-center gap-2">
-                    <select
-                      value={p.substituteTeacherId || ""}
-                      onChange={(e) =>
-                        updatePeriod(idx, "substituteTeacherId", e.target.value)
-                      }
-                      className="text-xs w-full border border-gray-200 bg-[rgb(var(--surface))] text-[rgb(var(--text))] rounded-lg px-2 py-1.5 focus:outline-none focus:border-indigo-400"
-                    >
-                      <option value="">No proxy</option>
-                      {teachers
-                        .filter((t) => String(t._id) !== String(teacherId))
-                        .map((t) => (
-                          <option key={t._id} value={t._id}>
-                            {t.fullName}
-                          </option>
-                        ))}
-                    </select>
+                    {(() => {
+                      const options = availableSubstitutesFor(p);
+
+                      return (
+                        <select
+                          value={p.substituteTeacherId || ""}
+                          onChange={(e) =>
+                            updatePeriod(
+                              idx,
+                              "substituteTeacherId",
+                              e.target.value,
+                            )
+                          }
+                          className="text-xs w-full border border-gray-200 bg-[rgb(var(--surface))] text-[rgb(var(--text))] rounded-lg px-2 py-1.5 focus:outline-none focus:border-indigo-400"
+                        >
+                          <option value="">No substitute</option>
+                          {options.map((t) => (
+                            <option key={t._id} value={t._id}>
+                              {t.fullName}
+                            </option>
+                          ))}
+                          {options.length === 0 && (
+                            <option value="" disabled>
+                              No teacher free in this slot
+                            </option>
+                          )}
+                        </select>
+                      );
+                    })()}
                     {p.substituteTeacherId && (
                       <button
                         onClick={() => updatePeriod(idx, "substituteTeacherId", "")}

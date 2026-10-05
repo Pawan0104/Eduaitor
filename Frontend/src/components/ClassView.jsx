@@ -106,13 +106,18 @@ export default function ClassView() {
         <div className="p-6 sm:p-8">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
             {/* left — class identity */}
-            <div className="flex items-center gap-4">
-              <div className="w-14 h-14 rounded-2xl text-[rgb(var(--text))] bg-[rgb(var(--primary))] flex items-center justify-center font-bold text-lg shrink-0">
+            <div className="flex items-center gap-4 min-w-0">
+              <div className="w-14 h-14 rounded-2xl text-[rgb(var(--text))] bg-[rgb(var(--primary))] flex items-center justify-center font-bold text-lg shrink-0 overflow-hidden px-1.5"
+                title={classData.name}
+              >
                 {classData.name.replace(/\D/g, "") ||
-                  classData.name.slice(0, 2).toUpperCase()}
+                  classData.name.replace(/[^A-Za-z]/g, "").slice(0, 2).toUpperCase()}
               </div>
-              <div>
-                <h1 className="text-2xl font-bold  text-[rgb(var(--text))]">
+              <div className="min-w-0">
+                <h1
+                  className="text-2xl font-bold text-[rgb(var(--text))] truncate"
+                  title={classData.name}
+                >
                   {classData.name}
                 </h1>
                 <div className="flex items-center gap-2 mt-1 flex-wrap">

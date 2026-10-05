@@ -5,6 +5,7 @@ import {
   getClassTimetablePreview,
   markTeacherAbsent,
   getTeacherDaySchedule,
+  getDayTeacherBusyMap,
   assignProxyTeacher,
 } from "../controllers/timetableController.js";
 import {
@@ -30,6 +31,8 @@ router.post(
 
 router.post("/save", authMiddleware, saveTimetable);
 router.get("/teacher-schedule", authMiddleware, getTeacherDaySchedule);
+// Registered before the "/:classId" catch-all below.
+router.get("/proxy-busy-map", authMiddleware, getDayTeacherBusyMap);
 router.post("/proxy-assign", authMiddleware, assignProxyTeacher);
 router.get("/preview/:classId", authMiddleware, getClassTimetablePreview);
 router.get("/:classId", authMiddleware, getTimetable);

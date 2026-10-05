@@ -99,10 +99,6 @@ const Teachers = () => {
 
   const present = teachers.filter((t) => t.status === "Present").length;
 
-  const avgExperience =
-    teachers.reduce((a, b) => a + Number(b.experience || 0), 0) /
-    (teachers.length || 1);
-
   if (loading) {
     return (
       <div className="p-8 flex items-center justify-center min-h-screen">
@@ -151,14 +147,9 @@ const Teachers = () => {
 
       {/* STATS */}
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 mb-8 bg-[rgb(var(--surface))] text-[rgb(var(--text))]">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-8 bg-[rgb(var(--surface))] text-[rgb(var(--text))]">
         <Stat title="TOTAL TEACHERS" value={totalTeachers} color="blue" />
         <Stat title="PRESENT TODAY" value={present} color="green" />
-        <Stat
-          title="AVG EXPERIENCE"
-          value={`${avgExperience.toFixed(1)} yrs`}
-          color="purple"
-        />
       </div>
 
       {/* DIRECTORY HEADER */}

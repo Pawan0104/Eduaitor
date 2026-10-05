@@ -437,7 +437,7 @@ export default function SchoolMenu() {
       icon: <GiTeacher />,
       children: [
         { name: "All Teachers", path: "/school/teachers" },
-        { name: "Proxy Teacher", path: "/school/proxy-teacher" },
+        { name: "Teacher Substitution", path: "/school/proxy-teacher" },
       ],
     },
     {

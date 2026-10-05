@@ -1,3 +1,4 @@
+import { useEffect, useState } from "react";
 import { publicAsset } from "../utils/publicAsset";
 
 /**
@@ -5,6 +6,23 @@ import { publicAsset } from "../utils/publicAsset";
  * Portrait art is centered and scaled with contain (letterboxed on wide screens).
  */
 export default function BootSplash({ className = "" }) {
+  // initNativeShell() injects its own splash (#eduaitor-native-splash) at a
+  // higher z-index, and it is created before React first renders. Rendering
+  // this component as well stacks two logos and two spinning AI marks, so the
+  // React splash defers to the injected one. We keep re-checking so that if the
+  // injected splash is removed early (max-ms timeout) we still cover the gap.
+  const [deferred, setDeferred] = useState(true);
+
+  useEffect(() => {
+    const check = () =>
+      setDeferred(!!document.getElementById("eduaitor-native-splash"));
+    check();
+    const t = setInterval(check, 250);
+    return () => clearInterval(t);
+  }, []);
+
+  if (deferred) return null;
+
   const src = publicAsset("eduaitor-splash-logo.png");
   const aiSrc = publicAsset("eduaitor-splash-ai.png");
   return (

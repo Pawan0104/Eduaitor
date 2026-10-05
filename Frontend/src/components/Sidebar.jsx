@@ -202,7 +202,7 @@ const Sidebar = ({ closeSidebar }) => {
       module: "teachers",
       children: [
         { name: "All Teachers", path: "/school/teachers" },
-        { name: "Proxy Teacher", path: "/school/proxy-teacher" },
+        { name: "Teacher Substitution", path: "/school/proxy-teacher" },
       ],
     },
     {
@@ -289,7 +289,6 @@ const Sidebar = ({ closeSidebar }) => {
         { name: "Transport", path: "/school/transport" },
         { name: "Route Manage", path: "/school/transport-route" },
         { name: "Bus Manage", path: "/school/transport-bus" },
-        { name: "Driver Manage", path: "/school/transport-driver" },
         { name: "Stop Manage", path: "/school/transport-stop" },
         { name: "Attendant Manage", path: "/school/transport-attendant" },
         { name: "Vendor Manage", path: "/school/transport-vendor" },
@@ -719,7 +718,6 @@ const Sidebar = ({ closeSidebar }) => {
         { name: "Transport", path: "/staff/transport" },
         { name: "Route Manage", path: "/staff/transport-route" },
         { name: "Bus Manage", path: "/staff/transport-bus" },
-        { name: "Driver Manage", path: "/staff/transport-driver" },
         { name: "Stop Manage", path: "/staff/transport-stop" },
         { name: "Attendant Manage", path: "/staff/transport-attendant" },
         { name: "Vendor Manage", path: "/staff/transport-vendor" },

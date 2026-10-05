@@ -539,7 +539,11 @@ export default function ClassPage() {
                             </span>
                           </div>
                         </td>
-                        <td className="p-3 text-[rgb(var(--text-muted))]">{student.classId?.name || "-"}</td>
+                        <td className="p-3 text-[rgb(var(--text-muted))] max-w-[180px] truncate"
+                            title={student.classId?.name || "-"}
+                          >
+                            {student.classId?.name || "-"}
+                          </td>
                         <td className="p-3 text-[rgb(var(--text-muted))]">{student.fatherName}</td>
                         <td className="p-3 text-[rgb(var(--text-muted))]">{student.fatherMobile}</td>
                         <td className="p-3">
@@ -633,25 +637,34 @@ export default function ClassPage() {
               ];
               const shortLabel =
                 cls.name.replace(/\D/g, "") ||
-                cls.name.slice(0, 2).toUpperCase();
+                cls.name.replace(/[^A-Za-z]/g, "").slice(0, 2).toUpperCase();
 
               return (
                 <div
                   key={cls._id}
                   onClick={() => navigate(`/teacher/class-view/${cls._id}`)}
-                  className={`cursor-pointer bg-[rgb(var(--surface))] text-[rgb(var(--text))] rounded-2xl border shadow-sm p-5 space-y-4 hover:shadow-md hover:-translate-y-0.5 transition
+                  className={`cursor-pointer bg-[rgb(var(--surface))] text-[rgb(var(--text))] rounded-2xl border shadow-sm p-5 space-y-4 hover:shadow-md hover:-translate-y-0.5 transition min-w-0 overflow-hidden
                     ${isClassTeacher ? "border-indigo-300 ring-1 ring-indigo-200" : "border-gray-100"}`}
                 >
                   {/* Header */}
                   <div className="flex items-center gap-3">
-                    <div className="w-12 h-12 rounded-xl text-white flex items-center justify-center font-bold text-sm shrink-0 bg-[rgb(var(--primary))]">
+                    <div
+                      className="w-12 h-12 rounded-xl text-white flex items-center justify-center font-bold text-sm shrink-0 overflow-hidden px-1 bg-[rgb(var(--primary))]"
+                      title={cls.name}
+                    >
                       {shortLabel}
                     </div>
-                    <div>
-                      <h3 className="font-bold text-[rgb(var(--text))] text-sm leading-tight">
+                    <div className="flex-1 min-w-0">
+                      <h3
+                        className="font-bold text-[rgb(var(--text))] text-sm leading-tight truncate"
+                        title={cls.name}
+                      >
                         {cls.name}
                       </h3>
-                      <p className="text-xs text-[rgb(var(--text))]">
+                      <p
+                        className="text-xs text-[rgb(var(--text))] truncate"
+                        title={rooms}
+                      >
                         {details.length} section
                         {details.length === 1 ? "" : "s"}
                         {rooms ? ` · Room ${rooms}` : ""}
@@ -752,168 +765,178 @@ export default function ClassPage() {
               );
             }
 
-            return (cls.details || []).map((detail, dIndex) => {
-              const pct = detail.capacity
-                ? Math.min((detail.studentCount / detail.capacity) * 100, 100)
-                : 0;
-              const hasSection = !!detail.sectionId;
-              const sectionName = detail.sectionId?.name || "";
-              const label = hasSection
-                ? `${cls.name}-${sectionName}`
-                : cls.name;
-              const shortLabel = hasSection
-                ? `${cls.name.replace(/\D/g, "")}-${sectionName}`
-                : cls.name.replace(/\D/g, "") ||
-                  cls.name.slice(0, 2).toUpperCase();
+            const details = cls.details || [];
+            const totalStudents = details.reduce(
+              (s, d) => s + (d.studentCount || 0),
+              0,
+            );
+            const totalCapacity = details.reduce(
+              (s, d) => s + (d.capacity || 0),
+              0,
+            );
+            const pct = totalCapacity
+              ? Math.min((totalStudents / totalCapacity) * 100, 100)
+              : 0;
+            const rooms = [
+              ...new Set(details.map((d) => d.roomNumber).filter(Boolean)),
+            ];
+            const teacherNames = [
+              ...new Set(
+                details.map((d) => d.teacherId?.fullName).filter(Boolean),
+              ),
+            ];
+            const allSubjects = [
+              ...new Map(
+                details
+                  .flatMap((d) => d.subjectTeachers || [])
+                  .map((st) => [st.subjectId?._id || st.subjectId, st]),
+              ).values(),
+            ];
+            const visibleSubjects = allSubjects.slice(0, 3);
+            const extraSubjects = allSubjects.length - 3;
+            const sectionRows = details.filter((d) => d.sectionId);
+            const numericPart = cls.name.replace(/\D/g, "");
+            const baseLabel =
+              numericPart ||
+              cls.name.replace(/[^A-Za-z]/g, "").slice(0, 2).toUpperCase();
+            const shortLabel = baseLabel;
 
-              // Highlight if this teacher is the class teacher or a subject teacher
-              const isMyClass =
-                isTeacher &&
-                (detail.teacherId?._id === user?.teacher_id ||
-                  detail.subjectTeachers?.some(
-                    (st) => st.teacherId?._id === user?.teacher_id,
-                  ));
-
-              const visibleSubjects = detail.subjectTeachers?.slice(0, 3) || [];
-              const extraSubjects = (detail.subjectTeachers?.length || 0) - 3;
-
-              return (
-                <div
-                  key={`${cls._id}_${dIndex}`}
-                  className={`bg-[rgb(var(--surface))] text-[rgb(var(--text))] rounded-2xl border shadow-sm p-5 space-y-4 hover:shadow-md transition
-                    ${isMyClass ? "border-indigo-300 ring-1 ring-indigo-200" : "border-gray-100"}`}
-                >
-                  {/* Header */}
-                  <div className="flex items-center gap-3">
-                    <div
-                      className={`w-12 h-12 rounded-xl text-white flex items-center justify-center font-bold text-sm shrink-0
-                      ${isMyClass ? "bg-[rgb(var(--primary))]" : "bg-[rgb(var(--primary))]"}`}
+            return (
+              <div
+                key={cls._id}
+                className="bg-[rgb(var(--surface))] text-[rgb(var(--text))] rounded-2xl border border-gray-100 shadow-sm p-5 space-y-4 hover:shadow-md transition min-w-0 overflow-hidden"
+              >
+                {/* Header */}
+                <div className="flex items-center gap-3">
+                  <div
+                    className="w-12 h-12 rounded-xl bg-[rgb(var(--primary))] text-white flex items-center justify-center font-bold text-sm shrink-0 overflow-hidden px-1"
+                    title={cls.name}
+                  >
+                    {shortLabel}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <h3
+                      className="font-bold text-[rgb(var(--text))] text-sm leading-tight truncate"
+                      title={cls.name}
                     >
-                      {shortLabel}
-                    </div>
-                    <div>
-                      <h3 className="font-bold text-[rgb(var(--text))] text-sm leading-tight">
-                        {label}
-                      </h3>
-                      <p className="text-xs text-[rgb(var(--text))]">
-                        Room {detail.roomNumber || "—"}
-                      </p>
-                    </div>
-                    {/* Badge: class teacher */}
-                    {isTeacher &&
-                      detail.teacherId?._id === user?.teacher_id && (
-                        <span className="ml-auto text-[10px] font-semibold px-2 py-0.5 rounded-full bg-[rgb(var(--primary))] text-[rgb(var(--text))]">
-                          Class Teacher
-                        </span>
-                      )}
+                      {cls.name}
+                    </h3>
+                    <p className="text-xs text-[rgb(var(--text))] truncate">
+                      {rooms.length > 0 ? `Room ${rooms.join(", ")}` : "Room —"}
+                    </p>
                   </div>
-
-                  {/* Meta */}
-                  <div className="space-y-1.5">
-                    <div className="flex items-center gap-2 text-sm text-[rgb(var(--text))]">
-                      <FaChalkboardTeacher
-                        size={13}
-                        className="shrink-0 text-gray-400"
-                      />
-                      <span>{detail.teacherId?.fullName || "No Teacher"}</span>
-                    </div>
-                    <div className="flex items-center gap-2 text-sm text-[rgb(var(--text))]">
-                      <FaUserGraduate
-                        size={13}
-                        className="shrink-0 text-gray-400"
-                      />
-                      <span>{detail.studentCount || 0} students</span>
-                    </div>
-                    <div className="flex items-center gap-2 text-sm text-[rgb(var(--text))]">
-                      <FaBook size={13} className="shrink-0 text-gray-400" />
-                      <span>
-                        {detail.subjectTeachers?.length || 0} subjects
-                      </span>
-                    </div>
-                  </div>
-
-                  {/* Capacity Bar */}
-                  <div>
-                    <div className="flex justify-between text-xs text-[rgb(var(--text))] mb-1.5">
-                      <span className="font-medium">Capacity</span>
-                      <span>
-                        {detail.studentCount || 0}/{detail.capacity || "—"}
-                      </span>
-                    </div>
-                    <div className="h-2 bg-gray-100 rounded-full overflow-hidden">
-                      <div
-                        className={`h-2 rounded-full transition-all ${pct >= 90 ? "bg-red-400" : pct >= 70 ? "bg-amber-400" : "bg-linear-to-r from-pink-400 to-indigo-400"}`}
-                        style={{ width: `${pct}%` }}
-                      />
-                    </div>
-                  </div>
-
-                  {/* Subject Pills */}
-                  {visibleSubjects.length > 0 && (
-                    <div className="flex flex-wrap gap-1.5">
-                      {visibleSubjects.map((sub, i) => {
-                        const isMySubject =
-                          isTeacher && sub.teacherId?._id === user?.teacher_id;
-                        return (
-                          <span
-                            key={i}
-                            className={`text-[11px] font-medium px-2.5 py-0.5 rounded-full border
-                              ${
-                                isMySubject
-                                  ? "bg-green-50 text-green-700 border-green-200"
-                                  : " bg-[rgb(var(--primary))] text-[rgb(var(--text))] border-indigo-100"
-                              }`}
-                          >
-                            {getSubjectName(
-                              sub.subjectId?._id || sub.subjectId,
-                            )}
-                            {isMySubject && " ✓"}
-                          </span>
-                        );
-                      })}
-                      {extraSubjects > 0 && (
-                        <span className="text-[11px] font-medium px-2.5 py-0.5 rounded-full bg-[rgb(var(--primary))] text-[rgb(var(--text))]">
-                          +{extraSubjects}
-                        </span>
-                      )}
-                    </div>
+                  {details.length > 1 && (
+                    <span className="ml-auto text-[10px] font-semibold px-2 py-0.5 rounded-full bg-gray-100 text-[rgb(var(--text))] shrink-0">
+                      {details.length} sections
+                    </span>
                   )}
+                </div>
 
-                  {/* Actions */}
-                  <div className="flex justify-end gap-2 pt-3 border-t border-gray-100">
-                    <button
-                      onClick={() =>
-                        navigate(
-                          isTeacher
-                            ? `/teacher/class-view/${cls._id}`
-                            : `/school/class-view/${cls._id}`,
-                        )
-                      }
-                      className="text-indigo-500 hover:bg-indigo-50 p-1.5 rounded-lg transition"
-                    >
-                      <FaEye size={14} />
-                    </button>
-                    {/* Admin-only actions */}
-                    {!isTeacher && (
-                      <>
-                        <button
-                          onClick={() => openEdit(cls)}
-                          className="text-amber-500 hover:bg-amber-50 p-1.5 rounded-lg transition"
-                        >
-                          <FaEdit size={14} />
-                        </button>
-                        <button
-                          onClick={() => setDeleteId(cls._id)}
-                          className="text-red-400 hover:bg-red-50 p-1.5 rounded-lg transition"
-                        >
-                          <FaTrash size={14} />
-                        </button>
-                      </>
-                    )}
+                {/* Meta */}
+                <div className="space-y-1.5">
+                  <div className="flex items-center gap-2 text-sm text-[rgb(var(--text))] min-w-0">
+                    <FaChalkboardTeacher
+                      size={13}
+                      className="shrink-0 text-gray-400"
+                    />
+                    <span className="truncate">
+                      {teacherNames.length > 0
+                        ? teacherNames.join(", ")
+                        : "No Teacher"}
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-2 text-sm text-[rgb(var(--text))]">
+                    <FaUserGraduate
+                      size={13}
+                      className="shrink-0 text-gray-400"
+                    />
+                    <span>{totalStudents} students</span>
+                  </div>
+                  <div className="flex items-center gap-2 text-sm text-[rgb(var(--text))]">
+                    <FaBook size={13} className="shrink-0 text-gray-400" />
+                    <span>{allSubjects.length} subjects</span>
                   </div>
                 </div>
-              );
-            });
+
+                {/* Capacity Bar */}
+                <div>
+                  <div className="flex justify-between text-xs text-[rgb(var(--text))] mb-1.5">
+                    <span className="font-medium">Capacity</span>
+                    <span>
+                      {totalStudents}/{totalCapacity || "—"}
+                    </span>
+                  </div>
+                  <div className="h-2 bg-gray-100 rounded-full overflow-hidden">
+                    <div
+                      className={`h-2 rounded-full transition-all ${pct >= 90 ? "bg-red-400" : pct >= 70 ? "bg-amber-400" : "bg-linear-to-r from-pink-400 to-indigo-400"}`}
+                      style={{ width: `${pct}%` }}
+                    />
+                  </div>
+                </div>
+
+                {/* Sections */}
+                {sectionRows.length > 1 && (
+                  <div className="space-y-1.5 pt-1">
+                    {sectionRows.map((d, i) => (
+                      <div
+                        key={d.sectionId?._id || i}
+                        className="flex items-center justify-between gap-2 text-xs px-2.5 py-1.5 rounded-lg bg-[rgb(var(--bg))] min-w-0"
+                      >
+                        <span className="font-semibold truncate">
+                          {d.sectionId?.name}
+                        </span>
+                        <span className="text-[rgb(var(--text-muted))] truncate">
+                          {d.roomNumber || "Room —"} ·{" "}
+                          {d.teacherId?.fullName || "No Teacher"} ·{" "}
+                          {d.studentCount || 0} students
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                {/* Subject Pills */}
+                {visibleSubjects.length > 0 && (
+                  <div className="flex flex-wrap gap-1.5">
+                    {visibleSubjects.map((sub, i) => (
+                      <span
+                        key={i}
+                        className="text-[11px] font-medium px-2.5 py-0.5 rounded-full border bg-[rgb(var(--primary))] text-[rgb(var(--text))] border-indigo-100"
+                      >
+                        {getSubjectName(sub.subjectId?._id || sub.subjectId)}
+                      </span>
+                    ))}
+                    {extraSubjects > 0 && (
+                      <span className="text-[11px] font-medium px-2.5 py-0.5 rounded-full bg-[rgb(var(--primary))] text-[rgb(var(--text))]">
+                        +{extraSubjects}
+                      </span>
+                    )}
+                  </div>
+                )}
+
+                {/* Actions */}
+                <div className="flex justify-end gap-2 pt-3 border-t border-gray-100">
+                  <button
+                    onClick={() => navigate(`/school/class-view/${cls._id}`)}
+                    className="text-indigo-500 hover:bg-indigo-50 p-1.5 rounded-lg transition"
+                  >
+                    <FaEye size={14} />
+                  </button>
+                  <button
+                    onClick={() => openEdit(cls)}
+                    className="text-amber-500 hover:bg-amber-50 p-1.5 rounded-lg transition"
+                  >
+                    <FaEdit size={14} />
+                  </button>
+                  <button
+                    onClick={() => setDeleteId(cls._id)}
+                    className="text-red-400 hover:bg-red-50 p-1.5 rounded-lg transition"
+                  >
+                    <FaTrash size={14} />
+                  </button>
+                </div>
+              </div>
+            );
           })}
         </div>
       )}
