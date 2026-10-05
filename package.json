@@ -1,4 +1,13 @@
 {
+  "name": "eduaitor",
+  "private": true,
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "postinstall": "npm --prefix Backend install --omit=dev",
+    "start": "npm --prefix Backend start"
+  },
   "dependencies": {
     "razorpay": "^2.9.8"
   }
