@@ -62,7 +62,9 @@ const HostelBuildings = () => {
       ]);
 
       const all = staffRes.data.data || [];
-      const staffWardens = all.filter((s) => s.staffRole === "hostel_warden");
+      const staffWardens = all.filter(
+        (s) => s.staffRole === "hostel_warden" || s.isHostelWarden,
+      );
 
       const teacherWardens = (teacherRes.data.data || [])
         .filter((t) => t.isHostelWarden)

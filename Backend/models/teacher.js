@@ -44,6 +44,12 @@ const teacherSchema = new mongoose.Schema(
     employmentType: String,
     salary: Number,
 
+    /** Set when the teacher is registered — ID card becomes available for download */
+    idCardIssuedAt: {
+      type: Date,
+      default: null,
+    },
+
     assignedClasses: [
       {
         type: mongoose.Schema.Types.ObjectId,

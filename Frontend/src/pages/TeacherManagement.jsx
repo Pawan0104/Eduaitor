@@ -7,6 +7,8 @@ import { FiX } from "react-icons/fi";
 import { MODULES } from "../constants/module.js";
 import { useAuth } from "../context/AuthContext";
 import LoadingSpinner from "../components/LoadingSpinner";
+import DummyFillBar from "../components/DummyFill.jsx";
+import { createDummyImageFile } from "../components/DummyFill.js";
 import { getApiErrorMessage } from "../utils/apiError.js";
 
 const API = import.meta.env.VITE_API_URL;
@@ -162,33 +164,6 @@ const [classes, setClasses] = useState([]);
     setErrors((prev) => ({ ...prev, permissions: undefined }));
   };
 
-  /* The warden option only makes sense once the school actually runs a hostel. */
-  const [hasHostels, setHasHostels] = useState(false);
-
-  useEffect(() => {
-    let cancelled = false;
-
-    const checkHostels = async () => {
-      try {
-        const res = await axios.get(`${API}/hostel/`, {
-          withCredentials: true,
-        });
-        const list = res.data?.data;
-        if (!cancelled) {
-          setHasHostels(Array.isArray(list) && list.length > 0);
-        }
-      } catch {
-        // No hostel module access, or no hostels yet.
-        if (!cancelled) setHasHostels(false);
-      }
-    };
-
-    checkHostels();
-    return () => {
-      cancelled = true;
-    };
-  }, []);
-
   /* Warden duty is authorised through the "hostel" module, so the checkbox
      keeps that module in sync with the flag in both directions. */
   const toggleWarden = () => {
@@ -204,6 +179,38 @@ const [classes, setClasses] = useState([]);
           : perms.filter((k) => k !== "hostel"),
       };
     });
+  };
+
+  /* QA helper: fills the whole teacher wizard with sample values at once. */
+  const fillTeacherDummy = () => {
+    const firstClass = classes?.[0]?._id || classes?.[0]?.id || "";
+    const firstSubject = subjects?.[0]?._id || subjects?.[0]?.id || "";
+    const today = new Date().toISOString().split("T")[0];
+    setForm((prev) => ({
+      ...prev,
+      fullName: "Test Teacher",
+      dob: "1990-04-12",
+      gender: "Female",
+      phone: "9876500001",
+      email: "teacher.test@example.com",
+      address: "12 Test Park Lane, Test City, Test State 500001",
+      governmentId: "TCH-2026-001",
+      photo: createDummyImageFile("teacher-photo.png"),
+      qualification: "M.Sc. Mathematics, B.Ed.",
+      experience: "5",
+      subjects: firstSubject ? [firstSubject] : [],
+      department: "Sciences",
+      designation: "PGT",
+      joiningDate: today,
+      employmentType: "Full Time",
+      salary: "45000",
+      role: "Teacher",
+      assignedClasses: firstClass ? [firstClass] : [],
+      username: "test.teacher",
+      password: "Test@1234",
+      permissions: schoolModules.map((m) => m.key),
+    }));
+    toast.info("Teacher form filled with test data");
   };
 
   /* RESTORE CREATE DRAFT (skip when editing) */
@@ -791,6 +798,11 @@ if (key === "subjects" || key === "assignedClasses" || key === "permissions") {
               </div>
             </div>
 
+            <DummyFillBar
+              onFill={fillTeacherDummy}
+              hint="Fills every step of the teacher form with sample values."
+            />
+
             {/* STEP CONTENT */}
 
             {step === 1 && (
@@ -1022,8 +1034,7 @@ if (key === "subjects" || key === "assignedClasses" || key === "permissions") {
                     Module Access <span className="text-red-500">*</span>
                   </label>
 
-                  {hasHostels && (
-                    <label className="flex items-start gap-2 mb-3 px-3 py-2 rounded-lg border border-[rgb(var(--border))] cursor-pointer hover:bg-[rgba(var(--primary),0.05)]">
+                  <label className="flex items-start gap-2 mb-3 px-3 py-2 rounded-lg border border-[rgb(var(--border))] cursor-pointer hover:bg-[rgba(var(--primary),0.05)]">
                       <input
                         type="checkbox"
                         checked={Boolean(form.isHostelWarden)}
@@ -1040,7 +1051,6 @@ if (key === "subjects" || key === "assignedClasses" || key === "permissions") {
                         </span>
                       </span>
                     </label>
-                  )}
 
                   <div
                     className={`rounded-xl border p-3 bg-[rgb(var(--surface))] ${

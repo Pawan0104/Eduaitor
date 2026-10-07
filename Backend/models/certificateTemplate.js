@@ -44,6 +44,12 @@ const certificateTemplateSchema = new mongoose.Schema(
     textColor: { type: String, default: "#0f172a" },
     /** Custom logo override; empty → use school.school_logo */
     logoUrl: { type: String, default: "" },
+    /**
+     * ID card field layout: { [cardType]: { header: [], body: [], footer: [] } }
+     * where cardType ∈ student | staff | teacher | driver.
+     * Empty in the DB → frontend falls back to the default layout.
+     */
+    cardFields: { type: mongoose.Schema.Types.Mixed, default: {} },
   },
   { timestamps: true },
 );

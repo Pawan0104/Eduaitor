@@ -10,6 +10,7 @@ import {
   updateMySchoolRazorpay,
   testMySchoolRazorpay,
 } from "../controllers/schoolController.js";
+import { importSchoolData } from "../controllers/schoolImportController.js";
 import upload from "../middlewares/upload.js";
 import { authMiddleware, requireRoles } from "../auth/auth.js";
 
@@ -42,5 +43,7 @@ router.put(
 );
 
 router.delete("/:id", ...superAdminOnly, deleteSchool);
+
+router.post("/:id/import", ...superAdminOnly, importSchoolData);
 
 export default router;

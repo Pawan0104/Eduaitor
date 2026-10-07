@@ -141,7 +141,7 @@ export default function StaffAttendance() {
 
   const handleSave = async () => {
     if (!selectedStaffId) {
-      toast.error("Select a staff member first.");
+      toast.error("Select a staff member or teacher first.");
       return;
     }
 
@@ -164,6 +164,7 @@ export default function StaffAttendance() {
           `${API}/staff-attendance/save`,
           {
             staffId: selectedStaffId,
+            personType: selectedStaff?.personType || "staff",
             date: selectedDate,
             status,
             note,
@@ -225,17 +226,37 @@ export default function StaffAttendance() {
                 {staffList.length === 0 ? (
                   <tr>
                     <td colSpan={5} className="px-4 py-6 text-center text-slate-500">
-                      No staff available.
+                      No staff, teachers or drivers available.
                     </td>
                   </tr>
                 ) : (
                   staffList.map((staff) => {
-                    const roleLabel = staff.staffRole === "other"
-                      ? staff.staffRoleCustom || "Other"
-                      : staff.staffRole?.charAt(0).toUpperCase() + staff.staffRole?.slice(1);
+                    const personType = staff.personType;
+                    const personBadge =
+                      personType === "teacher"
+                        ? { label: "Teacher", cls: "bg-indigo-50 text-indigo-600 border-indigo-100" }
+                        : personType === "driver"
+                          ? { label: "Driver", cls: "bg-sky-50 text-sky-600 border-sky-100" }
+                          : null;
+                    const roleLabel = personType === "teacher"
+                      ? staff.staffRoleCustom || "Teacher"
+                      : personType === "driver"
+                        ? "Driver"
+                        : staff.staffRole === "other"
+                          ? staff.staffRoleCustom || "Other"
+                          : staff.staffRole?.charAt(0).toUpperCase() + staff.staffRole?.slice(1);
                     return (
                       <tr key={staff._id} className="bg-white hover:bg-slate-50">
-                        <td className="px-4 py-3">{staff.fullName}</td>
+                        <td className="px-4 py-3">
+                          <div className="flex items-center gap-2">
+                            <span>{staff.fullName}</span>
+                            {personBadge && (
+                              <span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded-full border ${personBadge.cls}`}>
+                                {personBadge.label}
+                              </span>
+                            )}
+                          </div>
+                        </td>
                         <td className="px-4 py-3">{roleLabel}</td>
                         <td className="px-4 py-3">
                           <div className="text-slate-700">{staff.phone || staff.email}</div>
@@ -290,14 +311,32 @@ export default function StaffAttendance() {
 
           {!selectedStaff ? (
             <div className="rounded-2xl border border-dashed border-slate-200 bg-slate-50 p-8 text-center text-slate-500">
-              Select a staff member to view the attendance detail page.
+              Select a staff member, teacher or driver to view the attendance detail page.
             </div>
           ) : (
             <>
               <div className="mb-4 rounded-2xl bg-slate-50 p-4">
-                <div className="text-sm font-semibold text-slate-900">{selectedStaff.fullName}</div>
+                <div className="text-sm font-semibold text-slate-900">
+                  {selectedStaff.fullName}
+                  {selectedStaff.personType === "teacher" && (
+                    <span className="ml-2 text-[10px] font-semibold px-1.5 py-0.5 rounded-full bg-indigo-50 text-indigo-600 border border-indigo-100">
+                      Teacher
+                    </span>
+                  )}
+                  {selectedStaff.personType === "driver" && (
+                    <span className="ml-2 text-[10px] font-semibold px-1.5 py-0.5 rounded-full bg-sky-50 text-sky-600 border border-sky-100">
+                      Driver
+                    </span>
+                  )}
+                </div>
                 <div className="text-xs text-slate-500">{selectedStaff.email} • {selectedStaff.phone || "No phone"}</div>
-                <div className="text-xs text-slate-500">Role: {selectedStaff.staffRole === "other" ? selectedStaff.staffRoleCustom || "Other" : selectedStaff.staffRole}</div>
+                <div className="text-xs text-slate-500">Role: {selectedStaff.personType === "teacher"
+                    ? selectedStaff.staffRoleCustom || "Teacher"
+                    : selectedStaff.personType === "driver"
+                      ? "Driver"
+                      : selectedStaff.staffRole === "other"
+                        ? selectedStaff.staffRoleCustom || "Other"
+                        : selectedStaff.staffRole}</div>
               </div>
 
               <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 mb-4">

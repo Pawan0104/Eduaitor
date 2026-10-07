@@ -56,6 +56,7 @@ export const templateToJson = (doc) => ({
   borderColor: doc.borderColor || "",
   textColor: doc.textColor || "#0f172a",
   logoUrl: doc.logoUrl || "",
+  cardFields: doc.cardFields || {},
   updatedAt: doc.updatedAt,
 });
 
@@ -82,6 +83,7 @@ const ALLOWED_FIELDS = [
   "borderColor",
   "textColor",
   "logoUrl",
+  "cardFields",
 ];
 
 /** GET /certificates/meta — placeholders + types + presets */

@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback } from "react";
-import { useParams,useNavigate  } from "react-router-dom";
+import { useParams, useNavigate, useLocation } from "react-router-dom";
 import axios from "axios";
+import { FaChevronLeft, FaChevronRight } from "react-icons/fa";
 import UserAvatar from "../components/UserAvatar";
 
 const MONTHS = [
@@ -37,7 +38,7 @@ const STATUS_STYLES = {
 };
 
 /* ── Calendar ─────────────────────────────────────────────────────────── */
-function AttendanceCalendar({ records, month, year }) {
+function AttendanceCalendar({ records, month, year, selectedKey }) {
   const statusMap = {};
   records.forEach((r) => {
     const d = new Date(r.date);
@@ -54,11 +55,12 @@ function AttendanceCalendar({ records, month, year }) {
     const cellDate = new Date(year, month - 1, d);
     const status   = statusMap[`${year}-${month}-${d}`] || null;
     cells.push({
-      type:    "day",
-      day:     d,
+      type:       "day",
+      day:        d,
       status,
-      isToday: cellDate.toDateString() === today.toDateString(),
-      isFuture: cellDate > today,
+      isToday:    cellDate.toDateString() === today.toDateString(),
+      isFuture:   cellDate > today,
+      isSelected: selectedKey === `${year}-${month}-${d}`,
     });
   }
 
@@ -101,6 +103,7 @@ function AttendanceCalendar({ records, month, year }) {
                   ? "text-[rgb(var(--text-muted))] opacity-40"
                   : "text-[rgb(var(--text-muted))]",
                 cell.isToday ? "ring-1 ring-[rgb(var(--border-strong))]" : "",
+                cell.isSelected ? "ring-2 ring-[rgb(var(--primary))]" : "",
               ].join(" ")}
             >
               <span>{cell.day}</span>
@@ -116,16 +119,36 @@ function AttendanceCalendar({ records, month, year }) {
 }
 
 /* ── Main Component ───────────────────────────────────────────────────── */
-function StudentAttendanceDetail({}) {
+function StudentAttendanceDetail() {
   const now = new Date();
-  const [month,   setMonth]   = useState(now.getMonth() + 1);
-  const [year,    setYear]    = useState(now.getFullYear());
-  const [data,    setData]    = useState(null);
+  const { studentId } = useParams();
+  const navigate = useNavigate();
+  const location = useLocation();
+  const navState = location.state || {};
+
+  // Open on the month/year the report was filtered by, so the month
+  // switcher (below) reflects the period being viewed.
+  let initialMonth = now.getMonth() + 1;
+  let initialYear = now.getFullYear();
+  if (navState.year) {
+    const y = Number(navState.year);
+    if (Number.isFinite(y) && y > 2000) initialYear = y;
+    const m = Number(navState.month);
+    if (Number.isFinite(m) && m >= 1 && m <= 12) initialMonth = m;
+  } else if (navState.selDate) {
+    const d = new Date(navState.selDate);
+    if (!Number.isNaN(d.getTime())) {
+      initialMonth = d.getMonth() + 1;
+      initialYear = d.getFullYear();
+    }
+  }
+
+  const [month, setMonth] = useState(initialMonth);
+  const [year, setYear] = useState(initialYear);
+  const [selectedDate, setSelectedDate] = useState("");
+  const [data, setData] = useState(null);
   const [loading, setLoading] = useState(false);
-  const [error,   setError]   = useState(null);
-    const { studentId } = useParams();
-    const navigate = useNavigate();
-    // console.log("StudentAttendanceDetail mounted with studentId:", id);  
+  const [error, setError] = useState(null);
   const API_URL = `${import.meta.env.VITE_API_URL}`;
 
   const fetchData = useCallback(async () => {
@@ -152,7 +175,7 @@ function StudentAttendanceDetail({}) {
     } finally {
       setLoading(false);
     }
-  }, [studentId, month, year]);
+  }, [studentId, month, year, API_URL]);
 
   useEffect(() => { fetchData(); }, [fetchData]);
 
@@ -162,8 +185,20 @@ function StudentAttendanceDetail({}) {
     if (m > 12) { m = 1;  y++; }
     const current = new Date();
     if (y > current.getFullYear() || (y === current.getFullYear() && m > current.getMonth() + 1)) return;
+    setSelectedDate("");
     setMonth(m);
     setYear(y);
+  };
+
+  // Date picker can land on any earlier month — switch the month view too.
+  const handleDatePick = (value) => {
+    setSelectedDate(value || "");
+    if (!value) return;
+    const d = new Date(`${value}T00:00:00`);
+    if (!Number.isNaN(d.getTime()) && (d.getFullYear() !== year || d.getMonth() + 1 !== month)) {
+      setMonth(d.getMonth() + 1);
+      setYear(d.getFullYear());
+    }
   };
 
   const student  = data?.student;
@@ -179,6 +214,26 @@ function StudentAttendanceDetail({}) {
     : "#A32D2D";
 
   const sortedRecords = [...records].sort((a, b) => new Date(b.date) - new Date(a.date));
+
+  const padN = (n) => String(n).padStart(2, "0");
+  const todayKey = `${now.getFullYear()}-${padN(now.getMonth() + 1)}-${padN(now.getDate())}`;
+
+  const toDayKey = (value) => {
+    const x = new Date(value);
+    return `${x.getFullYear()}-${padN(x.getMonth() + 1)}-${padN(x.getDate())}`;
+  };
+
+  const dayRecords = selectedDate
+    ? sortedRecords.filter((r) => toDayKey(r.date) === selectedDate)
+    : sortedRecords;
+  const selectedStatus = selectedDate ? dayRecords[0]?.status || null : null;
+  const selectedLabel = selectedDate
+    ? new Date(`${selectedDate}T00:00:00`).toLocaleDateString("en-IN", {
+        day: "2-digit",
+        month: "short",
+        year: "numeric",
+      })
+    : "";
 
   const onBack = () => {
     // console.log("Back button clicked");
@@ -231,22 +286,64 @@ function StudentAttendanceDetail({}) {
       </div>
 
       {/* Month navigator */}
-      <div className="flex items-center justify-between mb-4">
+      <div className="flex items-center justify-between gap-2 mb-4">
         <button
           onClick={() => changeMonth(-1)}
-          className="border border-[rgb(var(--border))] rounded-lg p-1.5 text-[rgb(var(--text-muted))] hover:bg-[rgb(var(--surface))] transition-colors"
+          aria-label="Previous month"
+          className="flex items-center justify-center gap-1 border border-[rgb(var(--border))] rounded-lg px-3 py-2 text-[rgb(var(--text-muted))] hover:bg-[rgb(var(--surface))] hover:text-[rgb(var(--text))] transition-colors"
         >
-          <i className="ti ti-chevron-left" aria-hidden="true" />
+          <FaChevronLeft size={14} />
+          <span className="text-xs font-semibold">Prev</span>
         </button>
-        <span className="font-medium text-sm">{MONTHS[month - 1]} {year}</span>
+        <span className="font-bold text-base">{MONTHS[month - 1]} {year}</span>
         <button
           onClick={() => changeMonth(1)}
           disabled={isNextDisabled}
-          className="border border-[rgb(var(--border))] rounded-lg p-1.5 text-[rgb(var(--text-muted))] hover:bg-[rgb(var(--surface))] transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
+          aria-label="Next month"
+          className="flex items-center justify-center gap-1 border border-[rgb(var(--border))] rounded-lg px-3 py-2 text-[rgb(var(--text-muted))] hover:bg-[rgb(var(--surface))] hover:text-[rgb(var(--text))] transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
         >
-          <i className="ti ti-chevron-right" aria-hidden="true" />
+          <span className="text-xs font-semibold">Next</span>
+          <FaChevronRight size={14} />
         </button>
       </div>
+
+      {/* Date picker — check a specific date in the shown month */}
+      <div className="mb-4 flex flex-wrap items-center gap-2 rounded-xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))] px-3 py-2.5">
+        <i className="ti ti-calendar text-[rgb(var(--text-muted))]" aria-hidden="true" />
+        <span className="text-xs font-medium text-[rgb(var(--text-muted))]">
+          Check a date in {MONTHS[month - 1]} {year}:
+        </span>
+        <input
+          type="date"
+          min="2000-01-01"
+          max={todayKey}
+          value={selectedDate}
+          onChange={(e) => handleDatePick(e.target.value)}
+          className="text-sm border border-[rgb(var(--border))] rounded-lg px-2 py-1.5 bg-[rgb(var(--bg))] text-[rgb(var(--text))]"
+        />
+{selectedDate && !loading && (
+          <button
+            onClick={() => setSelectedDate("")}
+            className="ml-auto text-xs font-semibold text-[rgb(var(--primary))] hover:underline"
+          >
+            Show full month
+          </button>
+        )}
+      </div>
+
+      {selectedDate && (
+        <div className="mb-4 flex items-center justify-between rounded-xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))] px-4 py-2.5">
+          <span className="text-sm font-medium text-[rgb(var(--text))]">{selectedLabel}</span>
+          {selectedStatus ? (
+            <span className={`inline-flex items-center gap-1 text-xs px-3 py-1 rounded-full font-medium ${STATUS_STYLES[selectedStatus].badge}`}>
+              <i className={`ti ${STATUS_STYLES[selectedStatus].icon} text-xs`} aria-hidden="true" />
+              {selectedStatus}
+            </span>
+          ) : (
+            <span className="text-xs text-[rgb(var(--text-muted))]">No attendance recorded for this date</span>
+          )}
+        </div>
+      )}
 
       {/* Summary stats */}
       <div className="grid grid-cols-5 gap-2 mb-5">
@@ -268,7 +365,12 @@ function StudentAttendanceDetail({}) {
 
       {/* Calendar */}
       {!error && (
-        <AttendanceCalendar records={records} month={month} year={year} />
+        <AttendanceCalendar
+          records={records}
+          month={month}
+          year={year}
+          selectedKey={selectedDate || undefined}
+        />
       )}
 
       {/* Records list */}
@@ -297,14 +399,14 @@ function StudentAttendanceDetail({}) {
           </div>
         )}
 
-        {!loading && !error && sortedRecords.length === 0 && (
+        {!loading && !error && dayRecords.length === 0 && (
           <div className="text-center py-10 text-sm text-[rgb(var(--text-muted))]">
             <i className="ti ti-calendar-off block text-2xl mb-2" aria-hidden="true" />
-            No attendance records for this month
+            {selectedDate ? "No attendance for this date" : "No attendance records for this month"}
           </div>
         )}
 
-        {!loading && !error && sortedRecords.map((r) => {
+        {!loading && !error && dayRecords.map((r) => {
           const d   = new Date(r.date);
           const st  = STATUS_STYLES[r.status] || STATUS_STYLES.Present;
           return (

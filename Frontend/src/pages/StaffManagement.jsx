@@ -3,6 +3,8 @@ import axios from "axios";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import { MODULES } from "../constants/module.js";
+import DummyFillBar from "../components/DummyFill.jsx";
+import { createDummyImageFile } from "../components/DummyFill.js";
 import { toast } from "react-toastify";
 import {
   FaPlus, FaEdit, FaTrash, FaEye, FaTimes, FaKey,
@@ -55,6 +57,7 @@ const emptyForm = {
   salary:          "",
   password:        "",
   status:          "Active",
+  isHostelWarden:  false,
 };
 
 /* ══════════════════════════════════════════════════
@@ -140,6 +143,45 @@ const [permissions, setPermissions]       = useState([]);
     );
   };
 
+  /* Warden duty implies hostel module access; mirror the selection in the
+     module list so the summary matches what will actually be saved. */
+  const toggleWarden = () => {
+    setDirty(true);
+    const next = !form.isHostelWarden;
+    setForm((p) => ({ ...p, isHostelWarden: next }));
+    setPermissions((prev) =>
+      next
+        ? prev.includes("hostel") ? prev : [...prev, "hostel"]
+        : prev.filter((k) => k !== "hostel"),
+    );
+  };
+
+  /* QA helper: fills the whole staff modal with sample values at once. */
+  const fillStaffDummy = () => {
+    const today = new Date().toISOString().split("T")[0];
+    setForm((prev) => ({
+      ...prev,
+      fullName: "Test Staff",
+      email: "staff.test@example.com",
+      phone: "9876500099",
+      dob: "1994-08-21",
+      gender: "Female",
+      address: "12 Test Park Lane, Test City, Test State 500001",
+      staffRole: "accountant",
+      joiningDate: today,
+      employmentType: "Full-Time",
+      salary: "30000",
+      password: "Test@1234",
+      status: "Active",
+    }));
+    setPermissions(MODULES.slice(0, 3).map((m) => m.key));
+    const photo = createDummyImageFile("staff-photo.png");
+    setPhotoFile(photo);
+    setPhotoPreview(URL.createObjectURL(photo));
+    setDirty(true);
+    toast.info("Staff form filled with test data");
+  };
+
   const handlePhotoChange = (e) => {
     const file = e.target.files[0];
     if (!file) return;
@@ -200,6 +242,7 @@ const [permissions, setPermissions]       = useState([]);
       salary:          staff.salary          || "",
       password:        "",
       status:          staff.status          || "Active",
+      isHostelWarden:  Boolean(staff.isHostelWarden),
     });
     setPermissions(staff.permissions || []);
     setPhotoPreview(staff.photo?.url  || null);
@@ -919,6 +962,12 @@ if (form.staffRole === "other" && !form.staffRoleCustom.trim())
                   {formError}
                 </div>
               ) : null}
+
+              <DummyFillBar
+                onFill={fillStaffDummy}
+                hint="Fills the staff form with sample values, including a photo."
+                className="mt-0"
+              />
               {/* ── PHOTO ── */}
               <div>
                 <p className="text-sm font-semibold mb-2">
@@ -1074,6 +1123,24 @@ if (form.staffRole === "other" && !form.staffRoleCustom.trim())
                         )}
                       </div>
                     </div>
+
+<label className="flex items-start gap-2 mt-3 px-3 py-2 rounded-lg border border-[rgb(var(--border))] cursor-pointer hover:bg-[rgba(var(--primary),0.05)]">
+                        <input
+                          type="checkbox"
+                          checked={Boolean(form.isHostelWarden)}
+                          onChange={toggleWarden}
+                          className="w-4 h-4 mt-0.5 accent-[rgb(var(--primary))]"
+                        />
+                        <span>
+                          <span className="text-sm font-medium text-[rgb(var(--text))]">
+                            Also assign as Hostel Warden
+                          </span>
+                          <span className="block text-[11px] text-[rgb(var(--text-muted))]">
+                            Adds Hostel module access automatically. Remove it to
+                            revoke both.
+                          </span>
+                        </span>
+                      </label>
                   </div>
 
                   {/* job title */}
@@ -1422,7 +1489,11 @@ if (form.staffRole === "other" && !form.staffRoleCustom.trim())
                       setShowViewModal(false);
                       const base =
                         user?.role === "staff_admin" ? "/staff" : "/school";
-                      navigate(`${base}/id-card/staff/${viewStaff._id}`);
+                      navigate(
+                        `${base}/id-card/staff/${viewStaff._id}?model=${encodeURIComponent(
+                          viewStaff.model || "Staff",
+                        )}`,
+                      );
                     }}
                     className="flex items-center gap-2 px-4 py-2
                       bg-emerald-600 text-white rounded-lg text-sm

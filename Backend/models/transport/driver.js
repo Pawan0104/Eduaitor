@@ -86,6 +86,12 @@ const driverSchema = new mongoose.Schema(
       default: "Active",
     },
 
+    /** Set when the driver is registered — ID card becomes available for download */
+    idCardIssuedAt: {
+      type: Date,
+      default: null,
+    },
+
     photo: { type: fileDocSchema, default: () => ({}) },
 
     /** Uploaded Aadhaar card (image / PDF) */

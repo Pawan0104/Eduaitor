@@ -5,6 +5,8 @@ import { toast } from "react-toastify";
 import { FaArrowLeft } from "react-icons/fa";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
+import DummyFillBar from "../components/DummyFill.jsx";
+import { createDummyImageFile } from "../components/DummyFill.js";
 
 const API = import.meta.env.VITE_API_URL;
 
@@ -711,6 +713,27 @@ const DriverFormModal = ({
     return !assignedDriver || assignedDriver === form._id;
   });
 
+  /* QA helper: fills the driver form with sample values at once. */
+  const fillDriverDummy = () => {
+    const bus = availableBuses?.[0]?._id || "";
+    const route = availableRoutes?.[0]?._id || "";
+    setForm((p) => ({
+      ...p,
+      name: "Test Driver",
+      phone: "9876500077",
+      license: "RJ-2026-0044110",
+      licenseExpiry: "2029-05-30",
+      experience: "6 years",
+      bus,
+      route,
+      status: "Active",
+    }));
+    setPhotoFile(createDummyImageFile("driver-photo.png"));
+    setAadharFile(createDummyImageFile("driver-aadhar.png"));
+    setLicenseFile(createDummyImageFile("driver-license.png"));
+    toast.info("Driver form filled with test data");
+  };
+
   return (
     <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50">
       <div className="text-[rgb(var(--text))] bg-[rgb(var(--surface))] rounded-xl p-6 w-full max-w-lg mx-4 max-h-[90vh] overflow-y-auto">
@@ -736,6 +759,11 @@ const DriverFormModal = ({
             ✕
           </button>
         </div>
+
+        <DummyFillBar
+          onFill={fillDriverDummy}
+          hint="Fills the driver form with sample values, including the required photo, Aadhaar and licence uploads."
+        />
 
         {/* Fields */}
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-[rgb(var(--text))] bg-[rgb(var(--surface))]">

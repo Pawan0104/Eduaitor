@@ -4,8 +4,15 @@ const staffAttendanceSchema = new mongoose.Schema(
   {
     staffId: {
       type: mongoose.Schema.Types.ObjectId,
-      ref: "Staff",
+      // Polymorphic: points at a Staff, Teacher or Driver document. Use
+      // personType below to know which collection the id belongs to, so it is
+      // deliberately not a hard "Staff" ref.
       required: true,
+    },
+    personType: {
+      type: String,
+      enum: ["staff", "teacher", "driver"],
+      default: "staff",
     },
     schoolId: {
       type: mongoose.Schema.Types.ObjectId,

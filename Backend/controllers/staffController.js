@@ -140,7 +140,12 @@ export const createStaff = async (req, res, next) => {
       permissions,  // JSON string from FormData (ignored when customRoleId set)
       password,
       status,
+      isHostelWarden,
     } = req.body;
+
+    // FormData sends booleans as strings; normalize to a real boolean.
+    const isHostelWardenFlag =
+      isHostelWarden === true || isHostelWarden === "true";
 
     // ── 1. GET SCHOOL ID FROM AUTH ────────────────
     // works for both school_admin and administrator staff
@@ -198,6 +203,12 @@ export const createStaff = async (req, res, next) => {
       return res.status(400).json({ success: false, message: resolved.error });
     }
 
+    // A hostel warden keeps "hostel" module access in sync with the flag even
+    // if the client omitted the permission from the submitted module list.
+    if (isHostelWardenFlag && !resolved.permissions.includes("hostel")) {
+      resolved.permissions = [...resolved.permissions, "hostel"];
+    }
+
     // ── 6. GENERATE IDs ───────────────────────────
     const staffId  = await generateStaffId(schoolId);
     const username = generateUsername(fullName, staffId);
@@ -238,6 +249,7 @@ export const createStaff = async (req, res, next) => {
       firstTimeLogin: true,
       status:         status     || "Active",
       photo,
+      isHostelWarden: isHostelWardenFlag,
       schoolId,
       idCardIssuedAt: new Date(),
     });
@@ -418,6 +430,7 @@ export const updateStaff = async (req, res, next) => {
       permissions,
       password,
       status,
+      isHostelWarden,
     } = req.body;
 
     // ── 1. FIND STAFF ─────────────────────────────
@@ -465,6 +478,9 @@ export const updateStaff = async (req, res, next) => {
     if (employmentType)    updateData.employmentType = employmentType;
     if (salary)            updateData.salary    = salary;
     if (status)            updateData.status    = status;
+    if (isHostelWarden !== undefined)
+      updateData.isHostelWarden =
+        isHostelWarden === true || isHostelWarden === "true";
 
     if (staffRole === "other" && staffRoleCustom?.trim()) {
       updateData.staffRoleCustom = staffRoleCustom;
@@ -521,7 +537,21 @@ export const updateStaff = async (req, res, next) => {
       if (resolved.error) {
         return res.status(400).json({ success: false, message: resolved.error });
       }
-      updateData.permissions = resolved.permissions;
+updateData.permissions = resolved.permissions;
+    }
+
+    // Keep "hostel" module access in sync with the warden flag: the flag is
+    // the source of truth, and the form always sends it along with the module
+    // list. Turning the flag off revokes access through the resolved list.
+    if (updateData.isHostelWarden) {
+      const base = Array.isArray(updateData.permissions)
+        ? updateData.permissions
+        : Array.isArray(staff.permissions)
+          ? staff.permissions
+          : [];
+      if (!base.includes("hostel")) {
+        updateData.permissions = [...base, "hostel"];
+      }
     }
 
     // ── 4. HANDLE PASSWORD ────────────────────────

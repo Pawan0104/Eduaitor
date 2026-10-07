@@ -23,10 +23,11 @@ import {
   FiAlertCircle,
 } from "react-icons/fi";
 import { toast } from "react-toastify";
-import { FaStudiovinari, FaUserCog } from "react-icons/fa";
+import { FaStudiovinari, FaUserCog, FaFileImport } from "react-icons/fa";
 import { useNavigate, useParams } from "react-router-dom";
 import { FaArrowLeft } from "react-icons/fa";
 import api from "../config/axios";
+import SchoolDataImport from "../components/SchoolDataImport";
 
 const fmt = (v) =>
   v
@@ -88,6 +89,7 @@ export default function SchoolDetail() {
     admin_confirm: "",
   });
   const [adminSaving, setAdminSaving] = useState(false);
+  const [showImport, setShowImport] = useState(false);
 
   useEffect(() => {
     api
@@ -609,6 +611,14 @@ export default function SchoolDetail() {
             )}
             {loadingWS ? "Loading…" : "Open"}
           </button>
+          {ws && (
+            <button
+              onClick={() => setShowImport(true)}
+              className="flex items-center gap-1.5 px-3 py-2 rounded-lg border border-indigo-200 text-indigo-600 hover:bg-indigo-50 text-sm transition"
+            >
+              <FaFileImport /> Import Data
+            </button>
+          )}
           {ws && (
             <button
               onClick={() => openAdminModal(ws.school)}
@@ -2454,6 +2464,18 @@ export default function SchoolDetail() {
             </div>
           </div>
         </div>
+      )}
+
+      {/* IMPORT DATA */}
+      {showImport && ws && (
+        <SchoolDataImport
+          school={ws.school}
+          onClose={() => setShowImport(false)}
+          onDone={() => {
+            setShowImport(false);
+            load(selId);
+          }}
+        />
       )}
     </div>
   );

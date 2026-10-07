@@ -105,6 +105,16 @@ const staffSchema = new mongoose.Schema(
       default: false,
     },
 
+    /**
+     * Set when this staff member also acts as a hostel warden.
+     * Warden duties are authorised through the "hostel" module permission,
+     * so this flag only records the extra responsibility.
+     */
+    isHostelWarden: {
+      type: Boolean,
+      default: false,
+    },
+
     // ── AUTH ──────────────────────────────────────
     username: {
       type: String,

@@ -4,6 +4,12 @@ import { toast } from "react-toastify";
 import { useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { FaArrowLeft, FaIdCard, FaPrint, FaDownload } from "react-icons/fa";
 import { useAuth } from "../context/AuthContext";
+import {
+  ID_CARD_FIELD_CONFIG,
+  mergeCardFields,
+  cardFieldLabel,
+  cardFieldValue,
+} from "../utils/idCardFields";
 
 const API = import.meta.env.VITE_API_URL;
 
@@ -15,7 +21,7 @@ const API = import.meta.env.VITE_API_URL;
  *   /school/id-card/student/:id
  *   /school/id-card/staff/:id
  *   /parent/id-card           → child's card
- * Query: ?type=student|staff&id=xxx
+ * Query: ?type=student|staff&id=xxx&model=staff|teacher|driver
  */
 export default function IdCard() {
   const navigate = useNavigate();
@@ -26,6 +32,8 @@ export default function IdCard() {
 
   const typeFromQuery = searchParams.get("type");
   const idFromQuery = searchParams.get("id");
+  // Which collection the id belongs to (staff / teacher / driver).
+  const modelFromQuery = searchParams.get("model");
 
   const role = user?.role;
   let cardType =
@@ -56,7 +64,11 @@ export default function IdCard() {
         if (personId) {
           url =
             cardType === "staff"
-              ? `${API}/id-card/staff/${personId}`
+              ? `${API}/id-card/staff/${personId}${
+                  modelFromQuery
+                    ? `?model=${encodeURIComponent(modelFromQuery)}`
+                    : ""
+                }`
               : `${API}/id-card/student/${personId}`;
         } else if (cardType === "staff" && role === "staff_admin") {
           url = `${API}/id-card/staff`;
@@ -74,7 +86,7 @@ export default function IdCard() {
       }
     };
     load();
-  }, [cardType, personId, role]);
+  }, [cardType, personId, role, modelFromQuery]);
 
   const handlePrint = () => window.print();
 
@@ -100,8 +112,16 @@ export default function IdCard() {
     );
   }
 
-  const { school, person, type, design } = payload;
+  const { school, person, type, design, personType } = payload;
   const canEditDesign = role === "school_admin";
+  const personLabel =
+    personType === "teacher"
+      ? "Teacher"
+      : personType === "driver"
+        ? "Driver"
+        : type === "staff"
+          ? "Staff"
+          : "Student";
 
   return (
     <div className="p-4 sm:p-6 lg:p-8 min-h-screen text-[rgb(var(--text))]">
@@ -117,7 +137,7 @@ export default function IdCard() {
           )}
           <h1 className="text-2xl font-bold flex items-center gap-2">
             <FaIdCard className="text-[rgb(var(--primary))]" />
-            {type === "staff" ? "Staff" : "Student"} ID Card
+            {personLabel} ID Card
           </h1>
           <p className="text-sm text-[rgb(var(--text-light))] mt-1">
             Issued on admission / registration — print or save as PDF
@@ -154,6 +174,7 @@ export default function IdCard() {
           school={school}
           person={person}
           type={type}
+          personType={personType}
           design={design}
         />
       </div>
@@ -179,7 +200,7 @@ export default function IdCard() {
   );
 }
 
-export function IdCardVisual({ school, person, type, design }) {
+export function IdCardVisual({ school, person, type, personType, design }) {
   const isStaff = type === "staff";
   const primary = design?.primaryColor || (isStaff ? "#0f766e" : "#4f46e5");
   const accent =
@@ -194,8 +215,36 @@ export function IdCardVisual({ school, person, type, design }) {
       ? ""
       : design?.logoUrl || school?.logo || "";
   const cardTitle = isStaff
-    ? design?.subtitle || "Staff Identity Card"
+    ? design?.subtitle ||
+      (personType === "teacher"
+        ? "Teacher Identity Card"
+        : personType === "driver"
+          ? "Driver Identity Card"
+          : "Staff Identity Card")
     : design?.title || "Student Identity Card";
+
+  const cardKey =
+    personType === "teacher"
+      ? "teacher"
+      : personType === "driver"
+        ? "driver"
+        : isStaff
+          ? "staff"
+          : "student";
+  const options = ID_CARD_FIELD_CONFIG[cardKey]?.options || [];
+  const fields = mergeCardFields(design?.cardFields)[cardKey];
+  const resolveField = (key, mono) => {
+    const label = cardFieldLabel(cardKey, key);
+    const value = cardFieldValue(person, cardKey, key);
+    return { key, label, value, mono };
+  };
+  const headerFields = (fields.header || []).map((k) => resolveField(k));
+  const bodyFields = (fields.body || []).map((k) =>
+    resolveField(k, k === "idNumber"),
+  );
+  const footerFields = (fields.footer || []).map((k) => resolveField(k));
+  const optionOf = (key) => options.find((o) => o.key === key);
+
   const photo =
     person.photo ||
     `https://ui-avatars.com/api/?name=${encodeURIComponent(person.name || "U")}&background=e2e8f0&color=334155&size=128`;
@@ -221,30 +270,48 @@ export function IdCardVisual({ school, person, type, design }) {
       }}
     >
       <div
-        className="px-4 py-3 flex items-center gap-3 text-white"
+        className="px-4 py-3 text-white"
         style={{
           background: `linear-gradient(135deg, ${headerColor}, ${headerColor}cc)`,
         }}
       >
-        {logo ? (
-          <img
-            src={logo}
-            alt=""
-            className="w-11 h-11 rounded-lg object-contain bg-white/90 p-0.5"
-          />
-        ) : (
-          <div className="w-11 h-11 rounded-lg bg-white/20 flex items-center justify-center text-lg font-black">
-            {(school?.name || "S").charAt(0)}
+        <div className="flex items-center gap-3">
+          {logo ? (
+            <img
+              src={logo}
+              alt=""
+              className="w-11 h-11 rounded-lg object-contain bg-white/90 p-0.5"
+            />
+          ) : (
+            <div className="w-11 h-11 rounded-lg bg-white/20 flex items-center justify-center text-lg font-black">
+              {(school?.name || "S").charAt(0)}
+            </div>
+          )}
+          <div className="min-w-0 flex-1">
+            <p className="text-sm font-black leading-tight truncate">
+              {school?.name || "School"}
+            </p>
+            <p className="text-[10px] opacity-90 uppercase tracking-wider mt-0.5">
+              {cardTitle}
+            </p>
+          </div>
+        </div>
+        {headerFields.length > 0 && (
+          <div className="mt-2 flex flex-wrap gap-1">
+            {headerFields.map((f) => {
+              const opt = optionOf(f.key);
+              const chipLabel = opt?.label || f.label;
+              return (
+                <span
+                  key={f.key}
+                  className="rounded bg-white/15 px-1.5 py-0.5 text-[8.5px] font-semibold uppercase tracking-wide"
+                >
+                  {chipLabel}: {f.value}
+                </span>
+              );
+            })}
           </div>
         )}
-        <div className="min-w-0 flex-1">
-          <p className="text-sm font-black leading-tight truncate">
-            {school?.name || "School"}
-          </p>
-          <p className="text-[10px] opacity-90 uppercase tracking-wider mt-0.5">
-            {cardTitle}
-          </p>
-        </div>
       </div>
 
       <div className="p-4 flex gap-3">
@@ -261,65 +328,38 @@ export function IdCardVisual({ school, person, type, design }) {
           <p className="text-base font-bold leading-tight" style={{ color: text }}>
             {person.name}
           </p>
-          <Row label="ID" value={person.idNumber} mono />
-          {isStaff ? (
-            <>
-              <Row label="Role" value={person.roleLabel} />
-              <Row label="Phone" value={person.phone} />
-              <Row label="Email" value={person.email} />
-              <Row
-                label="Joined"
-                value={
-                  person.joiningDate
-                    ? new Date(person.joiningDate).toLocaleDateString("en-IN")
-                    : "—"
-                }
-              />
-            </>
-          ) : (
-            <>
-              <Row
-                label="Class"
-                value={`${person.className}${
-                  person.sectionName && person.sectionName !== "—"
-                    ? ` – ${person.sectionName}`
-                    : ""
-                }`}
-              />
-              <Row label="Roll No." value={person.rollNo} />
-              <Row label="Blood" value={person.bloodGroup} />
-              <Row
-                label="DOB"
-                value={
-                  person.dob
-                    ? new Date(person.dob).toLocaleDateString("en-IN")
-                    : "—"
-                }
-              />
-              {person.house && <Row label="House" value={person.house} />}
-            </>
-          )}
+          {bodyFields.map((f) => (
+            <Row key={f.key} label={f.label} value={f.value} mono={f.mono} />
+          ))}
         </div>
       </div>
 
-      {!isStaff && (
-        <div className="px-4 pb-2 text-[10px] opacity-80">
-          <span className="font-semibold">Guardian:</span> {person.fatherName}
+      {footerFields.length > 0 && (
+        <div className="px-4 space-y-0.5">
+          {footerFields.map((f) => (
+            <Row
+              key={f.key}
+              label={f.label}
+              value={f.value}
+              muted
+              small
+            />
+          ))}
         </div>
       )}
 
-      <div className="px-4 pb-2 text-[10px] opacity-70 leading-snug">
+      <div className="px-4 mt-1 text-[10px] opacity-70 leading-snug">
         {school?.address || person.address || ""}
       </div>
 
       {design?.footerText ? (
-        <div className="px-4 pb-2 text-[9px] opacity-60 italic">
+        <div className="px-4 pb-1 text-[9px] opacity-60 italic">
           {design.footerText}
         </div>
       ) : null}
 
       <div
-        className="px-4 py-2 flex items-center justify-between text-[9px] text-white uppercase tracking-wide"
+        className="mt-1 px-4 py-2 flex items-center justify-between text-[9px] text-white uppercase tracking-wide"
         style={{ background: headerColor }}
       >
         <span>
@@ -334,10 +374,16 @@ export function IdCardVisual({ school, person, type, design }) {
   );
 }
 
-const Row = ({ label, value, mono }) => (
-  <div className="flex gap-1.5">
-    <span className="text-slate-400 shrink-0 w-12">{label}</span>
-    <span className={`font-semibold text-slate-800 truncate ${mono ? "font-mono" : ""}`}>
+const Row = ({ label, value, mono, muted, small }) => (
+  <div className="flex gap-1.5 items-baseline">
+    <span
+      className={`shrink-0 ${muted ? "opacity-80" : "text-slate-400"}`}
+    >
+      {label}
+    </span>
+    <span
+      className={`font-semibold text-slate-800 truncate ${mono ? "font-mono" : ""} ${small ? "text-[10px]" : ""}`}
+    >
       {value || "—"}
     </span>
   </div>

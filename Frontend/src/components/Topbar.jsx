@@ -1,4 +1,4 @@
-import { FaBell, FaThLarge, FaChevronLeft } from "react-icons/fa";
+import { FaBell, FaChevronLeft } from "react-icons/fa";
 import { AiOutlineLogout } from "react-icons/ai";
 import { useEffect, useState } from "react";
 import { useAuth } from "../context/AuthContext";
@@ -249,29 +249,6 @@ const Topbar = ({ menuPath = "/" }) => {
           </div>
         )}
 
-        {menuPath && (
-          <button
-            type="button"
-            onClick={() => navigate(menuPath)}
-            className={`hidden lg:flex h-10 shrink-0 items-center justify-center gap-2 rounded-2xl
-              border transition active:scale-95
-              ${onMenuHub ? "w-10 px-0" : "lg:w-auto lg:px-3"}
-              ${
-                onMenuHub
-                  ? "border-transparent bg-[rgb(var(--primary))] text-[rgb(var(--on-primary,255_255_255))] shadow-sm"
-                  : "border-[rgb(var(--border))] bg-[rgb(var(--bg))] text-[rgb(var(--primary))]"
-              }`}
-            aria-label={t("nav.home", "Home")}
-            title={t("nav.home", "Home")}
-          >
-            <FaThLarge size={14} />
-            {!onMenuHub && (
-              <span className="hidden text-[12px] font-extrabold lg:inline">
-                {t("nav.home", "Home")}
-              </span>
-            )}
-          </button>
-        )}
         {/* Home / brand — visible on all sizes so the school name stays in the top bar */}
         {menuPath && (
           <button

@@ -1,5 +1,7 @@
 import Student from "../models/student.js";
 import Staff from "../models/staff.js";
+import Teacher from "../models/teacher.js";
+import { Driver } from "../models/transport.js";
 import School from "../models/school.js";
 import { getDocumentDesign } from "./certificateController.js";
 
@@ -28,15 +30,49 @@ const ensureStudentIdCard = async (student) => {
   return student;
 };
 
-const ensureStaffIdCard = async (staff) => {
-  if (!staff.idCardIssuedAt) {
-    staff.idCardIssuedAt = staff.joiningDate || staff.createdAt || new Date();
-    await Staff.updateOne(
-      { _id: staff._id },
-      { $set: { idCardIssuedAt: staff.idCardIssuedAt } },
+/**
+ * Staff-facing ID cards are rendered for three separate collections.
+ * The caller says which one via `?model=`; "staff" remains the default so
+ * existing links and self-service cards keep working unchanged.
+ */
+const STAFF_CARD_MODELS = {
+  staff: {
+    Model: Staff,
+    personType: "staff",
+    label: "Staff member",
+    idField: "staffId",
+    nameField: "fullName",
+  },
+  teacher: {
+    Model: Teacher,
+    personType: "teacher",
+    label: "Teacher",
+    idField: "teacherId",
+    nameField: "fullName",
+  },
+  driver: {
+    Model: Driver,
+    personType: "driver",
+    label: "Driver",
+    idField: "driverId",
+    nameField: "name",
+  },
+};
+
+const resolveStaffCardModel = (raw) => {
+  const key = String(raw || "staff").trim().toLowerCase();
+  return STAFF_CARD_MODELS[key] || STAFF_CARD_MODELS.staff;
+};
+
+const ensureStaffIdCard = async (person, spec) => {
+  if (!person.idCardIssuedAt) {
+    person.idCardIssuedAt = person.joiningDate || person.createdAt || new Date();
+    await spec.Model.updateOne(
+      { _id: person._id },
+      { $set: { idCardIssuedAt: person.idCardIssuedAt } },
     );
   }
-  return staff;
+  return person;
 };
 
 /** GET /id-card/student/:id — school/teacher/parent; or omit id for logged-in student */
@@ -99,6 +135,7 @@ export const getStudentIdCard = async (req, res) => {
         bloodGroup: student.bloodGroup || "—",
         gender: student.gender || "—",
         fatherName: student.fatherName || "—",
+        motherName: student.motherName || "—",
         address: student.address || "—",
         house: student.houseId?.name || null,
         houseColor: student.houseId?.color || null,
@@ -151,44 +188,53 @@ export const getStaffIdCard = async (req, res) => {
       return res.status(403).json({ success: false, message: "Not authorized" });
     }
 
-    let staff = await Staff.findOne({ _id: staffId, schoolId }).lean();
-    if (!staff) {
-      return res.status(404).json({ success: false, message: "Staff not found" });
+    const spec = resolveStaffCardModel(req.query.model);
+
+    let person = await spec.Model.findOne({ _id: staffId, schoolId }).lean();
+    if (!person) {
+      return res
+        .status(404)
+        .json({ success: false, message: `${spec.label} not found` });
     }
 
-    staff = await ensureStaffIdCard(staff);
+    person = await ensureStaffIdCard(person, spec);
     const school = await getSchoolCard(schoolId);
     const design = await getDocumentDesign(schoolId, "id_card");
     if (design?.logoUrl && school) school.logo = design.logoUrl;
 
     const roleLabel =
-      staff.staffRole === "other"
-        ? staff.staffRoleCustom || "Staff"
-        : staff.staffRole
-          ? staff.staffRole.charAt(0).toUpperCase() + staff.staffRole.slice(1)
-          : "Staff";
+      spec.personType === "teacher"
+        ? person.designation || "Teacher"
+        : spec.personType === "driver"
+          ? "Driver"
+          : person.staffRole === "other"
+            ? person.staffRoleCustom || "Staff"
+            : person.staffRole
+              ? person.staffRole.charAt(0).toUpperCase() + person.staffRole.slice(1)
+              : "Staff";
 
     return res.json({
       success: true,
       type: "staff",
+      personType: spec.personType,
       school,
       design,
       person: {
-        _id: staff._id,
-        name: staff.fullName,
-        idNumber: staff.staffId,
-        photo: staff.photo?.url || "",
+        _id: person._id,
+        name: person[spec.nameField] || "",
+        idNumber: person[spec.idField] || "",
+        photo: person.photo?.url || "",
         roleLabel,
-        email: staff.email || "—",
-        phone: staff.phone || "—",
-        dob: staff.dob || null,
-        gender: staff.gender || "—",
-        address: staff.address || "—",
-        employmentType: staff.employmentType || "—",
-        joiningDate: staff.joiningDate || null,
-        issuedAt: staff.idCardIssuedAt,
-        validSession: staff.joiningDate
-          ? new Date(staff.joiningDate).getFullYear()
+        email: person.email || "—",
+        phone: person.phone || "—",
+        dob: person.dob || null,
+        gender: person.gender || "—",
+        address: person.address || "—",
+        employmentType: person.employmentType || "—",
+        joiningDate: person.joiningDate || null,
+        issuedAt: person.idCardIssuedAt,
+        validSession: person.joiningDate
+          ? new Date(person.joiningDate).getFullYear()
           : new Date().getFullYear(),
       },
     });

@@ -6,6 +6,11 @@ import { FaArrowLeft, FaRedo, FaSave, FaUpload, FaTrash } from "react-icons/fa";
 import CertificatePreview from "./CertificatePreview";
 import { IdCardVisual } from "./IdCard";
 import { useAuth } from "../context/AuthContext";
+import {
+  ID_CARD_FIELD_CONFIG,
+  ID_CARD_ZONES,
+  mergeCardFields,
+} from "../utils/idCardFields";
 
 const API = import.meta.env.VITE_API_URL;
 
@@ -32,6 +37,7 @@ const EMPTY = {
   borderColor: "",
   textColor: "#0f172a",
   logoUrl: "",
+  cardFields: {},
 };
 
 export default function CertificateSettings() {
@@ -46,6 +52,7 @@ export default function CertificateSettings() {
   const [placeholders, setPlaceholders] = useState([]);
   const [presets, setPresets] = useState([]);
   const [activePreset, setActivePreset] = useState(null);
+  const [previewCardKey, setPreviewCardKey] = useState("student");
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [uploading, setUploading] = useState(false);
@@ -69,8 +76,13 @@ export default function CertificateSettings() {
       ]);
       setPlaceholders(metaRes.data.placeholders || []);
       setPresets(metaRes.data.presets || []);
-      setForm({ ...EMPTY, ...(tplRes.data.template || {}) });
+      setForm({
+        ...EMPTY,
+        ...(tplRes.data.template || {}),
+        cardFields: mergeCardFields(tplRes.data.template?.cardFields),
+      });
       setActivePreset(null);
+      setPreviewCardKey("student");
     } catch (err) {
       toast.error(err.response?.data?.message || "Failed to load template");
     } finally {
@@ -119,7 +131,11 @@ export default function CertificateSettings() {
         {},
         { withCredentials: true },
       );
-      setForm({ ...EMPTY, ...(data.template || {}) });
+      setForm({
+        ...EMPTY,
+        ...(data.template || {}),
+        cardFields: mergeCardFields(data.template?.cardFields),
+      });
       setActivePreset(null);
       toast.success("Reset to default");
     } catch (err) {
@@ -137,7 +153,11 @@ export default function CertificateSettings() {
         { presetId },
         { withCredentials: true },
       );
-      setForm({ ...EMPTY, ...(data.template || {}) });
+      setForm({
+        ...EMPTY,
+        ...(data.template || {}),
+        cardFields: mergeCardFields(data.template?.cardFields),
+      });
       setActivePreset(presetId);
       toast.success("Template applied — you can still tweak colors & text");
     } catch (err) {
@@ -161,7 +181,11 @@ export default function CertificateSettings() {
           headers: { "Content-Type": "multipart/form-data" },
         },
       );
-      setForm({ ...EMPTY, ...(data.template || {}) });
+      setForm({
+        ...EMPTY,
+        ...(data.template || {}),
+        cardFields: mergeCardFields(data.template?.cardFields),
+      });
       toast.success("Logo uploaded");
     } catch (err) {
       toast.error(err.response?.data?.message || "Logo upload failed");
@@ -178,7 +202,11 @@ export default function CertificateSettings() {
         `${API}/certificates/templates/${type}/logo`,
         { withCredentials: true },
       );
-      setForm({ ...EMPTY, ...(data.template || {}) });
+      setForm({
+        ...EMPTY,
+        ...(data.template || {}),
+        cardFields: mergeCardFields(data.template?.cardFields),
+      });
       toast.success("Custom logo cleared");
     } catch (err) {
       toast.error(err.response?.data?.message || "Failed to clear logo");
@@ -228,21 +256,67 @@ export default function CertificateSettings() {
     };
   }, [form, previewSchool]);
 
-  const samplePerson = {
-    name: "Aarav Sharma",
-    idNumber: "STU001",
-    photo: "",
-    roleLabel: "Student",
-    className: "Class 8",
-    sectionName: "A",
-    rollNo: "12",
-    bloodGroup: "B+",
-    dob: "2012-01-12",
-    fatherName: "Rakesh Sharma",
-    address: previewSchool.address || "City, State",
-    house: "Blue",
-    issuedAt: new Date().toISOString(),
-    validSession: new Date().getFullYear(),
+  const samplePeople = {
+    student: {
+      name: "Aarav Sharma",
+      idNumber: "STU001",
+      photo: "",
+      roleLabel: "Student",
+      className: "Class 8",
+      sectionName: "A",
+      rollNo: "12",
+      bloodGroup: "B+",
+      dob: "2012-01-12",
+      gender: "Male",
+      fatherName: "Rakesh Sharma",
+      motherName: "Neha Sharma",
+      address: previewSchool.address || "City, State",
+      house: "Blue",
+      issuedAt: new Date().toISOString(),
+      validSession: new Date().getFullYear(),
+    },
+    staff: {
+      name: "Meera Iyer",
+      idNumber: "STF001",
+      photo: "",
+      roleLabel: "Accountant",
+      phone: "98765 43210",
+      email: "meera@school.com",
+      dob: "1990-08-14",
+      gender: "Female",
+      address: previewSchool.address || "City, State",
+      employmentType: "Full-time",
+      joiningDate: "2023-04-01",
+      issuedAt: new Date().toISOString(),
+      validSession: new Date().getFullYear(),
+    },
+    teacher: {
+      name: "Rahul Verma",
+      idNumber: "TCH0001",
+      photo: "",
+      roleLabel: "PGT Mathematics",
+      phone: "98765 12345",
+      email: "rahul@school.com",
+      dob: "1988-02-20",
+      gender: "Male",
+      address: previewSchool.address || "City, State",
+      employmentType: "Full-time",
+      joiningDate: "2021-06-10",
+      issuedAt: new Date().toISOString(),
+      validSession: new Date().getFullYear(),
+    },
+    driver: {
+      name: "Suresh Kumar",
+      idNumber: "DRV003",
+      photo: "",
+      roleLabel: "Driver",
+      phone: "98111 22334",
+      gender: "Male",
+      address: previewSchool.address || "City, State",
+      joiningDate: "2022-01-15",
+      issuedAt: new Date().toISOString(),
+      validSession: new Date().getFullYear(),
+    },
   };
 
   return (
@@ -582,6 +656,15 @@ export default function CertificateSettings() {
                 Show border
               </label>
             </div>
+
+            {kind === "id_card" && (
+              <CardFieldsEditor
+                config={form.cardFields}
+                onChange={(next) => setField("cardFields", next)}
+                cardKey={previewCardKey}
+                onCardKey={setPreviewCardKey}
+              />
+            )}
           </div>
 
           <div className="space-y-3">
@@ -598,8 +681,11 @@ export default function CertificateSettings() {
                 <div className="flex justify-center py-4">
                   <IdCardVisual
                     school={previewSchool}
-                    person={samplePerson}
-                    type="student"
+                    person={samplePeople[previewCardKey]}
+                    type={previewCardKey === "student" ? "student" : "staff"}
+                    personType={
+                      previewCardKey === "student" ? undefined : previewCardKey
+                    }
                     design={form}
                   />
                 </div>
@@ -700,6 +786,76 @@ function ReportCardDesignPreview({ school, design }) {
         <div className="border-t pt-1" style={{ borderColor: `${text}44` }}>
           {design?.signatoryDesignation || "Principal"}
         </div>
+      </div>
+    </div>
+  );
+}
+
+function CardFieldsEditor({ config, onChange, cardKey, onCardKey }) {
+  const merged = mergeCardFields(config);
+  const zones = merged[cardKey];
+  const toggle = (zoneKey, fieldKey) => {
+    const current = zones[zoneKey] || [];
+    const next = current.includes(fieldKey)
+      ? current.filter((k) => k !== fieldKey)
+      : [...current, fieldKey];
+    onChange({ ...merged, [cardKey]: { ...zones, [zoneKey]: next } });
+  };
+  return (
+    <div className="space-y-3 rounded-2xl border border-[rgb(var(--border))] bg-[rgb(var(--bg))] p-3">
+      <div>
+        <p className="text-sm font-bold text-[rgb(var(--text))]">Card fields</p>
+        <p className="text-xs text-[rgb(var(--text-muted))]">
+          Choose which data fields appear in the header, body, and footer of
+          each card — the preview updates as you tick fields.
+        </p>
+      </div>
+      <div className="flex flex-wrap gap-1 rounded-lg border border-[rgb(var(--border))] p-1">
+        {Object.keys(ID_CARD_FIELD_CONFIG).map((key) => (
+          <button
+            key={key}
+            type="button"
+            onClick={() => onCardKey(key)}
+            className={`rounded-md px-2.5 py-1.5 text-xs font-bold transition ${
+              cardKey === key
+                ? "bg-[rgb(var(--primary))] text-white"
+                : "text-[rgb(var(--text))]"
+            }`}
+          >
+            {ID_CARD_FIELD_CONFIG[key].label}
+          </button>
+        ))}
+      </div>
+      <div className="grid gap-3 sm:grid-cols-3">
+        {ID_CARD_ZONES.map((zone) => (
+          <div
+            key={zone.id}
+            className="rounded-xl border border-[rgb(var(--border))] p-2.5"
+          >
+            <p className="mb-2 text-xs font-bold uppercase tracking-wide text-[rgb(var(--text-muted))]">
+              {zone.label}
+            </p>
+            <div className="space-y-1.5">
+              {ID_CARD_FIELD_CONFIG[cardKey].options.map((opt) => {
+                const checked = zones[zone.id]?.includes(opt.key);
+                return (
+                  <label
+                    key={opt.key}
+                    className="flex items-center gap-2 text-sm text-[rgb(var(--text))]"
+                  >
+                    <input
+                      type="checkbox"
+                      checked={!!checked}
+                      onChange={() => toggle(zone.id, opt.key)}
+                      className="shrink-0"
+                    />
+                    <span className="truncate">{opt.label}</span>
+                  </label>
+                );
+              })}
+            </div>
+          </div>
+        ))}
       </div>
     </div>
   );

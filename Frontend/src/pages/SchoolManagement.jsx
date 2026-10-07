@@ -1,9 +1,10 @@
 import { useEffect, useState } from "react";
-import { FaPlus, FaEye, FaEdit, FaTrash, FaArrowLeft, FaLock, FaKey } from "react-icons/fa";
+import { FaPlus, FaEye, FaEdit, FaTrash, FaArrowLeft, FaLock, FaKey, FaFileImport } from "react-icons/fa";
 import { useNavigate } from "react-router-dom";
 import { toast } from "react-toastify";
 import { MODULES, MODULE_KEYS } from "../constants/module.js"; 
 import api from "../config/axios";
+import SchoolDataImport from "../components/SchoolDataImport";
 
 const SchoolManagement = () => {
   const navigate = useNavigate();
@@ -40,6 +41,8 @@ const SchoolManagement = () => {
   const [confirmModal, setConfirmModal] = useState(false);
   const [confirmMessage, setConfirmMessage] = useState("");
   const [confirmAction, setConfirmAction] = useState(null);
+
+  const [importSchool, setImportSchool] = useState(null);
 
   /* ── FETCH ──────────────────────────────────────── */
   const fetchSchools = async () => {
@@ -362,6 +365,13 @@ const SchoolManagement = () => {
                         <FaEye />
                       </button>
                       <button
+                        onClick={() => setImportSchool(school)}
+                        className="text-emerald-500 hover:text-emerald-700 transition hover:scale-110"
+                        title="Import Data"
+                      >
+                        <FaFileImport />
+                      </button>
+                      <button
                         onClick={() => editSchool(school)}
                         className="text-blue-500 hover:text-blue-700 transition hover:scale-110"
                         title="Edit"
@@ -618,6 +628,15 @@ const SchoolManagement = () => {
             </div>
           </div>
         </div>
+      )}
+
+      {/* ── IMPORT DATA POPUP ────────────────────────────── */}
+      {importSchool && (
+        <SchoolDataImport
+          school={importSchool}
+          onClose={() => setImportSchool(null)}
+          onDone={() => setImportSchool(null)}
+        />
       )}
 
       {/* ── CONFIRM POPUP ────────────────────────────── */}

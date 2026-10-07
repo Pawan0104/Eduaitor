@@ -5,6 +5,7 @@ import { toast } from "react-toastify";
 import { MODULES, MODULE_KEYS } from "../constants/module.js";
 import api from "../config/axios";
 import LoadingSpinner from "../components/LoadingSpinner";
+import SchoolDataImport from "../components/SchoolDataImport";
 
 const AddSchool = () => {
   const navigate = useNavigate();
@@ -27,6 +28,10 @@ const AddSchool = () => {
 
   const [subscriptions, setSubscriptions] = useState([]);
   const [loading, setLoading] = useState(false);
+
+  // after the school is created, offer Excel data import
+  const [createdSchool, setCreatedSchool] = useState(null);
+  const [showImport, setShowImport] = useState(false);
 
   // ── MODULES STATE ─────────────────────────────────
   // New schools get ALL modules by default; super admin deselects to restrict.
@@ -143,10 +148,18 @@ const AddSchool = () => {
       }
 
       // Shared api client attaches Bearer token (required on Netlify → Render)
-      await api.post(`/schools`, formData);
+      const res = await api.post(`/schools`, formData);
 
+      const created = res.data?.data;
       toast.success("School created successfully");
-      navigate("/schools");
+
+      // offer Excel import right away; otherwise go straight to the list
+      if (created?._id) {
+        setCreatedSchool(created);
+        setShowImport(true);
+      } else {
+        navigate("/schools");
+      }
     } catch (err) {
       toast.error(err.response?.data?.message || "Error creating school");
     } finally {
@@ -464,6 +477,21 @@ const AddSchool = () => {
           </div>
         </div>
       </div>
+
+      {/* ── IMPORT DATA (shown right after school is created) ── */}
+      {showImport && createdSchool && (
+        <SchoolDataImport
+          school={createdSchool}
+          onClose={() => {
+            setShowImport(false);
+            navigate("/schools");
+          }}
+          onDone={() => {
+            setShowImport(false);
+            navigate("/schools");
+          }}
+        />
+      )}
     </>
   );
 };

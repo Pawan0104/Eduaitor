@@ -62,6 +62,34 @@ const CHARACTER_BODY_BRIEF = `{{schoolName}} certifies that {{studentName}} ({{s
 Issued on {{issueDate}}.
 {{remarks}}`;
 
+/**
+ * Default ID card field layout per card type. Each zone lists field keys
+ * rendered on the card: header → chips under the school name, body → rows
+ * beside the photo, footer → muted rows above the school address.
+ */
+export const ID_CARD_FIELD_DEFAULTS = {
+  student: {
+    header: [],
+    body: ["idNumber", "className", "rollNo", "bloodGroup", "dob", "house"],
+    footer: ["fatherName"],
+  },
+  staff: {
+    header: [],
+    body: ["idNumber", "roleLabel", "phone", "email", "joiningDate"],
+    footer: [],
+  },
+  teacher: {
+    header: [],
+    body: ["idNumber", "roleLabel", "phone", "email", "joiningDate"],
+    footer: [],
+  },
+  driver: {
+    header: [],
+    body: ["idNumber", "roleLabel", "phone", "joiningDate"],
+    footer: [],
+  },
+};
+
 export const DEFAULT_TEMPLATES = {
   transfer: {
     title: "TRANSFER CERTIFICATE",
@@ -94,6 +122,7 @@ export const DEFAULT_TEMPLATES = {
     accentColor: "#0f766e",
     backgroundColor: "#ffffff",
     borderStyle: "modern",
+    cardFields: ID_CARD_FIELD_DEFAULTS,
   },
   report_card: {
     title: "PROGRESS REPORT",

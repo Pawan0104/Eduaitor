@@ -79,6 +79,12 @@ const productionAllowedOrigins = () => {
     "https://127.0.0.1:5173",
     "https://127.0.0.1:5174",
     "https://127.0.0.1:5175",
+    // Vite preview (localhost:4173) — used to smoke-test production builds
+    // against the Render API without deploying.
+    "http://localhost:4173",
+    "http://127.0.0.1:4173",
+    "https://localhost:4173",
+    "https://127.0.0.1:4173",
     "http://10.0.2.2",
   ]);
 };

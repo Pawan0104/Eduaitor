@@ -63,7 +63,7 @@ import CommerceOrders from "./pages/CommerceOrders";
 import Syllabus from "./pages/Syllabus";
 import SyllabusCatalogAdmin from "./pages/SyllabusCatalogAdmin";
 import SyllabusBooksViewer from "./pages/SyllabusBooksViewer";
-import AttendanceReportPrincipal from "./pages/AttendanceReportPrincipal";
+import ClassAttendanceReportPrincipal from "./pages/ClassAttendanceReportPrincipal";
 import Calendar from "./pages/Calendar";
 import Group from "./pages/Group";
 import DiaryPrincipal from "./pages/DiaryPrincipal";
@@ -216,7 +216,7 @@ const App = () => {
           <Route path="class-view/:id" element={<ClassView />} />
           <Route path="subject" element={<Subject />} />
           <Route path="syllabus" element={<Syllabus />} />
-          <Route path="attendance" element={<AttendanceReportPrincipal />} />
+          <Route path="attendance" element={<ClassAttendanceReportPrincipal />} />
           <Route
             path="attendance/student/:studentId"
             element={<StudentAttendanceDetail />}
