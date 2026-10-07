@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Keeps resources referenced only at runtime (Capacitor splash config looks
+     up "splash" by resource name) so shrinkResources does not strip them. -->
+<resources xmlns:tools="http://schemas.android.com/tools"
+    tools:keep="@drawable/splash,@drawable/ic_launcher_background,@drawable/ic_launcher_foreground,@layout/activity_main"
+    tools:shrinkMode="safe" />
