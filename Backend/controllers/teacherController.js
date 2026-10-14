@@ -9,6 +9,10 @@ import {
   syncTeacherGroups,
   removeTeacherFromOldGroups,
 } from "../utils/groupSync.js";
+import {
+  syncTeacherToClasses,
+  removeTeacherFromClasses,
+} from "../utils/teacherClassSync.js";
 import { resolveRolePermissions } from "../utils/resolveRolePermissions.js";
 import { notifyCredentialsAsync } from "../services/credentials/notifyCredentials.js";
 import {
@@ -171,7 +175,16 @@ export const createTeacher = async (req, res) => {
     // Sync teacher groups based on assigned classes and subjects
     await syncTeacherGroups(teacher);
 
+    // Replicate class/subject assignments into the class-side records so
+    // attendance, timetable and subject pages pick them up.
+    try {
+      await syncTeacherToClasses(teacher);
+    } catch (syncErr) {
+      console.error("Teacher -> class assignment sync failed:", syncErr);
+    }
+
     const populated = await Teacher.findById(teacher._id)
+      .select("-password -temp_password")
       .populate("customRoleId", "name permissions isActive")
       .lean();
 
@@ -240,6 +253,7 @@ export const getTeachers = async (req, res) => {
     }
 
     const teachers = await Teacher.find({ schoolId })
+      .select("-password -temp_password")
       .populate("assignedClasses", "name className section")
       .populate("subjects", "name")
       .populate("customRoleId", "name permissions isActive")
@@ -278,6 +292,7 @@ export const getTeacher = async (req, res) => {
     }
 
     const teacher = await Teacher.findOne({ _id: req.params.id, schoolId })
+      .select("-password -temp_password")
       .populate("assignedClasses", "name className section")
       .populate("subjects", "name")
       .populate("customRoleId", "name permissions isActive")
@@ -383,8 +398,16 @@ export const updateTeacher = async (req, res) => {
 
     // Only hash password if a new one was actually provided
     if (safeBody.password && safeBody.password.trim() !== "") {
-      safeBody.temp_password = safeBody.password;
-      safeBody.password = await bcrypt.hash(safeBody.password, 10);
+      // Guard against an already-hashed value being echoed back (e.g. an edit
+      // form that prefilled the stored bcrypt hash) — re-hashing it would
+      // silently change the teacher's password.
+      if (/^\$2[aby]\$\d{2}\$/.test(safeBody.password.trim())) {
+        delete safeBody.password;
+        delete safeBody.temp_password;
+      } else {
+        safeBody.temp_password = safeBody.password;
+        safeBody.password = await bcrypt.hash(safeBody.password, 10);
+      }
     } else {
       delete safeBody.password;
       delete safeBody.temp_password;
@@ -504,6 +527,7 @@ export const updateTeacher = async (req, res) => {
       { $set: updateData },
       { returnDocument: "after" },
     )
+      .select("-password -temp_password")
       .populate("assignedClasses", "name className section")
       .populate("customRoleId", "name permissions isActive");
 
@@ -514,6 +538,16 @@ export const updateTeacher = async (req, res) => {
     if (classesChanged) {
       await removeTeacherFromOldGroups(oldTeacher);
       await syncTeacherGroups(updatedTeacher);
+    }
+
+    // Keep the class-side records (class teacher + subject teachers) in sync
+    // with whatever the teacher form was just saved with.
+    try {
+      await syncTeacherToClasses(updatedTeacher, {
+        previousSubjects: oldTeacher.subjects,
+      });
+    } catch (syncErr) {
+      console.error("Teacher -> class assignment sync failed:", syncErr);
     }
 
     const data = updatedTeacher.toObject();
@@ -598,6 +632,13 @@ export const deleteTeacher = async (req, res) => {
       },
     );
 
+    // Drop the teacher from every class-side record (class teacher + subjects).
+    try {
+      await removeTeacherFromClasses(teacher._id, schoolId);
+    } catch (syncErr) {
+      console.error("Teacher -> class assignment cleanup failed:", syncErr);
+    }
+
     await teacher.deleteOne();
 
     res.json({
@@ -634,6 +675,7 @@ export const getAllTeachers = async (req, res) => {
     }
 
     const teachers = await Teacher.find({ schoolId })
+      .select("-password -temp_password")
       .populate("assignedClasses", "name className section")
       .populate("subjects", "name")
       .sort({ createdAt: -1 });

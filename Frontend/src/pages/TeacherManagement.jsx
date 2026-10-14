@@ -288,6 +288,9 @@ customRoleId: "",
           subjects: (t.subjects || []).map((s) =>
             typeof s === "object" ? s._id : s,
           ),
+          // Never prefill the stored (hashed) password on edit — an empty
+          // field means "keep the current password".
+          password: "",
         });
       } catch {
         toast.error("Failed to load teacher");
