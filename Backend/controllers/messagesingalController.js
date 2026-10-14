@@ -9,6 +9,12 @@ import Section from "../models/section.js";
 import { ensureSuperAdminParticipant } from "../models/superAdmin.js";
 import { SUPER_ADMIN_PARTICIPANT_ID } from "../constants/superAdminParticipant.js";
 import { uploadToCloudinary } from "../utils/uploadToCloudinary.js";
+import {
+  mirrorDirectMessageToCounterpart,
+  notifyStudentOfMessage,
+  getParticipantDisplayName,
+  buildMessagePreview,
+} from "../utils/messageNotifier.js";
 
 // ─────────────────────────────────────────────────────────────
 // HELPER — extract logged-in user info from JWT (req.user)
@@ -1243,6 +1249,58 @@ export const sendMessage = async (req, res) => {
       lastMessageSenderId: caller.participantId,
       lastMessageSenderSubType: caller.subType,
     });
+
+    // ── Mirror school→student msgs to the parent inbox + notify ──
+    // School/teacher/staff → student (or → parent) conversations are
+    // duplicated into the counterpart thread so the parent and student
+    // both see the same conversation, and the student is notified.
+    try {
+      const recipient = thread.participants.find(
+        (p) =>
+          !(
+            String(p.participantId) === String(caller.participantId) &&
+            (p.subType || "default") === (caller.subType || "default")
+          ),
+      );
+
+      if (
+        recipient &&
+        recipient.participantModel === "Student" &&
+        caller.participantModel !== "Student"
+      ) {
+        await mirrorDirectMessageToCounterpart({
+          thread,
+          sender: caller,
+          text: text?.trim() || "",
+          attachment: file
+            ? {
+                url: attachment.url,
+                public_id: attachment.public_id,
+                type: attachment.type,
+                name: attachment.name,
+              }
+            : undefined,
+        });
+
+        const senderName = await getParticipantDisplayName({
+          participantModel: caller.participantModel,
+          participantId: caller.participantId,
+        });
+
+        await notifyStudentOfMessage({
+          schoolId: caller.schoolId,
+          studentId: recipient.participantId,
+          senderName,
+          preview: buildMessagePreview(text, file ? attachment : null),
+          systemKey: `msg-thread-${threadId}-${recipient.participantId}`,
+        });
+      }
+    } catch (sideEffectError) {
+      console.error(
+        "⚠️ message mirror/notify failed:",
+        sideEffectError.message,
+      );
+    }
 
     return res.status(201).json({
       success: true,

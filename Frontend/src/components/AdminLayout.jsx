@@ -1,5 +1,6 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Outlet } from "react-router-dom";
+import axios from "axios";
 import {
   FaThLarge,
   FaUserGraduate,
@@ -22,6 +23,7 @@ import ProfileSheet from "./ProfileSheet";
 import DomI18n from "./DomI18n";
 import { useAuth } from "../context/AuthContext";
 import { useLanguage } from "../context/LanguageContext";
+import { API } from "../config/api";
 
 /* ─── Role → menu hub path ──────────────────────────────────── */
 export const getMenuPath = (role, loginAs) => {
@@ -140,13 +142,54 @@ const getNavItems = (role, loginAs, openProfile, tn) => {
 
 const AdminLayout = () => {
   const [showProfile, setShowProfile] = useState(false);
+  const [unreadMessages, setUnreadMessages] = useState(0);
   const { user } = useAuth();
   const { tn } = useLanguage();
 
   const menuPath = getMenuPath(user?.role, user?.loginAs);
   const navItems = getNavItems(user?.role, user?.loginAs, () =>
     setShowProfile(true), tn
+  ).map((item) =>
+    item.path &&
+    item.path.endsWith("/messages") &&
+    unreadMessages > 0
+      ? { ...item, badge: unreadMessages }
+      : item,
   );
+
+  // Poll the messages inbox so the Chat nav item shows an unread badge
+  // (bell notifications are handled separately by the Topbar).
+  useEffect(() => {
+    let cancelled = false;
+
+    const load = async () => {
+      if (document.hidden) return;
+      try {
+        const res = await axios.get(`${API}/message-signal/threads`, {
+          withCredentials: true,
+        });
+        const total = (res.data?.threads || []).reduce(
+          (sum, t) => sum + (Number(t?.unreadCount) || 0),
+          0,
+        );
+        if (!cancelled) setUnreadMessages(total);
+      } catch {
+        // best-effort badge — ignore network/permission errors
+      }
+    };
+
+    load();
+    const id = setInterval(load, 30000);
+    const onFocus = () => load();
+    window.addEventListener("focus", onFocus);
+    document.addEventListener("visibilitychange", onFocus);
+    return () => {
+      cancelled = true;
+      clearInterval(id);
+      window.removeEventListener("focus", onFocus);
+      document.removeEventListener("visibilitychange", onFocus);
+    };
+  }, []);
 
   return (
     <div className="app-shell h-screen bg-[rgb(var(--bg))] overflow-hidden flex flex-col">
@@ -155,7 +198,7 @@ const AdminLayout = () => {
       <div className="flex flex-1 overflow-hidden min-h-0">
         {/* Desktop Sidebar only — mobile uses Menu hub + bottom nav */}
         <aside className="hidden lg:flex w-70 shrink-0">
-          <Sidebar />
+          <Sidebar unreadMessages={unreadMessages} />
         </aside>
 
         <main className="app-main flex-1 overflow-y-auto overscroll-y-contain">

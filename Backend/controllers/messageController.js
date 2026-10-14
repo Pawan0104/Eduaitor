@@ -3,6 +3,10 @@ import Message from "../models/message.js";
 import Group from "../models/group.js";
 import { uploadToCloudinary } from "../utils/uploadToCloudinary.js";
 import { deleteFromCloudinary } from "../utils/deleteFromCloudinary.js";
+import {
+  notifyGroupStudentsOfMessage,
+  buildMessagePreview,
+} from "../utils/messageNotifier.js";
 
 // ─── Auth normalizer ───────────────────────────────────────────
 
@@ -127,6 +131,22 @@ export const sendMessage = async (req, res) => {
       updatedAt: new Date(),
       lastMessage: text || "📎 Attachment",
     });
+
+    // Notify student members so they see the bell/unread badge
+    try {
+      await notifyGroupStudentsOfMessage({
+        schoolId,
+        group,
+        sender: { userId, userType },
+        preview: buildMessagePreview(text, fileData),
+        systemKey: `msg-group-${groupId}`,
+      });
+    } catch (sideEffectError) {
+      console.error(
+        "⚠️ group message notify failed:",
+        sideEffectError.message,
+      );
+    }
 
     res.status(201).json({
       success: true,

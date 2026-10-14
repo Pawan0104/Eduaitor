@@ -95,7 +95,7 @@ const UpgradePopup = ({ moduleName, onClose }) => {
   );
 };
 
-const Sidebar = ({ closeSidebar }) => {
+const Sidebar = ({ closeSidebar, unreadMessages = 0 }) => {
   const { user, setUser } = useAuth();
   const { t, tn } = useLanguage();
   const navigate = useNavigate();
@@ -105,6 +105,20 @@ const Sidebar = ({ closeSidebar }) => {
   const [upgradePopup, setUpgradePopup] = useState(null); // stores { moduleName }
 
   const role = user?.role;
+
+  // Path of this role's Messages page — used to show the unread badge
+  const messagesPath =
+    role === "teacher_admin"
+      ? "/teacher/messages"
+      : role === "school_admin"
+        ? "/school/messages"
+        : role === "staff_admin"
+          ? "/staff/messages"
+          : role === "student_admin"
+            ? user?.loginAs === "parent"
+              ? "/parent/messages"
+              : "/student/messages"
+            : null;
 
   const subscribedModules = user?.subscribed_modules || [];
   const needsModuleCheck = role !== "super_admin";
@@ -1015,12 +1029,16 @@ const Sidebar = ({ closeSidebar }) => {
                     {tn(item.name)}
                   </span>
                 </div>
-                {!isSubscribed && (
+                {!isSubscribed ? (
                   <FaLock
                     size={10}
                     className="text-[rgb(var(--sidebar-text))] opacity-70 shrink-0"
                   />
-                )}
+                ) : item.path === messagesPath && unreadMessages > 0 ? (
+                  <span className="shrink-0 min-w-[18px] h-[18px] px-1 rounded-full bg-red-500 text-white text-[9px] font-bold flex items-center justify-center">
+                    {unreadMessages > 9 ? "9+" : unreadMessages}
+                  </span>
+                ) : null}
               </div>
             );
           })}

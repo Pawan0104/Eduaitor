@@ -40,7 +40,7 @@ const BottomNav = ({ items = [], className = "" }) => {
                 ${isActive ? "bg-[rgba(var(--primary),0.1)]" : ""}`}
             >
               <span
-                className={`flex h-8 w-8 items-center justify-center rounded-xl text-[16px] transition-all
+                className={`relative flex h-8 w-8 items-center justify-center rounded-xl text-[16px] transition-all
                   ${
                     isActive
                       ? "bg-[rgb(var(--primary))] text-[rgb(var(--on-primary,255_255_255))] shadow-md"
@@ -48,6 +48,15 @@ const BottomNav = ({ items = [], className = "" }) => {
                   }`}
               >
                 {item.icon}
+                {item.badge > 0 && (
+                  <span
+                    className="absolute -top-1 -right-1 min-w-[16px] h-4 px-1 rounded-full bg-red-500
+                      text-white text-[9px] font-bold flex items-center justify-center
+                      ring-2 ring-[rgb(var(--surface))]"
+                  >
+                    {item.badge > 9 ? "9+" : item.badge}
+                  </span>
+                )}
               </span>
               <span
                 className={`max-w-full truncate text-[10px] font-bold leading-tight
