@@ -9,6 +9,55 @@ const normalizeCode = (code) => {
   return value || undefined;
 };
 
+/**
+ * A hostel can have multiple wardens. Accepts the new `wardens[]` payload and
+ * falls back to the legacy single warden* fields so older clients keep working.
+ */
+const normalizeWardens = (input) => {
+  if (input === undefined) return undefined;
+  if (!Array.isArray(input)) return [];
+
+  const seenIds = new Set();
+  const wardens = [];
+
+  for (const raw of input) {
+    if (!raw) continue;
+    const wardenId =
+      raw.wardenId || raw._id || raw.id || null;
+    const name = String(
+      raw.name || raw.fullName || raw.wardenName || ""
+    ).trim();
+    const phone = String(raw.phone || raw.wardenPhone || "").trim();
+
+    // Skip empty rows (no id and no name).
+    if (!wardenId && !name) continue;
+
+    // Never assign the same person twice.
+    const key = wardenId ? String(wardenId) : `name:${name.toLowerCase()}`;
+    if (seenIds.has(key)) continue;
+    seenIds.add(key);
+
+    wardens.push({
+      wardenId: wardenId || null,
+      wardenType: raw.wardenType === "teacher" ? "teacher" : "staff",
+      name,
+      phone,
+      assignedAt: raw.assignedAt ? new Date(raw.assignedAt) : new Date(),
+    });
+  }
+
+  return wardens;
+};
+
+/** Keep the legacy flat warden fields pointed at the first warden. */
+const syncLegacyWardenFields = (hostel) => {
+  const primary = hostel.wardens?.[0];
+  hostel.wardenName = primary?.name || "";
+  hostel.wardenPhone = primary?.phone || "";
+  hostel.wardenId = primary?.wardenId || null;
+  hostel.wardenType = primary?.wardenType || "staff";
+};
+
 /* ---------------- LIST HOSTELS ---------------- */
 export const getHostels = async (req, res, next) => {
   try {
@@ -32,6 +81,7 @@ export const getHostels = async (req, res, next) => {
         { name: { $regex: q, $options: "i" } },
         { code: { $regex: q, $options: "i" } },
         { wardenName: { $regex: q, $options: "i" } },
+        { "wardens.name": { $regex: q, $options: "i" } },
         { address: { $regex: q, $options: "i" } },
       ];
     }
@@ -88,6 +138,7 @@ export const createHostel = async (req, res, next) => {
       wardenPhone,
       wardenId,
       wardenType,
+      wardens,
       description,
       status,
     } = req.body;
@@ -118,10 +169,21 @@ export const createHostel = async (req, res, next) => {
       status: status || "Active",
     };
 
+    // New multi-warden payload wins; otherwise build one from the legacy fields.
+    let normalizedWardens = normalizeWardens(wardens);
+    if (normalizedWardens === undefined) {
+      normalizedWardens = normalizeWardens([
+        { wardenId, wardenType, name: wardenName, phone: wardenPhone },
+      ]);
+    }
+    payload.wardens = normalizedWardens || [];
+
     const normalizedCode = normalizeCode(code);
     if (normalizedCode) payload.code = normalizedCode;
 
-    const hostel = await Hostel.create(payload);
+    const hostel = new Hostel(payload);
+    syncLegacyWardenFields(hostel);
+    await hostel.save();
 
     return res.status(201).json({
       success: true,
@@ -166,6 +228,7 @@ export const updateHostel = async (req, res, next) => {
       wardenPhone,
       wardenId,
       wardenType,
+      wardens,
       description,
       status,
     } = req.body;
@@ -203,6 +266,45 @@ export const updateHostel = async (req, res, next) => {
     }
     if (wardenType !== undefined) {
       hostel.wardenType = wardenType === "teacher" ? "teacher" : "staff";
+    }
+
+    const normalizedWardens = normalizeWardens(wardens);
+    if (normalizedWardens !== undefined) {
+      // Explicit multi-warden list replaces the whole set.
+      hostel.wardens = normalizedWardens;
+      syncLegacyWardenFields(hostel);
+    } else if (
+      wardenName !== undefined ||
+      wardenPhone !== undefined ||
+      wardenId !== undefined ||
+      wardenType !== undefined
+    ) {
+      // Legacy single-warden update: mirror it onto the first warden entry.
+      const primary = hostel.wardens?.[0];
+      if (primary) {
+        if (wardenName !== undefined) primary.name = String(wardenName).trim();
+        if (wardenPhone !== undefined) {
+          primary.phone = String(wardenPhone).trim();
+        }
+        if (wardenId !== undefined) primary.wardenId = wardenId || null;
+        if (wardenType !== undefined) {
+          primary.wardenType = wardenType === "teacher" ? "teacher" : "staff";
+        }
+        if (!primary.name && !primary.wardenId) {
+          hostel.wardens = [];
+        }
+      } else {
+        const created = normalizeWardens([
+          {
+            wardenId,
+            wardenType: hostel.wardenType,
+            name: hostel.wardenName,
+            phone: hostel.wardenPhone,
+          },
+        ]);
+        hostel.wardens = created || [];
+      }
+      syncLegacyWardenFields(hostel);
     }
     if (description !== undefined) {
       hostel.description = String(description).trim();

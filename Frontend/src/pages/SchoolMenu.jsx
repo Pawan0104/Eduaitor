@@ -418,6 +418,7 @@ export default function SchoolMenu() {
       children: [
         { name: "All Students", path: "/school/students" },
         { name: "Add Student", path: "/school/student-manage" },
+        { name: "Admission Form", path: "/school/admission-form" },
         { name: "Bulk Upload", path: "/school/students/bulk-upload" },
         { name: "House Allocation", path: "/school/house" },
         { name: "Certificates", path: "/school/certificates" },
@@ -447,6 +448,7 @@ export default function SchoolMenu() {
         { name: "Class", path: "/school/class" },
         { name: "Section", path: "/school/section" },
         { name: "Subjects", path: "/school/subject" },
+        { name: "Academic Sessions", path: "/school/academic-sessions" },
       ],
     },
     {

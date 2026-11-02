@@ -1,4 +1,5 @@
 import mongoose from "mongoose";
+import sessionScopedPlugin from "../utils/sessionPlugin.js";
 const attendanceSchema = new mongoose.Schema({
     studentId: { type: mongoose.Schema.Types.ObjectId, ref: "Student", required: true },
     classId: { type: mongoose.Schema.Types.ObjectId, ref: "Class", required: true }, 
@@ -23,5 +24,7 @@ const attendanceSchema = new mongoose.Schema({
 // IMPORTANT: Compound Index for fast lookup
 // This makes searching for a specific class's attendance for a specific month instant.
 attendanceSchema.index({ schoolId: 1, classId: 1, sectionId: 1, month: 1, year: 1 });
+
+attendanceSchema.plugin(sessionScopedPlugin);
 
 export default mongoose.model("Attendance", attendanceSchema);

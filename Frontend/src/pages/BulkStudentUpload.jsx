@@ -172,7 +172,30 @@ const BulkStudentUpload = ({ onComplete }) => {
       // dropzone is ready for another batch, while keeping the results visible.
       clearFileOnly();
     } catch (err) {
-      toast.error(err.response?.data?.message || "Bulk upload failed");
+      const status = err.response?.status;
+      const rawMessage = err.response?.data?.message;
+      const serverMessage =
+        typeof rawMessage === "string" && rawMessage.length <= 300
+          ? rawMessage
+          : null;
+
+      if (serverMessage) {
+        toast.error(serverMessage);
+      } else if (!err.response) {
+        toast.error(
+          "Upload failed — could not reach the server. Check your connection and try again.",
+        );
+      } else if (status === 502 || status === 504) {
+        toast.error(
+          `Upload failed (server gateway ${status}). The file may be too large or the server is busy — please retry.`,
+        );
+      } else if (status === 413) {
+        toast.error("Upload failed — the file is too large (max 5 MB).");
+      } else {
+        toast.error(
+          `Bulk upload failed${status ? ` (HTTP ${status})` : ""}. Please retry.`,
+        );
+      }
       // Keep the file selected on failure so the user can just retry.
     } finally {
       setUploading(false);

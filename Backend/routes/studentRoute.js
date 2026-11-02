@@ -1,6 +1,5 @@
 import express from "express";
-import upload, { handleUploadError } from "../middlewares/upload.js";
-import { authMiddleware } from "../auth/auth.js";
+import upload, { handleUploadError } from "../middlewares/upload.js";import { authMiddleware } from "../auth/auth.js";
 import {
   createStudent,
   getStudents,
@@ -26,6 +25,14 @@ const withUpload = (req, res, next) => {
   });
 };
 
+/** Surface multer errors (size/type) as JSON instead of a generic 500. */
+const withSpreadsheetUpload = (req, res, next) => {
+  uploadSpreadsheet.single("file")(req, res, (err) => {
+    if (err) return handleUploadError(err, req, res, next);
+    next();
+  });
+};
+
 /* SUPER ADMIN ROUTES */
 router.get("/all/admin", authMiddleware, getAllStudents);
 
@@ -34,7 +41,7 @@ router.get("/bulk-upload/template", authMiddleware, downloadStudentTemplate);
 router.post(
   "/bulk-upload",
   authMiddleware,
-  uploadSpreadsheet.single("file"),
+  withSpreadsheetUpload,
   bulkUploadStudents,
 );
 

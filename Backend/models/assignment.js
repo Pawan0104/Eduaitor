@@ -1,4 +1,5 @@
 import mongoose from "mongoose";
+import sessionScopedPlugin from "../utils/sessionPlugin.js";
 
 const assignmentSchema = new mongoose.Schema(
   {
@@ -23,6 +24,8 @@ const assignmentSchema = new mongoose.Schema(
       required: true,
       index: true,
     },
+    /** Academic session this assignment belongs to (e.g. "2026-27"). */
+    academicYear: { type: String, default: "", index: true },
     classId: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "Class",
@@ -99,5 +102,7 @@ assignmentSchema.index({
   subjectId: 1,
   chapterId: 1,
 });
+
+assignmentSchema.plugin(sessionScopedPlugin);
 
 export default mongoose.model("Assignment", assignmentSchema);

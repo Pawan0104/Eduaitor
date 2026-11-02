@@ -12,6 +12,7 @@ import DesignSkinPicker from "./DesignSkinPicker";
 import UserAvatar from "./UserAvatar";
 import BrandMark from "./BrandMark";
 import ParentChildSwitcher from "./ParentChildSwitcher";
+import AcademicSessionSwitcher from "./AcademicSessionSwitcher";
 import { clearSessionKeepPrefs } from "../utils/clearSessionKeepPrefs";
 import { applyTheme, getTheme } from "../utils/theme";
 
@@ -265,6 +266,8 @@ const Topbar = ({ menuPath = "/" }) => {
 
       {/* RIGHT */}
       <div className="flex shrink-0 items-center gap-1 sm:gap-2.5">
+        <AcademicSessionSwitcher />
+
         <div className="hidden lg:block text-right">
           <p className="text-sm font-semibold text-[rgb(var(--text))]">
             {time.t}

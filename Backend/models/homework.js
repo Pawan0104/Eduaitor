@@ -1,4 +1,5 @@
 import mongoose from "mongoose";
+import sessionScopedPlugin from "../utils/sessionPlugin.js";
 
 const studentStatusSchema = new mongoose.Schema(
   {
@@ -41,6 +42,8 @@ const homeworkSchema = new mongoose.Schema(
       ref: "School",
       required: true,
     },
+    /** Academic session this homework belongs to (e.g. "2026-27"). */
+    academicYear: { type: String, default: "", index: true },
     teacherId: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "Teacher",
@@ -86,5 +89,7 @@ const homeworkSchema = new mongoose.Schema(
 homeworkSchema.index({ schoolId: 1, classId: 1, sectionId: 1 });
 homeworkSchema.index({ teacherId: 1, createdAt: -1 });
 homeworkSchema.index({ "students.studentId": 1 });
+
+homeworkSchema.plugin(sessionScopedPlugin);
 
 export default mongoose.model("Homework", homeworkSchema);

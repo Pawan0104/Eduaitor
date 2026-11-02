@@ -80,6 +80,97 @@ const normalizeStudentFeeFields = (safeBody) => {
       : "";
 };
 
+/* ============ ADMIN-DEFINED (CUSTOM) ADMISSION FIELDS ============ */
+const CUSTOM_FIELD_FILE_PREFIX = "customField_";
+
+/** Parse the JSON blob the wizard sends for admin-created fields. */
+const parseCustomFieldMeta = (raw) => {
+  if (!raw) return null;
+  try {
+    const parsed = typeof raw === "string" ? JSON.parse(raw) : raw;
+    if (!Array.isArray(parsed)) return null;
+
+    return parsed
+      .filter((field) => field && typeof field.key === "string" && field.key)
+      .map((field) => ({
+        key: String(field.key).slice(0, 60),
+        label: String(field.label ?? "").slice(0, 120),
+        type: String(field.type ?? "text").slice(0, 20),
+        value:
+          field.value === undefined || field.value === null
+            ? ""
+            : String(field.value).slice(0, 4000),
+      }));
+  } catch {
+    return null;
+  }
+};
+
+/**
+ * Merge submitted custom-field values with previously saved ones (so an edit
+ * that does not re-send a file/value keeps the existing data).
+ */
+const buildCustomFields = async ({
+  meta,
+  files = {},
+  existing = [],
+  uploadFailures = [],
+}) => {
+  const existingByKey = new Map(
+    (existing || []).filter(Boolean).map((field) => [field.key, field])
+  );
+  const result = [];
+
+  for (const field of meta) {
+    const previous = existingByKey.get(field.key);
+    const uploadedFile = files[`${CUSTOM_FIELD_FILE_PREFIX}${field.key}`]?.[0];
+
+    if (field.type === "file") {
+      if (uploadedFile) {
+        try {
+          const uploaded = await uploadToCloudinary(uploadedFile, "documents");
+          if (previous?.file?.public_id) {
+            await deleteFromCloudinary(previous.file.public_id).catch(() => {});
+          }
+          result.push({
+            ...field,
+            value: uploaded.url,
+            file: {
+              url: uploaded.url,
+              public_id: uploaded.public_id,
+              type: uploaded.type,
+            },
+          });
+        } catch (err) {
+          console.error(`Upload failed for custom field ${field.key}`, err);
+          uploadFailures.push(
+            `${field.label || field.key}: ${err?.message || "upload failed"}`
+          );
+        }
+      } else if (previous?.file?.url) {
+        result.push({
+          ...field,
+          value: field.value || previous.value || previous.file.url,
+          file: previous.file,
+        });
+      } else {
+        result.push({ ...field, value: field.value || "" });
+      }
+      continue;
+    }
+
+    // Non-file field: keep the previous value when this request omits one
+    // (e.g. a partial update from an older screen).
+    const value =
+      field.value || (previous?.value && previous.type === field.type
+        ? previous.value
+        : "");
+    result.push({ ...field, value });
+  }
+
+  return result;
+};
+
 /* ================= GENERATE STUDENT ID ================= */
 const normalizeAdmissionNumber = (value) =>
   String(value || "")
@@ -93,6 +184,7 @@ const normalizeAdmissionNumber = (value) =>
 const generateStudentId = async (schoolId) => {
   const rows = await Student.find({ schoolId })
     .select("studentId")
+    .setOptions({ skipSession: true })
     .lean();
   const used = new Set(
     rows.map((r) => normalizeAdmissionNumber(r.studentId)).filter(Boolean),
@@ -120,7 +212,10 @@ const resolveAdmissionNumber = async (schoolId, rawValue, excludeStudentId = nul
   if (custom) {
     const query = { schoolId, studentId: custom };
     if (excludeStudentId) query._id = { $ne: excludeStudentId };
-    const exists = await Student.findOne(query).select("_id").lean();
+    const exists = await Student.findOne(query)
+      .select("_id")
+      .setOptions({ skipSession: true })
+      .lean();
     if (exists) {
       const err = new Error("Admission number already exists");
       err.statusCode = 400;
@@ -288,6 +383,26 @@ export const createStudent = async (req, res) => {
       });
     }
 
+    // Admin-defined admission fields (Admission Form Builder).
+    const customFieldsMeta = parseCustomFieldMeta(safeBody.customFieldsMeta);
+    delete safeBody.customFieldsMeta;
+    let customFields = [];
+    if (customFieldsMeta) {
+      customFields = await buildCustomFields({
+        meta: customFieldsMeta,
+        files,
+        existing: [],
+        uploadFailures,
+      });
+    }
+
+    if (uploadFailures.length > 0) {
+      return res.status(502).json({
+        success: false,
+        message: uploadFailures[0],
+      });
+    }
+
     if (!String(safeBody.password || "").trim()) {
       return res.status(400).json({
         success: false,
@@ -446,6 +561,7 @@ export const createStudent = async (req, res) => {
       totalPaid: 0,
       documents,
       extraDocuments,
+      customFields,
       parentCredentials,
       houseId,
       idCardIssuedAt: new Date(),
@@ -888,6 +1004,27 @@ export const updateStudent = async (req, res) => {
       });
     }
 
+    // Admin-defined admission fields: only touch them when the client sent the
+    // meta blob, otherwise a normal edit would wipe previously stored values.
+    const customFieldsMeta = parseCustomFieldMeta(safeBody.customFieldsMeta);
+    delete safeBody.customFieldsMeta;
+    let nextCustomFields = null;
+    if (customFieldsMeta) {
+      nextCustomFields = await buildCustomFields({
+        meta: customFieldsMeta,
+        files,
+        existing: student.customFields || [],
+        uploadFailures,
+      });
+    }
+
+    if (uploadFailures.length > 0) {
+      return res.status(502).json({
+        success: false,
+        message: uploadFailures[0],
+      });
+    }
+
     // ── STRIP OLD TOP-LEVEL CREDENTIAL FIELDS ──
     delete safeBody.username;
     delete safeBody.firstTimeLogin;
@@ -986,6 +1123,7 @@ export const updateStudent = async (req, res) => {
           : {}),
         documents,
         extraDocuments: [...extraDocuments, ...newExtraDocuments],
+        ...(nextCustomFields ? { customFields: nextCustomFields } : {}),
         ...credentialUpdate,
       },
       { new: true },

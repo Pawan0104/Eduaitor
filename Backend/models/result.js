@@ -1,5 +1,6 @@
 // models/Result.js
 import mongoose from "mongoose";
+import sessionScopedPlugin from "../utils/sessionPlugin.js";
 
 const ResultSchema = new mongoose.Schema(
   {
@@ -8,6 +9,8 @@ const ResultSchema = new mongoose.Schema(
       ref: "School",
       required: true,
     },
+    /** Academic session this result belongs to (e.g. "2026-27"). */
+    academicYear: { type: String, default: "", index: true },
     examId: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "Exam",
@@ -125,5 +128,7 @@ ResultSchema.index({ examId: 1, studentId: 1 }, { unique: true });
 ResultSchema.index({ schoolId: 1, termId: 1, studentId: 1 });
 ResultSchema.index({ schoolId: 1, classId: 1, termId: 1 });
 ResultSchema.index({ schoolId: 1, examId: 1 });
+
+ResultSchema.plugin(sessionScopedPlugin);
 
 export default mongoose.model("Result", ResultSchema);

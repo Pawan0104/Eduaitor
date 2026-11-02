@@ -1,8 +1,11 @@
 // models/Exam.js
 import mongoose from "mongoose";
+import sessionScopedPlugin from "../utils/sessionPlugin.js";
 
 const ExamSchema = new mongoose.Schema({
   schoolId: { type: mongoose.Schema.Types.ObjectId, ref: 'School', required: true },
+  /** Academic session this exam belongs to (e.g. "2026-27"). */
+  academicYear: { type: String, default: "", index: true },
   termId: { type: mongoose.Schema.Types.ObjectId, ref: 'Term', required: true }, // Added Term
   className: { type: mongoose.Schema.Types.ObjectId, ref: 'Class', required: true },
   subject: { type: mongoose.Schema.Types.ObjectId, ref: 'Subject', required: true },
@@ -20,5 +23,7 @@ ExamSchema.index(
   { schoolId: 1, className: 1, subject: 1, termId: 1 },
   { unique: true, name: "one_exam_per_class_subject_term" }
 );
+
+ExamSchema.plugin(sessionScopedPlugin);
 
 export default mongoose.model('Exam', ExamSchema);

@@ -1,4 +1,5 @@
 import mongoose from "mongoose";
+import sessionScopedPlugin from "../utils/sessionPlugin.js";
 
 /**
  * ClassAttendance Model
@@ -77,5 +78,7 @@ classAttendanceSchema.index(
   { studentId: 1, classId: 1, sectionId: 1, date: 1 },
   { unique: true, name: "idx_unique_student_class_date" }
 );
+
+classAttendanceSchema.plugin(sessionScopedPlugin);
 
 export default mongoose.model("ClassAttendance", classAttendanceSchema);

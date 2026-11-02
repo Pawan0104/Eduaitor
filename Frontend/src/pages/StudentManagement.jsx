@@ -1,12 +1,80 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, createContext, useContext, useMemo } from "react";
 import axios from "axios";
 import { toast } from "react-toastify";
 import { useParams, useNavigate, useSearchParams } from "react-router-dom";
-import { FaArrowLeft } from "react-icons/fa";
+import { FaArrowLeft, FaSlidersH } from "react-icons/fa";
 import { useAuth } from "../context/AuthContext";
 import LoadingSpinner from "../components/LoadingSpinner";
+import AdmissionFormBuilder from "../components/AdmissionFormBuilder";
+import {
+  buildFieldIndex,
+  mergeAdmissionSteps,
+} from "../lib/admissionFormDefaults";
 
 const API = import.meta.env.VITE_API_URL;
+
+/**
+ * Field-level overrides from the school's Admission Form Builder.
+ * `Input`, `Select` and `File` read this to hide fields or swap the label.
+ */
+const AdmissionFieldsContext = createContext(new Map());
+
+const useAdmissionField = (name) => {
+  const fields = useContext(AdmissionFieldsContext);
+  return name ? fields.get(name) : undefined;
+};
+
+/** Labels in the wizard carry " *" for required fields; keep that in sync. */
+const applyFieldMetaToLabel = (label, meta) => {
+  if (!meta) return label;
+  const base = String(label || "").replace(/\s*\*$/, "");
+  const text = meta.label || base;
+  return meta.required ? `${text} *` : text;
+};
+
+/** Map a validation message back to the field it belongs to. */
+const errorFieldKey = (error) => {
+  const text = String(error || "").toLowerCase();
+  if (!text) return null;
+  if (text.includes("first name")) return "firstName";
+  if (text.includes("last name")) return "lastName";
+  if (text.includes("date of birth") || text.includes("age must be"))
+    return "dob";
+  if (text.includes("admission date")) return "admissionDate";
+  if (text.includes("blood group")) return "bloodGroup";
+  if (text.includes("community")) return "community";
+  if (text.includes("category")) return "category";
+  if (text.includes("gender")) return "gender";
+  if (text.includes("father name")) return "fatherName";
+  if (text.includes("father mobile")) return "fatherMobile";
+  if (text.includes("father email")) return "fatherEmail";
+  if (text.includes("mother name")) return "motherName";
+  if (text.includes("mother mobile")) return "motherMobile";
+  if (text.includes("mother email")) return "motherEmail";
+  if (text.includes("guardian mobile")) return "guardianMobile";
+  if (text.includes("guardian relation")) return "guardianRelation";
+  if (text.includes("guardian")) return "guardianName";
+  if (text.includes("address")) return "address";
+  if (text.includes("student photo")) return "studentPhoto";
+  if (text.includes("father aadhar")) return "fatherAadhar";
+  if (text.includes("mother aadhar")) return "motherAadhar";
+  if (text.includes("class")) return "classId";
+  if (text.includes("section")) return "sectionId";
+  if (text.includes("roll number")) return "rollNo";
+  if (text.includes("total fee")) return "totalFee";
+  if (text.includes("transport route")) return "transport";
+  if (text.includes("bus fee quarter")) return "busFeeQuarter";
+  if (text.includes("username")) return "username";
+  if (text.includes("password")) return "password";
+  return null;
+};
+
+const CUSTOM_ERROR_PREFIX = "CF::";
+
+const isEmptyCustomValue = (value) =>
+  value === undefined || value === null || value === "" || value === false;
+
+
 
 const splitStudentName = (fullName = "") => {
   const parts = String(fullName).trim().split(/\s+/).filter(Boolean);
@@ -14,17 +82,6 @@ const splitStudentName = (fullName = "") => {
   if (parts.length === 1) return { firstName: parts[0], lastName: "-" };
   return { firstName: parts[0], lastName: parts.slice(1).join(" ") };
 };
-
-const steps = [
-  "Student Details",
-  "Parent / Guardian",
-  "Previous School",
-  "Documents",
-  "Class Details",
-  "Fee Structure",
-  "Parent Login",
-  "Review",
-];
 
 const busFeeQuarterOptions = [
   { label: "April-July", value: "april-july" },
@@ -123,6 +180,8 @@ const emptyForm = {
   username: "",
   password: "",
   extraDocuments: [],
+  // Values for admin-defined fields (Admission Form Builder).
+  custom: {},
 };
 
 const toDateInputValue = (date) => date.toISOString().slice(0, 10);
@@ -272,6 +331,55 @@ const StudentManagement = () => {
   const [transportRoutes, setTransportRoutes] = useState([]);
   const [freqFilter, setFreqFilter] = useState("annually");
 
+  // Admin-customisable admission form (Admission Form Builder).
+  const [formStepDefs, setFormStepDefs] = useState(() =>
+    mergeAdmissionSteps(null)
+  );
+  const [builderOpen, setBuilderOpen] = useState(false);
+
+  const customStepDefs = formStepDefs.filter((s) => !s.builtin);
+  // First seven steps are the built-in wizard steps; custom steps follow them
+  // and Review is always last.
+  const reviewStep = 8 + customStepDefs.length;
+  const wizardSteps = formStepDefs.map((s) => s.title);
+  const fieldIndex = useMemo(() => buildFieldIndex(formStepDefs), [formStepDefs]);
+
+  const customFieldsForStep = (stepNumber, stepDefs = formStepDefs) => {
+    const def = stepDefs[stepNumber - 1];
+    return (def?.fields || []).filter((field) => !field.builtin);
+  };
+
+  const setCustomValue = (key, value) =>
+    setForm((prev) => ({ ...prev, custom: { ...prev.custom, [key]: value } }));
+
+  useEffect(() => {
+    let cancelled = false;
+
+    (async () => {
+      try {
+        const res = await axios.get(`${API}/admission-form`, {
+          withCredentials: true,
+        });
+        if (cancelled) return;
+        setFormStepDefs(mergeAdmissionSteps(res.data?.data?.steps));
+      } catch {
+        /* keep the built-in layout */
+      }
+    })();
+
+    // The standalone builder page fires this after saving.
+    const handleUpdate = (event) => {
+      setFormStepDefs(mergeAdmissionSteps(event.detail));
+    };
+    window.addEventListener("admission-form-updated", handleUpdate);
+
+    return () => {
+      cancelled = true;
+      window.removeEventListener("admission-form-updated", handleUpdate);
+    };
+  }, []);
+
+
   const isMobile = window.innerWidth <= 768;
 
   const addExtraDocument = () => {
@@ -388,7 +496,7 @@ const StudentManagement = () => {
     });
   };
 
-  const progress = (step / steps.length) * 100;
+  const progress = (step / wizardSteps.length) * 100;
 
   /* NEXT ROLL NUMBER (per class + section) */
   const fetchNextRollNo = async (classId, sectionId) => {
@@ -694,6 +802,12 @@ const StudentManagement = () => {
           password: "",
           documents: student.documents || {},
           extraDocuments,
+          custom: Object.fromEntries(
+            (student.customFields || []).map((field) => [
+              field.key,
+              field.value || "",
+            ])
+          ),
         });
         setFreqFilter(normalizeFeeFrequency(student.feeFrequency));
       } catch {
@@ -710,7 +824,7 @@ const StudentManagement = () => {
 
     // Review step has no inputs of its own — fill everything so the whole
     // wizard can be checked in one click.
-    if (step === 8) {
+    if (step === reviewStep) {
       setForm((prev) => ({
         ...prev,
         ...DUMMY_DATA_BY_STEP[1](),
@@ -949,7 +1063,20 @@ const StudentManagement = () => {
   ]);
 
   const isDirty = () =>
-    Object.values(form).some((v) => v !== "" && v !== null && v !== undefined);
+    Object.entries(form).some(([key, value]) => {
+      // `custom` is always an object (admin-defined fields); only count it
+      // once the admin has actually entered something.
+      if (key === "custom") {
+        return (
+          value && typeof value === "object" && Object.keys(value).length > 0
+        );
+      }
+      if (Array.isArray(value)) return value.length > 0;
+      if (value && typeof value === "object") {
+        return Object.keys(value).length > 0;
+      }
+      return value !== "" && value !== null && value !== undefined;
+    });
 
   const validateStep = () => {
     const errors = [];
@@ -1071,7 +1198,41 @@ const StudentManagement = () => {
         errors.push("Password must be at least 5 characters");
     }
 
-    return errors;
+    // ── Admin-defined fields on this step ──
+    const stepCustomFields = customFieldsForStep(step);
+    stepCustomFields.forEach((field) => {
+      if (field.visible === false) return;
+      const value = form.custom?.[field.key];
+      const label = field.label || "This field";
+
+      if (field.required && isEmptyCustomValue(value)) {
+        errors.push(`${CUSTOM_ERROR_PREFIX}${field.key}::${label} is required`);
+        return;
+      }
+      if (!isEmptyCustomValue(value) && field.type === "email") {
+        const emailOk = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/i.test(
+          String(value).trim()
+        );
+        if (!emailOk) {
+          errors.push(
+            `${CUSTOM_ERROR_PREFIX}${field.key}::Enter a valid email for ${label}`
+          );
+        }
+      }
+    });
+
+    // Respect the admin's choices for built-in fields: a hidden field never
+    // blocks the wizard, and an optional field ignores "required" errors.
+    return errors.filter((error) => {
+      if (String(error).startsWith(CUSTOM_ERROR_PREFIX)) return true;
+      const key = errorFieldKey(error);
+      if (!key) return true;
+      const meta = fieldIndex.get(key);
+      if (!meta) return true;
+      if (meta.visible === false) return false;
+      if (!meta.required && /required/i.test(error)) return false;
+      return true;
+    });
   };
 
   const next = () => {
@@ -1081,6 +1242,13 @@ const StudentManagement = () => {
       const errorMap = {};
 
       stepErrorsArray.forEach((err) => {
+        // Admin-defined field: "CF::<key>::<message>"
+        if (String(err).startsWith(CUSTOM_ERROR_PREFIX)) {
+          const [, key, ...rest] = String(err).split("::");
+          if (key) errorMap[key] = rest.join("::");
+          return;
+        }
+
         // Create a lowercase version for matching
         const lowerErr = err.toLowerCase();
 
@@ -1221,6 +1389,8 @@ const forbidden = [
 
       Object.entries(form).forEach(([key, value]) => {
         if (forbidden.includes(key)) return;
+        // Admin-defined fields are sent separately below.
+        if (key === "custom") return;
 
         if (key === "extraDocuments") {
           const extraDocsMeta = [];
@@ -1262,6 +1432,47 @@ const forbidden = [
       data.set("feeFrequency", freqFilter);
       if (!isEdit && leadId) {
         data.set("leadId", leadId);
+      }
+
+      // Admin-defined fields → JSON metadata (+ files with a customField_ prefix).
+      const customFieldDefs = formStepDefs
+        .flatMap((stepDef) => stepDef.fields || [])
+        .filter((field) => !field.builtin);
+      const customMeta = [];
+      customFieldDefs.forEach((field) => {
+        const value = form.custom?.[field.key];
+
+        if (field.type === "file") {
+          if (typeof File !== "undefined" && value instanceof File) {
+            data.append(`customField_${field.key}`, value);
+            customMeta.push({
+              key: field.key,
+              label: field.label || "",
+              type: field.type,
+              value: "",
+            });
+          } else if (value) {
+            customMeta.push({
+              key: field.key,
+              label: field.label || "",
+              type: field.type,
+              value: String(value),
+            });
+          }
+          return;
+        }
+
+        if (value === undefined || value === null || value === "") return;
+        customMeta.push({
+          key: field.key,
+          label: field.label || "",
+          type: field.type,
+          value:
+            typeof value === "boolean" ? (value ? "Yes" : "No") : String(value),
+        });
+      });
+      if (customMeta.length > 0) {
+        data.append("customFieldsMeta", JSON.stringify(customMeta));
       }
 
       if (isEdit) {
@@ -1322,7 +1533,8 @@ const forbidden = [
   }, [form]);
 
   return (
-    <div className="p-4 lg:p-8  min-h-screen">
+    <AdmissionFieldsContext.Provider value={fieldIndex}>
+      <div className="p-4 lg:p-8  min-h-screen">
       {/* BACK BUTTON */}
       {isMobile && (
         <div className="pt-4">
@@ -1361,12 +1573,27 @@ const forbidden = [
           )}
         </div>
 
-        <button
-          onClick={resetForm}
-          className="px-4 py-2 bg-red-500 text-white rounded-lg"
-        >
-          Reset
-        </button>
+        <div className="flex items-center gap-2 flex-wrap">
+          {["school_admin", "staff_admin", "super_admin"].includes(
+            user?.role
+          ) && (
+            <button
+              type="button"
+              onClick={() => setBuilderOpen(true)}
+              className="inline-flex items-center gap-2 px-4 py-2 rounded-lg border border-[rgb(var(--border))] text-sm font-semibold"
+              title="Add, hide or reorder admission fields and steps"
+            >
+              <FaSlidersH size={12} />
+              Customize Form
+            </button>
+          )}
+          <button
+            onClick={resetForm}
+            className="px-4 py-2 bg-red-500 text-white rounded-lg"
+          >
+            Reset
+          </button>
+        </div>
       </div>
 
       {sourceLead && (
@@ -1381,7 +1608,7 @@ const forbidden = [
 
         <div className="col-span-12 lg:col-span-3">
           <div className="bg-[rgb(var(--surface))] rounded-xl  border border-[rgb(var(--border))] shadow p-4 sticky top-6">
-            {steps.map((s, i) => {
+            {wizardSteps.map((s, i) => {
               const index = i + 1;
               const status =
                 step === index
@@ -1437,7 +1664,7 @@ const forbidden = [
             <div className="mb-6">
               <div className="flex justify-between text-sm mb-2">
                 <span>
-                  Step {step} of {steps.length}
+                  Step {step} of {wizardSteps.length}
                 </span>
                 <span>{Math.round(progress)}%</span>
               </div>
@@ -2115,8 +2342,60 @@ const forbidden = [
                 </>
               )}
 
-            {/* STEP 8 REVIEW */}
-            {step === 8 && (
+            {/* ADMIN-DEFINED FIELDS ON BUILT-IN STEPS */}
+            {step >= 1 &&
+              step <= 7 &&
+              customFieldsForStep(step).filter(
+                (field) => field.visible !== false
+              ).length > 0 && (
+                <div className="mt-6 grid gap-4">
+                  <h3 className="text-sm font-semibold text-[rgb(var(--text-muted))] uppercase tracking-wide">
+                    Additional Details
+                  </h3>
+                  {customFieldsForStep(step)
+                    .filter((field) => field.visible !== false)
+                    .map((field) => (
+                      <CustomField
+                        key={field.key}
+                        field={field}
+                        value={form.custom?.[field.key]}
+                        error={errors[field.key]}
+                        onChange={(value) => setCustomValue(field.key, value)}
+                      />
+                    ))}
+                </div>
+              )}
+
+            {/* ADMIN-DEFINED STEPS */}
+            {customStepDefs.map((stepDef, index) => {
+              if (step !== 8 + index) return null;
+              const fields = (stepDef.fields || []).filter(
+                (field) => field.visible !== false
+              );
+
+              return (
+                <div key={stepDef.key} className="grid gap-4">
+                  {fields.length === 0 ? (
+                    <p className="text-sm text-[rgb(var(--text-muted))]">
+                      This step has no fields yet.
+                    </p>
+                  ) : (
+                    fields.map((field) => (
+                      <CustomField
+                        key={field.key}
+                        field={field}
+                        value={form.custom?.[field.key]}
+                        error={errors[field.key]}
+                        onChange={(value) => setCustomValue(field.key, value)}
+                      />
+                    ))
+                  )}
+                </div>
+              );
+            })}
+
+            {/* REVIEW */}
+            {step === reviewStep && (
               <>
                 <DummyFillBar onFill={fillDummyData} step={step} />
                 <ReviewStep
@@ -2126,6 +2405,9 @@ const forbidden = [
                   transportRoutes={transportRoutes}
                   feeStructure={feeStructure}
                   freqFilter={freqFilter}
+                  customFields={formStepDefs.flatMap((stepDef) =>
+                    (stepDef.fields || []).filter((field) => !field.builtin)
+                  )}
                 />
               </>
             )}
@@ -2142,7 +2424,7 @@ const forbidden = [
                 </button>
               )}
 
-              {step < steps.length ? (
+              {step < wizardSteps.length ? (
                 <button
                   onClick={next}
                   className={`px-6 py-2 rounded-lg text-[rgb(var(--text))]
@@ -2222,7 +2504,15 @@ const forbidden = [
           </div>
         </div>
       )}
-    </div>
+
+      {builderOpen && (
+        <AdmissionFormBuilder
+          onClose={() => setBuilderOpen(false)}
+          onSaved={(steps) => setFormStepDefs(mergeAdmissionSteps(steps))}
+        />
+      )}
+      </div>
+    </AdmissionFieldsContext.Provider>
   );
 };
 
@@ -2230,53 +2520,68 @@ export default StudentManagement;
 
 /* INPUT */
 
-const Input = ({ label, error, ...props }) => (
-  <div>
-    <label className="block text-sm font-medium text-[rgb(var(--text))] mb-1">
-      {label}
-    </label>
+const Input = ({ label, error, ...props }) => {
+  const meta = useAdmissionField(props.name);
+  if (meta?.visible === false) return null;
 
-    <input
-      {...props}
-      className="w-full border px-3 py-2 rounded-lg  bg-[rgb(var(--surface))]"
-    />
-    {error && <span className="text-xs text-red-500 font-medium">{error}</span>}
-  </div>
-);
+  return (
+    <div>
+      <label className="block text-sm font-medium text-[rgb(var(--text))] mb-1">
+        {applyFieldMetaToLabel(label, meta)}
+      </label>
+
+      <input
+        {...props}
+        className="w-full border px-3 py-2 rounded-lg  bg-[rgb(var(--surface))]"
+      />
+      {error && (
+        <span className="text-xs text-red-500 font-medium">{error}</span>
+      )}
+    </div>
+  );
+};
 
 /* SELECT */
 
-const Select = ({ label, error, options, ...props }) => (
-  <div>
-    <label className="block text-sm font-medium text-[rgb(var(--text))] mb-1">
-      {label}
-    </label>
+const Select = ({ label, error, options, ...props }) => {
+  const meta = useAdmissionField(props.name);
+  if (meta?.visible === false) return null;
 
-    <select
-      {...props}
-      className="w-full border px-3 py-2 rounded-lg focus:ring-2 focus:ring-indigo-500 text-[rgb(var(--text))] bg-[rgb(var(--surface))] "
-    >
-      <option value="">Select</option>
+  return (
+    <div>
+      <label className="block text-sm font-medium text-[rgb(var(--text))] mb-1">
+        {applyFieldMetaToLabel(label, meta)}
+      </label>
 
-      {options.map((o, i) => {
-        if (typeof o === "string") {
+      <select
+        {...props}
+        className="w-full border px-3 py-2 rounded-lg focus:ring-2 focus:ring-indigo-500 text-[rgb(var(--text))] bg-[rgb(var(--surface))] "
+      >
+        <option value="">Select</option>
+
+        {options.map((o, i) => {
+          if (typeof o === "string") {
+            return (
+              <option key={i} value={o}>
+                {o}
+              </option>
+            );
+          }
+
           return (
-            <option key={i} value={o}>
-              {o}
+            <option key={i} value={String(o.value ?? "")} disabled={!o.value}>
+              {o.label}
             </option>
           );
-        }
+        })}
+      </select>
+      {error && (
+        <span className="text-xs text-red-500 font-medium">{error}</span>
+      )}
+    </div>
+  );
+};
 
-        return (
-          <option key={i} value={String(o.value ?? "")} disabled={!o.value}>
-            {o.label}
-          </option>
-        );
-      })}
-    </select>
-    {error && <span className="text-xs text-red-500 font-medium">{error}</span>}
-  </div>
-);
 /* FILE */
 
 const PHOTO_FIELD_NAMES = new Set([
@@ -2287,6 +2592,7 @@ const PHOTO_FIELD_NAMES = new Set([
 ]);
 
 const File = ({ label, name, onChange, existingUrl, error }) => {
+  const meta = useAdmissionField(name);
   const [preview, setPreview] = useState(existingUrl || null);
   const [localFile, setLocalFile] = useState(false);
   const isPhotoField = PHOTO_FIELD_NAMES.has(name);
@@ -2358,12 +2664,14 @@ const File = ({ label, name, onChange, existingUrl, error }) => {
       /\.(png|jpe?g|gif|webp|bmp|svg)(\?|$)/i.test(preview) ||
       /\/image\/upload\//i.test(preview));
 
+  if (meta?.visible === false) return null;
+
   return (
     <div className="border rounded-xl p-4 text-[rgb(var(--text))]">
       <label
         className={`block text-sm font-medium mb-2 ${error ? "text-red-600" : "text-[rgb(var(--text))]"}`}
       >
-        {label}
+        {applyFieldMetaToLabel(label, meta)}
       </label>
 
       <input
@@ -2406,9 +2714,159 @@ const File = ({ label, name, onChange, existingUrl, error }) => {
   );
 };
 
+/* CUSTOM FIELD (admin-defined) */
+
+const CustomField = ({ field, value, error, onChange }) => {
+  const label = field.required ? `${field.label} *` : field.label;
+  const inputClass =
+    "w-full border px-3 py-2 rounded-lg bg-[rgb(var(--surface))] text-[rgb(var(--text))]";
+  const help = field.help ? (
+    <p className="text-xs text-[rgb(var(--text-muted))] mt-1">{field.help}</p>
+  ) : null;
+  const errorNode = error ? (
+    <span className="text-xs text-red-500 font-medium">{error}</span>
+  ) : null;
+
+  const labelNode = (
+    <label className="block text-sm font-medium text-[rgb(var(--text))] mb-1">
+      {label}
+    </label>
+  );
+
+  if (field.type === "textarea") {
+    return (
+      <div>
+        {labelNode}
+        <textarea
+          rows={3}
+          value={value ?? ""}
+          placeholder={field.placeholder || ""}
+          onChange={(e) => onChange(e.target.value)}
+          className={inputClass}
+        />
+        {help}
+        {errorNode}
+      </div>
+    );
+  }
+
+  if (field.type === "select") {
+    return (
+      <div>
+        {labelNode}
+        <select
+          value={value ?? ""}
+          onChange={(e) => onChange(e.target.value)}
+          className={inputClass}
+        >
+          <option value="">Select</option>
+          {(field.options || []).map((option) => (
+            <option key={option} value={option}>
+              {option}
+            </option>
+          ))}
+        </select>
+        {help}
+        {errorNode}
+      </div>
+    );
+  }
+
+  if (field.type === "radio") {
+    return (
+      <div>
+        {labelNode}
+        <div className="flex flex-wrap gap-4">
+          {(field.options || []).map((option) => (
+            <label key={option} className="flex items-center gap-2 text-sm">
+              <input
+                type="radio"
+                name={`cf-${field.key}`}
+                checked={value === option}
+                onChange={() => onChange(option)}
+              />
+              {option}
+            </label>
+          ))}
+        </div>
+        {help}
+        {errorNode}
+      </div>
+    );
+  }
+
+  if (field.type === "checkbox") {
+    return (
+      <div>
+        <label className="flex items-center gap-2 text-sm font-medium">
+          <input
+            type="checkbox"
+            checked={Boolean(value)}
+            onChange={(e) => onChange(e.target.checked)}
+          />
+          {label}
+        </label>
+        {help}
+        {errorNode}
+      </div>
+    );
+  }
+
+  if (field.type === "file") {
+    return (
+      <div className="border rounded-xl p-4">
+        {labelNode}
+        <input
+          type="file"
+          onChange={(e) => onChange(e.target.files?.[0] || "")}
+          className="w-full border px-3 py-2 rounded-lg"
+        />
+        {value && typeof value === "string" && (
+          <a
+            href={value}
+            target="_blank"
+            rel="noreferrer"
+            className="mt-2 inline-flex text-sm font-semibold text-[rgb(var(--primary))] underline"
+          >
+            View uploaded file
+          </a>
+        )}
+        {value && typeof value !== "string" && (
+          <p className="mt-2 text-xs text-[rgb(var(--text-muted))]">
+            Selected: {value.name}
+          </p>
+        )}
+        {help}
+        {errorNode}
+      </div>
+    );
+  }
+
+  return (
+    <div>
+      {labelNode}
+      <input
+        type={
+          ["number", "date", "email", "tel"].includes(field.type)
+            ? field.type
+            : "text"
+        }
+        value={value ?? ""}
+        placeholder={field.placeholder || ""}
+        onChange={(e) => onChange(e.target.value)}
+        className={inputClass}
+      />
+      {help}
+      {errorNode}
+    </div>
+  );
+};
+
 /* PARENT LOGIN STEP */
 const ParentLoginStep = ({ form, handleChange, isEdit }) => {
   const [showPassword, setShowPassword] = useState(false);
+  const usernameMeta = useAdmissionField("username");
+  const passwordMeta = useAdmissionField("password");
 
   return (
     <div className="grid gap-5">
@@ -2416,42 +2874,48 @@ const ParentLoginStep = ({ form, handleChange, isEdit }) => {
         These credentials will be used by the parent to log into the portal.
       </div>
 
-      <div>
-        <label className="block text-sm font-medium text-[rgb(var(--text))] mb-1">
-          Username *
-        </label>
-        <input
-          name="username"
-          value={form.fatherMobile || ""}
-          onChange={handleChange}
-          disabled
-          placeholder="e.g. john.doe2024"
-          className="w-full border px-3 py-2 rounded-lg focus:ring-2 focus:ring-indigo-500"
-        />
-      </div>
-
-      <div>
-        <label className="block text-sm font-medium text-[rgb(var(--text))] mb-1">
-          {isEdit ? "New Password (leave blank to keep current)" : "Password *"}
-        </label>
-        <div className="relative">
+      {usernameMeta?.visible !== false && (
+        <div>
+          <label className="block text-sm font-medium text-[rgb(var(--text))] mb-1">
+            {applyFieldMetaToLabel("Username *", usernameMeta)}
+          </label>
           <input
-            name="password"
-            type={showPassword ? "text" : "password"}
-            value={form.password || ""}
+            name="username"
+            value={form.fatherMobile || ""}
             onChange={handleChange}
-            placeholder={isEdit ? "Leave blank to keep current" : "Min. 5 characters or leave blank for default"}
-            className="w-full border px-3 py-2 rounded-lg focus:ring-2 focus:ring-indigo-500 pr-10"
+            disabled
+            placeholder="e.g. john.doe2024"
+            className="w-full border px-3 py-2 rounded-lg focus:ring-2 focus:ring-indigo-500"
           />
-          <button
-            type="button"
-            onClick={() => setShowPassword((v) => !v)}
-            className="absolute right-3 top-2.5 text-gray-400 hover:text-gray-600 text-sm"
-          >
-            {showPassword ? "Hide" : "Show"}
-          </button>
         </div>
-      </div>
+      )}
+
+      {passwordMeta?.visible !== false && (
+        <div>
+          <label className="block text-sm font-medium text-[rgb(var(--text))] mb-1">
+            {isEdit
+              ? "New Password (leave blank to keep current)"
+              : applyFieldMetaToLabel("Password *", passwordMeta)}
+          </label>
+          <div className="relative">
+            <input
+              name="password"
+              type={showPassword ? "text" : "password"}
+              value={form.password || ""}
+              onChange={handleChange}
+              placeholder={isEdit ? "Leave blank to keep current" : "Min. 5 characters or leave blank for default"}
+              className="w-full border px-3 py-2 rounded-lg focus:ring-2 focus:ring-indigo-500 pr-10"
+            />
+            <button
+              type="button"
+              onClick={() => setShowPassword((v) => !v)}
+              className="absolute right-3 top-2.5 text-gray-400 hover:text-gray-600 text-sm"
+            >
+              {showPassword ? "Hide" : "Show"}
+            </button>
+          </div>
+        </div>
+      )}
 
       {form.temp_password && isEdit && (
         <div className="text-xs text-gray-400">
@@ -2470,6 +2934,7 @@ const ReviewStep = ({
   transportRoutes,
   feeStructure,
   freqFilter,
+  customFields = [],
 }) => {
   const className =
     classes.find((c) => c._id === form.classId)?.name ||
@@ -2653,6 +3118,34 @@ const ReviewStep = ({
         <Field label="Username" value={form.username} />
         <Field label="Password" value={form.password ? "••••••••" : null} />
       </Section>
+
+      {customFields.some(
+        (field) => form.custom?.[field.key] !== undefined && form.custom?.[field.key] !== ""
+      ) && (
+        <Section title="Additional details" headerClass="">
+          {customFields.map((field) => {
+            const value = form.custom?.[field.key];
+            if (value === undefined || value === null || value === "") {
+              return null;
+            }
+            return (
+              <Field
+                key={field.key}
+                label={field.label}
+                value={
+                  typeof value === "boolean"
+                    ? value
+                      ? "Yes"
+                      : "No"
+                    : typeof value === "string"
+                      ? value
+                      : value?.name || "Uploaded"
+                }
+              />
+            );
+          })}
+        </Section>
+      )}
 
       {/* Documents */}
       {form.documents &&

@@ -1,4 +1,5 @@
 import mongoose from "mongoose";
+import sessionScopedPlugin from "../utils/sessionPlugin.js";
 
 const fileSchema = new mongoose.Schema({
   url: String,
@@ -127,10 +128,32 @@ const studentSchema = new mongoose.Schema(
       type: [extraDocumentSchema],
       default: [],
     },
+    /**
+     * Values for fields the school admin added through the admission form
+     * builder. `key` matches the field key in the AdmissionForm config.
+     */
+    customFields: {
+      type: [
+        new mongoose.Schema(
+          {
+            key: { type: String, required: true },
+            label: { type: String, default: "" },
+            type: { type: String, default: "text" },
+            value: { type: String, default: "" },
+            file: fileSchema,
+          },
+          { _id: false }
+        ),
+      ],
+      default: [],
+    },
     schoolId: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "School", // or whatever your school model is named
     },
+
+    /** Academic session this admission belongs to (e.g. "2026-27"). */
+    academicYear: { type: String, default: "", index: true },
 
     /** Lead this student was admitted from (Lead Management → admission) */
     convertedFromLeadId: {
@@ -172,4 +195,6 @@ studentSchema.index(
   { schoolId: 1, convertedFromLeadId: 1 },
   { unique: true, sparse: true },
 );
+studentSchema.plugin(sessionScopedPlugin);
+
 export default mongoose.model("Student", studentSchema);

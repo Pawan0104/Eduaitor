@@ -1,0 +1,300 @@
+/**
+ * Built-in admission wizard layout.
+ *
+ * The school admin can customise this through the Admission Form Builder
+ * (add/edit/hide fields, mark them optional, add extra steps). The saved config
+ * only stores deltas; this file is the source of truth for the default layout
+ * and field keys, so the wizard keeps working even with no saved config.
+ */
+
+const CATEGORY_OPTIONS = ["General", "OBC", "SC", "ST", "Minority"];
+
+const COMMUNITY_OPTIONS = [
+  "Muslim",
+  "Christian",
+  "Sikh",
+  "Jain",
+  "Buddhist",
+  "Parsi",
+  "Other",
+];
+
+const GUARDIAN_RELATION_OPTIONS = [
+  "Father",
+  "Mother",
+  "Step Father",
+  "Step Mother",
+  "Grand Father",
+  "Grand Mother",
+  "Uncle",
+  "Aunt",
+  "Brother",
+  "Sister",
+  "Legal Guardian",
+  "Other",
+];
+
+/** Field shapes the builder offers. */
+export const ADMISSION_FIELD_TYPES = [
+  { value: "text", label: "Short text" },
+  { value: "textarea", label: "Long text" },
+  { value: "number", label: "Number" },
+  { value: "date", label: "Date" },
+  { value: "email", label: "Email" },
+  { value: "tel", label: "Phone" },
+  { value: "select", label: "Dropdown" },
+  { value: "radio", label: "Radio buttons" },
+  { value: "checkbox", label: "Checkbox (yes/no)" },
+  { value: "file", label: "File upload" },
+];
+
+const f = (key, label, type, required, extra = {}) => ({
+  key,
+  label,
+  type,
+  required,
+  visible: true,
+  placeholder: "",
+  help: "",
+  options: [],
+  builtin: true,
+  ...extra,
+});
+
+/** Steps 1-8, in the exact order the wizard renders them. */
+export const ADMISSION_STEPS = [
+  {
+    key: "builtin_1",
+    title: "Student Details",
+    builtin: true,
+    fields: [
+      f("studentId", "Admission Number", "text", false, {
+        placeholder: "Leave blank to auto-generate (e.g. STU0001)",
+      }),
+      f("firstName", "First Name", "text", true),
+      f("lastName", "Last Name", "text", true),
+      f("dob", "Date of Birth", "date", true),
+      f("gender", "Gender", "select", true, {
+        options: ["Male", "Female"],
+      }),
+      f("bloodGroup", "Blood Group", "text", false),
+      f("category", "Category", "select", true, {
+        options: CATEGORY_OPTIONS,
+      }),
+      f("community", "Community", "select", false, {
+        options: COMMUNITY_OPTIONS,
+        help: "Only shown when Category is Minority.",
+      }),
+      f("admissionDate", "Admission Date", "date", true),
+    ],
+  },
+  {
+    key: "builtin_2",
+    title: "Parent / Guardian",
+    builtin: true,
+    fields: [
+      f("fatherName", "Father Name", "text", true),
+      f("fatherMobile", "Father Mobile", "tel", true),
+      f("fatherEmail", "Father Email", "email", false),
+      f("motherName", "Mother Name", "text", true),
+      f("motherMobile", "Mother Mobile", "tel", true),
+      f("motherEmail", "Mother Email", "email", false),
+      f("guardianName", "Guardian Name", "text", false),
+      f("guardianMobile", "Guardian Mobile", "tel", false),
+      f("guardianRelation", "Guardian Relation", "select", false, {
+        options: GUARDIAN_RELATION_OPTIONS,
+      }),
+      f("address", "Address", "textarea", true),
+    ],
+  },
+  {
+    key: "builtin_3",
+    title: "Previous School",
+    builtin: true,
+    fields: [
+      f("previousSchoolName", "Previous School Name", "text", false),
+      f("previousSchoolClass", "Last Class Attended", "text", false),
+      f("previousSchoolResult", "Last Result", "text", false),
+    ],
+  },
+  {
+    key: "builtin_4",
+    title: "Documents",
+    builtin: true,
+    fields: [
+      f("studentPhoto", "Student Photo", "file", true),
+      f("fatherPhoto", "Father Photo", "file", false),
+      f("motherPhoto", "Mother Photo", "file", false),
+      f("guardianPhoto", "Guardian Photo", "file", false),
+      f("birthCertificate", "Birth Certificate", "file", false),
+      f("transferCertificate", "Transfer Certificate", "file", false),
+      f("studentAadhar", "Student Aadhar", "file", false),
+      f("fatherAadhar", "Father Aadhar", "file", true),
+      f("motherAadhar", "Mother Aadhar", "file", true),
+    ],
+  },
+  {
+    key: "builtin_5",
+    title: "Class Details",
+    builtin: true,
+    fields: [
+      f("classId", "Class", "select", true),
+      f("sectionId", "Section", "select", false),
+      f("rollNo", "Roll Number", "text", true),
+      f("studentType", "Student Type", "select", false, {
+        options: ["Day Scholar", "Day Boarder", "Boarder"],
+      }),
+      f("transport", "Transport Route", "select", false),
+      f("relative", "Relative / Sibling", "text", false),
+    ],
+  },
+  {
+    key: "builtin_6",
+    title: "Fee Structure",
+    builtin: true,
+    fields: [
+      f("totalFee", "Total Annual Fee", "number", true),
+      f("discountType", "Discount Type", "select", false),
+      f("discountValue", "Discount Value", "number", false),
+      f("finalFee", "Final Fee", "number", false),
+      f("busFeeFrequency", "Bus Fee Type", "select", false, {
+        options: [
+          { label: "Annually", value: "annually" },
+          { label: "Quarterly", value: "quarterly" },
+        ],
+      }),
+      f("busFeeQuarter", "Bus Fee Quarter", "select", false),
+    ],
+  },
+  {
+    key: "builtin_7",
+    title: "Parent Login",
+    builtin: true,
+    fields: [
+      f("username", "Parent Username", "text", true),
+      f("password", "Password", "text", true),
+    ],
+  },
+  {
+    key: "builtin_8",
+    title: "Review",
+    builtin: true,
+    fields: [],
+  },
+];
+
+export const REVIEW_STEP_KEY = "builtin_8";
+
+/** Structural fields the wizard/backend cannot create a student without. */
+export const LOCKED_VISIBLE_FIELD_KEYS = new Set(["firstName", "lastName"]);
+
+const cloneField = (field) => ({
+  ...field,
+  options: Array.isArray(field.options) ? [...field.options] : [],
+});
+
+const mergeStep = (defaultStep, storedStep) => {
+  if (!storedStep) {
+    return {
+      ...defaultStep,
+      fields: defaultStep.fields.map(cloneField),
+    };
+  }
+
+  const defaultByKey = new Map(
+    defaultStep.fields.map((field) => [field.key, field])
+  );
+  const storedFields = (storedStep.fields || []).filter(
+    (field) => field && field.key
+  );
+
+  // Respect the order the admin saved (they can move fields around). Built-in
+  // fields keep their original input type; only label/visibility/required/
+  // placeholder/help are overridable, so unknown types can't break the wizard.
+  const mergedFields = storedFields.map((field) => {
+    const defaultField = defaultByKey.get(field.key);
+    if (defaultField) {
+      defaultByKey.delete(field.key);
+      return cloneField({
+        ...defaultField,
+        ...field,
+        type: defaultField.type,
+        builtin: true,
+        visible: LOCKED_VISIBLE_FIELD_KEYS.has(field.key)
+          ? true
+          : field.visible !== false,
+      });
+    }
+    return cloneField({ ...field, builtin: false });
+  });
+
+  // Any built-in field missing from the saved config (e.g. introduced by a
+  // later release) still shows up at the end instead of silently vanishing.
+  defaultByKey.forEach((field) => mergedFields.push(cloneField(field)));
+
+  return {
+    key: defaultStep.key,
+    title: storedStep.title?.trim() || defaultStep.title,
+    builtin: true,
+    fields: mergedFields,
+  };
+};
+
+/**
+ * Merge a saved config with the built-in layout.
+ * Custom steps are placed after "Parent Login" and before "Review".
+ */
+export const mergeAdmissionSteps = (storedSteps) => {
+  if (!Array.isArray(storedSteps) || storedSteps.length === 0) {
+    return ADMISSION_STEPS.map((step) => ({
+      ...step,
+      fields: step.fields.map(cloneField),
+    }));
+  }
+
+  const storedByKey = new Map(
+    storedSteps.filter((s) => s?.key).map((s) => [s.key, s])
+  );
+
+  const builtinBody = ADMISSION_STEPS.filter((s) => s.key !== REVIEW_STEP_KEY);
+  const reviewDefault = ADMISSION_STEPS.find(
+    (s) => s.key === REVIEW_STEP_KEY
+  );
+
+  const mergedBuiltin = builtinBody.map((step) =>
+    mergeStep(step, storedByKey.get(step.key))
+  );
+
+  const customSteps = storedSteps
+    .filter((step) => step && !step.builtin && step.key !== REVIEW_STEP_KEY)
+    .map((step) => ({
+      key: String(step.key),
+      title: step.title?.trim() || "Additional Details",
+      builtin: false,
+      fields: (step.fields || [])
+        .filter((field) => field && field.key)
+        .map((field) => cloneField({ ...field, builtin: false })),
+    }));
+
+  const review = mergeStep(reviewDefault, storedByKey.get(REVIEW_STEP_KEY));
+
+  return [...mergedBuiltin, ...customSteps, review];
+};
+
+/** key -> field metadata (including which step it lives in). */
+export const buildFieldIndex = (steps) => {
+  const index = new Map();
+  for (const step of steps) {
+    for (const field of step.fields) {
+      index.set(field.key, { ...field, stepKey: step.key });
+    }
+  }
+  return index;
+};
+
+/** Is this a field the admin added (as opposed to a built-in one)? */
+export const isCustomField = (field) =>
+  !field.builtin && String(field.key).startsWith("cf_");
+
+export const makeCustomFieldKey = () =>
+  `cf_${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`;

@@ -153,6 +153,9 @@ import schoolRoutes from "./routes/schoolRoute.js";
 import subscriptionRoutes from "./routes/subscriptionRoute.js";
 
 import studentRoutes from "./routes/studentRoute.js";
+import admissionFormRoute from "./routes/admissionFormRoute.js";
+import academicYearRoute from "./routes/academicYearRoute.js";
+import { attachAcademicSession } from "./middlewares/academicSession.js";
 import teacherRoutes from "./routes/teacherRoute.js";
 import sectionRoute from "./routes/sectionRoute.js";
 import classRoute from "./routes/classRoute.js";
@@ -459,6 +462,11 @@ app.post("/api/auth/logout", (req, res) => {
 
 app.use("/api/auth", authRoutes);
 
+// Resolve the academic session (x-academic-year header -> active session) for
+// every API request before the module routes run.
+app.use("/api", attachAcademicSession);
+app.use("/api/academic-years", academicYearRoute);
+
 /** Safe mail readiness check (no secrets). */
 app.get("/api/health/mail", async (_req, res) => {
   const clientUrlSet = Boolean(clientOrigin());
@@ -487,6 +495,7 @@ app.use("/api/schools", schoolRoutes);
 app.use("/api/subscriptions", subscriptionRoutes);
 
 app.use("/api/students", studentRoutes);
+app.use("/api/admission-form", admissionFormRoute);
 app.use("/api/teachers", teacherRoutes);
 app.use("/api/sections", sectionRoute);
 app.use("/api/classes", classRoute);

@@ -1,6 +1,7 @@
 import axios from "axios";
 import { API } from "./api";
 import { beginProcessing, endProcessing } from "../utils/processing.js";
+import { ACADEMIC_SESSION_KEY } from "../lib/academicSession.js";
 
 const TOKEN_KEY = "eduaitor_token";
 
@@ -27,9 +28,15 @@ export function clearAuthToken() {
 
 function attachAuthHeader(config) {
   const token = getAuthToken();
+  config.headers = config.headers || {};
   if (token) {
-    config.headers = config.headers || {};
     config.headers.Authorization = `Bearer ${token}`;
+  }
+  try {
+    const session = localStorage.getItem(ACADEMIC_SESSION_KEY);
+    if (session) config.headers["x-academic-year"] = session;
+  } catch {
+    // storage unavailable
   }
   return config;
 }

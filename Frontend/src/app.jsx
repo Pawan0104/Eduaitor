@@ -20,6 +20,8 @@ import FinancialReport from "./pages/FinancialReport";
 import SchoolMenu from "./pages/SchoolMenu";
 import Students from "./pages/Students";
 import StudentManagement from "./pages/StudentManagement";
+import AdmissionFormSettings from "./pages/AdmissionFormSettings";
+import AcademicSessions from "./pages/AcademicSessions";
 import StudentView from "./components/StudentView";
 import Teachers from "./pages/Teachers";
 import TeacherManagement from "./pages/TeacherManagement";
@@ -201,6 +203,8 @@ const App = () => {
           <Route path="leads" element={<LeadManagement />} />
           <Route path="student-manage" element={<StudentManagement />} />
           <Route path="student-manage/:id" element={<StudentManagement />} />
+          <Route path="admission-form" element={<AdmissionFormSettings />} />
+          <Route path="academic-sessions" element={<AcademicSessions />} />
           <Route path="student-view/:id" element={<StudentView />} />
           <Route path="id-card/student/:id" element={<IdCard />} />
           <Route path="id-card/staff/:id" element={<IdCard />} />
@@ -451,6 +455,8 @@ const App = () => {
           <Route path="students" element={<Students />} />
           <Route path="student-manage" element={<StudentManagement />} />
           <Route path="student-manage/:id" element={<StudentManagement />} />
+          <Route path="admission-form" element={<AdmissionFormSettings />} />
+          <Route path="academic-sessions" element={<AcademicSessions />} />
           <Route path="student-view/:id" element={<StudentView />} />
           <Route path="attendance" element={<StaffAttendance />} />
           <Route path="fees" element={<FeeCollection />} />

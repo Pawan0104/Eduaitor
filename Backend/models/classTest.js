@@ -1,4 +1,5 @@
 import mongoose from "mongoose";
+import sessionScopedPlugin from "../utils/sessionPlugin.js";
 
 const classTestResultSchema = new mongoose.Schema(
   {
@@ -26,6 +27,8 @@ const classTestSchema = new mongoose.Schema(
       ref: "School",
       required: true,
     },
+    /** Academic session this test belongs to (e.g. "2026-27"). */
+    academicYear: { type: String, default: "", index: true },
     className: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "Class",
@@ -66,5 +69,7 @@ const classTestSchema = new mongoose.Schema(
 
 classTestSchema.index({ schoolId: 1, className: 1, testDate: 1 });
 classTestSchema.index({ teacherId: 1, testDate: 1 });
+
+classTestSchema.plugin(sessionScopedPlugin);
 
 export default mongoose.model("ClassTest", classTestSchema);

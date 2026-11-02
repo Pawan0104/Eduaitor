@@ -1,4 +1,5 @@
 import mongoose from "mongoose";
+import sessionScopedPlugin from "../utils/sessionPlugin.js";
 
 const eventSchema = new mongoose.Schema(
   {
@@ -7,6 +8,8 @@ const eventSchema = new mongoose.Schema(
       ref: "School",
       required: true,
     },
+    /** Academic session this event belongs to (e.g. "2026-27"). */
+    academicYear: { type: String, default: "", index: true },
     title: { type: String, required: true, trim: true },
     type: {
       type: String,
@@ -32,5 +35,7 @@ const eventSchema = new mongoose.Schema(
   },
   { timestamps: true },
 );
+
+eventSchema.plugin(sessionScopedPlugin);
 
 export default mongoose.model("Event", eventSchema);

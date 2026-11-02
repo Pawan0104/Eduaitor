@@ -6,6 +6,7 @@ import { BrowserRouter } from "react-router-dom";
 import { ToastContainer } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
 import { AuthProvider } from "./context/AuthContext.jsx";
+import { AcademicSessionProvider } from "./context/AcademicSessionContext.jsx";
 import { LanguageProvider } from "./context/LanguageContext.jsx";
 import { HelmetProvider } from "react-helmet-async";
 import {
@@ -37,12 +38,14 @@ createRoot(document.getElementById("root")).render(
       <ErrorBoundary>
         <LanguageProvider>
           <AuthProvider>
-            <HelmetProvider>
-              <App />
-              <OptionalPasswordChangeModal />
-              <AppUpdatePrompt />
-              <ProcessingOverlay />
-            </HelmetProvider>
+            <AcademicSessionProvider>
+              <HelmetProvider>
+                <App />
+                <OptionalPasswordChangeModal />
+                <AppUpdatePrompt />
+                <ProcessingOverlay />
+              </HelmetProvider>
+            </AcademicSessionProvider>
           </AuthProvider>
           <ToastContainer
             position="top-right"

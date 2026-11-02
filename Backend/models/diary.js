@@ -1,4 +1,5 @@
 import mongoose from "mongoose";
+import sessionScopedPlugin from "../utils/sessionPlugin.js";
 
 const diarySchema = new mongoose.Schema(
   {
@@ -7,6 +8,8 @@ const diarySchema = new mongoose.Schema(
       ref: "School",
       required: true,
     },
+    /** Academic session this diary entry belongs to (e.g. "2026-27"). */
+    academicYear: { type: String, default: "", index: true },
 
     teacherId: {
       type: mongoose.Schema.Types.ObjectId,
@@ -51,5 +54,7 @@ const diarySchema = new mongoose.Schema(
   },
   { timestamps: true },
 );
+
+diarySchema.plugin(sessionScopedPlugin);
 
 export default mongoose.model("Diary", diarySchema);

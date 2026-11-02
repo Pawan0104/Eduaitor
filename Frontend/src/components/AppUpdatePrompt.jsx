@@ -6,7 +6,8 @@ const STORAGE_KEY = "eduaitor_build_id";
 const CHECK_MS = 60_000;
 
 async function fetchRemoteVersion() {
-  const res = await fetch(`/version.json?t=${Date.now()}`, {
+  const base = import.meta.env.BASE_URL || "/";
+  const res = await fetch(`${base}version.json?t=${Date.now()}`, {
     cache: "no-store",
     headers: { "Cache-Control": "no-cache" },
   });

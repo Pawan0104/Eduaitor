@@ -21,13 +21,42 @@ const EMPTY_FORM = {
   address: "",
   totalFloors: "1",
   capacity: "",
-wardenId: "",
-    wardenType: "staff",
-    wardenName: "",
-  wardenPhone: "",
+  wardens: [],
   description: "",
   status: "Active",
 };
+
+/** Old hostels only have the flat warden* fields; treat them as one warden. */
+const wardensOf = (hostel) => {
+  const list = Array.isArray(hostel?.wardens)
+    ? hostel.wardens.filter(Boolean)
+    : [];
+  if (list.length) return list;
+  if (hostel?.wardenName || hostel?.wardenId) {
+    return [
+      {
+        wardenId: hostel.wardenId?._id || hostel.wardenId || null,
+        wardenType: hostel.wardenType || "staff",
+        name: hostel.wardenName || "",
+        phone: hostel.wardenPhone || "",
+        assignedAt: hostel.createdAt || null,
+      },
+    ];
+  }
+  return [];
+};
+
+const formatJoined = (value) => {
+  if (!value) return "";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "";
+  return date.toLocaleDateString("en-IN", {
+    day: "2-digit",
+    month: "short",
+    year: "numeric",
+  });
+};
+
 
 const HostelBuildings = () => {
   const navigate = useNavigate();
@@ -119,10 +148,7 @@ const HostelBuildings = () => {
       address: hostel.address || "",
       totalFloors: String(hostel.totalFloors ?? 1),
       capacity: hostel.capacity ? String(hostel.capacity) : "",
-wardenId: hostel.wardenId?._id || hostel.wardenId || "",
-        wardenType: hostel.wardenType || "staff",
-        wardenName: hostel.wardenName || "",
-      wardenPhone: hostel.wardenPhone || "",
+      wardens: wardensOf(hostel),
       description: hostel.description || "",
       status: hostel.status || "Active",
     });
@@ -144,6 +170,8 @@ wardenId: hostel.wardenId?._id || hostel.wardenId || "",
       return toast.error("Capacity must be 0 or more");
     }
 
+    const primaryWarden = form.wardens[0];
+
     const payload = {
       name: form.name.trim(),
       code: form.code.trim(),
@@ -151,10 +179,18 @@ wardenId: hostel.wardenId?._id || hostel.wardenId || "",
       address: form.address.trim(),
       totalFloors: floors || 0,
       capacity: capacityNum,
-wardenId: form.wardenId || null,
-        wardenType: form.wardenId ? form.wardenType || "staff" : "staff",
-        wardenName: form.wardenName.trim(),
-      wardenPhone: form.wardenPhone.trim(),
+      wardens: form.wardens.map((w) => ({
+        wardenId: w.wardenId || null,
+        wardenType: w.wardenType === "teacher" ? "teacher" : "staff",
+        name: (w.name || "").trim(),
+        phone: (w.phone || "").trim(),
+        assignedAt: w.assignedAt || new Date().toISOString(),
+      })),
+      // Legacy mirror of the first warden (older screens still read these).
+      wardenId: primaryWarden?.wardenId || null,
+      wardenType: primaryWarden?.wardenType || "staff",
+      wardenName: (primaryWarden?.name || "").trim(),
+      wardenPhone: (primaryWarden?.phone || "").trim(),
       description: form.description.trim(),
       status: form.status,
     };
@@ -202,11 +238,15 @@ wardenId: form.wardenId || null,
 
   const filtered = hostels.filter((h) => {
     const s = search.toLowerCase();
+    const wardenNames = wardensOf(h)
+      .map((w) => w.name?.toLowerCase())
+      .filter(Boolean);
     const matchSearch =
       !s ||
       h.name?.toLowerCase().includes(s) ||
       h.code?.toLowerCase().includes(s) ||
       h.wardenName?.toLowerCase().includes(s) ||
+      wardenNames.some((n) => n.includes(s)) ||
       h.address?.toLowerCase().includes(s);
     const matchStatus = filterStatus ? h.status === filterStatus : true;
     const matchType = filterType ? h.type === filterType : true;
@@ -341,12 +381,35 @@ wardenId: form.wardenId || null,
                   </td>
                   <td className="p-4">{hostel.type || "-"}</td>
                   <td className="p-4">
-                    <p className="font-medium">
-                      {hostel.wardenName || "Unassigned"}
-                    </p>
-                    <p className="text-xs text-[rgb(var(--text-muted))]">
-                      {hostel.wardenPhone || "—"}
-                    </p>
+                    {(() => {
+                      const list = wardensOf(hostel);
+                      if (!list.length) {
+                        return <span className="text-[rgb(var(--text-muted))]">Unassigned</span>;
+                      }
+                      return (
+                        <ul className="space-y-1.5">
+                          {list.map((w, idx) => {
+                            const joined = formatJoined(w.assignedAt);
+                            return (
+                              <li key={`${w.wardenId || w.name}-${idx}`}>
+                                <p className="font-medium leading-tight">
+                                  {w.name || "Unnamed warden"}
+                                  {list.length > 1 && (
+                                    <span className="ml-2 text-[10px] uppercase tracking-wide text-indigo-600 bg-indigo-50 px-1.5 py-0.5 rounded">
+                                      Warden {idx + 1}
+                                    </span>
+                                  )}
+                                </p>
+                                <p className="text-xs text-[rgb(var(--text-muted))]">
+                                  {w.phone || "—"}
+                                  {joined ? ` · Since ${joined}` : ""}
+                                </p>
+                              </li>
+                            );
+                          })}
+                        </ul>
+                      );
+                    })()}
                   </td>
                   <td className="p-4">{hostel.totalFloors ?? 0}</td>
                   <td className="p-4">
@@ -455,17 +518,58 @@ const HostelFormModal = ({ isEdit, form, setForm, staffList, onClose, onSubmit, 
   const set = (key) => (e) =>
     setForm((p) => ({ ...p, [key]: e.target.value }));
 
-const handleWardenSelect = (e) => {
-      const id = e.target.value;
-      const staff = staffList.find((s) => String(s._id) === String(id));
-      setForm((p) => ({
+  const addWarden = (e) => {
+    const id = e.target.value;
+    if (!id) return;
+    const staff = staffList.find((s) => String(s._id) === String(id));
+    if (!staff) return;
+    setForm((p) => {
+      if (p.wardens.some((w) => String(w.wardenId) === String(id))) return p;
+      return {
         ...p,
-        wardenId: id,
-        wardenType: staff?.wardenSource === "teacher" ? "teacher" : "staff",
-        wardenName: staff?.fullName || "",
-        wardenPhone: staff?.phone || "",
-      }));
-    };
+        wardens: [
+          ...p.wardens,
+          {
+            wardenId: staff._id,
+            wardenType: staff.wardenSource === "teacher" ? "teacher" : "staff",
+            name: staff.fullName || "",
+            phone: staff.phone || "",
+            assignedAt: new Date().toISOString(),
+          },
+        ],
+      };
+    });
+    e.target.value = "";
+  };
+
+  const addManualWarden = () =>
+    setForm((p) => ({
+      ...p,
+      wardens: [
+        ...p.wardens,
+        {
+          wardenId: null,
+          wardenType: "staff",
+          name: "",
+          phone: "",
+          assignedAt: new Date().toISOString(),
+        },
+      ],
+    }));
+
+  const updateWarden = (index, key, value) =>
+    setForm((p) => ({
+      ...p,
+      wardens: p.wardens.map((w, i) =>
+        i === index ? { ...w, [key]: value } : w
+      ),
+    }));
+
+  const removeWarden = (index) =>
+    setForm((p) => ({
+      ...p,
+      wardens: p.wardens.filter((_, i) => i !== index),
+    }));
 
   return (
     <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50">
@@ -566,46 +670,101 @@ const handleWardenSelect = (e) => {
 
           <div className="sm:col-span-2">
             <label className="block text-xs font-semibold text-[rgb(var(--text-muted))] uppercase tracking-wide mb-1">
-              Warden (Staff)
+              Wardens (Staff / Teachers)
             </label>
-            <select
-              value={form.wardenId}
-              onChange={handleWardenSelect}
-              className="w-full border rounded-lg px-3 py-2 text-sm bg-[rgb(var(--surface))]"
-            >
-              <option value="">Select warden</option>
-              {staffList.map((s) => (
-                <option key={s._id} value={s._id}>
-                  {s.fullName}{s.staffRole === "hostel_warden" ? " (Warden)" : ""}
-                </option>
-              ))}
-            </select>
-          </div>
+            <p className="text-xs text-[rgb(var(--text-muted))] mb-2">
+              A hostel can have more than one warden — add as many as needed.
+            </p>
 
-          <div>
-            <label className="block text-xs font-semibold text-[rgb(var(--text-muted))] uppercase tracking-wide mb-1">
-              Warden Name
-            </label>
-            <input
-              type="text"
-              placeholder="e.g. Ramesh Kumar"
-              value={form.wardenName}
-              onChange={set("wardenName")}
-              className="w-full border rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 outline-none bg-[rgb(var(--surface))]"
-            />
-          </div>
+            {form.wardens.length > 0 && (
+              <ul className="space-y-2 mb-2">
+                {form.wardens.map((w, index) => (
+                  <li
+                    key={`${w.wardenId || "manual"}-${index}`}
+                    className="border rounded-lg p-2 bg-[rgb(var(--surface))]"
+                  >
+                    <div className="flex items-center justify-between gap-2 mb-1.5">
+                      <div className="flex items-center gap-2 min-w-0">
+                        <span className="text-[10px] uppercase tracking-wide text-indigo-600 bg-indigo-50 px-1.5 py-0.5 rounded shrink-0">
+                          Warden {index + 1}
+                        </span>
+                        {w.wardenType === "teacher" && (
+                          <span className="text-[10px] uppercase tracking-wide text-emerald-600 bg-emerald-50 px-1.5 py-0.5 rounded shrink-0">
+                            Teacher
+                          </span>
+                        )}
+                        <span className="text-xs text-[rgb(var(--text-muted))] truncate">
+                          {formatJoined(w.assignedAt) ? `Since ${formatJoined(w.assignedAt)}` : ""}
+                        </span>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => removeWarden(index)}
+                        className="text-red-500 hover:text-red-700 text-xs font-semibold shrink-0"
+                        title="Remove warden"
+                      >
+                        Remove
+                      </button>
+                    </div>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                      <input
+                        type="text"
+                        placeholder="Warden name"
+                        value={w.name || ""}
+                        onChange={(e) => updateWarden(index, "name", e.target.value)}
+                        className="w-full border rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 outline-none bg-[rgb(var(--surface))]"
+                      />
+                      <input
+                        type="text"
+                        placeholder="Phone"
+                        value={w.phone || ""}
+                        onChange={(e) => updateWarden(index, "phone", e.target.value)}
+                        className="w-full border rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 outline-none bg-[rgb(var(--surface))]"
+                      />
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            )}
 
-          <div>
-            <label className="block text-xs font-semibold text-[rgb(var(--text-muted))] uppercase tracking-wide mb-1">
-              Warden Phone
-            </label>
-            <input
-              type="text"
-              placeholder="e.g. 9876543210"
-              value={form.wardenPhone}
-              onChange={set("wardenPhone")}
-              className="w-full border rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 outline-none bg-[rgb(var(--surface))]"
-            />
+            <div className="flex flex-col sm:flex-row gap-2">
+              <select
+                value=""
+                onChange={addWarden}
+                className="w-full border rounded-lg px-3 py-2 text-sm bg-[rgb(var(--surface))]"
+              >
+                <option value="">+ Add warden from staff</option>
+                {staffList
+                  .filter(
+                    (s) =>
+                      !form.wardens.some(
+                        (w) => String(w.wardenId) === String(s._id)
+                      )
+                  )
+                  .map((s) => (
+                    <option key={s._id} value={s._id}>
+                      {s.fullName}
+                      {s.staffRole === "hostel_warden" || s.isHostelWarden
+                        ? " (Warden)"
+                        : ""}
+                      {s.wardenSource === "teacher" ? " · Teacher" : ""}
+                    </option>
+                  ))}
+              </select>
+              <button
+                type="button"
+                onClick={addManualWarden}
+                className="px-3 py-2 rounded-lg border text-sm font-medium whitespace-nowrap hover:bg-gray-50"
+              >
+                + Manual entry
+              </button>
+            </div>
+            {staffList.length === 0 && (
+              <p className="text-xs text-[rgb(var(--text-muted))] mt-2">
+                No staff or teachers marked as wardens yet. Use “Manual entry” or
+                flag a staff member as a hostel warden.
+              </p>
+            )}
           </div>
 
           <div className="sm:col-span-2">

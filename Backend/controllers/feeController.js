@@ -783,6 +783,9 @@ export const getAllDefaulter = async (req, res) => {
           pipeline: [
             {
               $match: {
+                ...(req.academicYear && !req.academicYearAll
+                  ? { academicYear: req.academicYear }
+                  : {}),
                 $expr: {
                   $and: [
                     { $eq: ["$studentId", "$$studId"] },
@@ -915,6 +918,9 @@ export const getAllAdminDefaulter = async (req, res) => {
           pipeline: [
             {
               $match: {
+                ...(req.academicYear && !req.academicYearAll
+                  ? { academicYear: req.academicYear }
+                  : {}),
                 $expr: {
                   $and: [
                     { $eq: ["$studentId", "$$studId"] },
@@ -1313,6 +1319,9 @@ export const notifyAllDefaulters = async (req, res) => {
           pipeline: [
             {
               $match: {
+                ...(req.academicYear && !req.academicYearAll
+                  ? { academicYear: req.academicYear }
+                  : {}),
                 $expr: {
                   $and: [
                     { $eq: ["$studentId", "$$studId"] },

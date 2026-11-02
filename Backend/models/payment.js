@@ -1,4 +1,5 @@
 import mongoose from "mongoose";
+import sessionScopedPlugin from "../utils/sessionPlugin.js";
 const paymentSchema = new mongoose.Schema(
   {
     studentId: {
@@ -26,6 +27,8 @@ const paymentSchema = new mongoose.Schema(
       ref: "School",
       required: true,
     },
+    /** Academic session this payment belongs to (e.g. "2026-27"). */
+    academicYear: { type: String, default: "", index: true },
     razorpayOrderId: { type: String },
     razorpayPaymentId: { type: String },
     razorpaySignature: { type: String },
@@ -36,5 +39,7 @@ const paymentSchema = new mongoose.Schema(
 );
 
 paymentSchema.index({ receiptNo: 1, schoolId: 1 }, { unique: true });
+
+paymentSchema.plugin(sessionScopedPlugin);
 
 export default mongoose.model("Payment", paymentSchema);

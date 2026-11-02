@@ -38,6 +38,42 @@ const hostelSchema = new mongoose.Schema(
       min: 0,
       default: 0,
     },
+    // A hostel can have more than one warden (e.g. day warden + night warden).
+    // The flat warden* fields below are kept in sync with wardens[0] for
+    // backwards compatibility with older clients/reports.
+    wardens: {
+      type: [
+        new mongoose.Schema(
+          {
+            wardenId: {
+              type: mongoose.Schema.Types.ObjectId,
+              default: null,
+            },
+            wardenType: {
+              type: String,
+              enum: ["staff", "teacher"],
+              default: "staff",
+            },
+            name: {
+              type: String,
+              trim: true,
+              default: "",
+            },
+            phone: {
+              type: String,
+              trim: true,
+              default: "",
+            },
+            assignedAt: {
+              type: Date,
+              default: Date.now,
+            },
+          },
+          { _id: false }
+        ),
+      ],
+      default: [],
+    },
     wardenName: {
       type: String,
       trim: true,

@@ -1,4 +1,5 @@
 import mongoose from "mongoose";
+import sessionScopedPlugin from "../utils/sessionPlugin.js";
 
 const periodEntrySchema = new mongoose.Schema({
   periodId: { type: String, required: true },
@@ -50,6 +51,8 @@ const timetableSchema = new mongoose.Schema(
       ref: "School",
       required: true,
     },
+    /** Academic session this timetable belongs to (e.g. "2026-27"). */
+    academicYear: { type: String, default: "", index: true },
     classId: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "Class",
@@ -65,10 +68,12 @@ const timetableSchema = new mongoose.Schema(
   { timestamps: true },
 );
 
-// ← schoolId added to unique index
+// One timetable per class/detail per academic session.
 timetableSchema.index(
-  { schoolId: 1, classId: 1, detailId: 1 },
-  { unique: true },
+  { schoolId: 1, classId: 1, detailId: 1, academicYear: 1 },
+  { unique: true, name: "one_timetable_per_class_detail_session" },
 );
+
+timetableSchema.plugin(sessionScopedPlugin);
 
 export default mongoose.model("Timetable", timetableSchema);

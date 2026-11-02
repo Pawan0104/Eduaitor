@@ -1,4 +1,5 @@
 import mongoose from "mongoose";
+import sessionScopedPlugin from "../utils/sessionPlugin.js";
 
 const noticeSchema = new mongoose.Schema(
   {
@@ -7,6 +8,8 @@ const noticeSchema = new mongoose.Schema(
       ref: "School",
       required: true,
     },
+    /** Academic session this notice belongs to (e.g. "2026-27"). */
+    academicYear: { type: String, default: "", index: true },
     title: { type: String, required: true, trim: true },
     content: { type: String, required: true },
     category: {
@@ -32,5 +35,7 @@ const noticeSchema = new mongoose.Schema(
   },
   { timestamps: true },
 );
+
+noticeSchema.plugin(sessionScopedPlugin);
 
 export default mongoose.model("Notice", noticeSchema);
