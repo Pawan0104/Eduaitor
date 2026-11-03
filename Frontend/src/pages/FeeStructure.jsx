@@ -18,7 +18,10 @@ const FeeStructure = () => {
     name: "",
     amount: "",
     isOptional: false,
+    category: "General",
+    appliesTo: "All",
   });
+  const [viewBatch, setViewBatch] = useState("All"); // All | New | Old
   const [saving, setSaving] = useState(false);
   const [errors, setErrors] = useState({});
   // calculate amount for monthly wise drop down
@@ -117,7 +120,13 @@ const FeeStructure = () => {
   /* Open modal in ADD mode */
   const openAdd = () => {
     setEditingFee(null);
-    setFormData({ name: "", amount: "", isOptional: false });
+    setFormData({
+      name: "",
+      amount: "",
+      isOptional: false,
+      category: "General",
+      appliesTo: "All",
+    });
     setShowModal(true);
   };
 
@@ -127,7 +136,9 @@ const FeeStructure = () => {
     setFormData({
       name: fee.name,
       amount: fee.amount,
-      isOptional: fee.isOptional,
+      isOptional: !!fee.isOptional,
+      category: fee.category || "General",
+      appliesTo: fee.appliesTo || "All",
     });
     setShowModal(true);
   };
@@ -208,18 +219,31 @@ const FeeStructure = () => {
     }
   };
 
-  // calculate totals for cards
+  const visibleFees = (feeData?.fees || []).filter((f) => {
+    if (viewBatch === "All") return true;
+    const applies = f.appliesTo || "All";
+    return applies === "All" || applies === viewBatch;
+  });
 
-  const feeCount = feeData?.fees?.length ?? 0;
+  // calculate totals for cards
+  const feeCount = visibleFees.length;
   const totalAll =
-    feeData?.fees?.reduce((sum, f) => sum + calcAmount(f.amount), 0) ?? 0;
+    visibleFees.reduce((sum, f) => sum + calcAmount(f.amount), 0) ?? 0;
   const totalOptional =
-    feeData?.fees
-      ?.filter((f) => f.isOptional)
+    visibleFees
+      .filter((f) => f.isOptional)
       .reduce((sum, f) => sum + calcAmount(f.amount), 0) ?? 0;
   const totalMandatory =
-    feeData?.fees
-      ?.filter((f) => !f.isOptional)
+    visibleFees
+      .filter((f) => !f.isOptional)
+      .reduce((sum, f) => sum + calcAmount(f.amount), 0) ?? 0;
+  const totalHostel =
+    visibleFees
+      .filter((f) => (f.category || "General") === "Hostel")
+      .reduce((sum, f) => sum + calcAmount(f.amount), 0) ?? 0;
+  const totalTransport =
+    visibleFees
+      .filter((f) => (f.category || "General") === "Transport")
       .reduce((sum, f) => sum + calcAmount(f.amount), 0) ?? 0;
 
   /* INR currency formatter */
@@ -301,6 +325,36 @@ const FeeStructure = () => {
           )}
         </div>
 
+        {selectedClass && (
+          <div className="mb-3 flex flex-wrap gap-2 items-center">
+            <span className="text-[10px] font-bold uppercase tracking-widest opacity-70">
+              Show for
+            </span>
+            {["All", "New", "Old"].map((batch) => (
+              <button
+                key={batch}
+                type="button"
+                onClick={() => setViewBatch(batch)}
+                className={`px-3 py-1.5 rounded-lg text-xs font-semibold border transition ${
+                  viewBatch === batch
+                    ? "bg-[rgb(var(--primary))] text-white border-transparent"
+                    : "bg-[rgb(var(--surface))]"
+                }`}
+              >
+                {batch === "All"
+                  ? "All components"
+                  : batch === "New"
+                    ? "New students"
+                    : "Old students"}
+              </button>
+            ))}
+            <p className="text-[11px] opacity-70 w-full sm:w-auto">
+              Add as many heads as needed (tuition, hostel, transport, exam…).
+              Mark New / Old / All so batches can differ.
+            </p>
+          </div>
+        )}
+
         {/* Frequency selector — saved to class fee structure (parents see installments) */}
         {selectedClass && (
           <div className="flex flex-col gap-1 mt-4 mb-3 ">
@@ -378,6 +432,22 @@ const FeeStructure = () => {
                 {fmt(totalAll)}
               </p>
             </div>
+            <div className="px-3 py-2 border rounded-lg">
+              <p className="text-[9px] font-bold tracking-widest uppercase mb-0.5">
+                Hostel
+              </p>
+              <p className="font-bold text-[15px]" style={{ fontFamily: "Outfit, sans-serif" }}>
+                {fmt(totalHostel)}
+              </p>
+            </div>
+            <div className="px-3 py-2 border rounded-lg">
+              <p className="text-[9px] font-bold tracking-widest uppercase mb-0.5">
+                Transport
+              </p>
+              <p className="font-bold text-[15px]" style={{ fontFamily: "Outfit, sans-serif" }}>
+                {fmt(totalTransport)}
+              </p>
+            </div>
           </div>
         )}
 
@@ -429,6 +499,12 @@ const FeeStructure = () => {
                       Component
                     </th>
                     <th className="px-4 py-2.5 text-left text-[9px] font-bold  uppercase ">
+                      Category
+                    </th>
+                    <th className="px-4 py-2.5 text-left text-[9px] font-bold  uppercase ">
+                      Applies to
+                    </th>
+                    <th className="px-4 py-2.5 text-left text-[9px] font-bold  uppercase ">
                       Type
                     </th>
                     <th className="px-4 py-2.5 text-right text-[9px] font-bold  uppercase ">
@@ -442,7 +518,7 @@ const FeeStructure = () => {
 
                 {/* Fee rows — each fee component gets its own row */}
                 <tbody>
-                  {feeData.fees.map((fee, i) => (
+                  {visibleFees.map((fee, i) => (
                     <tr
                       key={fee._id}
                       className="border text-[rgb(var(--text))]"
@@ -455,6 +531,22 @@ const FeeStructure = () => {
                       {/* Fee component name */}
                       <td className="px-4 py-3 text-sm font-semibold text-[rgb(var(--text))]">
                         {fee.name}
+                      </td>
+
+                      <td className="px-4 py-3">
+                        <span className="inline-block text-[9px] font-bold tracking-wider uppercase px-2 py-0.5 rounded bg-slate-100 text-slate-700">
+                          {fee.category || "General"}
+                        </span>
+                      </td>
+
+                      <td className="px-4 py-3">
+                        <span className="inline-block text-[9px] font-bold tracking-wider uppercase px-2 py-0.5 rounded bg-indigo-50 text-indigo-700">
+                          {(fee.appliesTo || "All") === "All"
+                            ? "All students"
+                            : fee.appliesTo === "New"
+                              ? "New only"
+                              : "Old only"}
+                        </span>
                       </td>
 
                       {/* Mandatory / Optional badge */}
@@ -504,10 +596,11 @@ const FeeStructure = () => {
                 <tfoot>
                   <tr className="bg-[rgb(var(--surface))]">
                     <td
-                      colSpan={3}
+                      colSpan={5}
                       className="px-4 py-3 text-[11px] font-bold tracking-widest uppercase  text-[rgb(var(--primary))]"
                     >
                       Total Fees
+                      {viewBatch !== "All" ? ` (${viewBatch} students)` : ""}
                     </td>
                     <td
                       colSpan={2}
@@ -615,6 +708,52 @@ const FeeStructure = () => {
               </p>
             )}
 
+            <label className="block text-[10px] font-bold tracking-widest uppercase mb-1.5">
+              Category
+            </label>
+            <select
+              className="fs-select w-full border rounded-lg px-3 py-2 text-sm mb-4 bg-[rgb(var(--surface))]"
+              value={formData.category}
+              onChange={(e) => {
+                const category = e.target.value;
+                setFormData((p) => ({
+                  ...p,
+                  category,
+                  // Hostel/Transport are usually optional opt-ins
+                  isOptional:
+                    category === "Hostel" || category === "Transport"
+                      ? true
+                      : p.isOptional,
+                  name:
+                    !p.name && category === "Hostel"
+                      ? "Hostel Fee"
+                      : !p.name && category === "Transport"
+                        ? "Transport Fee"
+                        : p.name,
+                }));
+              }}
+            >
+              <option value="General">General (Tuition / Exam / etc.)</option>
+              <option value="Hostel">Hostel</option>
+              <option value="Transport">Transport</option>
+              <option value="Other">Other</option>
+            </select>
+
+            <label className="block text-[10px] font-bold tracking-widest uppercase mb-1.5">
+              Applies to
+            </label>
+            <select
+              className="fs-select w-full border rounded-lg px-3 py-2 text-sm mb-4 bg-[rgb(var(--surface))]"
+              value={formData.appliesTo}
+              onChange={(e) =>
+                setFormData((p) => ({ ...p, appliesTo: e.target.value }))
+              }
+            >
+              <option value="All">All students</option>
+              <option value="New">New students only</option>
+              <option value="Old">Old / continuing students only</option>
+            </select>
+
             {/* isOptional toggle */}
             <label className="flex items-center gap-2 mb-5 cursor-pointer">
               <input
@@ -627,6 +766,12 @@ const FeeStructure = () => {
               />
               <span className="text-sm text-[rgb(var(--text))] font-medium">
                 Mark as Optional
+                {(formData.category === "Hostel" ||
+                  formData.category === "Transport") && (
+                  <span className="block text-[11px] opacity-70 font-normal">
+                    Applied when student has hostel / transport assigned
+                  </span>
+                )}
               </span>
             </label>
 

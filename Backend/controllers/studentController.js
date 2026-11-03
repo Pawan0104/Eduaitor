@@ -1,6 +1,7 @@
 import mongoose from "mongoose";
 import Student from "../models/student.js";
 import Lead from "../models/lead.js";
+import Registration from "../models/registration.js";
 import Group from "../models/group.js";
 import Teacher from "../models/teacher.js";
 import Class from "../models/class.js";
@@ -21,6 +22,7 @@ import {
 import bcrypt from "bcryptjs";
 import { resolveParentCredentialsForCreate } from "../utils/parentChildren.js";
 import { notifyCredentialsAsync } from "../services/credentials/notifyCredentials.js";
+import { resolveStream } from "../utils/resolveStream.js";
 
 const isValidObjectId = (value) =>
   Boolean(value) && mongoose.Types.ObjectId.isValid(String(value));
@@ -55,7 +57,28 @@ const sanitizeStudentObjectIds = (safeBody) => {
   return errors;
 };
 
+const toBool = (value) =>
+  value === true ||
+  value === "true" ||
+  value === "1" ||
+  value === "on" ||
+  value === 1;
+
 const normalizeStudentFeeFields = (safeBody) => {
+  ["isSpecialChild", "isEws", "isPhysicallyDisabled"].forEach((key) => {
+    if (safeBody[key] !== undefined) {
+      safeBody[key] = toBool(safeBody[key]);
+    }
+  });
+  if (safeBody.aadhaarNumber !== undefined) {
+    safeBody.aadhaarNumber = String(safeBody.aadhaarNumber || "")
+      .replace(/\D/g, "")
+      .slice(0, 12);
+  }
+  if (safeBody.feeBatch !== undefined) {
+    safeBody.feeBatch =
+      String(safeBody.feeBatch || "").trim() === "Old" ? "Old" : "New";
+  }
   if (safeBody.transport === "") {
     safeBody.transport = null;
   }
@@ -516,6 +539,85 @@ export const createStudent = async (req, res) => {
       convertedFromLeadId = lead._id;
     }
 
+    const registrationIdRaw =
+      safeBody.registrationId || safeBody.convertedFromRegistrationId || null;
+    delete safeBody.registrationId;
+    delete safeBody.convertedFromRegistrationId;
+
+    let registrationDoc = null;
+    if (registrationIdRaw) {
+      if (!mongoose.Types.ObjectId.isValid(registrationIdRaw)) {
+        return res.status(400).json({
+          success: false,
+          message: "Invalid registration reference",
+        });
+      }
+
+      registrationDoc = await Registration.findOne({
+        _id: registrationIdRaw,
+        schoolId,
+      });
+      if (!registrationDoc) {
+        return res.status(404).json({
+          success: false,
+          message: "Registration not found",
+        });
+      }
+      if (registrationDoc.status === "admitted" || registrationDoc.studentId) {
+        return res.status(400).json({
+          success: false,
+          message: "This registration has already been admitted",
+        });
+      }
+      if (registrationDoc.status === "cancelled") {
+        return res.status(400).json({
+          success: false,
+          message: "Cancelled registrations cannot be admitted",
+        });
+      }
+      if (
+        registrationDoc.entranceExamId &&
+        registrationDoc.entrance?.result !== "pass"
+      ) {
+        return res.status(400).json({
+          success: false,
+          message:
+            registrationDoc.entrance?.result === "fail"
+              ? "This candidate did not pass the entrance exam"
+              : "Entrance exam result is still pending. Add the marks first.",
+        });
+      }
+
+      // A registration opened from a lead keeps that lead in sync.
+      if (!convertedFromLeadId && registrationDoc.leadId) {
+        const linkedLead = await Lead.findOne({
+          _id: registrationDoc.leadId,
+          schoolId,
+        })
+          .select("_id studentId status")
+          .lean();
+        if (linkedLead && !linkedLead.studentId) {
+          convertedFromLeadId = linkedLead._id;
+        }
+      }
+    }
+
+    let resolvedStreamOnAdmit = { streamId: null, stream: "" };
+    try {
+      resolvedStreamOnAdmit = await resolveStream(
+        schoolId,
+        safeBody.streamId || null,
+      );
+    } catch (streamErr) {
+      return res.status(streamErr.statusCode || 400).json({
+        success: false,
+        message: streamErr.message || "Invalid stream selected.",
+      });
+    }
+    if (!resolvedStreamOnAdmit.streamId && safeBody.stream) {
+      resolvedStreamOnAdmit.stream = String(safeBody.stream).trim();
+    }
+
     // Auto-assign a random active house when school uses House Allocation
     let houseId = safeBody.houseId || null;
     if (!houseId) {
@@ -564,8 +666,11 @@ export const createStudent = async (req, res) => {
       customFields,
       parentCredentials,
       houseId,
+      streamId: resolvedStreamOnAdmit.streamId,
+      stream: resolvedStreamOnAdmit.stream,
       idCardIssuedAt: new Date(),
       convertedFromLeadId,
+      convertedFromRegistrationId: registrationDoc?._id || null,
     });
 
     let student = null;
@@ -599,6 +704,13 @@ export const createStudent = async (req, res) => {
         },
         { $set: { status: "admitted", studentId: student._id } },
       );
+    }
+
+    if (registrationDoc) {
+      registrationDoc.status = "admitted";
+      registrationDoc.studentId = student._id;
+      registrationDoc.admittedAt = new Date();
+      await registrationDoc.save();
     }
 
     // AUTO ADD TO GROUPS (non-blocking for admit)
@@ -669,6 +781,16 @@ export const createStudent = async (req, res) => {
       return res.status(400).json({
         success: false,
         message: "This lead has already been converted to a student",
+      });
+    }
+
+    if (
+      error?.code === 11000 &&
+      error?.keyPattern?.convertedFromRegistrationId
+    ) {
+      return res.status(400).json({
+        success: false,
+        message: "This registration has already been admitted",
       });
     }
 

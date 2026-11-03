@@ -32,6 +32,9 @@ import {
   rejectVisitor,
   checkoutVisitor,
   deleteVisitor,
+  getParentPendingVisitorAuth,
+  parentAuthorizeVisitor,
+  parentRejectVisitor,
 } from "../controllers/hostelVisitorController.js";
 
 const router = express.Router();
@@ -42,6 +45,21 @@ router.post(
   "/visitors/parent-request",
   authMiddleware,
   createParentVisitorRequest,
+);
+router.get(
+  "/visitors/parent-pending-auth",
+  authMiddleware,
+  getParentPendingVisitorAuth,
+);
+router.post(
+  "/visitors/:id/parent-authorize",
+  authMiddleware,
+  parentAuthorizeVisitor,
+);
+router.post(
+  "/visitors/:id/parent-reject",
+  authMiddleware,
+  parentRejectVisitor,
 );
 
 /* Nested resources before /:id */

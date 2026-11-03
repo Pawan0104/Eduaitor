@@ -114,8 +114,9 @@ export default function TeacherMenu() {
       icon: <FaClipboardCheck />,
       module: "attendance",
       children: [
-        { name: "Mark Attendance", path: "/teacher/attendance/mark" },
-        { name: "Attendance Report", path: "/teacher/attendance/report" },
+{ name: "Mark Class Attendance", path: "/teacher/attendance/mark" },
+          { name: "Mark My Attendance", path: "/teacher/attendance/my" },
+          { name: "Attendance Report", path: "/teacher/attendance/report" },
         { name: "Leave Request", path: "/teacher/leave-request" },
       ],
     },

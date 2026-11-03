@@ -30,6 +30,8 @@ const emptyForm = {
   parentMobile: "",
   parentEmail: "",
   previousSchoolName: "",
+  classId: "",
+  streamId: "",
   assigneeKey: "",
 };
 
@@ -41,6 +43,8 @@ const LeadManagement = () => {
   const basePath = isStaffLogin ? "/staff" : "/school";
 
   const [leads, setLeads] = useState([]);
+  const [classes, setClasses] = useState([]);
+  const [streams, setStreams] = useState([]);
   const [assignees, setAssignees] = useState([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -63,16 +67,25 @@ const LeadManagement = () => {
   const fetchPageData = async () => {
     try {
       setLoading(true);
-      const requestList = [axios.get(`${API}/leads`, { withCredentials: true })];
+      const requestList = [
+        axios.get(`${API}/leads`, { withCredentials: true }),
+        axios.get(`${API}/classes/all`, { withCredentials: true }),
+        axios.get(`${API}/streams/all`, {
+          params: { status: "Active" },
+          withCredentials: true,
+        }),
+      ];
       if (!isStaffLogin) {
         requestList.push(
           axios.get(`${API}/leads/assignable-users`, { withCredentials: true }),
         );
       }
 
-      const [leadRes, assigneeRes] = await Promise.all(requestList);
+      const [leadRes, classRes, streamRes, assigneeRes] = await Promise.all(requestList);
 
       setLeads(leadRes.data.data || []);
+      setClasses(classRes?.data?.classes || []);
+      setStreams(streamRes?.data?.streams || streamRes?.data?.data || []);
       setAssignees(assigneeRes?.data?.data || []);
     } catch (error) {
       toast.error(error.response?.data?.message || "Failed to load lead data");
@@ -137,6 +150,8 @@ const LeadManagement = () => {
           parentMobile: form.parentMobile.trim(),
           parentEmail: form.parentEmail.trim(),
           previousSchoolName: form.previousSchoolName.trim(),
+          classId: form.classId || undefined,
+          streamId: form.streamId || undefined,
           assignedToUserType,
           assignedToUserId,
         },
@@ -163,18 +178,18 @@ const LeadManagement = () => {
     }
   };
 
-  const handleStartAdmission = async (lead) => {
+  const handleStartRegistration = async (lead) => {
     if (!lead?._id) return;
     if (lead.studentId || String(lead.status || "").toLowerCase() === "admitted") {
       toast.info("This lead is already converted. Open the student record from Students.");
       return;
     }
     if (String(lead.status || "").toLowerCase() === "cancelled") {
-      toast.error("Cancelled leads cannot be admitted");
+      toast.error("Cancelled leads cannot be registered");
       return;
     }
 
-    // Mark as processing so the pipeline reflects admission in progress
+    // Mark as processing so the pipeline reflects registration in progress
     if (String(lead.status || "").toLowerCase() === "active") {
       try {
         await axios.patch(
@@ -188,11 +203,16 @@ const LeadManagement = () => {
           ),
         );
       } catch {
-        /* still open admission form */
+        /* still open registration form */
       }
     }
 
-    navigate(`${basePath}/student-manage?leadId=${lead._id}`);
+    // Middle layer: Lead → Registration → (exam if needed) → Admit
+    if (lead.registrationId) {
+      navigate(`${basePath}/registrations?registrationId=${lead.registrationId}`);
+      return;
+    }
+    navigate(`${basePath}/registrations?leadId=${lead._id}`);
   };
 
   const handleStatusChange = async (leadId, nextStatus) => {
@@ -202,8 +222,12 @@ const LeadManagement = () => {
     if (normalized === "admitted") {
       const lead = leads.find((item) => item._id === leadId);
       if (!lead?.studentId) {
-        toast.info("Use Start Admission to convert this lead into a student");
-        handleStartAdmission(lead || { _id: leadId });
+        toast.info(
+          lead?.registrationId
+            ? "Open Registration and use Admit after the candidate passes"
+            : "Register this lead first, then Admit from Registration",
+        );
+        handleStartRegistration(lead || { _id: leadId });
         return;
       }
     }
@@ -456,6 +480,12 @@ const LeadManagement = () => {
                     {lead.previousSchoolName && (
                       <span className="flex items-center gap-1"><FaSchool size={11} /> {lead.previousSchoolName}</span>
                     )}
+                    {(lead.className || lead.stream) && (
+                      <span className="flex items-center gap-1">
+                        <FaUserGraduate size={11} />
+                        {[lead.className, lead.stream].filter(Boolean).join(" · ")}
+                      </span>
+                    )}
                   </div>
                 </div>
 
@@ -574,10 +604,11 @@ const LeadManagement = () => {
                     ) : String(lead.status || "").toLowerCase() !== "cancelled" ? (
                       <button
                         type="button"
-                        onClick={() => handleStartAdmission(lead)}
+                        onClick={() => handleStartRegistration(lead)}
                         className="inline-flex items-center justify-center gap-2 px-3 py-2 rounded-xl bg-[rgb(var(--primary))] text-white hover:opacity-90 transition text-sm font-medium"
                       >
-                        <FaUserGraduate size={12} /> Start Admission
+                        <FaUserGraduate size={12} />{" "}
+                        {lead.registrationId ? "Open Registration" : "Register"}
                       </button>
                     ) : null}
 
@@ -669,6 +700,40 @@ const LeadManagement = () => {
                   className="px-3 py-2.5 rounded-xl border border-[rgb(var(--border))] bg-[rgb(var(--bg))]"
                   placeholder="Enter previous school"
                 />
+              </label>
+
+              <label className="flex flex-col gap-2 text-sm font-medium">
+                Interested Class
+                <select
+                  name="classId"
+                  value={form.classId}
+                  onChange={handleChange}
+                  className="px-3 py-2.5 rounded-xl border border-[rgb(var(--border))] bg-[rgb(var(--bg))]"
+                >
+                  <option value="">Select class</option>
+                  {classes.map((cls) => (
+                    <option key={cls._id} value={cls._id}>
+                      {cls.name}
+                    </option>
+                  ))}
+                </select>
+              </label>
+
+              <label className="flex flex-col gap-2 text-sm font-medium">
+                Stream
+                <select
+                  name="streamId"
+                  value={form.streamId}
+                  onChange={handleChange}
+                  className="px-3 py-2.5 rounded-xl border border-[rgb(var(--border))] bg-[rgb(var(--bg))]"
+                >
+                  <option value="">Select stream (optional)</option>
+                  {streams.map((item) => (
+                    <option key={item._id} value={item._id}>
+                      {item.name}
+                    </option>
+                  ))}
+                </select>
               </label>
 
               <label className="flex flex-col gap-2 text-sm font-medium">

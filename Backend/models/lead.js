@@ -56,6 +56,28 @@ const leadSchema = new mongoose.Schema(
       trim: true,
       default: "",
     },
+    /** Class the enquiry is interested in */
+    classId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "Class",
+      default: null,
+    },
+    className: {
+      type: String,
+      trim: true,
+      default: "",
+    },
+    /** Academic stream managed by school admin */
+    streamId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "Stream",
+      default: null,
+    },
+    stream: {
+      type: String,
+      trim: true,
+      default: "",
+    },
     assignedTo: {
       userId: {
         type: mongoose.Schema.Types.ObjectId,
@@ -98,6 +120,12 @@ const leadSchema = new mongoose.Schema(
     studentId: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "Student",
+      default: null,
+    },
+    /** Set when a registration was opened for this lead */
+    registrationId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "Registration",
       default: null,
     },
     followUps: {

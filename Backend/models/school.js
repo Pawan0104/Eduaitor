@@ -110,8 +110,28 @@ const schoolSchema = new mongoose.Schema(
       type: String,
       default: "",
     },
+
+    /**
+     * Public admission registration form. `token` is the unguessable slug used
+     * by the shareable link (/register/<token>); it is created lazily when an
+     * admin opens the Registration page.
+     */
+    registrationForm: {
+      publicEnabled: { type: Boolean, default: false },
+      token: { type: String, default: "" },
+      instructions: { type: String, default: "" },
+      /** Empty = every active class is open for registration. */
+      openClassIds: [
+        { type: mongoose.Schema.Types.ObjectId, ref: "Class" },
+      ],
+    },
   },
   { timestamps: true },
+);
+
+schoolSchema.index(
+  { "registrationForm.token": 1 },
+  { unique: true, sparse: true },
 );
 
 export default mongoose.model("School", schoolSchema);

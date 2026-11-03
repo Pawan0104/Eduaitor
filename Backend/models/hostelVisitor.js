@@ -57,6 +57,25 @@ const hostelVisitorSchema = new mongoose.Schema(
       trim: true,
       default: "",
     },
+    /**
+     * Parent  — father/mother/registered guardian (or explicitly marked)
+     * Other   — new / unregistered visitor (needs parent auth first)
+     */
+    visitorRelation: {
+      type: String,
+      enum: ["Parent", "Other"],
+      default: "Other",
+    },
+    /** Matched against student father/mother/guardian records */
+    isRegisteredContact: {
+      type: Boolean,
+      default: false,
+    },
+    matchedRelation: {
+      type: String,
+      trim: true,
+      default: "",
+    },
     residentId: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "HostelResident",
@@ -72,14 +91,21 @@ const hostelVisitorSchema = new mongoose.Schema(
     /** Live photo captured by security guard at gate */
     photo: fileSchema,
     /**
-     * Pending  — submitted by guard, awaiting warden
-     * CheckedIn — approved; entry granted
-     * Rejected — warden denied entry
-     * CheckedOut — visitor left
+     * PendingParentAuth — new visitor; waiting for parent authorization
+     * Pending           — awaiting warden approval
+     * CheckedIn         — approved; entry granted
+     * Rejected          — parent or warden denied
+     * CheckedOut        — visitor left
      */
     status: {
       type: String,
-      enum: ["Pending", "CheckedIn", "Rejected", "CheckedOut"],
+      enum: [
+        "PendingParentAuth",
+        "Pending",
+        "CheckedIn",
+        "Rejected",
+        "CheckedOut",
+      ],
       default: "Pending",
       index: true,
     },
@@ -89,9 +115,24 @@ const hostelVisitorSchema = new mongoose.Schema(
       type: Date,
       default: null,
     },
+    parentAuthBy: actorSchema,
+    parentAuthAt: {
+      type: Date,
+      default: null,
+    },
+    parentAuthNote: {
+      type: String,
+      trim: true,
+      default: "",
+    },
     rejectionReason: {
       type: String,
       trim: true,
+      default: "",
+    },
+    rejectedByRole: {
+      type: String,
+      enum: ["", "parent", "warden", "staff"],
       default: "",
     },
     /** Set when warden approves (entry granted) */
@@ -120,5 +161,6 @@ const hostelVisitorSchema = new mongoose.Schema(
 
 hostelVisitorSchema.index({ schoolId: 1, createdAt: -1 });
 hostelVisitorSchema.index({ schoolId: 1, status: 1, hostelId: 1 });
+hostelVisitorSchema.index({ schoolId: 1, studentId: 1, status: 1 });
 
 export default mongoose.model("HostelVisitor", hostelVisitorSchema);

@@ -84,6 +84,14 @@ export default function FeeReceipt() {
   }
 
   const { receipt, student, school } = data;
+  const entryType = receipt.entryType || "payment";
+  const docTitle =
+    entryType === "refund"
+      ? "Fee Refund"
+      : entryType === "voucher"
+        ? "Fee Voucher"
+        : "Fee Receipt";
+  const feeHeads = Array.isArray(receipt.feeHeads) ? receipt.feeHeads : [];
 
   return (
     <div className="p-4 sm:p-6 lg:p-8 min-h-screen text-[rgb(var(--text))]">
@@ -102,7 +110,7 @@ export default function FeeReceipt() {
           >
             <FaArrowLeft /> Back
           </button>
-          <h1 className="text-2xl font-bold">Fee Receipt</h1>
+          <h1 className="text-2xl font-bold">{docTitle}</h1>
           <p className="text-sm text-[rgb(var(--text-light))] mt-1">
             {receipt.receiptNo} · Print or save as PDF
           </p>
@@ -155,11 +163,16 @@ export default function FeeReceipt() {
             </div>
             <div className="text-right shrink-0">
               <p className="text-[10px] uppercase tracking-wider opacity-70">
-                Fee Receipt
+                {docTitle}
               </p>
               <p className="text-sm font-mono font-bold mt-1">
                 {receipt.receiptNo}
               </p>
+              {entryType === "voucher" && (
+                <p className="text-[10px] mt-1 opacity-80">
+                  Status: {receipt.status || "open"}
+                </p>
+              )}
             </div>
           </div>
 
@@ -241,24 +254,60 @@ export default function FeeReceipt() {
                 </tr>
               </thead>
               <tbody>
-                <tr className="border-b border-slate-100">
-                  <td className="py-3">
-                    School fee payment
-                    {receipt.remarks ? (
-                      <span className="block text-xs text-slate-500 mt-0.5">
-                        {receipt.remarks}
-                      </span>
-                    ) : null}
-                  </td>
-                  <td className="py-3 text-right font-semibold">
-                    {fmtINR(receipt.amountPaid)}
-                  </td>
-                </tr>
+                {feeHeads.length > 0 ? (
+                  feeHeads.map((head, idx) => (
+                    <tr key={`${head.name}-${idx}`} className="border-b border-slate-100">
+                      <td className="py-3">
+                        {head.name}
+                        {idx === 0 && receipt.remarks ? (
+                          <span className="block text-xs text-slate-500 mt-0.5">
+                            {receipt.remarks}
+                          </span>
+                        ) : null}
+                      </td>
+                      <td className="py-3 text-right font-semibold">
+                        {fmtINR(head.amount)}
+                      </td>
+                    </tr>
+                  ))
+                ) : (
+                  <tr className="border-b border-slate-100">
+                    <td className="py-3">
+                      {entryType === "refund"
+                        ? "Fee refund"
+                        : entryType === "voucher"
+                          ? "Fee voucher / challan"
+                          : "School fee payment"}
+                      {receipt.remarks ? (
+                        <span className="block text-xs text-slate-500 mt-0.5">
+                          {receipt.remarks}
+                        </span>
+                      ) : null}
+                    </td>
+                    <td className="py-3 text-right font-semibold">
+                      {fmtINR(receipt.amountPaid)}
+                    </td>
+                  </tr>
+                )}
               </tbody>
               <tfoot>
                 <tr>
-                  <td className="pt-4 font-black text-base">Amount received</td>
-                  <td className="pt-4 text-right font-black text-lg text-emerald-700">
+                  <td className="pt-4 font-black text-base">
+                    {entryType === "refund"
+                      ? "Amount refunded"
+                      : entryType === "voucher"
+                        ? "Amount payable"
+                        : "Amount received"}
+                  </td>
+                  <td
+                    className={`pt-4 text-right font-black text-lg ${
+                      entryType === "refund"
+                        ? "text-red-600"
+                        : entryType === "voucher"
+                          ? "text-amber-700"
+                          : "text-emerald-700"
+                    }`}
+                  >
                     {fmtINR(receipt.amountPaid)}
                   </td>
                 </tr>

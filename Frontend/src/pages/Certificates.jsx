@@ -209,17 +209,39 @@ export default function Certificates() {
       toast.error("Select a student first — the preview builds automatically");
       return;
     }
-    const win = window.open("", "_blank", "noopener,noreferrer,width=900,height=1200");
-    if (!win) {
-      toast.error("Pop-up blocked — allow pop-ups to print");
+    // Hidden iframe — window.open(..., "noopener") returns null in modern browsers
+    const frame = document.createElement("iframe");
+    frame.setAttribute("aria-hidden", "true");
+    frame.style.cssText =
+      "position:fixed;right:0;bottom:0;width:0;height:0;border:0;opacity:0;pointer-events:none";
+    document.body.appendChild(frame);
+    const win = frame.contentWindow;
+    if (!win?.document) {
+      frame.remove();
+      toast.error("Could not prepare print view");
       return;
     }
+    win.document.open();
     win.document.write(html);
     win.document.close();
-    win.focus();
+    const cleanup = () => {
+      try {
+        frame.remove();
+      } catch {
+        /* ignore */
+      }
+    };
+    win.addEventListener("afterprint", cleanup);
     setTimeout(() => {
-      win.print();
+      try {
+        win.focus();
+        win.print();
+      } catch {
+        toast.error("Print failed");
+        cleanup();
+      }
     }, 400);
+    setTimeout(cleanup, 120000);
   };
 
   const downloadCertificate = () => {

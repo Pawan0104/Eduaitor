@@ -2,8 +2,17 @@ import React, { useState, useEffect } from "react";
 import axios from "axios";
 import { toast } from "react-toastify";
 import { useNavigate } from "react-router-dom";
-import { FaArrowLeft, FaSearch, FaTimes, FaChevronRight } from "react-icons/fa";
+import {
+  FaArrowLeft,
+  FaChevronRight,
+  FaFilePdf,
+  FaPrint,
+  FaSearch,
+  FaTimes,
+} from "react-icons/fa";
 import UserAvatar from "../components/UserAvatar";
+import { printReportElement } from "../utils/printReport";
+import useSchoolBranding from "../hooks/useSchoolBranding";
 
 const API = import.meta.env.VITE_API_URL;
 
@@ -160,6 +169,7 @@ function Sel({ label, value, onChange, disabled, children }) {
 export default function ClassAttendanceReportPrincipal() {
   const navigate = useNavigate();
   const isMobile = window.innerWidth <= 768;
+  const { branding } = useSchoolBranding();
 
   const [classes,     setClasses]     = useState([]);
   const [metaLoading, setMetaLoading] = useState(true);
@@ -388,6 +398,52 @@ export default function ClassAttendanceReportPrincipal() {
         {/* ── Results ── */}
         {hasFetched && (
           <>
+            <div className="mb-3 flex flex-wrap gap-2">
+              <button
+                type="button"
+                onClick={() =>
+                  printReportElement("class-attendance-report-print", {
+                    title:
+                      reportType === "daily"
+                        ? "Daily Attendance Report"
+                        : "Monthly Attendance Report",
+                    subtitle: `${selectedClassName || ""}${
+                      selectedSectionName ? ` › ${selectedSectionName}` : ""
+                    }${modeLabel ? ` · ${modeLabel}` : ""}`,
+                    branding,
+                    asPdf: false,
+                    onInfo: (msg) => toast.info(msg),
+                    onError: (msg) => toast.error(msg),
+                  })
+                }
+                className="inline-flex items-center gap-2 rounded-xl bg-[rgb(var(--primary))] px-3 py-2 text-sm font-semibold text-white"
+              >
+                <FaPrint size={12} /> Print
+              </button>
+              <button
+                type="button"
+                onClick={() =>
+                  printReportElement("class-attendance-report-print", {
+                    title:
+                      reportType === "daily"
+                        ? "Daily Attendance Report"
+                        : "Monthly Attendance Report",
+                    subtitle: `${selectedClassName || ""}${
+                      selectedSectionName ? ` › ${selectedSectionName}` : ""
+                    }${modeLabel ? ` · ${modeLabel}` : ""}`,
+                    branding,
+                    asPdf: true,
+                    onInfo: (msg) => toast.info(msg),
+                    onError: (msg) => toast.error(msg),
+                  })
+                }
+                className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-[rgb(var(--surface))] px-3 py-2 text-sm font-semibold"
+              >
+                <FaFilePdf size={12} /> PDF
+              </button>
+            </div>
+
+            <div id="class-attendance-report-print" className="space-y-4">
             {reportData.length > 0 && <SummaryBar data={reportData} type={reportType} />}
 
             <div className="bg-[rgb(var(--surface))] rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
@@ -426,6 +482,7 @@ export default function ClassAttendanceReportPrincipal() {
                   reportData.map((r,i) => <MonthlyRow key={r._id ?? i} record={r} onClick={() => goToStudent(r)} />)
                 )}
               </div>
+            </div>
             </div>
           </>
         )}

@@ -18,8 +18,11 @@ import { useNavigate } from "react-router-dom";
 import {
   FaArrowLeft, FaSearch, FaTimes,
   FaChevronRight, FaClipboardList, FaUserCheck,
+  FaPrint, FaFilePdf,
 } from "react-icons/fa";
 import UserAvatar from "../components/UserAvatar";
+import { printReportElement } from "../utils/printReport";
+import useSchoolBranding from "../hooks/useSchoolBranding";
 
 const ClassAttendanceReportPrincipal = lazy(() => import("./ClassAttendanceReportPrincipal"));
 
@@ -211,6 +214,7 @@ function Sel({ label, value, onChange, disabled, children }) {
 /* ── Subject-wise (original principal logic, preserved) ── */
 function SubjectWisePrincipal() {
   const navigate = useNavigate();
+  const { branding } = useSchoolBranding();
   const [classes, setClasses] = useState([]);
   const [subjects, setSubjects] = useState([]);
   const [metaLoading, setMetaLoading] = useState(true);
@@ -371,6 +375,55 @@ function SubjectWisePrincipal() {
 
       {hasFetched && (
         <>
+          <div className="mb-3 flex flex-wrap gap-2">
+            <button
+              type="button"
+              onClick={() =>
+                printReportElement("subject-attendance-report-print", {
+                  title:
+                    reportType === "daily"
+                      ? "Daily Attendance Report"
+                      : "Monthly Attendance Report",
+                  subtitle: `${selectedClassName || ""}${
+                    selectedSectionName ? ` › ${selectedSectionName}` : ""
+                  }${selectedSubjectName ? ` › ${selectedSubjectName}` : ""}${
+                    modeLabel ? ` · ${modeLabel}` : ""
+                  }`,
+                  branding,
+                  asPdf: false,
+                  onInfo: (msg) => toast.info(msg),
+                  onError: (msg) => toast.error(msg),
+                })
+              }
+              className="inline-flex items-center gap-2 rounded-xl bg-[rgb(var(--primary))] px-3 py-2 text-sm font-semibold text-white"
+            >
+              <FaPrint size={12} /> Print
+            </button>
+            <button
+              type="button"
+              onClick={() =>
+                printReportElement("subject-attendance-report-print", {
+                  title:
+                    reportType === "daily"
+                      ? "Daily Attendance Report"
+                      : "Monthly Attendance Report",
+                  subtitle: `${selectedClassName || ""}${
+                    selectedSectionName ? ` › ${selectedSectionName}` : ""
+                  }${selectedSubjectName ? ` › ${selectedSubjectName}` : ""}${
+                    modeLabel ? ` · ${modeLabel}` : ""
+                  }`,
+                  branding,
+                  asPdf: true,
+                  onInfo: (msg) => toast.info(msg),
+                  onError: (msg) => toast.error(msg),
+                })
+              }
+              className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-[rgb(var(--surface))] px-3 py-2 text-sm font-semibold"
+            >
+              <FaFilePdf size={12} /> PDF
+            </button>
+          </div>
+          <div id="subject-attendance-report-print" className="space-y-4">
           {filteredData.length > 0 && <SummaryBar data={filteredData} type={reportType}/>}
           <div className="bg-[rgb(var(--surface))] rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
             <div className="flex items-start justify-between px-4 py-3 border-b border-slate-100">
@@ -394,6 +447,7 @@ function SubjectWisePrincipal() {
                 filteredData.map((r,i)=><MonthlyRow key={r._id??i} record={r} onClick={()=>goToStudent(r)}/>)
               )}
             </div>
+          </div>
           </div>
         </>
       )}

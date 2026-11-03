@@ -15,6 +15,10 @@ import {
   verifyRazorpayPayment,
   getFeeReceipt,
   getFinancialReport,
+  getFeeTypedReport,
+  getStudentFeeHeads,
+  createFeeVoucher,
+  refundStudentFee,
 } from "../controllers/feeController.js";
 import { authMiddleware, requireRoles } from "../auth/auth.js";
 import checkModuleAccess from "../middlewares/checkModuleAccess.js";
@@ -38,6 +42,8 @@ router.get("/admin", ...superAdminOnly, getAllStudentAdminHistory);
 router.post("/razorpay/order", authMiddleware, initiateRazorpayOrder);
 router.post("/razorpay/verify", authMiddleware, verifyRazorpayPayment);
 router.post("/", ...schoolOrStaffFees, collectStudentFee);
+router.post("/refund", ...schoolOrStaffFees, refundStudentFee);
+router.post("/voucher", ...schoolOrStaffFees, createFeeVoucher);
 
 // fetch all student history
 router.get("/", ...schoolOrStaffFees, AllStudentHistory);
@@ -48,6 +54,8 @@ router.get("/parent/student/me", authMiddleware, getMyFeeDetails);
 // Receipt + financial reports (must be before /:classId)
 router.get("/receipt/:paymentId", authMiddleware, getFeeReceipt);
 router.get("/financial-report", ...schoolOrStaffFees, getFinancialReport);
+router.get("/reports", ...schoolOrStaffFees, getFeeTypedReport);
+router.get("/student/:studentId/heads", ...schoolOrStaffFees, getStudentFeeHeads);
 
 // fetch all defaulter
 router.get("/defaulters", ...schoolOrStaffFees, getAllDefaulter);

@@ -1,4 +1,7 @@
+import mongoose from "mongoose";
 import Lead from "../models/lead.js";
+import Class from "../models/class.js";
+import { resolveStream } from "../utils/resolveStream.js";
 import School from "../models/school.js";
 import Staff from "../models/staff.js";
 import Teacher from "../models/teacher.js";
@@ -190,6 +193,9 @@ export const createLead = async (req, res) => {
       parentMobile,
       parentEmail,
       previousSchoolName,
+      classId,
+      streamId,
+      stream,
       assignedToUserId,
       assignedToUserType,
     } = req.body;
@@ -222,12 +228,28 @@ export const createLead = async (req, res) => {
     await backfillMissingLeadNumbers(schoolId);
     const leadNumber = await generateLeadNumber(schoolId);
 
+    let resolvedClassId = null;
+    let resolvedClassName = "";
+    if (classId && mongoose.Types.ObjectId.isValid(classId)) {
+      const cls = await Class.findOne({ _id: classId, schoolId }).select("name").lean();
+      if (!cls) {
+        return res.status(400).json({ success: false, message: "Selected class was not found" });
+      }
+      resolvedClassId = cls._id;
+      resolvedClassName = cls.name || "";
+    }
+
+    const resolvedStream = await resolveStream(schoolId, streamId || null);
     const lead = await Lead.create({
       studentName: studentName.trim(),
       parentName: parentName.trim(),
       parentMobile: parentMobile.trim(),
       parentEmail: parentEmail?.trim() || "",
       previousSchoolName: previousSchoolName?.trim() || "",
+      classId: resolvedClassId,
+      className: resolvedClassName,
+      streamId: resolvedStream.streamId,
+      stream: resolvedStream.stream || (typeof stream === "string" ? stream.trim() : ""),
       leadNumber,
       assignedTo: {
         userId: assignee.userId,
@@ -301,7 +323,7 @@ export const updateLeadStatus = async (req, res) => {
     if (nextStatus === "admitted" && !existing.studentId) {
       return res.status(400).json({
         success: false,
-        message: "Use Start Admission to convert this lead into a student",
+        message: "Register this lead first, then Admit from Registration",
         code: "START_ADMISSION_REQUIRED",
       });
     }

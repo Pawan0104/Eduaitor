@@ -14,6 +14,8 @@ import {
   FaChevronDown,
   FaUserGraduate,
   FaClipboardCheck,
+  FaChartBar,
+  FaChartPie,
   FaBook,
   FaBlog,
   FaHotel,
@@ -49,8 +51,12 @@ export const COLOR_MAP = {
   Students: { bg: "#EFF6FF", icon: "#3B82F6", dot: "#BFDBFE" },
   Certificates: { bg: "#F5F3FF", icon: "#7C3AED", dot: "#DDD6FE" },
   "Lead Management": { bg: "#FFF7ED", icon: "#EA580C", dot: "#FED7AA" },
+  Registration: { bg: "#ECFDF5", icon: "#059669", dot: "#A7F3D0" },
+  "Admission Reports": { bg: "#EEF2FF", icon: "#4F46E5", dot: "#C7D2FE" },
+  Reports: { bg: "#EEF2FF", icon: "#4F46E5", dot: "#C7D2FE" },
   Teachers: { bg: "#F0FDF4", icon: "#22C55E", dot: "#BBF7D0" },
   Classes: { bg: "#FAF5FF", icon: "#A855F7", dot: "#E9D5FF" },
+  Streams: { bg: "#EEF2FF", icon: "#4F46E5", dot: "#C7D2FE" },
   "My Classes": { bg: "#FAF5FF", icon: "#A855F7", dot: "#E9D5FF" },
 
   Attendance: { bg: "#FFF1F2", icon: "#F43F5E", dot: "#FFD5DB" },
@@ -434,6 +440,22 @@ export default function SchoolMenu() {
       path: "/school/leads",
     },
     {
+      name: "Registration",
+      icon: <FaClipboardCheck />,
+      path: "/school/registrations",
+    },
+    {
+      name: "Reports",
+      icon: <FaChartPie />,
+      children: [
+        { name: "All Reports", path: "/school/reports" },
+        { name: "Admission Reports", path: "/school/admission-reports" },
+        { name: "Fee Report", path: "/school/financial-report" },
+        { name: "Fee Defaulters", path: "/school/defaulters" },
+        { name: "Attendance Report", path: "/school/attendance" },
+      ],
+    },
+    {
       name: "Teachers",
       icon: <GiTeacher />,
       children: [
@@ -447,6 +469,7 @@ export default function SchoolMenu() {
       children: [
         { name: "Class", path: "/school/class" },
         { name: "Section", path: "/school/section" },
+        { name: "Streams", path: "/school/streams" },
         { name: "Subjects", path: "/school/subject" },
         { name: "Academic Sessions", path: "/school/academic-sessions" },
       ],
@@ -469,7 +492,6 @@ export default function SchoolMenu() {
       icon: <FiUsers />,
       children: [
         { name: "Staff Management", path: "/school/staff" },
-        { name: "Staff Attendance", path: "/school/staff-attendance" },
       ],
     },
     {
@@ -481,7 +503,6 @@ export default function SchoolMenu() {
         { name: "Exam Papers", path: "/school/exam-papers" },
         { name: "Marks Entry", path: "/school/exam-marks-entry" },
         { name: "Exam Marks", path: "/school/exam-marks" },
-        { name: "Report Card", path: "/school/report-card" },
       ],
     },
     {

@@ -7,6 +7,70 @@ import { useNavigate } from "react-router-dom";
 
 const API = import.meta.env.VITE_API_URL;
 
+const DOC_FIELDS = [
+  { key: "rc", label: "RC (Registration)" },
+  { key: "insurance", label: "Insurance" },
+  { key: "fitness", label: "Fitness Certificate" },
+  { key: "permit", label: "Permit" },
+  { key: "puc", label: "Pollution (PUC)" },
+  { key: "roadTax", label: "Road Tax" },
+];
+
+const emptyDoc = () => ({ number: "", expiry: "" });
+const emptyDocuments = () =>
+  Object.fromEntries(DOC_FIELDS.map((d) => [d.key, emptyDoc()]));
+
+const toDateInput = (d) =>
+  d && !isNaN(new Date(d)) ? new Date(d).toISOString().slice(0, 10) : "";
+
+const normalizeDocuments = (docs = {}) => {
+  const out = emptyDocuments();
+  for (const { key } of DOC_FIELDS) {
+    out[key] = {
+      number: docs?.[key]?.number || "",
+      expiry: toDateInput(docs?.[key]?.expiry),
+    };
+  }
+  return out;
+};
+
+const documentsPayload = (docs = {}) => {
+  const out = {};
+  for (const { key } of DOC_FIELDS) {
+    const row = docs[key] || {};
+    out[key] = {
+      number: String(row.number || "").trim(),
+      expiry: row.expiry || null,
+    };
+  }
+  return out;
+};
+
+const fmtDocDate = (d) =>
+  d && !isNaN(new Date(d))
+    ? new Date(d).toLocaleDateString("en-IN", {
+        day: "2-digit",
+        month: "short",
+        year: "numeric",
+      })
+    : "—";
+
+/** days left; negative = expired; null = no date */
+const daysUntil = (d) => {
+  if (!d || isNaN(new Date(d))) return null;
+  const end = new Date(d);
+  end.setHours(23, 59, 59, 999);
+  return Math.ceil((end - new Date()) / (1000 * 60 * 60 * 24));
+};
+
+const docTone = (expiry) => {
+  const days = daysUntil(expiry);
+  if (days == null) return "muted";
+  if (days < 0) return "expired";
+  if (days <= 30) return "soon";
+  return "ok";
+};
+
 const EMPTY_FORM = {
   _id: null,
   busId: "",
@@ -21,6 +85,7 @@ const EMPTY_FORM = {
   gpsDeviceId: "",
   lastLatitude: "",
   lastLongitude: "",
+  documents: emptyDocuments(),
 };
 
 const BusManagement = () => {
@@ -115,6 +180,7 @@ const BusManagement = () => {
         bus.lastLongitude != null && bus.lastLongitude !== ""
           ? String(bus.lastLongitude)
           : "",
+      documents: normalizeDocuments(bus.documents),
     });
     setFormModal(true);
   };
@@ -144,6 +210,7 @@ const BusManagement = () => {
         gpsDeviceId: form.gpsDeviceId?.trim() || "",
         lastLatitude: form.lastLatitude !== "" ? form.lastLatitude : null,
         lastLongitude: form.lastLongitude !== "" ? form.lastLongitude : null,
+        documents: documentsPayload(form.documents),
       };
       if (isEdit) {
         await axios.put(`${API}/transport/buses/${editId}`, payload, {
@@ -206,7 +273,12 @@ const BusManagement = () => {
   const totalBuses = buses.length;
   const activeBuses = buses.filter((b) => b.status === "Active").length;
   const inMaintenance = buses.filter((b) => b.status === "Maintenance").length;
-  const inactiveBuses = buses.filter((b) => b.status === "Inactive").length;
+  const docsExpiring = buses.filter((b) =>
+    DOC_FIELDS.some((d) => {
+      const tone = docTone(b.documents?.[d.key]?.expiry);
+      return tone === "expired" || tone === "soon";
+    }),
+  ).length;
 
   /* ── LOADING ──────────────────────────────────────────────────────────── */
 
@@ -261,7 +333,11 @@ const BusManagement = () => {
         <StatCard title="TOTAL FLEET" value={totalBuses} color="blue" />
         <StatCard title="ACTIVE" value={activeBuses} color="green" />
         <StatCard title="IN MAINTENANCE" value={inMaintenance} color="yellow" />
-        <StatCard title="INACTIVE" value={inactiveBuses} color="gray" />
+        <StatCard
+          title="DOCS EXPIRED / DUE"
+          value={docsExpiring}
+          color="gray"
+        />
       </div>
 
       {/* FILTERS */}
@@ -299,6 +375,7 @@ const BusManagement = () => {
                 <th className="p-4 text-left">Driver / Route</th>
                 <th className="p-4 text-left">Capacity</th>
                 <th className="p-4 text-left">Next Service</th>
+                <th className="p-4 text-left">Documents</th>
                 <th className="p-4 text-left">Status</th>
                 <th className="p-4 text-left">GPS</th>
                 <th className="p-4 text-center">Actions</th>
@@ -351,6 +428,49 @@ const BusManagement = () => {
                     {bus.nextService
                       ? new Date(bus.nextService).toLocaleDateString()
                       : "N/A"}
+                  </td>
+
+                  {/* DOCUMENTS */}
+                  <td className="p-4">
+                    <div className="flex flex-wrap gap-1 max-w-[220px]">
+                      {DOC_FIELDS.map(({ key, label }) => {
+                        const expiry = bus.documents?.[key]?.expiry;
+                        const tone = docTone(expiry);
+                        if (tone === "muted") return null;
+                        const short = label.split(" ")[0];
+                        const cls =
+                          tone === "expired"
+                            ? "bg-rose-100 text-rose-700"
+                            : tone === "soon"
+                              ? "bg-amber-100 text-amber-800"
+                              : "bg-emerald-50 text-emerald-700";
+                        return (
+                          <span
+                            key={key}
+                            title={`${label}: ${fmtDocDate(expiry)}${
+                              bus.documents?.[key]?.number
+                                ? ` · ${bus.documents[key].number}`
+                                : ""
+                            }`}
+                            className={`px-1.5 py-0.5 rounded text-[10px] font-semibold ${cls}`}
+                          >
+                            {short}
+                            {tone === "expired"
+                              ? " ✕"
+                              : tone === "soon"
+                                ? " !"
+                                : ""}
+                          </span>
+                        );
+                      })}
+                      {!DOC_FIELDS.some(
+                        (d) => docTone(bus.documents?.[d.key]?.expiry) !== "muted",
+                      ) && (
+                        <span className="text-xs text-[rgb(var(--text-light))]">
+                          Not set
+                        </span>
+                      )}
+                    </div>
                   </td>
 
                   {/* STATUS */}
@@ -421,7 +541,7 @@ const BusManagement = () => {
 
               {filtered.length === 0 && (
                 <tr>
-                  <td colSpan="9" className="text-center py-10 text-[rgb(var(--text))] bg-[rgb(var(--surface))]">
+                  <td colSpan="10" className="text-center py-10 text-[rgb(var(--text))] bg-[rgb(var(--surface))]">
                     No buses found. Click "Add Bus" to register one.
                   </td>
                 </tr>
@@ -529,7 +649,7 @@ const BusFormModal = ({
 
   return (
     <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50">
-      <div className="text-[rgb(var(--text))] bg-[rgb(var(--surface))] rounded-xl p-6 w-full max-w-lg mx-4 max-h-[90vh] overflow-y-auto">
+      <div className="text-[rgb(var(--text))] bg-[rgb(var(--surface))] rounded-xl p-6 w-full max-w-2xl mx-4 max-h-[90vh] overflow-y-auto">
         {/* Header */}
         <div className="flex items-center justify-between mb-5">
           <div className="flex items-center gap-3">
@@ -658,6 +778,92 @@ const BusFormModal = ({
               <option value="Maintenance">Maintenance</option>
               <option value="Inactive">Inactive</option>
             </select>
+          </div>
+        </div>
+
+        {/* LEGAL DOCUMENTS */}
+        <div className="mt-5 pt-4 border-t">
+          <div className="mb-3">
+            <p className="text-sm font-semibold">Vehicle documents</p>
+            <p className="text-xs text-[rgb(var(--text-light))]">
+              RC, insurance, pollution (PUC), fitness, permit, road tax — number
+              and validity date
+            </p>
+          </div>
+          <div className="space-y-3">
+            {DOC_FIELDS.map(({ key, label }) => {
+              const row = form.documents?.[key] || emptyDoc();
+              const tone = docTone(row.expiry);
+              return (
+                <div
+                  key={key}
+                  className="rounded-xl border border-[rgb(var(--border))] p-3"
+                >
+                  <div className="flex items-center justify-between gap-2 mb-2">
+                    <p className="text-xs font-bold uppercase tracking-wide">
+                      {label}
+                    </p>
+                    {tone === "expired" && (
+                      <span className="text-[10px] font-semibold text-rose-600">
+                        Expired
+                      </span>
+                    )}
+                    {tone === "soon" && (
+                      <span className="text-[10px] font-semibold text-amber-700">
+                        Expiring soon
+                      </span>
+                    )}
+                  </div>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div>
+                      <label className="block text-[10px] font-semibold text-[rgb(var(--text-light))] mb-1">
+                        Document / policy no.
+                      </label>
+                      <input
+                        type="text"
+                        value={row.number}
+                        onChange={(e) =>
+                          setForm((p) => ({
+                            ...p,
+                            documents: {
+                              ...p.documents,
+                              [key]: {
+                                ...(p.documents?.[key] || emptyDoc()),
+                                number: e.target.value,
+                              },
+                            },
+                          }))
+                        }
+                        placeholder="Number"
+                        className="w-full border rounded-lg px-3 py-2 text-sm"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-[10px] font-semibold text-[rgb(var(--text-light))] mb-1">
+                        Valid till
+                      </label>
+                      <input
+                        type="date"
+                        value={row.expiry}
+                        onChange={(e) =>
+                          setForm((p) => ({
+                            ...p,
+                            documents: {
+                              ...p.documents,
+                              [key]: {
+                                ...(p.documents?.[key] || emptyDoc()),
+                                expiry: e.target.value,
+                              },
+                            },
+                          }))
+                        }
+                        className="w-full border rounded-lg px-3 py-2 text-sm"
+                      />
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
           </div>
         </div>
 

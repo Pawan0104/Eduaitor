@@ -19,6 +19,9 @@ import {
   FaLock,
   FaIdCard,
   FaClipboardList,
+  FaClipboardCheck,
+  FaChartBar,
+  FaChartPie,
   FaHotel,
   FaHome,
   FaStore,
@@ -134,6 +137,12 @@ const Sidebar = ({ closeSidebar, unreadMessages = 0 }) => {
     subscribedModules.length === 0 ||
     subscribedModules.includes("leaveRequest");
 
+  const hasStaffLeave =
+    !needsModuleCheck ||
+    subscribedModules.length === 0 ||
+    subscribedModules.includes("staffLeave") ||
+    subscribedModules.includes("leaveRequest");
+
   const logout = async () => {
     try {
       await axios.post(`${API}/auth/logout`, {}, { withCredentials: true });
@@ -163,6 +172,11 @@ const Sidebar = ({ closeSidebar, unreadMessages = 0 }) => {
         { name: "Add School", path: "/add-school" },
         { name: "School Subscription Plan", path: "/subscription-plan" },
       ],
+    },
+    {
+      name: "Staff Leave Types",
+      icon: <FaClipboardList />,
+      path: "/leave-types",
     },
     {
       name: "Syllabus Catalog",
@@ -211,6 +225,22 @@ const Sidebar = ({ closeSidebar, unreadMessages = 0 }) => {
       path: "/school/leads",
     },
     {
+      name: "Registration",
+      icon: <FaClipboardCheck />,
+      path: "/school/registrations",
+    },
+    {
+      name: "Reports",
+      icon: <FaChartPie />,
+      children: [
+        { name: "All Reports", path: "/school/reports" },
+        { name: "Admission Reports", path: "/school/admission-reports" },
+        { name: "Fee Report", path: "/school/financial-report" },
+        { name: "Fee Defaulters", path: "/school/defaulters" },
+        { name: "Attendance Report", path: "/school/attendance" },
+      ],
+    },
+    {
       name: "Teachers",
       icon: <GiTeacher />,
       module: "teachers",
@@ -226,6 +256,7 @@ const Sidebar = ({ closeSidebar, unreadMessages = 0 }) => {
       children: [
         { name: "Class", path: "/school/class" },
         { name: "Section", path: "/school/section" },
+        { name: "Streams", path: "/school/streams" },
         { name: "Subjects", path: "/school/subject" },
       ],
     },
@@ -235,7 +266,10 @@ const Sidebar = ({ closeSidebar, unreadMessages = 0 }) => {
       module: "attendance",
       children: [
         { name: "Attendance", path: "/school/attendance" },
-        { name: "Leave Request", path: "/school/leave-request" },
+        { name: "Student Leave", path: "/school/leave-request" },
+        ...(hasStaffLeave
+          ? [{ name: "Staff Leave", path: "/school/staff-leave" }]
+          : []),
       ],
     },
     {
@@ -253,7 +287,6 @@ const Sidebar = ({ closeSidebar, unreadMessages = 0 }) => {
         { name: "Exam Papers", path: "/school/exam-papers" },
         { name: "Marks Entry", path: "/school/exam-marks-entry" },
         { name: "Exam Marks", path: "/school/exam-marks" },
-        { name: "Report Card", path: "/school/report-card" },
       ],
     },
     {
@@ -346,7 +379,9 @@ const Sidebar = ({ closeSidebar, unreadMessages = 0 }) => {
       module: "staff",
       children: [
         { name: "Staff Management", path: "/school/staff" },
-        { name: "Staff Attendance", path: "/school/staff-attendance" },
+        ...(hasStaffLeave
+          ? [{ name: "Staff Leave", path: "/school/staff-leave" }]
+          : []),
       ],
     },
     {
@@ -387,7 +422,10 @@ const Sidebar = ({ closeSidebar, unreadMessages = 0 }) => {
       children: [
         { name: "Mark Attendance", path: "/teacher/attendance/mark" },
         { name: "Attendance Report", path: "/teacher/attendance/report" },
-        { name: "Leave Request", path: "/teacher/leave-request" },
+        { name: "Student Leave", path: "/teacher/leave-request" },
+        ...(hasStaffLeave
+          ? [{ name: "My Leave", path: "/teacher/my-leave" }]
+          : []),
       ],
     },
     {
@@ -698,7 +736,13 @@ const Sidebar = ({ closeSidebar, unreadMessages = 0 }) => {
       module: "attendance",
       children: [
         { name: "Attendance", path: "/staff/attendance" },
-        { name: "Leave Request", path: "/staff/leave-request" },
+        { name: "Student Leave", path: "/staff/leave-request" },
+        ...(hasStaffLeave
+          ? [
+              { name: "My Leave", path: "/staff/my-leave" },
+              { name: "Staff Leave Admin", path: "/staff/staff-leave" },
+            ]
+          : []),
       ],
     },
     {
@@ -762,7 +806,6 @@ const Sidebar = ({ closeSidebar, unreadMessages = 0 }) => {
       children: [
         { name: "Schedule Exams", path: "/staff/exams" },
         { name: "Marks Entry", path: "/staff/exam-marks" },
-        { name: "Report Card", path: "/staff/report-card" },
       ],
     },
     {
@@ -776,6 +819,23 @@ const Sidebar = ({ closeSidebar, unreadMessages = 0 }) => {
       icon: <FaClipboardList />,
       path: "/staff/leads",
       module: "leads",
+    },
+    {
+      name: "Registration",
+      icon: <FaClipboardCheck />,
+      path: "/staff/registrations",
+      module: "leads",
+    },
+    {
+      name: "Reports",
+      icon: <FaChartPie />,
+      children: [
+        { name: "All Reports", path: "/staff/reports" },
+        { name: "Admission Reports", path: "/staff/admission-reports" },
+        { name: "Fee Report", path: "/staff/financial-report" },
+        { name: "Fee Defaulters", path: "/staff/defaulters" },
+        { name: "Attendance Report", path: "/staff/attendance" },
+      ],
     },
     {
       name: "Hostel Management",

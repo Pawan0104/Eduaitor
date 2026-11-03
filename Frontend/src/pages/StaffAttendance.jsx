@@ -424,19 +424,20 @@ export default function StaffAttendance() {
                     <tr>
                       <th className="px-4 py-3 text-left font-semibold">Date</th>
                       <th className="px-4 py-3 text-left font-semibold">Status</th>
+                      <th className="px-4 py-3 text-left font-semibold">Location</th>
                       <th className="px-4 py-3 text-left font-semibold">Note</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-200">
                     {detailLoading ? (
                       <tr>
-                        <td colSpan={3} className="px-4 py-6 text-center text-slate-500">
+                        <td colSpan={4} className="px-4 py-6 text-center text-slate-500">
                           Loading records...
                         </td>
                       </tr>
                     ) : attendanceRecords.length === 0 ? (
                       <tr>
-                        <td colSpan={3} className="px-4 py-6 text-center text-slate-500">
+                        <td colSpan={4} className="px-4 py-6 text-center text-slate-500">
                           No attendance records available.
                         </td>
                       </tr>
@@ -445,6 +446,15 @@ export default function StaffAttendance() {
                         <tr key={recordItem._id} className="bg-white hover:bg-slate-50">
                           <td className="px-4 py-3">{formatDate(recordItem.date)}</td>
                           <td className="px-4 py-3">{recordItem.status}</td>
+                          <td className="px-4 py-3 text-xs">
+                            {recordItem.locationMode || "Manual"}
+                            {recordItem.latitude != null
+                              ? ` · ${Number(recordItem.latitude).toFixed(4)}, ${Number(recordItem.longitude).toFixed(4)}`
+                              : ""}
+                            {recordItem.distanceFromSchoolM != null
+                              ? ` · ${recordItem.distanceFromSchoolM}m`
+                              : ""}
+                          </td>
                           <td className="px-4 py-3">{recordItem.note || "—"}</td>
                         </tr>
                       ))

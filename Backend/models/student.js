@@ -25,6 +25,9 @@ const studentSchema = new mongoose.Schema(
     dob: Date,
     gender: String,
     bloodGroup: String,
+    nationality: { type: String, default: "" },
+    placeOfBirth: { type: String, default: "" },
+    caste: { type: String, default: "" },
 
     // Reservation category + (for Minority) the specific community.
     category: {
@@ -36,6 +39,14 @@ const studentSchema = new mongoose.Schema(
       type: String,
       default: "",
     },
+
+    aadhaarNumber: { type: String, default: "" },
+    penNumber: { type: String, default: "" },
+    admissionSource: { type: String, default: "" },
+    isSpecialChild: { type: Boolean, default: false },
+    isEws: { type: Boolean, default: false },
+    isPhysicallyDisabled: { type: Boolean, default: false },
+    medicalConditionRemarks: { type: String, default: "" },
 
     admissionDate: Date,
 
@@ -61,6 +72,7 @@ const studentSchema = new mongoose.Schema(
     previousSchoolName: String,
     previousSchoolClass: String,
     previousSchoolResult: String,
+    previousSchoolTcNumber: { type: String, default: "" },
 
     classId: {
       type: mongoose.Schema.Types.ObjectId,
@@ -70,8 +82,27 @@ const studentSchema = new mongoose.Schema(
       type: mongoose.Schema.Types.ObjectId,
       ref: "Section",
     },
+    streamId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "Stream",
+      default: null,
+    },
+    stream: {
+      type: String,
+      default: "",
+    },
     rollNo: String,
     studentType: String,
+
+    /**
+     * Fee structure batch — New vs continuing (Old) students can have
+     * different fee components configured by school admin.
+     */
+    feeBatch: {
+      type: String,
+      enum: ["New", "Old"],
+      default: "New",
+    },
 
     transport: {
       type: mongoose.Schema.Types.ObjectId,
@@ -155,6 +186,13 @@ const studentSchema = new mongoose.Schema(
     /** Academic session this admission belongs to (e.g. "2026-27"). */
     academicYear: { type: String, default: "", index: true },
 
+    /** Set when the student was admitted from a Registration record. */
+    convertedFromRegistrationId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "Registration",
+      default: null,
+    },
+
     /** Lead this student was admitted from (Lead Management → admission) */
     convertedFromLeadId: {
       type: mongoose.Schema.Types.ObjectId,
@@ -193,6 +231,10 @@ studentSchema.index(
 );
 studentSchema.index(
   { schoolId: 1, convertedFromLeadId: 1 },
+  { unique: true, sparse: true },
+);
+studentSchema.index(
+  { schoolId: 1, convertedFromRegistrationId: 1 },
   { unique: true, sparse: true },
 );
 studentSchema.plugin(sessionScopedPlugin);

@@ -27,6 +27,7 @@ import Teachers from "./pages/Teachers";
 import TeacherManagement from "./pages/TeacherManagement";
 import TeacherView from "./components/TeacherView";
 import SectionManagement from "./pages/SectionManagement";
+import StreamManagement from "./pages/StreamManagement";
 import Class from "./pages/Class";
 import ClassView from "./components/ClassView";
 import Subject from "./pages/Subject";
@@ -72,6 +73,7 @@ import DiaryPrincipal from "./pages/DiaryPrincipal";
 import TeacherPageProgress from "./pages/TeacherPageProgress";
 import PrincipalResultView from "./pages/PrincipalResultView";
 import StaffAttendance from "./pages/StaffAttendance";
+import StaffSelfAttendance from "./pages/StaffSelfAttendance";
 import StaffMenu from "./pages/StaffMenu";
 
 import TeacherMenu from "./pages/TeacherMenu";
@@ -115,6 +117,9 @@ import ParentHostelVisit from "./pages/ParentHostelVisit";
 import TeacherGatepass from "./pages/TeacherGatepass";
 import ParentLeaveRequest from "./pages/ParentLeaveRequest";
 import ManageLeaveRequests from "./pages/ManageLeaveRequests";
+import LeaveTypesAdmin from "./pages/LeaveTypesAdmin";
+import StaffLeaveAdmin from "./pages/StaffLeaveAdmin";
+import StaffApplyLeave from "./pages/StaffApplyLeave";
 import MessagesPage from "./pages/messagesingal/MessagePage";
 import NewMessagePage from "./pages/messagesingal/NewMessagePage";
 import ChatPage from "./pages/messagesingal/ChatPage";
@@ -128,6 +133,10 @@ import SuperAdminAutopilot from "./pages/marketing/SuperAdminAutopilot";
 import OauthCallback from "./pages/marketing/OauthCallback";
 import BulkStudentUpload from "./pages/BulkStudentUpload";
 import LeadManagement from "./pages/LeadManagement";
+import Registrations from "./pages/Registrations";
+import AdmissionReports from "./pages/AdmissionReports";
+import ReportsHub from "./pages/ReportsHub";
+import PublicRegistration from "./pages/PublicRegistration";
 
 // message files -
 
@@ -152,6 +161,7 @@ const App = () => {
         <Route path="/login" element={<Login />} />
         <Route path="/forgot-password" element={<ForgotPassword />} />
         <Route path="/reset-password" element={<ResetPassword />} />
+        <Route path="/register/:token" element={<PublicRegistration />} />
 
         <Route
           path="/change-password"
@@ -176,8 +186,10 @@ const App = () => {
           <Route path="platform-analytics" element={<PlatformAnalytics />} />
           <Route path="access-control" element={<AccessControl />} />
           <Route path="schools" element={<Schools />} />
-<Route path="add-school" element={<AddSchool />} />
+          <Route path="add-school" element={<AddSchool />} />
           <Route path="school-view/:id" element={<SchoolDetail />} />
+          <Route path="subscription-plan" element={<SchoolSubscription />} />
+          <Route path="leave-types" element={<LeaveTypesAdmin />} />
           <Route path="syllabus-catalog" element={<SyllabusCatalogAdmin />} />
           <Route path="messages" element={<MessagesPage />} />
           <Route path="messages/:threadId" element={<ChatPage />} />
@@ -201,6 +213,9 @@ const App = () => {
           <Route path="notification" element={<NotificationPage />} />
           <Route path="students" element={<Students />} />
           <Route path="leads" element={<LeadManagement />} />
+          <Route path="registrations" element={<Registrations />} />
+          <Route path="admission-reports" element={<AdmissionReports />} />
+          <Route path="reports" element={<ReportsHub />} />
           <Route path="student-manage" element={<StudentManagement />} />
           <Route path="student-manage/:id" element={<StudentManagement />} />
           <Route path="admission-form" element={<AdmissionFormSettings />} />
@@ -216,6 +231,7 @@ const App = () => {
           <Route path="teacher-manage/:id" element={<TeacherManagement />} />
           <Route path="teacher-view/:id" element={<TeacherView />} />
           <Route path="section" element={<SectionManagement />} />
+          <Route path="streams" element={<StreamManagement />} />
           <Route path="class" element={<Class />} />
           <Route path="class-view/:id" element={<ClassView />} />
           <Route path="subject" element={<Subject />} />
@@ -269,12 +285,14 @@ const App = () => {
           <Route path="commerce/:section" element={<CommerceInventory />} />
           <Route path="blogs" element={<Blogs />} />
           <Route path="staff" element={<StaffManagement />} />
+          <Route path="staff-leave" element={<StaffLeaveAdmin />} />
           <Route path="messages" element={<MessagesPage />} />
           <Route path="messages/new" element={<NewMessagePage />} />
           <Route path="messages/:threadId" element={<ChatPage />} />
           <Route path="help" element={<HelpSupport />} />
           <Route path="/school/gatepass" element={<TeacherGatepass />}  />
           <Route path="leave-request" element={<ManageLeaveRequests pageTitle="Leave Requests" />} />
+          <Route path="my-leave" element={<StaffApplyLeave />} />
           <Route path="marketing" element={<MarketingDashboard />} />
           <Route path="marketing/suggestions" element={<MarketingSuggestions />} />
           <Route path="marketing/create" element={<MarketingCreate />} />
@@ -311,6 +329,10 @@ const App = () => {
           <Route path="report-card" element={<ReportCard />} />
           <Route path="attendance/mark" element={<ClassAttendanceMarking />} />
           <Route
+            path="attendance/my"
+            element={<StaffSelfAttendance />}
+          />
+          <Route
             path="attendance/student/:studentId"
             element={<StudentAttendanceDetail />}
           />
@@ -329,7 +351,8 @@ const App = () => {
           <Route path="timetable" element={<ReadTimetable />} />
           <Route path="blogs" element={<Blogs />} />
            <Route path="gatepass" element={<TeacherGatepass />} />
-           <Route path="leave-request" element={<ManageLeaveRequests pageTitle="Leave Requests" />} />
+           <Route path="leave-request" element={<ManageLeaveRequests pageTitle="Student Leave Requests" />} />
+           <Route path="my-leave" element={<StaffApplyLeave />} />
            <Route path="messages" element={<MessagesPage />} />
           <Route path="messages/new" element={<NewMessagePage />} />
           <Route path="messages/:threadId" element={<ChatPage />} />
@@ -458,7 +481,8 @@ const App = () => {
           <Route path="admission-form" element={<AdmissionFormSettings />} />
           <Route path="academic-sessions" element={<AcademicSessions />} />
           <Route path="student-view/:id" element={<StudentView />} />
-          <Route path="attendance" element={<StaffAttendance />} />
+          <Route path="attendance" element={<StaffSelfAttendance />} />
+          <Route path="attendance/manage" element={<StaffAttendance />} />
           <Route path="fees" element={<FeeCollection />} />
           <Route path="fee-history" element={<FeeHistory />} />
           <Route path="financial-report" element={<FinancialReport />} />
@@ -479,7 +503,9 @@ const App = () => {
           <Route path="hostel/residents" element={<HostelResidents />} />
           <Route path="hostel/visitors" element={<HostelVisitors />} />
           <Route path="gatepass" element={<TeacherGatepass />} />
-          <Route path="leave-request" element={<ManageLeaveRequests pageTitle="Leave Requests" />} />
+          <Route path="leave-request" element={<ManageLeaveRequests pageTitle="Student Leave Requests" />} />
+          <Route path="my-leave" element={<StaffApplyLeave />} />
+          <Route path="staff-leave" element={<StaffLeaveAdmin />} />
           <Route path="timetable" element={<ReadTimetable />} />
           <Route path="syllabus" element={<Syllabus />} />
           <Route path="diary" element={<DiaryPrincipal />} />
@@ -488,6 +514,9 @@ const App = () => {
           <Route path="report-card" element={<ReportCard />} />
           <Route path="assignments" element={<Assignment />} />
           <Route path="leads" element={<LeadManagement />} />
+          <Route path="registrations" element={<Registrations />} />
+          <Route path="admission-reports" element={<AdmissionReports />} />
+          <Route path="reports" element={<ReportsHub />} />
           <Route path="group" element={<Group />} />
           <Route path="staff" element={<StaffManagement />} />
           <Route path="staff-roles" element={<SchoolStaffRoles />} />

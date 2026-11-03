@@ -375,6 +375,42 @@ export const deleteSchool = async (req, res, next) => {
 
 /* ---------------- SCHOOL SELF-SERVE RAZORPAY SETTINGS ---------------- */
 
+/** Branding for report headers/footers (logo, name, address, contact). */
+export const getMySchoolBranding = async (req, res, next) => {
+  try {
+    const schoolId = req.user?.school_id;
+    if (!schoolId) {
+      return res.status(400).json({
+        success: false,
+        message: "School context required",
+      });
+    }
+
+    const school = await School.findById(schoolId)
+      .select("school_name school_logo address contact_phone contact_email")
+      .lean();
+    if (!school) {
+      return res.status(404).json({
+        success: false,
+        message: "School not found",
+      });
+    }
+
+    return res.json({
+      success: true,
+      data: {
+        name: school.school_name || "",
+        logo: school.school_logo || "",
+        address: school.address || "",
+        phone: school.contact_phone || "",
+        email: school.contact_email || "",
+      },
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
 export const getMySchoolRazorpay = async (req, res, next) => {
   try {
     const schoolId = req.user?.school_id;

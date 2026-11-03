@@ -44,6 +44,22 @@ const staffAttendanceSchema = new mongoose.Schema(
       type: mongoose.Schema.Types.ObjectId,
       default: null,
     },
+    /**
+     * App punch mode:
+     * InCampus  — must be within school campus radius (100–150 m)
+     * OutCampus — allowed anywhere; lat/long still captured
+     * Manual   — office/admin entry without GPS
+     */
+    locationMode: {
+      type: String,
+      enum: ["InCampus", "OutCampus", "Manual"],
+      default: "Manual",
+    },
+    latitude: { type: Number, default: null },
+    longitude: { type: Number, default: null },
+    accuracyM: { type: Number, default: null },
+    distanceFromSchoolM: { type: Number, default: null },
+    markedAt: { type: Date, default: null },
   },
   { timestamps: true },
 );

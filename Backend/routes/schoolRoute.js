@@ -6,6 +6,7 @@ import {
   getSchool,
   updateSchool,
   deleteSchool,
+  getMySchoolBranding,
   getMySchoolRazorpay,
   updateMySchoolRazorpay,
   testMySchoolRazorpay,
@@ -29,6 +30,7 @@ router.post(
 
 router.get("/", ...superAdminOnly, getSchools);
 
+router.get("/me/branding", authMiddleware, getMySchoolBranding);
 router.get("/me/razorpay", authMiddleware, getMySchoolRazorpay);
 router.put("/me/razorpay", authMiddleware, updateMySchoolRazorpay);
 router.post("/me/razorpay/test", authMiddleware, testMySchoolRazorpay);

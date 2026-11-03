@@ -8,6 +8,8 @@ import {
   saveStaffAttendance,
   updateStaffAttendance,
   getStaffAttendanceSummary,
+  getMyStaffAttendanceToday,
+  selfPunchStaffAttendance,
 } from "../controllers/staffAttendanceController.js";
 
 const router = express.Router();
@@ -29,6 +31,18 @@ router.get(
   authMiddleware,
   checkModuleAccess("attendance"),
   getStaffAttendanceSummary,
+);
+router.get(
+  "/me/today",
+  authMiddleware,
+  checkModuleAccess("attendance"),
+  getMyStaffAttendanceToday,
+);
+router.post(
+  "/me/punch",
+  authMiddleware,
+  checkModuleAccess("attendance"),
+  selfPunchStaffAttendance,
 );
 router.post(
   "/save",

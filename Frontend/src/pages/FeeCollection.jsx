@@ -1,8 +1,9 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import axios from "axios";
 import { toast } from "react-toastify";
 import { FaArrowLeft } from "react-icons/fa";
 import { useNavigate } from "react-router-dom";
+import { useAuth } from "../context/AuthContext";
 
 function FeeCollection() {
   const [classes, setClasses] = useState([]);
@@ -15,12 +16,19 @@ function FeeCollection() {
   const [hasRazorpaySecret, setHasRazorpaySecret] = useState(false);
   const [savingRazorpay, setSavingRazorpay] = useState(false);
   const [testingRazorpay, setTestingRazorpay] = useState(false);
-  const [razorpayStatus, setRazorpayStatus] = useState(""); // idle | ready | error
+  const [razorpayStatus, setRazorpayStatus] = useState("");
 
   const API = import.meta.env.VITE_API_URL;
   const navigate = useNavigate();
+  const { user } = useAuth();
   const isMobile = window.innerWidth <= 768;
-  /* Fetch all classes for the dropdown */
+  const basePath =
+    user?.role === "staff_admin"
+      ? "/staff"
+      : user?.role === "school_admin"
+        ? "/school"
+        : "";
+
   const fetchClasses = async () => {
     try {
       const { data } = await axios.get(`${API}/classes/all`, {
@@ -32,7 +40,6 @@ function FeeCollection() {
     }
   };
 
-  //   fetch student
   const fetchStudents = async () => {
     try {
       const res = await axios.get(`${API}/students`, {
@@ -68,7 +75,7 @@ function FeeCollection() {
         }
       }
     } catch {
-      // optional settings panel; ignore if unavailable
+      // optional
     }
   };
 
@@ -102,7 +109,9 @@ function FeeCollection() {
         setRazorpayStatus("error");
       }
     } catch (err) {
-      toast.error(err?.response?.data?.message || "Failed to save Razorpay settings");
+      toast.error(
+        err?.response?.data?.message || "Failed to save Razorpay settings",
+      );
       setRazorpayStatus("error");
     } finally {
       setSavingRazorpay(false);
@@ -138,90 +147,246 @@ function FeeCollection() {
     fetchRazorpaySettings();
   }, []);
 
-  const handleClassChange = (e) => {
-    const classId = e.target.value;
-    setSelectedClass(classId);
-
-    const query = inputValue.toLowerCase();
-
-    const filtered = students.filter((s) => {
-      // Check Class
+  const applyFilters = (list, classId, queryRaw) => {
+    const query = (queryRaw || "").toLowerCase();
+    return list.filter((s) => {
       const isClassMatch = !classId
         ? true
         : s.classId === classId || s.classId?._id === classId;
-
-      // Check Search
       const fullName = `${s.firstName} ${s.lastName}`.toLowerCase();
       const isSearchMatch =
-        fullName.includes(query) || s.studentId.toLowerCase().includes(query);
-
+        !query ||
+        fullName.includes(query) ||
+        String(s.studentId || "")
+          .toLowerCase()
+          .includes(query);
       return isClassMatch && isSearchMatch;
     });
+  };
 
-    setFilteredStudents(filtered);
+  const handleClassChange = (e) => {
+    const classId = e.target.value;
+    setSelectedClass(classId);
+    setFilteredStudents(applyFilters(students, classId, inputValue));
   };
 
   const handleinput = (e) => {
-    const query = e.target.value.toLowerCase();
-    setInputValue(query); // Update the search box state
-
-    const filtered = students.filter((s) => {
-      // 1. Search Match (Name or ID)
-      const fullName = `${s.firstName} ${s.lastName}`.toLowerCase();
-      const isSearchMatch =
-        fullName.includes(query) || s.studentId.toLowerCase().includes(query);
-
-      // 2. Class Match
-      // If selectedClass is empty (""), it's 'All Classes', so always true.
-      // Otherwise, check if the student's classId matches.
-      const isClassMatch = !selectedClass
-        ? true
-        : s.classId === selectedClass || s.classId?._id === selectedClass;
-
-      return isSearchMatch && isClassMatch;
-    });
-
-    setFilteredStudents(filtered);
+    const query = e.target.value;
+    setInputValue(query);
+    setFilteredStudents(applyFilters(students, selectedClass, query));
   };
 
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [modalMode, setModalMode] = useState("collect"); // collect | refund
   const [selectedStudent, setSelectedStudent] = useState(null);
+  const [heads, setHeads] = useState([]);
+  const [selectedHeadIds, setSelectedHeadIds] = useState([]);
+  const [headsLoading, setHeadsLoading] = useState(false);
+  const [openVouchers, setOpenVouchers] = useState([]);
+  const [recentPayments, setRecentPayments] = useState([]);
+  const [refundPaymentId, setRefundPaymentId] = useState("");
   const [amountToPay, setAmountToPay] = useState("");
   const [paymentMode, setPaymentMode] = useState("Cash");
   const [utr, setUtr] = useState("");
   const [transactionId, setTransactionId] = useState("");
+  const [remarks, setRemarks] = useState("");
+  const [submitting, setSubmitting] = useState(false);
+  const [feeSummary, setFeeSummary] = useState({
+    finalFee: 0,
+    totalPaid: 0,
+    totalDue: 0,
+  });
 
-  // This function triggers when you click the "Collect Fee" button in your table
-  const handleCollectFee = (student) => {
+  const selectedHeads = useMemo(
+    () => heads.filter((h) => selectedHeadIds.includes(String(h._id))),
+    [heads, selectedHeadIds],
+  );
+
+  const selectedTotal = useMemo(
+    () =>
+      Math.round(
+        selectedHeads.reduce(
+          (sum, h) => sum + Number(h.due || h.amount || 0),
+          0,
+        ) * 100,
+      ) / 100,
+    [selectedHeads],
+  );
+
+  const loadStudentHeads = async (student) => {
+    setHeadsLoading(true);
+    try {
+      const { data } = await axios.get(
+        `${API}/fees/student/${student._id}/heads`,
+        { withCredentials: true },
+      );
+      const list = (data.heads || []).filter((h) => Number(h.amount) > 0);
+      setHeads(list);
+      setOpenVouchers(data.openVouchers || []);
+      setRecentPayments(data.recentPayments || []);
+      setFeeSummary({
+        finalFee: data.finalFee || student.finalFee || 0,
+        totalPaid: data.totalPaid || student.totalPaid || 0,
+        totalDue: data.totalDue || student.totalDue || 0,
+      });
+      const dueIds = list
+        .filter((h) => Number(h.due) > 0)
+        .map((h) => String(h._id));
+      setSelectedHeadIds(dueIds);
+      setAmountToPay(
+        String(
+          Math.round(
+            list
+              .filter((h) => dueIds.includes(String(h._id)))
+              .reduce((s, h) => s + Number(h.due || 0), 0) * 100,
+          ) / 100,
+        ),
+      );
+    } catch (err) {
+      toast.error(err?.response?.data?.message || "Failed to load fee heads");
+      setHeads([]);
+      setSelectedHeadIds([]);
+      setAmountToPay(String(student.totalDue || ""));
+      setFeeSummary({
+        finalFee: student.finalFee || 0,
+        totalPaid: student.totalPaid || 0,
+        totalDue: student.totalDue || 0,
+      });
+    } finally {
+      setHeadsLoading(false);
+    }
+  };
+
+  const handleCollectFee = async (student) => {
     setSelectedStudent(student);
-    setAmountToPay(student.totalDue); // Default to total due amount
+    setModalMode("collect");
     setPaymentMode("Cash");
     setUtr("");
     setTransactionId("");
+    setRemarks("");
+    setRefundPaymentId("");
     setIsModalOpen(true);
+    await loadStudentHeads(student);
   };
 
+  const toggleHead = (headId) => {
+    const id = String(headId);
+    setSelectedHeadIds((prev) => {
+      const next = prev.includes(id)
+        ? prev.filter((x) => x !== id)
+        : [...prev, id];
+      const total =
+        Math.round(
+          heads
+            .filter((h) => next.includes(String(h._id)))
+            .reduce((s, h) => s + Number(h.due || 0), 0) * 100,
+        ) / 100;
+      setAmountToPay(String(total));
+      return next;
+    });
+  };
+
+  const selectAllDue = () => {
+    const dueIds = heads
+      .filter((h) => Number(h.due) > 0)
+      .map((h) => String(h._id));
+    setSelectedHeadIds(dueIds);
+    const total =
+      Math.round(
+        heads
+          .filter((h) => dueIds.includes(String(h._id)))
+          .reduce((s, h) => s + Number(h.due || 0), 0) * 100,
+      ) / 100;
+    setAmountToPay(String(total));
+  };
+
+  const clearHeads = () => {
+    setSelectedHeadIds([]);
+    setAmountToPay("0");
+  };
+
+  const refreshStudentsAfterAction = async () => {
+    try {
+      const res = await axios.get(`${API}/students`, {
+        withCredentials: true,
+      });
+      const freshStudents = res.data.data;
+      if (freshStudents) {
+        setStudents(freshStudents);
+        setFilteredStudents(
+          applyFilters(freshStudents, selectedClass, inputValue),
+        );
+      }
+    } catch {
+      toast.error(
+        "Action saved, but failed to refresh the list. Please reload.",
+      );
+    }
+  };
+
+  const buildSelectedFeeHeadsPayload = (payAmount) => {
+    const full = selectedHeads.map((h) => ({
+      feeId: h._id,
+      name: h.name,
+      amount: Number(h.due || 0),
+    }));
+    const max =
+      Math.round(full.reduce((s, h) => s + Number(h.amount), 0) * 100) / 100;
+    const target =
+      payAmount != null && Number(payAmount) > 0
+        ? Math.min(Number(payAmount), max)
+        : max;
+    let left = Math.round(target * 100) / 100;
+    const allocated = [];
+    for (const h of full) {
+      if (left <= 0) break;
+      const take = Math.min(Number(h.amount) || 0, left);
+      if (take <= 0) continue;
+      allocated.push({ ...h, amount: Math.round(take * 100) / 100 });
+      left = Math.round((left - take) * 100) / 100;
+    }
+    return allocated;
+  };
+
+  const isPartialPay =
+    selectedTotal > 0 &&
+    Number(amountToPay) > 0 &&
+    Number(amountToPay) < selectedTotal - 0.009;
+
   const confirmPayment = async () => {
-    if (!amountToPay || Number(amountToPay) <= 0) {
+    if (!selectedHeads.length) {
+      toast.error("Select at least one fee head");
+      return;
+    }
+    const payAmt = Number(amountToPay);
+    if (!payAmt || payAmt <= 0) {
       toast.error("Please enter a valid amount");
       return;
     }
-
+    if (payAmt > selectedTotal + 0.009) {
+      toast.error(`Amount cannot exceed selected total ₹${selectedTotal}`);
+      return;
+    }
     if (paymentMode === "UPI" && !utr.trim()) {
       toast.error("Please enter the UTR number for UPI payment");
       return;
     }
-
     if (paymentMode === "Online" && !transactionId.trim()) {
       toast.error("Please enter the transaction ID for online payment");
       return;
     }
 
+    const feeHeads = buildSelectedFeeHeadsPayload(payAmt);
     const payload = {
       studentId: selectedStudent._id,
-      amountPaid: Number(amountToPay),
-      paymentMode: paymentMode,
-      remarks: "Fee collection via Accountant",
+      amountPaid: payAmt,
+      paymentMode,
+      remarks:
+        remarks.trim() ||
+        `Fee collection — ${feeHeads.map((h) => h.name).join(", ")}${
+          isPartialPay ? " (partial)" : ""
+        }`,
+      feeHeads,
       ...(paymentMode === "UPI" ? { utr: utr.trim() } : {}),
       ...(paymentMode === "Online"
         ? { transactionId: transactionId.trim() }
@@ -229,81 +394,114 @@ function FeeCollection() {
     };
 
     const loadingToast = toast.loading("Processing payment...");
-    let isSuccess = false; // 👈 flag to track what happened
-
+    setSubmitting(true);
     try {
       const response = await axios.post(`${API}/fee-collect`, payload, {
         withCredentials: true,
       });
       toast.dismiss(loadingToast);
-
       if (response.data.success) {
-        isSuccess = true; // 👈 mark success
-        toast.success(`₹${amountToPay} collected successfully! 🎉`);
+        toast.success(`₹${amountToPay} collected successfully`);
+        const receiptId = response.data?.data?.receipt?._id;
+        setIsModalOpen(false);
+        await refreshStudentsAfterAction();
+        if (receiptId && basePath) {
+          navigate(`${basePath}/fees/receipt/${receiptId}`);
+        }
       } else {
         toast.error(response.data.message || "Payment failed");
       }
     } catch (error) {
       toast.dismiss(loadingToast);
       toast.error(error.response?.data?.message || "Something went wrong");
+    } finally {
+      setSubmitting(false);
     }
+  };
 
-    // ✅ Runs AFTER try/catch — errors here won't trigger error toast
-    if (isSuccess) {
-      setIsModalOpen(false);
-      setSelectedStudent(null);
-      setAmountToPay("");
-      setPaymentMode("Cash");
-
-      try {
-        // 1. Fetch the fresh data from the server
-        const res = await axios.get(`${API}/students`, {
-          withCredentials: true,
-        });
-        const freshStudents = res.data.data;
-
-        if (freshStudents) {
-          // 2. Update the master list
-          setStudents(freshStudents);
-
-          // 3. Re-apply the current filters to the fresh data
-          const query = inputValue.toLowerCase();
-
-          const refreshedFilteredList = freshStudents.filter((s) => {
-            const fullName = `${s.firstName} ${s.lastName}`.toLowerCase();
-
-            // Check if matches current search query
-            const matchesSearch =
-              fullName.includes(query) ||
-              s.studentId.toLowerCase().includes(query);
-
-            /* ─────────────────────────────────────────────────────────────
-               CHANGE HERE: We match based on ID now, not className string
-               ───────────────────────────────────────────────────────────── */
-            const matchesClass = selectedClass
-              ? s.classId === selectedClass || s.classId?._id === selectedClass
-              : true;
-
-            return matchesSearch && matchesClass;
-          });
-
-          // 4. Finally, update the UI list
-          setFilteredStudents(refreshedFilteredList);
+  const createVoucher = async () => {
+    if (!selectedHeads.length) {
+      toast.error("Select fee heads for the voucher");
+      return;
+    }
+    setSubmitting(true);
+    const loadingToast = toast.loading("Creating voucher...");
+    try {
+      const { data } = await axios.post(
+        `${API}/fees/voucher`,
+        {
+          studentId: selectedStudent._id,
+          feeHeads: buildSelectedFeeHeadsPayload(selectedTotal),
+          remarks:
+            remarks.trim() ||
+            `Fee voucher — ${selectedHeads.map((h) => h.name).join(", ")}`,
+        },
+        { withCredentials: true },
+      );
+      toast.dismiss(loadingToast);
+      if (data.success) {
+        toast.success(`Voucher ${data.data.receiptNo} created`);
+        const voucherId = data.data?._id;
+        setIsModalOpen(false);
+        if (voucherId && basePath) {
+          navigate(`${basePath}/fees/receipt/${voucherId}`);
         }
-      } catch (error) {
-        console.error("Error refreshing student list:", error);
-        toast.error(
-          "Payment successful, but failed to refresh the list. Please reload.",
-        );
+      } else {
+        toast.error(data.message || "Failed to create voucher");
       }
+    } catch (err) {
+      toast.dismiss(loadingToast);
+      toast.error(err.response?.data?.message || "Failed to create voucher");
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const confirmRefund = async () => {
+    if (!refundPaymentId && (!selectedHeads.length || !amountToPay)) {
+      toast.error("Select a payment to refund, or select heads / amount");
+      return;
+    }
+    setSubmitting(true);
+    const loadingToast = toast.loading("Processing refund...");
+    try {
+      const payload = {
+        studentId: selectedStudent._id,
+        remarks: remarks.trim() || "Fee refund",
+      };
+      if (refundPaymentId) {
+        payload.paymentId = refundPaymentId;
+      } else {
+        payload.feeHeads = buildSelectedFeeHeadsPayload(Number(amountToPay));
+        payload.amount = Number(amountToPay);
+      }
+      const { data } = await axios.post(`${API}/fees/refund`, payload, {
+        withCredentials: true,
+      });
+      toast.dismiss(loadingToast);
+      if (data.success) {
+        toast.success("Refund processed");
+        const refundId = data.data?.refund?._id;
+        setIsModalOpen(false);
+        await refreshStudentsAfterAction();
+        if (refundId && basePath) {
+          navigate(`${basePath}/fees/receipt/${refundId}`);
+        }
+      } else {
+        toast.error(data.message || "Refund failed");
+      }
+    } catch (err) {
+      toast.dismiss(loadingToast);
+      toast.error(err.response?.data?.message || "Refund failed");
+    } finally {
+      setSubmitting(false);
     }
   };
 
   return (
     <div className="p-8 text-[rgb(var(--text))]">
-      {/* 🔙 BACK BUTTON */}
       {isMobile && (
-          <div className="pt-4">
+        <div className="pt-4">
           <button
             onClick={() => navigate(-1)}
             className="flex items-center gap-2 px-3 py-1.5 rounded-xl
@@ -323,7 +521,8 @@ function FeeCollection() {
             <h2 className="text-base font-semibold">Razorpay key setup</h2>
             <p className="text-xs text-[rgb(var(--text-muted))] mt-1">
               Optional for now. Without keys, parents use a development checkout
-              (OK button → payment success). Add real keys later for live Razorpay.
+              (OK button → payment success). Add real keys later for live
+              Razorpay.
             </p>
           </div>
           {razorpayStatus === "ready" && (
@@ -355,8 +554,13 @@ function FeeCollection() {
               Razorpay Dashboard → API Keys
             </a>
           </li>
-          <li>Switch to <strong>Test Mode</strong> (toggle in left sidebar)</li>
-          <li>Copy <strong>Key ID</strong> and generate/copy <strong>Key Secret</strong></li>
+          <li>
+            Switch to <strong>Test Mode</strong> (toggle in left sidebar)
+          </li>
+          <li>
+            Copy <strong>Key ID</strong> and generate/copy{" "}
+            <strong>Key Secret</strong>
+          </li>
           <li>Paste below → Save → Test connection</li>
         </ol>
 
@@ -433,9 +637,18 @@ function FeeCollection() {
               value={selectedClass}
               className="block w-full px-4 py-2 text-[rgb(var(--text))] bg-[rgb(var(--surface))] border border-[rgb(var(--border))] rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-[rgba(var(--primary),0.25)] focus:border-[rgb(var(--primary))] cursor-pointer appearance-none"
             >
-              <option value="" className="text-[rgb(var(--text))] bg-[rgb(var(--surface))]">All Classes</option>
+              <option
+                value=""
+                className="text-[rgb(var(--text))] bg-[rgb(var(--surface))]"
+              >
+                All Classes
+              </option>
               {classes.map((c) => (
-                <option key={c._id} value={c._id} className="text-[rgb(var(--text))] bg-[rgb(var(--surface))]">
+                <option
+                  key={c._id}
+                  value={c._id}
+                  className="text-[rgb(var(--text))] bg-[rgb(var(--surface))]"
+                >
                   Class {c.name}
                 </option>
               ))}
@@ -463,10 +676,10 @@ function FeeCollection() {
                       Type
                     </th>
                     <th className="px-6 py-3 text-left text-xs font-medium  uppercase tracking-wider">
-                      Fee Deu
+                      Fee Due
                     </th>
                     <th className="px-6 py-3 text-left text-xs font-medium  uppercase tracking-wider">
-                      action
+                      Action
                     </th>
                   </tr>
                 </thead>
@@ -476,80 +689,62 @@ function FeeCollection() {
                       !!selectedStudent?._id &&
                       String(selectedStudent._id) === String(student._id);
                     return (
-                    <tr
-                      key={student._id}
-                      className={`transition-colors ${
-                        isSelected
-                          ? "bg-[rgba(var(--primary),0.12)]"
-                          : "hover:bg-[rgba(var(--primary),0.05)]"
-                      }`}
-                    >
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <div
-                          className={`text-sm ${
-                            isSelected
-                              ? "font-extrabold text-[rgb(var(--primary))]"
-                              : "font-bold text-[rgb(var(--primary))]"
-                          }`}
-                        >
-                          {student.studentId}
-                        </div>
-                        <div className="text-xs text-[rgb(var(--text))]">
-                          Roll: {student.rollNo}
-                        </div>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <div className="text-sm font-medium ">
-                          {student.firstName} {student.lastName}
-                        </div>
-                        <div className="text-xs ">
-                          {student.gender} | {student.bloodGroup}
-                        </div>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <span className="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-green-100 text-green-800">
-                          {student.studentType}
-                        </span>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm ">
-                        <div className="font-medium ">
-                          ₹{student.totalDue}
-                        </div>
-                        {student.discountValue > 0 && (
-                          <div className="text-xs text-red-500">
-                            -{student.discountValue} Off
+                      <tr
+                        key={student._id}
+                        className={`transition-colors ${
+                          isSelected
+                            ? "bg-[rgba(var(--primary),0.12)]"
+                            : "hover:bg-[rgba(var(--primary),0.05)]"
+                        }`}
+                      >
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          <div
+                            className={`text-sm ${
+                              isSelected
+                                ? "font-extrabold text-[rgb(var(--primary))]"
+                                : "font-bold text-[rgb(var(--primary))]"
+                            }`}
+                          >
+                            {student.studentId}
                           </div>
-                        )}
-                      </td>
-                      <td className=" whitespace-nowrap text-sm font-medium">
-                        <button
-                          onClick={() => handleCollectFee(student)}
-                          className="inline-flex items-center px-4 py-2 border border-transparent 
+                          <div className="text-xs text-[rgb(var(--text))]">
+                            Roll: {student.rollNo}
+                          </div>
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          <div className="text-sm font-medium ">
+                            {student.firstName} {student.lastName}
+                          </div>
+                          <div className="text-xs ">
+                            {student.gender} | {student.bloodGroup}
+                          </div>
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          <span className="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-green-100 text-green-800">
+                            {student.studentType}
+                          </span>
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm ">
+                          <div className="font-medium ">
+                            ₹{student.totalDue}
+                          </div>
+                          {student.discountValue > 0 && (
+                            <div className="text-xs text-red-500">
+                              -{student.discountValue} Off
+                            </div>
+                          )}
+                        </td>
+                        <td className=" whitespace-nowrap text-sm font-medium">
+                          <button
+                            onClick={() => handleCollectFee(student)}
+                            className="inline-flex items-center px-4 py-2 border border-transparent 
                     text-sm font-medium rounded-md shadow-sm text-white bg-[rgb(var(--primary))]
                     focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[rgb(var(--primary))] transition-colors"
-                        >
-                          <svg
-                            className="mr-2 h-4 w-4"
-                            fill="none"
-                            stroke="currentColor"
-                            viewBox="0 0 24 24"
-                            xmlns="http://w3.org"
                           >
-                            <path
-                              strokeLinecap="round"
-                              strokeLinejoin="round"
-                              d="M15 8.5H9m6 3H9m3 1.5H9L15 17M9 5.5c4.833 0 4.833 6 0 6"
-                            />
-                            <path
-                              strokeLinecap="round"
-                              strokeLinejoin="round"
-                              d="M21.5 12a9.5 9.5 0 11-19 0 9.5 10.5 0 0119 0z"
-                            />
-                          </svg>
-                          Collect Fee
-                        </button>
-                      </td>
-                    </tr>
+                            Collect Fee
+                          </button>
+                        </td>
+                      </tr>
                     );
                   })}
                 </tbody>
@@ -557,58 +752,40 @@ function FeeCollection() {
             </div>
           )}
         </div>
-      </div>{" "}
-      {/* end of container div */}
-      {/* popup modal for collect payemnt - */}
+      </div>
+
       {isModalOpen && selectedStudent && (
         <div className="fixed inset-0 z-999 flex items-center justify-center p-3 sm:p-4">
-          {/* Backdrop */}
           <div
-            className="absolute inset-0  backdrop-blur-[3px]"
+            className="absolute inset-0 backdrop-blur-[3px] bg-black/20"
             onClick={() => setIsModalOpen(false)}
           ></div>
 
-          {/* Modal Container */}
-          <div className="relative bg-[rgb(var(--surface))] text-[rgb(var(--text))] w-full max-w-sm sm:max-w-lg md:max-w-xl max-h-[90vh] sm:max-h-[80vh] rounded-3xl shadow-2xl flex flex-col overflow-hidden animate-in zoom-in duration-200">
-            {/* 1. FIXED HEADER */}
-            <div className="px-4 sm:px-6 py-3 sm:py-4 border-b border-slate-50 flex justify-between items-center shrink-0">
+          <div className="relative bg-[rgb(var(--surface))] text-[rgb(var(--text))] w-full max-w-sm sm:max-w-lg md:max-w-2xl max-h-[92vh] rounded-3xl shadow-2xl flex flex-col overflow-hidden">
+            <div className="px-4 sm:px-6 py-3 sm:py-4 border-b border-slate-100 flex justify-between items-center shrink-0">
               <div>
-                <h2 className="text-lg font-black ">
-                  Collect Fee
+                <h2 className="text-lg font-black">
+                  {modalMode === "refund" ? "Fee Refund" : "Collect Fee"}
                 </h2>
                 <p className="text-[10px] text-[rgb(var(--primary))] font-bold uppercase tracking-widest">
-                  Payment Portal
+                  Head-wise payment
                 </p>
               </div>
               <button
                 onClick={() => setIsModalOpen(false)}
-                className="p-2  rounded-fulltransition-colors"
+                className="p-2 rounded-full"
               >
-                <svg
-                  className="w-5 h-5"
-                  fill="none"
-                  stroke="currentColor"
-                  viewBox="0 0 24 24"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth="2"
-                    d="M6 18L18 6M6 6l12 12"
-                  />
-                </svg>
+                ✕
               </button>
             </div>
 
-            {/* 2. SCROLLABLE CONTENT AREA */}
-            <div className="flex-1 overflow-y-auto p-4 sm:p-6 space-y-4 sm:space-y-6 custom-scrollbar">
-              {/* Student Info Card */}
+            <div className="flex-1 overflow-y-auto p-4 sm:p-6 space-y-4 custom-scrollbar">
               <div className="bg-[rgb(var(--surface))] p-4 rounded-2xl flex flex-col sm:flex-row items-center gap-3 sm:gap-4 border border-[rgb(var(--border))]">
                 <div className="h-12 w-12 bg-[rgb(var(--primary))] rounded-xl flex items-center justify-center text-white text-xl font-bold shrink-0">
                   {selectedStudent?.firstName?.charAt(0) || "S"}
                 </div>
                 <div className="text-center sm:text-left">
-                  <h3 className="font-bold  leading-none">
+                  <h3 className="font-bold leading-none">
                     {selectedStudent?.firstName} {selectedStudent?.lastName}
                   </h3>
                   <p className="text-[11px] mt-1">
@@ -618,128 +795,342 @@ function FeeCollection() {
                 </div>
               </div>
 
-              {/* Stats Grid */}
               <div className="grid grid-cols-3 gap-2">
-                <div className="p-3  rounded-xl border border-slate-100 text-center">
-                  <p className="text-[9px] font-bold  uppercase">
-                    Total
-                  </p>
-                  <p className="text-sm font-bold ">
-                    ₹{selectedStudent?.finalFee}
-                  </p>
+                <div className="p-3 rounded-xl border border-slate-100 text-center">
+                  <p className="text-[9px] font-bold uppercase">Total</p>
+                  <p className="text-sm font-bold">₹{feeSummary.finalFee}</p>
                 </div>
-                <div className="p-3  rounded-xl border border-green-100 text-center">
+                <div className="p-3 rounded-xl border border-green-100 text-center">
                   <p className="text-[9px] font-bold text-green-500 uppercase">
                     Paid
                   </p>
                   <p className="text-sm font-bold text-green-700">
-                    ₹{selectedStudent?.totalPaid || 0}
+                    ₹{feeSummary.totalPaid || 0}
                   </p>
                 </div>
-                <div className="p-3  rounded-xl border border-red-100 text-center">
+                <div className="p-3 rounded-xl border border-red-100 text-center">
                   <p className="text-[9px] font-bold text-red-400 uppercase">
                     Due
                   </p>
                   <p className="text-sm font-bold text-red-600">
-                    ₹{selectedStudent?.totalDue}
+                    ₹{feeSummary.totalDue}
                   </p>
                 </div>
               </div>
 
-              {/* Payment Form */}
-              <div className="space-y-4">
-                <div>
-                  <label className="text-[10px] font-bold uppercase ml-1">
-                    Amount to Collect
+              <div className="flex gap-2 p-1 rounded-xl bg-[rgb(var(--bg))] border border-[rgb(var(--border))]">
+                <button
+                  type="button"
+                  onClick={() => setModalMode("collect")}
+                  className={`flex-1 py-2 rounded-lg text-xs font-bold ${
+                    modalMode === "collect"
+                      ? "bg-[rgb(var(--primary))] text-white"
+                      : ""
+                  }`}
+                >
+                  Collect / Voucher
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setModalMode("refund")}
+                  className={`flex-1 py-2 rounded-lg text-xs font-bold ${
+                    modalMode === "refund"
+                      ? "bg-[rgb(var(--primary))] text-white"
+                      : ""
+                  }`}
+                >
+                  Refund
+                </button>
+              </div>
+
+              <div>
+                <div className="flex items-center justify-between mb-2">
+                  <label className="text-[10px] font-bold uppercase">
+                    Fee heads
                   </label>
-                  <div className="relative mt-1">
-                    <span className="absolute left-4 top-1/2 -translate-y-1/2 font-bold">
-                      ₹
-                    </span>
-                    <input
-                      type="number"
-                      value={amountToPay}
-                      onChange={(e) => setAmountToPay(e.target.value)}
-                      className="w-full pl-8 pr-4 py-3 border-2  focus:border-[rgb(var(--primary))] focus:bg-[rgb(var(--surface))] rounded-xl outline-none font-bold text-[rgb(var(--primary))] transition-all"
-                      placeholder="0.00"
-                    />
+                  <div className="flex gap-2">
+                    <button
+                      type="button"
+                      onClick={selectAllDue}
+                      className="text-[10px] font-semibold text-[rgb(var(--primary))]"
+                    >
+                      Select due
+                    </button>
+                    <button
+                      type="button"
+                      onClick={clearHeads}
+                      className="text-[10px] font-semibold text-slate-500"
+                    >
+                      Clear
+                    </button>
                   </div>
                 </div>
 
-                <div>
-                  <label className="text-[10px] font-bold text-[rgb(var(--primary))] uppercase ml-1">
-                    Payment Method
-                  </label>
-                  <div className="grid grid-cols-2 gap-2 mt-1">
-                    {["Cash", "UPI", "Cheque", "Online"].map((mode) => (
-                      <button
-                        key={mode}
-                        type="button"
-                        onClick={() => {
-                          setPaymentMode(mode);
-                          if (mode !== "UPI") setUtr("");
-                          if (mode !== "Online") setTransactionId("");
-                        }}
-                        className={`py-3 px-2 rounded-xl border-2 text-xs font-bold transition-all ${
-                          paymentMode === mode
-                            ? "border-[rgb(var(--primary))] text-[rgb(var(--primary))]"
-                            : "border-slate-50   text-[rgb(var(--text))]"
-                        }`}
-                      >
-                        {mode}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-
-                {paymentMode === "UPI" && (
-                  <div>
-                    <label className="text-[10px] font-bold text-[rgb(var(--primary))] uppercase ml-1">
-                      UTR Number <span className="text-red-500">*</span>
-                    </label>
-                    <input
-                      type="text"
-                      value={utr}
-                      onChange={(e) => setUtr(e.target.value)}
-                      className="w-full mt-1 px-4 py-3 border-2 focus:border-[rgb(var(--primary))] rounded-xl outline-none font-medium text-sm transition-all"
-                      placeholder="Enter 12-digit UTR / UPI reference"
-                      autoComplete="off"
-                    />
-                  </div>
-                )}
-
-                {paymentMode === "Online" && (
-                  <div>
-                    <label className="text-[10px] font-bold text-[rgb(var(--primary))] uppercase ml-1">
-                      Transaction ID <span className="text-red-500">*</span>
-                    </label>
-                    <input
-                      type="text"
-                      value={transactionId}
-                      onChange={(e) => setTransactionId(e.target.value)}
-                      className="w-full mt-1 px-4 py-3 border-2 focus:border-[rgb(var(--primary))] rounded-xl outline-none font-medium text-sm transition-all"
-                      placeholder="Enter bank / gateway transaction ID"
-                      autoComplete="off"
-                    />
+                {headsLoading ? (
+                  <p className="text-sm text-[rgb(var(--text-muted))]">
+                    Loading fee heads…
+                  </p>
+                ) : heads.length === 0 ? (
+                  <p className="text-sm text-[rgb(var(--text-muted))] border border-dashed rounded-xl p-4 text-center">
+                    No fee structure heads found for this student&apos;s class.
+                    Add heads in Fee Structure (Tuition, Hostel, Transport…).
+                  </p>
+                ) : (
+                  <div className="space-y-2 max-h-56 overflow-y-auto pr-1">
+                    {heads.map((head) => {
+                      const id = String(head._id);
+                      const checked = selectedHeadIds.includes(id);
+                      const due = Number(head.due || 0);
+                      const disabled =
+                        modalMode === "collect" ? due <= 0 : false;
+                      return (
+                        <label
+                          key={id}
+                          className={`flex items-center gap-3 p-3 rounded-xl border cursor-pointer transition ${
+                            checked
+                              ? "border-[rgb(var(--primary))] bg-[rgba(var(--primary),0.06)]"
+                              : "border-[rgb(var(--border))]"
+                          } ${disabled ? "opacity-50 cursor-not-allowed" : ""}`}
+                        >
+                          <input
+                            type="checkbox"
+                            checked={checked}
+                            disabled={disabled}
+                            onChange={() => toggleHead(id)}
+                            className="h-4 w-4 accent-[rgb(var(--primary))]"
+                          />
+                          <div className="flex-1 min-w-0">
+                            <p className="text-sm font-semibold truncate">
+                              {head.name}
+                              {head.isOptional ? (
+                                <span className="ml-2 text-[10px] font-medium text-amber-600">
+                                  Optional
+                                </span>
+                              ) : null}
+                            </p>
+                            <p className="text-[11px] text-[rgb(var(--text-muted))]">
+                              Amount ₹{head.amount} · Paid ₹{head.paid} · Due ₹
+                              {due}
+                            </p>
+                          </div>
+                          <div className="text-sm font-bold shrink-0">
+                            ₹{due}
+                          </div>
+                        </label>
+                      );
+                    })}
                   </div>
                 )}
               </div>
+
+              <div className="rounded-2xl border border-[rgb(var(--border))] p-4 bg-[rgb(var(--bg))]">
+                <div className="flex items-center justify-between gap-3">
+                  <div>
+                    <p className="text-[10px] font-bold uppercase tracking-wide text-[rgb(var(--text-muted))]">
+                      Selected total
+                    </p>
+                    <p className="text-2xl font-black text-[rgb(var(--primary))]">
+                      ₹{selectedTotal}
+                    </p>
+                    <p className="text-[11px] text-[rgb(var(--text-muted))] mt-0.5">
+                      {selectedHeads.length
+                        ? selectedHeads.map((h) => h.name).join(", ")
+                        : "No heads selected"}
+                    </p>
+                  </div>
+                  {isPartialPay && (
+                    <span className="shrink-0 text-[10px] font-bold uppercase tracking-wide px-2.5 py-1 rounded-full bg-amber-50 text-amber-700 border border-amber-200">
+                      Partial
+                    </span>
+                  )}
+                </div>
+              </div>
+
+              {modalMode === "refund" && (
+                <div>
+                  <label className="text-[10px] font-bold uppercase ml-1">
+                    Refund against payment (optional)
+                  </label>
+                  <select
+                    value={refundPaymentId}
+                    onChange={(e) => setRefundPaymentId(e.target.value)}
+                    className="w-full mt-1 px-3 py-2.5 border rounded-xl text-sm bg-[rgb(var(--surface))]"
+                  >
+                    <option value="">Use selected heads / amount</option>
+                    {recentPayments.map((p) => (
+                      <option key={p._id} value={p._id}>
+                        {p.receiptNo} · ₹{p.amountPaid} ·{" "}
+                        {new Date(p.paidDate).toLocaleDateString("en-IN")}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              )}
+
+              {modalMode === "collect" && (
+                <>
+                  <div>
+                    <div className="flex items-center justify-between gap-2 ml-1">
+                      <label className="text-[10px] font-bold uppercase">
+                        Amount to collect
+                      </label>
+                      <div className="flex gap-2">
+                        <button
+                          type="button"
+                          onClick={() => setAmountToPay(String(selectedTotal))}
+                          className="text-[10px] font-semibold text-[rgb(var(--primary))]"
+                        >
+                          Full due
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const half =
+                              Math.round((selectedTotal / 2) * 100) / 100;
+                            setAmountToPay(half > 0 ? String(half) : "0");
+                          }}
+                          className="text-[10px] font-semibold text-amber-700"
+                        >
+                          Half
+                        </button>
+                      </div>
+                    </div>
+                    <div className="relative mt-1">
+                      <span className="absolute left-4 top-1/2 -translate-y-1/2 font-bold">
+                        ₹
+                      </span>
+                      <input
+                        type="number"
+                        min="1"
+                        max={selectedTotal || undefined}
+                        step="0.01"
+                        value={amountToPay}
+                        onChange={(e) => setAmountToPay(e.target.value)}
+                        className="w-full pl-8 pr-4 py-3 border-2 focus:border-[rgb(var(--primary))] rounded-xl outline-none font-bold text-[rgb(var(--primary))]"
+                        placeholder="Enter partial or full amount"
+                      />
+                    </div>
+                    <p className="text-[11px] text-[rgb(var(--text-muted))] mt-1.5 ml-1">
+                      Partial payment allowed — enter any amount up to ₹
+                      {selectedTotal}. Remaining stays due.
+                    </p>
+                  </div>
+
+                  <div>
+                    <label className="text-[10px] font-bold text-[rgb(var(--primary))] uppercase ml-1">
+                      Payment Method
+                    </label>
+                    <div className="grid grid-cols-2 gap-2 mt-1">
+                      {["Cash", "UPI", "Cheque", "Online"].map((mode) => (
+                        <button
+                          key={mode}
+                          type="button"
+                          onClick={() => {
+                            setPaymentMode(mode);
+                            if (mode !== "UPI") setUtr("");
+                            if (mode !== "Online") setTransactionId("");
+                          }}
+                          className={`py-3 px-2 rounded-xl border-2 text-xs font-bold transition-all ${
+                            paymentMode === mode
+                              ? "border-[rgb(var(--primary))] text-[rgb(var(--primary))]"
+                              : "border-slate-50 text-[rgb(var(--text))]"
+                          }`}
+                        >
+                          {mode}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  {paymentMode === "UPI" && (
+                    <div>
+                      <label className="text-[10px] font-bold text-[rgb(var(--primary))] uppercase ml-1">
+                        UTR Number <span className="text-red-500">*</span>
+                      </label>
+                      <input
+                        type="text"
+                        value={utr}
+                        onChange={(e) => setUtr(e.target.value)}
+                        className="w-full mt-1 px-4 py-3 border-2 focus:border-[rgb(var(--primary))] rounded-xl outline-none font-medium text-sm"
+                        placeholder="Enter 12-digit UTR / UPI reference"
+                      />
+                    </div>
+                  )}
+
+                  {paymentMode === "Online" && (
+                    <div>
+                      <label className="text-[10px] font-bold text-[rgb(var(--primary))] uppercase ml-1">
+                        Transaction ID <span className="text-red-500">*</span>
+                      </label>
+                      <input
+                        type="text"
+                        value={transactionId}
+                        onChange={(e) => setTransactionId(e.target.value)}
+                        className="w-full mt-1 px-4 py-3 border-2 focus:border-[rgb(var(--primary))] rounded-xl outline-none font-medium text-sm"
+                        placeholder="Enter bank / gateway transaction ID"
+                      />
+                    </div>
+                  )}
+
+                  {openVouchers.length > 0 && (
+                    <div className="rounded-xl border border-amber-200 bg-amber-50 p-3 text-xs text-amber-800">
+                      Open vouchers:{" "}
+                      {openVouchers
+                        .map((v) => `${v.receiptNo} (₹${v.amountPaid})`)
+                        .join(", ")}
+                    </div>
+                  )}
+                </>
+              )}
+
+              <div>
+                <label className="text-[10px] font-bold uppercase ml-1">
+                  Remarks
+                </label>
+                <input
+                  type="text"
+                  value={remarks}
+                  onChange={(e) => setRemarks(e.target.value)}
+                  className="w-full mt-1 px-4 py-2.5 border rounded-xl text-sm"
+                  placeholder="Optional note"
+                />
+              </div>
             </div>
 
-            {/* 3. FIXED FOOTER ACTIONS */}
-            <div className="px-4 sm:px-6 py-4 sm:py-6  border-t border-slate-50 flex gap-3 shrink-0">
+            <div className="px-4 sm:px-6 py-4 border-t border-slate-100 flex flex-wrap gap-2 shrink-0">
               <button
                 onClick={() => setIsModalOpen(false)}
-                className="flex-1 py-3.5 text-sm font-bold border-1 rounded-xl transition-colors"
+                className="flex-1 min-w-[90px] py-3 text-sm font-bold border rounded-xl"
+                disabled={submitting}
               >
                 Cancel
               </button>
-              <button
-                onClick={confirmPayment}
-                className="flex-[2] py-3.5 bg-[rgb(var(--primary))] text-white rounded-2xl font-bold shadow-lg active:scale-95 transition-all"
-              >
-                Confirm Payment
-              </button>
+              {modalMode === "collect" ? (
+                <>
+                  <button
+                    onClick={createVoucher}
+                    disabled={submitting || !selectedHeads.length}
+                    className="flex-1 min-w-[110px] py-3 border-2 border-[rgb(var(--primary))] text-[rgb(var(--primary))] rounded-xl font-bold text-sm disabled:opacity-50"
+                  >
+                    Cut Voucher
+                  </button>
+                  <button
+                    onClick={confirmPayment}
+                    disabled={submitting || !selectedHeads.length}
+                    className="flex-[1.4] min-w-[120px] py-3 bg-[rgb(var(--primary))] text-white rounded-xl font-bold shadow-lg active:scale-95 transition-all disabled:opacity-50"
+                  >
+                    Pay Now
+                  </button>
+                </>
+              ) : (
+                <button
+                  onClick={confirmRefund}
+                  disabled={submitting}
+                  className="flex-[2] py-3 bg-red-600 text-white rounded-xl font-bold disabled:opacity-50"
+                >
+                  Process Refund
+                </button>
+              )}
             </div>
           </div>
         </div>

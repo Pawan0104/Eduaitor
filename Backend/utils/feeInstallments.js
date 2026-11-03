@@ -108,37 +108,56 @@ export function buildInstallments({
   }));
 
   const byKey = Object.fromEntries(installments.map((i) => [i.key, i]));
-  const keyedPaid = new Set();
+  const round2 = (n) => Math.round((Number(n) || 0) * 100) / 100;
 
+  // Apply payments that name period keys — support partial amounts (FIFO on keys).
   for (const payment of payments) {
+    const entryType = payment?.entryType || "payment";
+    if (entryType === "voucher" || entryType === "refund") continue;
     const keys = Array.isArray(payment?.periodKeys)
       ? payment.periodKeys.map(String).filter(Boolean)
       : [];
     if (!keys.length) continue;
+    let remaining = round2(payment.amountPaid);
     for (const key of keys) {
+      if (remaining <= 0) break;
       const row = byKey[key];
-      if (!row || keyedPaid.has(key)) continue;
-      row.paidAmount = row.amount;
-      row.dueAmount = 0;
-      row.status = "paid";
-      keyedPaid.add(key);
+      if (!row) continue;
+      const space = round2(row.amount - row.paidAmount);
+      if (space <= 0) continue;
+      const apply = Math.min(space, remaining);
+      row.paidAmount = round2(row.paidAmount + apply);
+      row.dueAmount = round2(row.amount - row.paidAmount);
+      remaining = round2(remaining - apply);
     }
   }
 
-  const keyedCovered = installments
-    .filter((i) => keyedPaid.has(i.key))
-    .reduce((sum, i) => sum + i.amount, 0);
+  for (const row of installments) {
+    if (row.dueAmount <= 0.009) {
+      row.paidAmount = row.amount;
+      row.dueAmount = 0;
+      row.status = "paid";
+    } else if (row.paidAmount > 0) {
+      row.status = "partial";
+    }
+  }
+
+  const keyedCovered = installments.reduce(
+    (sum, i) => sum + Number(i.paidAmount || 0),
+    0,
+  );
 
   let leftover = Math.max(0, Number(totalPaid) || 0) - keyedCovered;
-  leftover = Math.round(leftover * 100) / 100;
+  leftover = round2(leftover);
 
   for (const row of installments) {
-    if (keyedPaid.has(row.key)) continue;
-    if (leftover <= 0) break;
-    const apply = Math.min(row.amount, leftover);
-    row.paidAmount = Math.round(apply * 100) / 100;
-    row.dueAmount = Math.round((row.amount - row.paidAmount) * 100) / 100;
-    leftover = Math.round((leftover - apply) * 100) / 100;
+    if (row.status === "paid" || leftover <= 0) continue;
+    const space = round2(row.amount - row.paidAmount);
+    if (space <= 0) continue;
+    const apply = Math.min(space, leftover);
+    row.paidAmount = round2(row.paidAmount + apply);
+    row.dueAmount = round2(row.amount - row.paidAmount);
+    leftover = round2(leftover - apply);
     if (row.dueAmount <= 0.009) {
       row.paidAmount = row.amount;
       row.dueAmount = 0;
@@ -155,8 +174,15 @@ export function buildInstallments({
   };
 }
 
-/** Validate selected unpaid/partial period keys and return expected pay amount. */
-export function resolveSelectedInstallments(installments, periodKeys) {
+/**
+ * Validate selected unpaid/partial period keys.
+ * Optional requestedAmount allows partial payment (must be > 0 and ≤ total due).
+ */
+export function resolveSelectedInstallments(
+  installments,
+  periodKeys,
+  requestedAmount,
+) {
   const keys = [...new Set((periodKeys || []).map(String).filter(Boolean))];
   if (!keys.length) {
     return { ok: false, message: "Select at least one fee period" };
@@ -177,15 +203,52 @@ export function resolveSelectedInstallments(installments, periodKeys) {
     selected.push(row);
   }
 
-  const amount = Math.round(
-    selected.reduce((sum, row) => sum + Number(row.dueAmount || 0), 0) * 100,
-  ) / 100;
+  const maxAmount =
+    Math.round(
+      selected.reduce((sum, row) => sum + Number(row.dueAmount || 0), 0) * 100,
+    ) / 100;
+
+  let amount = maxAmount;
+  if (requestedAmount !== undefined && requestedAmount !== null && requestedAmount !== "") {
+    const req = Math.round((Number(requestedAmount) || 0) * 100) / 100;
+    if (req <= 0) {
+      return { ok: false, message: "Enter a valid partial amount" };
+    }
+    if (req > maxAmount + 0.009) {
+      return {
+        ok: false,
+        message: `Amount cannot exceed ₹${maxAmount} for selected periods`,
+      };
+    }
+    amount = req;
+  }
 
   return {
     ok: true,
     selected,
     amount,
+    maxAmount,
+    partial: amount < maxAmount - 0.009,
     periodKeys: selected.map((s) => s.key),
     labels: selected.map((s) => s.label),
   };
+}
+
+/** Spread a partial amount across fee heads in selection order (FIFO). */
+export function allocateHeadsFifo(feeHeads, payAmount) {
+  let left = Math.round((Number(payAmount) || 0) * 100) / 100;
+  const out = [];
+  for (const h of feeHeads || []) {
+    if (left <= 0) break;
+    const due = Math.round((Number(h.amount) || 0) * 100) / 100;
+    if (due <= 0) continue;
+    const take = Math.min(due, left);
+    out.push({
+      feeId: h.feeId || h._id || undefined,
+      name: String(h.name || "").trim(),
+      amount: take,
+    });
+    left = Math.round((left - take) * 100) / 100;
+  }
+  return out.filter((h) => h.name && h.amount > 0);
 }

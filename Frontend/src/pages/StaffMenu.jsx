@@ -11,6 +11,9 @@ import {
   FaBookDead,
   FaBookOpen,
   FaClipboardList,
+  FaClipboardCheck,
+  FaChartBar,
+  FaChartPie,
   FaBell,
   FaCalendar,
   FaCalendarAlt,
@@ -43,6 +46,9 @@ const COLOR_MAP = {
   Transport: { bg: "#F0FDFA", icon: "#0D9488", dot: "#99F6E4" },
   Assignments: { bg: "#F8FAFC", icon: "#64748B", dot: "#CBD5E1" },
   "Lead Management": { bg: "#EEF2FF", icon: "#4F46E5", dot: "#C7D2FE" },
+  Registration: { bg: "#ECFDF5", icon: "#059669", dot: "#A7F3D0" },
+  "Admission Reports": { bg: "#EEF2FF", icon: "#4F46E5", dot: "#C7D2FE" },
+  Reports: { bg: "#EEF2FF", icon: "#4F46E5", dot: "#C7D2FE" },
   Groups: { bg: "#F0FDF4", icon: "#22C55E", dot: "#BBF7D0" },
   Staff: { bg: "#EFF6FF", icon: "#3B82F6", dot: "#BFDBFE" },
 };
@@ -104,7 +110,8 @@ export default function StaffMenu() {
         icon: <FaUserAlt />,
         module: "attendance",
         children: [
-          { name: "Attendance", path: "/staff/attendance" },
+          { name: "Mark My Attendance", path: "/staff/attendance" },
+          { name: "Staff Attendance", path: "/staff/attendance/manage" },
           { name: "Leave Request", path: "/staff/leave-request" },
         ],
       },
@@ -182,7 +189,6 @@ export default function StaffMenu() {
         children: [
           { name: "Schedule Exams", path: "/staff/exams" },
           { name: "Marks Entry", path: "/staff/exam-marks" },
-          { name: "Report Card", path: "/staff/report-card" },
         ],
       },
       {
@@ -196,6 +202,23 @@ export default function StaffMenu() {
         icon: <FaClipboardList />,
         path: "/staff/leads",
         module: "leads",
+      },
+      {
+        name: "Registration",
+        icon: <FaClipboardCheck />,
+        path: "/staff/registrations",
+        module: "leads",
+      },
+      {
+        name: "Reports",
+        icon: <FaChartPie />,
+        children: [
+          { name: "All Reports", path: "/staff/reports" },
+          { name: "Admission Reports", path: "/staff/admission-reports" },
+          { name: "Fee Report", path: "/staff/financial-report" },
+          { name: "Fee Defaulters", path: "/staff/defaulters" },
+          { name: "Attendance Report", path: "/staff/attendance" },
+        ],
       },
       {
         name: "Groups",

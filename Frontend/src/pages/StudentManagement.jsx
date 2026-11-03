@@ -121,14 +121,37 @@ const GUARDIAN_RELATION_OPTIONS = [
   "Other",
 ];
 
+const ADMISSION_SOURCE_OPTIONS = [
+  "Newspaper",
+  "Advertisement",
+  "Vendor / Partner",
+  "Website / Online",
+  "Social Media",
+  "Friend / Relative",
+  "Alumni",
+  "Walk-in",
+  "School Camp / Event",
+  "Other",
+];
+
 const emptyForm = {
   firstName: "",
   lastName: "",
   dob: "",
   gender: "",
   bloodGroup: "",
+  nationality: "",
+  placeOfBirth: "",
+  caste: "",
   category: "",
   community: "",
+  aadhaarNumber: "",
+  penNumber: "",
+  admissionSource: "",
+  isSpecialChild: false,
+  isEws: false,
+  isPhysicallyDisabled: false,
+  medicalConditionRemarks: "",
   admissionDate: "",
   studentId: "",
 
@@ -149,11 +172,15 @@ const emptyForm = {
   previousSchoolName: "",
   previousSchoolClass: "",
   previousSchoolResult: "",
+  previousSchoolTcNumber: "",
 
   classId: "",
   sectionId: "",
+  streamId: "",
+  stream: "",
   rollNo: "",
   studentType: "",
+    feeBatch: "New",
   transport: "",
   useTransport: false,
   selectedOptionalFees: [],
@@ -195,8 +222,18 @@ const DUMMY_DATA_BY_STEP = {
     dob: "2015-06-15",
     gender: "Male",
     bloodGroup: "B+",
+    nationality: "Indian",
+    placeOfBirth: "Hyderabad",
+    caste: "",
     category: "General",
     community: "",
+    aadhaarNumber: "123412341234",
+    penNumber: "PEN123456",
+    admissionSource: "Walk-in",
+    isSpecialChild: false,
+    isEws: false,
+    isPhysicallyDisabled: false,
+    medicalConditionRemarks: "",
     admissionDate: toDateInputValue(new Date()),
   }),
   2: () => ({
@@ -215,11 +252,13 @@ const DUMMY_DATA_BY_STEP = {
     previousSchoolName: "Test Public School",
     previousSchoolClass: "Class 4",
     previousSchoolResult: "Pass",
+    previousSchoolTcNumber: "TC/2024/001",
   }),
   5: (classes) => ({
     classId: classes?.[0]?._id || classes?.[0]?.id || "",
     rollNo: "1",
     studentType: "Day Scholar",
+    feeBatch: "New",
   }),
   6: () => ({
     discountType: "Percentage",
@@ -311,13 +350,18 @@ const StudentManagement = () => {
   const { user } = useAuth();
   const isEdit = Boolean(id);
   const leadIdParam = !isEdit ? searchParams.get("leadId") || "" : "";
+  const registrationIdParam = !isEdit
+    ? searchParams.get("registrationId") || ""
+    : "";
   const basePath = user?.role === "staff_admin" ? "/staff" : "/school";
 
   const [step, setStep] = useState(1);
   const [form, setForm] = useState(emptyForm);
   const [errors, setErrors] = useState({});
   const [sourceLead, setSourceLead] = useState(null);
+  const [sourceRegistration, setSourceRegistration] = useState(null);
   const [leadId, setLeadId] = useState("");
+  const [registrationId, setRegistrationId] = useState("");
 
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [confirmAction, setConfirmAction] = useState(null);
@@ -325,6 +369,7 @@ const StudentManagement = () => {
   const [submitting, setSubmitting] = useState(false);
 
   const [classes, setClasses] = useState([]);
+  const [streams, setStreams] = useState([]);
   const [sections, setSections] = useState([]);
 
   const [feeStructure, setFeeStructure] = useState([]);
@@ -557,7 +602,21 @@ const StudentManagement = () => {
       }
     };
 
+    const fetchStreams = async () => {
+      try {
+        const res = await axios.get(`${API}/streams/all`, {
+          params: { status: "Active" },
+          withCredentials: true,
+        });
+        setStreams(res.data?.streams || res.data?.data || []);
+      } catch (err) {
+        console.error(err);
+        setStreams([]);
+      }
+    };
+
     fetchClasses();
+    fetchStreams();
   }, []);
 
   useEffect(() => {
@@ -646,9 +705,99 @@ const StudentManagement = () => {
     fetchFeeStructure();
   }, [form.classId]);
 
-  /* PREFILL FROM LEAD */
+  /* PREFILL FROM REGISTRATION (middle layer after lead) */
   useEffect(() => {
-    if (isEdit || !leadIdParam) return;
+    if (isEdit || !registrationIdParam) return;
+
+    const fetchRegistration = async () => {
+      try {
+        const res = await axios.get(`${API}/registrations/${registrationIdParam}`, {
+          withCredentials: true,
+        });
+        const registration = res.data?.data;
+        if (!registration) {
+          toast.error("Registration not found");
+          return;
+        }
+        if (registration.studentId || registration.status === "admitted") {
+          toast.info("This registration is already admitted");
+          if (registration.studentId) {
+            navigate(`${basePath}/student-view/${registration.studentId}`, {
+              replace: true,
+            });
+          } else {
+            navigate(`${basePath}/registrations`, { replace: true });
+          }
+          return;
+        }
+        if (registration.status === "cancelled") {
+          toast.error("Cancelled registrations cannot be admitted");
+          navigate(`${basePath}/registrations`, { replace: true });
+          return;
+        }
+        if (
+          registration.entranceExamId &&
+          registration.entrance?.result !== "pass"
+        ) {
+          toast.error(
+            registration.entrance?.result === "fail"
+              ? "This candidate did not pass the entrance exam"
+              : "Entrance exam result is still pending. Add the marks first.",
+          );
+          navigate(
+            `${basePath}/registrations?registrationId=${registration._id}`,
+            { replace: true },
+          );
+          return;
+        }
+
+        const { firstName, lastName } = splitStudentName(
+          registration.studentName,
+        );
+        setSourceRegistration(registration);
+        setRegistrationId(registration._id);
+        if (registration.leadId) setLeadId(String(registration.leadId));
+        setForm((prev) => ({
+          ...prev,
+          firstName: firstName || prev.firstName,
+          lastName: lastName || prev.lastName,
+          dob: registration.dob
+            ? String(registration.dob).slice(0, 10)
+            : prev.dob,
+          gender: registration.gender || prev.gender,
+          bloodGroup: registration.bloodGroup || prev.bloodGroup,
+          fatherName: registration.parentName || prev.fatherName,
+          fatherMobile: registration.parentMobile || prev.fatherMobile,
+          fatherEmail: registration.parentEmail || prev.fatherEmail,
+          address: registration.address || prev.address,
+          previousSchoolName:
+            registration.previousSchoolName || prev.previousSchoolName,
+          classId: registration.classId
+            ? String(registration.classId)
+            : prev.classId,
+          sectionId: registration.sectionId
+            ? String(registration.sectionId)
+            : prev.sectionId,
+          streamId: registration.streamId
+            ? String(registration.streamId)
+            : prev.streamId,
+          stream: registration.stream || prev.stream,
+          username: registration.parentMobile || prev.username,
+        }));
+      } catch (err) {
+        toast.error(
+          err?.response?.data?.message || "Failed to load registration",
+        );
+        navigate(`${basePath}/registrations`, { replace: true });
+      }
+    };
+
+    fetchRegistration();
+  }, [isEdit, registrationIdParam, basePath, navigate]);
+
+  /* PREFILL FROM LEAD (legacy/direct — prefer registration when present) */
+  useEffect(() => {
+    if (isEdit || !leadIdParam || registrationIdParam) return;
 
     const fetchLead = async () => {
       try {
@@ -668,6 +817,14 @@ const StudentManagement = () => {
         if (String(lead.status || "").toLowerCase() === "cancelled") {
           toast.error("Cancelled leads cannot be admitted");
           navigate(`${basePath}/leads`, { replace: true });
+          return;
+        }
+        // Route through the registration middle layer when one already exists.
+        if (lead.registrationId) {
+          navigate(
+            `${basePath}/student-manage?registrationId=${lead.registrationId}`,
+            { replace: true },
+          );
           return;
         }
 
@@ -691,7 +848,7 @@ const StudentManagement = () => {
     };
 
     fetchLead();
-  }, [isEdit, leadIdParam, basePath, navigate]);
+  }, [isEdit, leadIdParam, registrationIdParam, basePath, navigate]);
 
   /* FETCH STUDENT */
   useEffect(() => {
@@ -764,8 +921,18 @@ const StudentManagement = () => {
           dob: toDateInput(student.dob),
           gender: student.gender || "",
           bloodGroup: student.bloodGroup || "",
-      category: student.category || "",
-      community: student.community || "",
+          nationality: student.nationality || "",
+          placeOfBirth: student.placeOfBirth || "",
+          caste: student.caste || "",
+          category: student.category || "",
+          community: student.community || "",
+          aadhaarNumber: student.aadhaarNumber || "",
+          penNumber: student.penNumber || "",
+          admissionSource: student.admissionSource || "",
+          isSpecialChild: Boolean(student.isSpecialChild),
+          isEws: Boolean(student.isEws),
+          isPhysicallyDisabled: Boolean(student.isPhysicallyDisabled),
+          medicalConditionRemarks: student.medicalConditionRemarks || "",
           admissionDate: toDateInput(student.admissionDate),
           studentId: student.studentId || "",
           fatherName: student.fatherName || "",
@@ -781,10 +948,12 @@ const StudentManagement = () => {
           previousSchoolName: student.previousSchoolName || "",
           previousSchoolClass: student.previousSchoolClass || "",
           previousSchoolResult: student.previousSchoolResult || "",
+          previousSchoolTcNumber: student.previousSchoolTcNumber || "",
           classId: student.classId?._id || student.classId || "",
           sectionId: student.sectionId?._id || student.sectionId || "",
           rollNo: student.rollNo || "",
           studentType: student.studentType || "",
+          feeBatch: student.feeBatch === "Old" ? "Old" : "New",
           transport: student.transport?._id || student.transport || "",
           useTransport: Boolean(student.transport),
           selectedOptionalFees: Array.isArray(student.selectedOptionalFees)
@@ -876,6 +1045,11 @@ const StudentManagement = () => {
       nextValue = String(value || "")
         .replace(/\D/g, "")
         .slice(0, 10);
+    }
+    if (name === "aadhaarNumber") {
+      nextValue = String(value || "")
+        .replace(/\D/g, "")
+        .slice(0, 12);
     }
 
     if (name === "discountValue") {
@@ -1315,24 +1489,60 @@ const StudentManagement = () => {
     if (step > 1) setStep((s) => s - 1);
   };
 
-  const applyLeadPrefill = (base = emptyForm, lead = sourceLead) => {
-    if (!lead) return { ...base };
-    const { firstName, lastName } = splitStudentName(lead.studentName);
-    return {
-      ...base,
-      firstName,
-      lastName,
-      fatherName: lead.parentName || "",
-      fatherMobile: lead.parentMobile || "",
-      fatherEmail: lead.parentEmail || "",
-      previousSchoolName: lead.previousSchoolName || "",
-      username: lead.parentMobile || "",
-    };
+  const applySourcePrefill = (base = emptyForm) => {
+    if (sourceRegistration) {
+      const { firstName, lastName } = splitStudentName(
+        sourceRegistration.studentName,
+      );
+      return {
+        ...base,
+        firstName,
+        lastName,
+        dob: sourceRegistration.dob
+          ? String(sourceRegistration.dob).slice(0, 10)
+          : "",
+        gender: sourceRegistration.gender || "",
+        bloodGroup: sourceRegistration.bloodGroup || "",
+        fatherName: sourceRegistration.parentName || "",
+        fatherMobile: sourceRegistration.parentMobile || "",
+        fatherEmail: sourceRegistration.parentEmail || "",
+        address: sourceRegistration.address || "",
+        previousSchoolName: sourceRegistration.previousSchoolName || "",
+        classId: sourceRegistration.classId
+          ? String(sourceRegistration.classId)
+          : "",
+        sectionId: sourceRegistration.sectionId
+          ? String(sourceRegistration.sectionId)
+          : "",
+        streamId: sourceRegistration.streamId
+          ? String(sourceRegistration.streamId)
+          : "",
+        stream: sourceRegistration.stream || "",
+        username: sourceRegistration.parentMobile || "",
+      };
+    }
+    if (sourceLead) {
+      const { firstName, lastName } = splitStudentName(sourceLead.studentName);
+      return {
+        ...base,
+        firstName,
+        lastName,
+        fatherName: sourceLead.parentName || "",
+        fatherMobile: sourceLead.parentMobile || "",
+        fatherEmail: sourceLead.parentEmail || "",
+        previousSchoolName: sourceLead.previousSchoolName || "",
+        classId: sourceLead.classId ? String(sourceLead.classId) : "",
+        streamId: sourceLead.streamId ? String(sourceLead.streamId) : "",
+        stream: sourceLead.stream || "",
+        username: sourceLead.parentMobile || "",
+      };
+    }
+    return { ...base };
   };
 
   const resetForm = () => {
     const doReset = () => {
-      setForm(applyLeadPrefill(emptyForm));
+      setForm(applySourcePrefill(emptyForm));
       setStep(1);
       setErrors({});
     };
@@ -1422,6 +1632,8 @@ const forbidden = [
             value?.size !== undefined)
         ) {
           data.append(key, value);
+        } else if (typeof value === "boolean") {
+          data.append(key, value ? "true" : "false");
         } else if (typeof value === "object") {
           data.append(key, JSON.stringify(value));
         } else {
@@ -1430,7 +1642,9 @@ const forbidden = [
       });
 
       data.set("feeFrequency", freqFilter);
-      if (!isEdit && leadId) {
+      if (!isEdit && registrationId) {
+        data.set("registrationId", registrationId);
+      } else if (!isEdit && leadId) {
         data.set("leadId", leadId);
       }
 
@@ -1486,15 +1700,21 @@ const forbidden = [
           withCredentials: true,
         });
         toast.success(
-          leadId
-            ? "Student admitted from lead. Opening ID card for download…"
-            : "Student admitted successfully. Opening ID card for download…",
+          registrationId
+            ? "Student admitted from registration."
+            : leadId
+              ? "Student admitted from lead."
+              : "Student admitted successfully.",
         );
         const newId = res.data?.data?._id;
         if (newId) {
           navigate(`${basePath}/students`, { state: { refresh: true } });
+        } else if (registrationId) {
+          navigate(`${basePath}/registrations`, { state: { refresh: true } });
         } else {
-          navigate(leadId ? `${basePath}/leads` : `${basePath}/students`, { state: { refresh: true } });
+          navigate(leadId ? `${basePath}/leads` : `${basePath}/students`, {
+            state: { refresh: true },
+          });
         }
       }
     } catch (err) {
@@ -1555,7 +1775,26 @@ const forbidden = [
           <h1 className="text-2xl lg:text-3xl font-bold">
             {isEdit ? "Edit Student Details" : "Student Admission"}
           </h1>
-          {sourceLead && (
+          {sourceRegistration && (
+            <p className="mt-1 text-sm text-[rgb(var(--text-muted))]">
+              Prefilled from registration:{" "}
+              <span className="font-semibold text-[rgb(var(--text))]">
+                {sourceRegistration.studentName}
+              </span>
+              {sourceRegistration.registrationNumber
+                ? ` (${sourceRegistration.registrationNumber})`
+                : ""}
+              {" · "}
+              <button
+                type="button"
+                onClick={() => navigate(`${basePath}/registrations`)}
+                className="text-[rgb(var(--primary))] underline underline-offset-2"
+              >
+                Back to registrations
+              </button>
+            </p>
+          )}
+          {!sourceRegistration && sourceLead && (
             <p className="mt-1 text-sm text-[rgb(var(--text-muted))]">
               Prefilled from lead:{" "}
               <span className="font-semibold text-[rgb(var(--text))]">
@@ -1596,10 +1835,19 @@ const forbidden = [
         </div>
       </div>
 
-      {sourceLead && (
+      {sourceRegistration && (
         <div className="mb-5 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-800">
-          Lead details transferred. Complete class, fees, and documents, then save
-          to mark the lead as admitted.
+          Registration details transferred
+          {sourceRegistration.registrationNumber
+            ? ` (${sourceRegistration.registrationNumber})`
+            : ""}
+          . Complete remaining admission steps, then save to admit the student.
+        </div>
+      )}
+      {!sourceRegistration && sourceLead && (
+        <div className="mb-5 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
+          Lead details transferred. Prefer Registering the lead first so entrance
+          exams stay in the funnel — complete class, fees, and documents to admit.
         </div>
       )}
 
@@ -1741,6 +1989,27 @@ const forbidden = [
                   onChange={handleChange}
                   error={errors.bloodGroup}
                 />
+                <Input
+                  label="Nationality"
+                  placeholder="e.g. Indian"
+                  name="nationality"
+                  value={form.nationality}
+                  onChange={handleChange}
+                />
+                <Input
+                  label="Place of Birth"
+                  placeholder="City / Place of birth"
+                  name="placeOfBirth"
+                  value={form.placeOfBirth}
+                  onChange={handleChange}
+                />
+                <Input
+                  label="Caste"
+                  placeholder="Enter caste"
+                  name="caste"
+                  value={form.caste}
+                  onChange={handleChange}
+                />
                 <Select
                   label="Category *"
                   name="category"
@@ -1758,6 +2027,98 @@ const forbidden = [
                     onChange={handleChange}
                     error={errors.community}
                   />
+                )}
+                <Input
+                  label="Aadhaar Number / Aadhaar ID"
+                  placeholder="12-digit Aadhaar number"
+                  name="aadhaarNumber"
+                  value={form.aadhaarNumber}
+                  onChange={handleChange}
+                  maxLength={12}
+                  inputMode="numeric"
+                />
+                <Input
+                  label="PEN Number"
+                  placeholder="Permanent Education Number"
+                  name="penNumber"
+                  value={form.penNumber}
+                  onChange={handleChange}
+                />
+                <Select
+                  label="Admission Source"
+                  name="admissionSource"
+                  value={form.admissionSource}
+                  options={ADMISSION_SOURCE_OPTIONS}
+                  onChange={handleChange}
+                />
+                {(fieldIndex.get("isSpecialChild")?.visible !== false ||
+                  fieldIndex.get("isEws")?.visible !== false ||
+                  fieldIndex.get("isPhysicallyDisabled")?.visible !==
+                    false) && (
+                  <div className="md:col-span-2 grid gap-3 sm:grid-cols-3">
+                    {fieldIndex.get("isSpecialChild")?.visible !== false && (
+                      <label className="flex items-center gap-2 text-sm font-medium rounded-xl border border-[rgb(var(--border))] px-3 py-2.5 bg-[rgb(var(--surface))]">
+                        <input
+                          type="checkbox"
+                          checked={Boolean(form.isSpecialChild)}
+                          onChange={(e) =>
+                            setForm((prev) => ({
+                              ...prev,
+                              isSpecialChild: e.target.checked,
+                            }))
+                          }
+                        />
+                        Is special child?
+                      </label>
+                    )}
+                    {fieldIndex.get("isEws")?.visible !== false && (
+                      <label className="flex items-center gap-2 text-sm font-medium rounded-xl border border-[rgb(var(--border))] px-3 py-2.5 bg-[rgb(var(--surface))]">
+                        <input
+                          type="checkbox"
+                          checked={Boolean(form.isEws)}
+                          onChange={(e) =>
+                            setForm((prev) => ({
+                              ...prev,
+                              isEws: e.target.checked,
+                            }))
+                          }
+                        />
+                        EWS (Economically Weaker Section)
+                      </label>
+                    )}
+                    {fieldIndex.get("isPhysicallyDisabled")?.visible !==
+                      false && (
+                      <label className="flex items-center gap-2 text-sm font-medium rounded-xl border border-[rgb(var(--border))] px-3 py-2.5 bg-[rgb(var(--surface))]">
+                        <input
+                          type="checkbox"
+                          checked={Boolean(form.isPhysicallyDisabled)}
+                          onChange={(e) =>
+                            setForm((prev) => ({
+                              ...prev,
+                              isPhysicallyDisabled: e.target.checked,
+                            }))
+                          }
+                        />
+                        Is physically disabled?
+                      </label>
+                    )}
+                  </div>
+                )}
+                {fieldIndex.get("medicalConditionRemarks")?.visible !==
+                  false && (
+                  <div className="md:col-span-2">
+                    <label className="block text-sm font-medium text-[rgb(var(--text))] mb-1">
+                      Medical Condition / History
+                    </label>
+                    <textarea
+                      name="medicalConditionRemarks"
+                      rows={3}
+                      placeholder="Any medical history or remarks"
+                      value={form.medicalConditionRemarks}
+                      onChange={handleChange}
+                      className="w-full border px-3 py-2 rounded-lg bg-[rgb(var(--surface))]"
+                    />
+                  </div>
                 )}
                 <Input
                   type="date"
@@ -1904,6 +2265,13 @@ const forbidden = [
                   placeholder="Enter previous school result"
                   name="previousSchoolResult"
                   value={form.previousSchoolResult}
+                  onChange={handleChange}
+                />
+                <Input
+                  label="TC Number"
+                  placeholder="Transfer Certificate number"
+                  name="previousSchoolTcNumber"
+                  value={form.previousSchoolTcNumber}
                   onChange={handleChange}
                 />
 </div>
@@ -2074,6 +2442,18 @@ const forbidden = [
                   />
                 )}
 
+                <Select
+                  label="Stream"
+                  name="streamId"
+                  value={form.streamId}
+                  options={(streams || []).map((s) => ({
+                    label: s.name,
+                    value: s._id,
+                  }))}
+                  onChange={handleChange}
+                  error={errors.streamId}
+                />
+
                 <Input
                   label="Roll Number *"
                   name="rollNo"
@@ -2094,6 +2474,17 @@ const forbidden = [
                   options={["Day Scholar", "Day Boarder", "Boarder"]}
                   onChange={handleChange}
                 />
+                <Select
+                  label="Fee batch"
+                  name="feeBatch"
+                  value={form.feeBatch || "New"}
+                  options={["New", "Old"]}
+                  onChange={handleChange}
+                />
+                <p className="text-[11px] text-[rgb(var(--text-muted))] -mt-2 sm:col-span-2">
+                  New / Old controls which fee-structure components apply (admin
+                  configures heads separately for each batch).
+                </p>
               </div>
                 </>
               )}
@@ -3025,10 +3416,29 @@ const ReviewStep = ({
         <Field label="Date of birth" value={form.dob} />
         <Field label="Gender" value={form.gender} />
         <Field label="Blood group" value={form.bloodGroup} />
+        <Field label="Nationality" value={form.nationality} />
+        <Field label="Place of birth" value={form.placeOfBirth} />
+        <Field label="Caste" value={form.caste} />
         <Field label="Category" value={form.category} />
         {form.category === "Minority" && (
           <Field label="Community" value={form.community} />
         )}
+        <Field label="Aadhaar number" value={form.aadhaarNumber} />
+        <Field label="PEN number" value={form.penNumber} />
+        <Field label="Admission source" value={form.admissionSource} />
+        <Field
+          label="Special child"
+          value={form.isSpecialChild ? "Yes" : "No"}
+        />
+        <Field label="EWS" value={form.isEws ? "Yes" : "No"} />
+        <Field
+          label="Physically disabled"
+          value={form.isPhysicallyDisabled ? "Yes" : "No"}
+        />
+        <Field
+          label="Medical condition / history"
+          value={form.medicalConditionRemarks}
+        />
         <Field label="Admission date" value={form.admissionDate} />
       </Section>
 
@@ -3053,6 +3463,7 @@ const ReviewStep = ({
         <Field label="Previous School Name" value={form.previousSchoolName} />
         <Field label="Previous School Class" value={form.previousSchoolClass} />
         <Field label="Previous School Result" value={form.previousSchoolResult} />
+        <Field label="TC Number" value={form.previousSchoolTcNumber} />
       </Section>
 
       <Section title="Class details" headerClass="">

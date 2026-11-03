@@ -2,7 +2,42 @@ import mongoose from "mongoose";
 import StaffAttendance from "../models/staffAttendance.js";
 import Staff from "../models/staff.js";
 import Teacher from "../models/teacher.js";
+import School from "../models/school.js";
 import { Driver } from "../models/transport.js";
+
+/** Staff in-campus fence: 100–150 m (default 150) */
+const STAFF_CAMPUS_RADIUS_MIN = 100;
+const STAFF_CAMPUS_RADIUS_MAX = 150;
+
+const haversineMeters = (lat1, lon1, lat2, lon2) => {
+  const toRad = (v) => (v * Math.PI) / 180;
+  const R = 6371000;
+  const dLat = toRad(lat2 - lat1);
+  const dLon = toRad(lon2 - lon1);
+  const a =
+    Math.sin(dLat / 2) ** 2 +
+    Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLon / 2) ** 2;
+  return 2 * R * Math.asin(Math.sqrt(a));
+};
+
+const resolveCampusRadiusM = (schoolRadius) => {
+  const raw = Number(schoolRadius);
+  if (!Number.isFinite(raw) || raw <= 0) return STAFF_CAMPUS_RADIUS_MAX;
+  return Math.min(
+    STAFF_CAMPUS_RADIUS_MAX,
+    Math.max(STAFF_CAMPUS_RADIUS_MIN, raw),
+  );
+};
+
+const resolveSelfPerson = (user) => {
+  if (user?.role === "teacher_admin" && user?.teacher_id) {
+    return { staffId: user.teacher_id, personType: "teacher" };
+  }
+  if (user?.role === "staff_admin" && user?.staff_id) {
+    return { staffId: user.staff_id, personType: "staff" };
+  }
+  return null;
+};
 
 /**
  * Attendance covers everyone the staff-management screen knows about — Staff,
@@ -114,12 +149,29 @@ export const getStaffAttendanceMeta = async (req, res, next) => {
       };
     });
 
+    const school = await School.findById(schoolId)
+      .select("school_name latitude longitude geofenceRadiusM address")
+      .lean();
+    const campusRadiusM = resolveCampusRadiusM(school?.geofenceRadiusM);
+
     return res.json({
       success: true,
       data: {
         staffList: staffWithToday,
         todayDate: start,
         todayStatus: todayRecords.length ? true : false,
+        campus: {
+          name: school?.school_name || "",
+          address: school?.address || "",
+          latitude: school?.latitude ?? null,
+          longitude: school?.longitude ?? null,
+          geofenceRadiusM: campusRadiusM,
+          configured:
+            school?.latitude != null &&
+            school?.longitude != null &&
+            Number.isFinite(Number(school.latitude)) &&
+            Number.isFinite(Number(school.longitude)),
+        },
       },
     });
   } catch (error) {
@@ -369,6 +421,226 @@ export const getStaffAttendanceSummary = async (req, res, next) => {
     });
 
     return res.json({ success: true, data: result });
+  } catch (error) {
+    next(error);
+  }
+};
+
+/* ── Self punch (app): InCampus / OutCampus ─────────────────────────────── */
+
+export const getMyStaffAttendanceToday = async (req, res, next) => {
+  try {
+    const schoolId = req.user?.school_id;
+    const self = resolveSelfPerson(req.user);
+    if (!schoolId || !self) {
+      return res.status(403).json({
+        success: false,
+        message: "Only staff or teachers can mark their own attendance.",
+      });
+    }
+
+    const today = new Date();
+    const { start, end } = getDateRange(today);
+    const record = await StaffAttendance.findOne({
+      schoolId,
+      staffId: self.staffId,
+      date: { $gte: start, $lte: end },
+    }).lean();
+
+    const school = await School.findById(schoolId)
+      .select("school_name latitude longitude geofenceRadiusM address")
+      .lean();
+    const campusRadiusM = resolveCampusRadiusM(school?.geofenceRadiusM);
+
+    return res.json({
+      success: true,
+      data: {
+        person: self,
+        record: record || null,
+        campus: {
+          name: school?.school_name || "",
+          address: school?.address || "",
+          latitude: school?.latitude ?? null,
+          longitude: school?.longitude ?? null,
+          geofenceRadiusM: campusRadiusM,
+          configured:
+            school?.latitude != null &&
+            school?.longitude != null &&
+            Number.isFinite(Number(school.latitude)) &&
+            Number.isFinite(Number(school.longitude)),
+        },
+      },
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const selfPunchStaffAttendance = async (req, res, next) => {
+  try {
+    const schoolId = req.user?.school_id;
+    const self = resolveSelfPerson(req.user);
+    if (!schoolId || !self) {
+      return res.status(403).json({
+        success: false,
+        message: "Only staff or teachers can mark their own attendance.",
+      });
+    }
+
+    const locationMode = String(req.body?.locationMode || "").trim();
+    const latitude = Number(req.body?.latitude);
+    const longitude = Number(req.body?.longitude);
+    const accuracyM =
+      req.body?.accuracyM !== undefined && req.body?.accuracyM !== ""
+        ? Number(req.body.accuracyM)
+        : null;
+    const note = String(req.body?.note || "").trim();
+    const status = String(req.body?.status || "Present").trim() || "Present";
+
+    if (!["InCampus", "OutCampus"].includes(locationMode)) {
+      return res.status(400).json({
+        success: false,
+        message: "Select In campus or Out campus.",
+      });
+    }
+
+    if (!Number.isFinite(latitude) || !Number.isFinite(longitude)) {
+      return res.status(400).json({
+        success: false,
+        message: "Location permission is required to mark attendance.",
+      });
+    }
+
+    if (!["Present", "Absent", "Leave", "Half Day"].includes(status)) {
+      return res.status(400).json({
+        success: false,
+        message: "Invalid attendance status.",
+      });
+    }
+
+    const Person = self.personType === "teacher" ? Teacher : Staff;
+    const person = await Person.findOne({
+      _id: self.staffId,
+      schoolId,
+    })
+      .select("_id")
+      .lean();
+    if (!person) {
+      return res.status(404).json({
+        success: false,
+        message: "Your staff profile was not found for this school.",
+      });
+    }
+
+    const school = await School.findById(schoolId)
+      .select("latitude longitude geofenceRadiusM school_name")
+      .lean();
+    if (!school) {
+      return res.status(404).json({
+        success: false,
+        message: "School not found.",
+      });
+    }
+
+    const campusRadiusM = resolveCampusRadiusM(school.geofenceRadiusM);
+    let distanceFromSchoolM = null;
+
+    if (locationMode === "InCampus") {
+      if (
+        school.latitude == null ||
+        school.longitude == null ||
+        !Number.isFinite(Number(school.latitude)) ||
+        !Number.isFinite(Number(school.longitude))
+      ) {
+        return res.status(400).json({
+          success: false,
+          message:
+            "School campus location is not configured. Ask admin to set campus GPS first.",
+        });
+      }
+
+      distanceFromSchoolM = Math.round(
+        haversineMeters(
+          Number(school.latitude),
+          Number(school.longitude),
+          latitude,
+          longitude,
+        ),
+      );
+
+      if (distanceFromSchoolM > campusRadiusM) {
+        return res.status(400).json({
+          success: false,
+          message: `You are outside the campus radius (${distanceFromSchoolM} m away; allowed ${campusRadiusM} m). Use Out campus or move closer to school.`,
+          data: {
+            distanceFromSchoolM,
+            allowedRadiusM: campusRadiusM,
+          },
+        });
+      }
+    } else {
+      // Out campus — still compute distance if campus coords exist (for audit)
+      if (
+        school.latitude != null &&
+        school.longitude != null &&
+        Number.isFinite(Number(school.latitude)) &&
+        Number.isFinite(Number(school.longitude))
+      ) {
+        distanceFromSchoolM = Math.round(
+          haversineMeters(
+            Number(school.latitude),
+            Number(school.longitude),
+            latitude,
+            longitude,
+          ),
+        );
+      }
+    }
+
+    const today = new Date();
+    const { start } = getDateRange(today);
+    const month = start.getMonth() + 1;
+    const year = start.getFullYear();
+
+    const existing = await StaffAttendance.findOne({
+      schoolId,
+      staffId: self.staffId,
+      date: start,
+    });
+    if (existing) {
+      return res.status(400).json({
+        success: false,
+        message: "Attendance already marked for today.",
+        data: existing,
+      });
+    }
+
+    const record = await StaffAttendance.create({
+      schoolId,
+      staffId: self.staffId,
+      personType: self.personType,
+      date: start,
+      month,
+      year,
+      status,
+      note,
+      markedBy: req.user._id,
+      locationMode,
+      latitude,
+      longitude,
+      accuracyM: Number.isFinite(accuracyM) ? accuracyM : null,
+      distanceFromSchoolM,
+      markedAt: new Date(),
+    });
+
+    return res.status(201).json({
+      success: true,
+      message:
+        locationMode === "InCampus"
+          ? "In-campus attendance marked successfully."
+          : "Out-campus attendance marked with location.",
+      data: record,
+    });
   } catch (error) {
     next(error);
   }

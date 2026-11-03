@@ -34,6 +34,19 @@ const GUARDIAN_RELATION_OPTIONS = [
   "Other",
 ];
 
+const ADMISSION_SOURCE_OPTIONS = [
+  "Newspaper",
+  "Advertisement",
+  "Vendor / Partner",
+  "Website / Online",
+  "Social Media",
+  "Friend / Relative",
+  "Alumni",
+  "Walk-in",
+  "School Camp / Event",
+  "Other",
+];
+
 /** Field shapes the builder offers. */
 export const ADMISSION_FIELD_TYPES = [
   { value: "text", label: "Short text" },
@@ -78,12 +91,40 @@ export const ADMISSION_STEPS = [
         options: ["Male", "Female"],
       }),
       f("bloodGroup", "Blood Group", "text", false),
+      f("nationality", "Nationality", "text", false, {
+        placeholder: "e.g. Indian",
+      }),
+      f("placeOfBirth", "Place of Birth", "text", false),
+      f("caste", "Caste", "text", false),
       f("category", "Category", "select", true, {
         options: CATEGORY_OPTIONS,
       }),
       f("community", "Community", "select", false, {
         options: COMMUNITY_OPTIONS,
         help: "Only shown when Category is Minority.",
+      }),
+      f("aadhaarNumber", "Aadhaar Number / Aadhaar ID", "text", false, {
+        placeholder: "12-digit Aadhaar number",
+      }),
+      f("penNumber", "PEN Number", "text", false, {
+        placeholder: "Permanent Education Number",
+        help: "APAAR / PEN as issued by the education board.",
+      }),
+      f("admissionSource", "Admission Source", "select", false, {
+        options: ADMISSION_SOURCE_OPTIONS,
+        help: "How did you come to know about the school?",
+      }),
+      f("isSpecialChild", "Is special child?", "checkbox", false),
+      f("isEws", "EWS (Economically Weaker Section)", "checkbox", false),
+      f(
+        "isPhysicallyDisabled",
+        "Is physically disabled?",
+        "checkbox",
+        false,
+      ),
+      f("medicalConditionRemarks", "Medical Condition / History", "textarea", false, {
+        placeholder: "Any medical history or remarks",
+        help: "Optional notes about medical conditions.",
       }),
       f("admissionDate", "Admission Date", "date", true),
     ],
@@ -115,6 +156,9 @@ export const ADMISSION_STEPS = [
       f("previousSchoolName", "Previous School Name", "text", false),
       f("previousSchoolClass", "Last Class Attended", "text", false),
       f("previousSchoolResult", "Last Result", "text", false),
+      f("previousSchoolTcNumber", "TC Number", "text", false, {
+        placeholder: "Transfer Certificate number",
+      }),
     ],
   },
   {

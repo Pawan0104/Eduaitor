@@ -1,15 +1,59 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import axios from "axios";
-import { FaArrowLeft, FaChartBar, FaPrint } from "react-icons/fa";
+import * as XLSX from "xlsx";
+import {
+  FaArrowLeft,
+  FaCalendarDay,
+  FaCalendarWeek,
+  FaFileExcel,
+  FaFilePdf,
+  FaPrint,
+  FaRupeeSign,
+  FaUserClock,
+  FaWallet,
+} from "react-icons/fa";
+import { toast } from "react-toastify";
 import { useAuth } from "../context/AuthContext";
+import { printReportHtml } from "../utils/printReport";
+import {
+  normalizeSchoolBranding,
+  wrapExcelWithBranding,
+} from "../utils/reportBranding";
 
 const API = import.meta.env.VITE_API_URL;
 
-const FILTER_OPTIONS = [
-  { key: "fy", label: "Financial Year" },
-  { key: "last_month", label: "Last Month" },
-  { key: "custom", label: "Custom" },
+const REPORT_TYPES = [
+  {
+    key: "daily",
+    title: "Daily Collection",
+    blurb: "Fees collected on a selected day.",
+    icon: FaCalendarDay,
+  },
+  {
+    key: "weekly",
+    title: "Weekly Collection",
+    blurb: "Fees collected across the selected week.",
+    icon: FaCalendarWeek,
+  },
+  {
+    key: "collected",
+    title: "Fees Collected",
+    blurb: "Who paid in the selected period.",
+    icon: FaWallet,
+  },
+  {
+    key: "due",
+    title: "Due Fees",
+    blurb: "Students with outstanding dues.",
+    icon: FaRupeeSign,
+  },
+  {
+    key: "defaulters",
+    title: "Defaulters",
+    blurb: "Due students who have not paid this month.",
+    icon: FaUserClock,
+  },
 ];
 
 const toYmd = (date) => {
@@ -19,37 +63,13 @@ const toYmd = (date) => {
   return `${y}-${m}-${d}`;
 };
 
-/** Indian FY: 1 Apr → 31 Mar. `startYear` is the April calendar year. */
-const getFyBounds = (startYear) => {
-  const from = new Date(startYear, 3, 1);
-  const to = new Date(startYear + 1, 2, 31);
-  return {
-    from: toYmd(from),
-    to: toYmd(to),
-    label: `FY ${startYear}-${String(startYear + 1).slice(-2)}`,
-  };
+const startOfWeekMonday = (date = new Date()) => {
+  const start = new Date(date);
+  const day = (start.getDay() + 6) % 7;
+  start.setDate(start.getDate() - day);
+  start.setHours(0, 0, 0, 0);
+  return start;
 };
-
-const currentFyStartYear = () => {
-  const now = new Date();
-  return now.getMonth() >= 3 ? now.getFullYear() : now.getFullYear() - 1;
-};
-
-const getLastMonthBounds = () => {
-  const now = new Date();
-  const from = new Date(now.getFullYear(), now.getMonth() - 1, 1);
-  const to = new Date(now.getFullYear(), now.getMonth(), 0);
-  return {
-    from: toYmd(from),
-    to: toYmd(to),
-    label: from.toLocaleDateString("en-IN", { month: "long", year: "numeric" }),
-  };
-};
-
-const FY_OPTIONS = Array.from({ length: 8 }, (_, i) => {
-  const start = currentFyStartYear() - i;
-  return { value: String(start), ...getFyBounds(start) };
-});
 
 const fmtINR = (n) =>
   new Intl.NumberFormat("en-IN", {
@@ -58,582 +78,574 @@ const fmtINR = (n) =>
     maximumFractionDigits: 0,
   }).format(Number(n) || 0);
 
-const fmtDate = (d) =>
-  d
-    ? new Date(d).toLocaleDateString("en-IN", {
-        day: "2-digit",
-        month: "short",
-        year: "numeric",
-      })
-    : "—";
-
-const fmtYmd = (ymd) => {
-  if (!ymd) return "—";
-  const [y, m, d] = ymd.split("-").map(Number);
-  if (!y || !m || !d) return ymd;
-  return new Date(y, m - 1, d).toLocaleDateString("en-IN", {
+const fmtDate = (value) => {
+  if (!value) return "—";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "—";
+  return date.toLocaleDateString("en-IN", {
     day: "2-digit",
     month: "short",
     year: "numeric",
   });
 };
 
-function StatCard({ label, value, hint, tone = "slate" }) {
-  const tones = {
-    slate: "bg-slate-50 border-slate-200 text-slate-800",
-    emerald: "bg-emerald-50 border-emerald-200 text-emerald-800",
-    amber: "bg-amber-50 border-amber-200 text-amber-800",
-    blue: "bg-sky-50 border-sky-200 text-sky-800",
-  };
-  return (
-    <div className={`rounded-2xl border p-4 ${tones[tone] || tones.slate}`}>
-      <p className="text-xs font-semibold uppercase tracking-wide opacity-70">
-        {label}
-      </p>
-      <p className="text-xl font-black mt-1">{value}</p>
-      {hint && <p className="text-xs mt-1 opacity-70">{hint}</p>}
-    </div>
-  );
-}
+const StatCard = ({ label, value, hint }) => (
+  <div className="rounded-2xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))] p-4">
+    <p className="text-[10px] font-semibold uppercase tracking-wide text-[rgb(var(--text-muted))]">
+      {label}
+    </p>
+    <p className="mt-1 text-xl font-bold text-[rgb(var(--text))]">{value}</p>
+    {hint ? (
+      <p className="mt-1 text-xs text-[rgb(var(--text-muted))]">{hint}</p>
+    ) : null}
+  </div>
+);
 
 export default function FinancialReport() {
   const { user } = useAuth();
   const navigate = useNavigate();
-
-  const lastMonth = useMemo(() => getLastMonthBounds(), []);
-  const [filterMode, setFilterMode] = useState("fy");
-  const [fyStartYear, setFyStartYear] = useState(String(currentFyStartYear()));
-  const [customFrom, setCustomFrom] = useState(lastMonth.from);
-  const [customTo, setCustomTo] = useState(toYmd(new Date()));
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState("");
-  const [report, setReport] = useState(null);
-  const [selectedClass, setSelectedClass] = useState(null);
-  const [classDetail, setClassDetail] = useState(null);
-  const [classLoading, setClassLoading] = useState(false);
-
   const basePath = user?.role === "staff_admin" ? "/staff" : "/school";
+  const isMobile = typeof window !== "undefined" && window.innerWidth <= 768;
 
-  const resetClassView = () => {
-    setSelectedClass(null);
-    setClassDetail(null);
-    setClassLoading(false);
-  };
-
-  const range = useMemo(() => {
-    if (filterMode === "last_month") {
-      return getLastMonthBounds();
-    }
-    if (filterMode === "custom") {
-      return {
-        from: customFrom,
-        to: customTo,
-        label: `${fmtYmd(customFrom)} – ${fmtYmd(customTo)}`,
-      };
-    }
-    return getFyBounds(Number(fyStartYear) || currentFyStartYear());
-  }, [filterMode, fyStartYear, customFrom, customTo]);
-
-  const fetchReport = useCallback(
-    async (from = range.from, to = range.to) => {
-      if (!from || !to) {
-        setError("Select both from and to dates");
-        return;
-      }
-      if (from > to) {
-        setError("From date must be on or before to date");
-        return;
-      }
-
-      try {
-        setLoading(true);
-        setError("");
-        resetClassView();
-        const { data } = await axios.get(`${API}/fees/financial-report`, {
-          params: { from, to },
-          withCredentials: true,
-        });
-        setReport(data);
-      } catch (err) {
-        setError(err.response?.data?.message || "Failed to load report");
-        setReport(null);
-      } finally {
-        setLoading(false);
-      }
-    },
-    [range.from, range.to],
+  const [reportType, setReportType] = useState("daily");
+  const [day, setDay] = useState(toYmd(new Date()));
+  const [weekStart, setWeekStart] = useState(toYmd(startOfWeekMonday()));
+  const [from, setFrom] = useState(
+    toYmd(new Date(new Date().getFullYear(), new Date().getMonth(), 1)),
   );
+  const [to, setTo] = useState(toYmd(new Date()));
+  const [classId, setClassId] = useState("");
+  const [classes, setClasses] = useState([]);
+  const [loading, setLoading] = useState(false);
+  const [report, setReport] = useState(null);
 
-  const openClassDetail = async (row) => {
-    if (!row) return;
-    setSelectedClass(row);
-    setClassLoading(true);
-    setClassDetail(null);
+  const activeType =
+    REPORT_TYPES.find((item) => item.key === reportType) || REPORT_TYPES[0];
+
+  const isPaymentReport =
+    reportType === "daily" ||
+    reportType === "weekly" ||
+    reportType === "collected";
+
+  const loadClasses = useCallback(async () => {
     try {
-      const { data } = await axios.get(`${API}/fees/financial-report`, {
-        params: {
-          from: range.from,
-          to: range.to,
-          classId: row.classId || "unassigned",
-        },
+      const { data } = await axios.get(`${API}/classes/all`, {
         withCredentials: true,
       });
-      setClassDetail(data.classDetail || null);
-    } catch (err) {
-      setClassDetail(null);
-      setError(err.response?.data?.message || "Failed to load class report");
-    } finally {
-      setClassLoading(false);
+      setClasses(data?.classes || []);
+    } catch {
+      setClasses([]);
     }
-  };
+  }, []);
 
-  // Auto-load for Financial Year / Last Month; Custom waits for Apply
+  const fetchReport = useCallback(async () => {
+    setLoading(true);
+    try {
+      const params = { type: reportType, classId: classId || undefined };
+      if (reportType === "daily") params.day = day;
+      if (reportType === "weekly") params.weekStart = weekStart;
+      if (reportType === "collected") {
+        params.from = from;
+        params.to = to;
+      }
+      const { data } = await axios.get(`${API}/fees/reports`, {
+        params,
+        withCredentials: true,
+      });
+      setReport(data?.data || null);
+    } catch (error) {
+      setReport(null);
+      toast.error(
+        error.response?.data?.message || "Could not generate the fee report.",
+      );
+    } finally {
+      setLoading(false);
+    }
+  }, [reportType, day, weekStart, from, to, classId]);
+
   useEffect(() => {
-    if (filterMode === "custom") return;
-    fetchReport(range.from, range.to);
-  }, [filterMode, fyStartYear, range.from, range.to, fetchReport]);
+    loadClasses();
+  }, [loadClasses]);
 
-  const exportCsv = () => {
-    if (!report) return;
-    const rows = [
-      ["Section", "Label", "Amount", "Count"],
-      ...report.byMode.map((r) => ["Mode", r.mode, r.total, r.count]),
-      ...report.byMonth.map((r) => ["Month", r.monthLabel, r.total, r.count]),
-      ...report.byClass.map((r) => ["Class", r.className, r.total, r.count]),
+  useEffect(() => {
+    fetchReport();
+  }, [fetchReport]);
+
+  const periodLabel = useMemo(() => {
+    if (reportType === "daily") return fmtDate(day);
+    if (reportType === "weekly") {
+      const start = new Date(`${weekStart}T00:00:00`);
+      const end = new Date(start);
+      end.setDate(start.getDate() + 6);
+      return `${fmtDate(start)} – ${fmtDate(end)}`;
+    }
+    if (reportType === "collected") return `${fmtDate(from)} – ${fmtDate(to)}`;
+    return "As of today";
+  }, [reportType, day, weekStart, from, to]);
+
+  const excelRows = useMemo(() => {
+    if (!report?.rows) return [];
+    if (isPaymentReport) {
+      return [
+        [
+          "S.No",
+          "Receipt",
+          "Date",
+          "Student",
+          "Admission No",
+          "Class",
+          "Section",
+          "Roll",
+          "Mobile",
+          "Mode",
+          "Amount",
+          "UTR / Txn",
+        ],
+        ...report.rows.map((row) => [
+          row.sNo,
+          row.receiptNo,
+          fmtDate(row.paidDate),
+          row.studentName,
+          row.studentCode,
+          row.className,
+          row.sectionName,
+          row.rollNo,
+          row.parentMobile,
+          row.paymentMode,
+          row.amountPaid,
+          row.utr || row.transactionId || "",
+        ]),
+      ];
+    }
+    return [
+      [
+        "S.No",
+        "Student",
+        "Admission No",
+        "Class",
+        "Section",
+        "Roll",
+        "Mobile",
+        "Final Fee",
+        "Paid",
+        "Due",
+        "Last Paid",
+      ],
+      ...report.rows.map((row) => [
+        row.sNo,
+        row.studentName,
+        row.studentCode,
+        row.className,
+        row.sectionName,
+        row.rollNo,
+        row.parentMobile,
+        row.finalFee,
+        row.totalPaid,
+        row.dueAmount,
+        fmtDate(row.lastPaidDate),
+      ]),
     ];
-    const csv = rows.map((r) => r.join(",")).join("\n");
-    const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = `financial-report-${range.from}_to_${range.to}.csv`;
-    a.click();
-    URL.revokeObjectURL(url);
+  }, [report, isPaymentReport]);
+
+  const schoolBranding = normalizeSchoolBranding(report?.meta?.school);
+
+  const exportExcel = () => {
+    if (!report?.rows?.length) {
+      toast.error("No rows to export.");
+      return;
+    }
+    const title = report.meta?.title || activeType.title;
+    const aoa = wrapExcelWithBranding(excelRows, schoolBranding, {
+      title,
+      subtitle: `Period: ${periodLabel} · Generated ${fmtDate(
+        report.meta?.generatedAt || new Date(),
+      )}`,
+    });
+    const sheet = XLSX.utils.aoa_to_sheet(aoa);
+    const book = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(book, sheet, "Fee Report");
+    XLSX.writeFile(
+      book,
+      `fee-${reportType}-report-${toYmd(new Date())}.xlsx`,
+    );
   };
 
-  const maxMonth = Math.max(1, ...(report?.byMonth?.map((m) => m.total) || [1]));
+  const openPrintPdf = (asPdf = false) => {
+    if (!report) {
+      toast.error("Load a report first");
+      return;
+    }
+    const title = report.meta?.title || activeType.title;
+    const schoolName = schoolBranding.name || "School";
+    const tableHtml = isPaymentReport
+      ? `<table>
+          <thead><tr>
+            <th>#</th><th>Receipt</th><th>Date</th><th>Student</th><th>Class</th><th>Mode</th><th>Amount</th>
+          </tr></thead>
+          <tbody>
+            ${(report.rows || [])
+              .map(
+                (row) => `<tr>
+              <td>${row.sNo}</td>
+              <td>${row.receiptNo || "—"}</td>
+              <td>${fmtDate(row.paidDate)}</td>
+              <td>${row.studentName || "—"}</td>
+              <td>${row.className || "—"}${row.sectionName ? ` · ${row.sectionName}` : ""}</td>
+              <td>${row.paymentMode || "—"}</td>
+              <td>${fmtINR(row.amountPaid)}</td>
+            </tr>`,
+              )
+              .join("")}
+          </tbody>
+        </table>`
+      : `<table>
+          <thead><tr>
+            <th>#</th><th>Student</th><th>Class</th><th>Mobile</th><th>Paid</th><th>Due</th>
+          </tr></thead>
+          <tbody>
+            ${(report.rows || [])
+              .map(
+                (row) => `<tr>
+              <td>${row.sNo}</td>
+              <td>${row.studentName || "—"}</td>
+              <td>${row.className || "—"}${row.sectionName ? ` · ${row.sectionName}` : ""}</td>
+              <td>${row.parentMobile || "—"}</td>
+              <td>${fmtINR(row.totalPaid)}</td>
+              <td>${fmtINR(row.dueAmount)}</td>
+            </tr>`,
+              )
+              .join("")}
+          </tbody>
+        </table>`;
+
+    const summaryHtml = isPaymentReport
+      ? `<p><b>Total collected:</b> ${fmtINR(report.summary?.totalCollected)} · <b>Payments:</b> ${report.summary?.paymentCount || 0}</p>`
+      : `<p><b>Students:</b> ${report.summary?.studentCount || 0} · <b>Total due:</b> ${fmtINR(report.summary?.totalDue)}</p>`;
+
+    printReportHtml({
+      title,
+      subtitle: `Period: ${periodLabel} · Generated ${fmtDate(report.meta?.generatedAt || new Date())}`,
+      bodyHtml: `${summaryHtml}${tableHtml}`,
+      branding: schoolBranding.name ? schoolBranding : { name: schoolName },
+      asPdf,
+      onInfo: (msg) => toast.info(msg),
+      onError: (msg) => toast.error(msg),
+    });
+  };
 
   return (
-    <div className="p-4 sm:p-6 lg:p-8 min-h-screen">
-      <div className="mb-6 flex flex-col lg:flex-row lg:items-end lg:justify-between gap-4 print:hidden">
+    <div className="min-h-screen bg-[rgb(var(--bg))] p-4 text-[rgb(var(--text))] md:p-6">
+      {isMobile && (
+        <button
+          type="button"
+          onClick={() => navigate(-1)}
+          className="mb-4 flex items-center gap-2 rounded-xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))] px-3 py-1.5 text-sm font-bold print:hidden"
+        >
+          <FaArrowLeft size={12} /> Back
+        </button>
+      )}
+
+      <div className="mb-6 flex flex-col justify-between gap-4 lg:flex-row lg:items-end print:hidden">
         <div>
-          <button
-            type="button"
-            onClick={() => navigate(`${basePath}/dashboard`)}
-            className="flex items-center gap-2 px-3 py-1.5 mb-3 rounded-xl bg-[rgb(var(--surface))] border text-sm font-bold"
-          >
-            <FaArrowLeft /> Back
-          </button>
-          <h1 className="text-2xl font-bold flex items-center gap-2">
-            <FaChartBar className="text-[rgb(var(--primary))]" />
-            Financial Report
-          </h1>
-          <p className="text-sm text-[rgb(var(--text-light))] mt-1">
-            Fee collection summary for your school
+          {!isMobile && (
+            <button
+              type="button"
+              onClick={() => navigate(`${basePath}/reports`)}
+              className="mb-3 flex items-center gap-2 rounded-xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))] px-3 py-1.5 text-sm font-bold"
+            >
+              <FaArrowLeft size={12} /> Back
+            </button>
+          )}
+          <h1 className="text-2xl font-bold md:text-3xl">Fee Reports</h1>
+          <p className="mt-0.5 text-sm text-[rgb(var(--text-muted))]">
+            Generate daily, weekly, collected, due and defaulter fee reports.
           </p>
         </div>
-
-        <div className="flex flex-wrap gap-2 items-center">
+        <div className="flex flex-wrap gap-2">
           <button
             type="button"
-            onClick={() => window.print()}
-            className="app-btn-primary px-3 py-2 rounded-lg text-sm flex items-center gap-2"
+            onClick={() => openPrintPdf(false)}
+            disabled={!report}
+            className="inline-flex items-center gap-2 rounded-xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))] px-4 py-2.5 text-sm font-medium disabled:opacity-50"
           >
-            <FaPrint /> Print
+            <FaPrint size={13} /> Print
           </button>
           <button
             type="button"
-            onClick={exportCsv}
+            onClick={() => openPrintPdf(true)}
             disabled={!report}
-            className="px-3 py-2 rounded-lg border text-sm font-medium disabled:opacity-50"
+            className="inline-flex items-center gap-2 rounded-xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))] px-4 py-2.5 text-sm font-medium disabled:opacity-50"
           >
-            Export CSV
+            <FaFilePdf size={13} /> PDF
+          </button>
+          <button
+            type="button"
+            onClick={exportExcel}
+            disabled={!report}
+            className="inline-flex items-center gap-2 rounded-xl bg-[rgb(var(--primary))] px-4 py-2.5 text-sm font-medium text-white disabled:opacity-50"
+          >
+            <FaFileExcel size={13} /> Excel
           </button>
         </div>
       </div>
 
-      {/* Bank-style period filter */}
-      <div className="mb-5 rounded-2xl border bg-[rgb(var(--surface))] p-3 sm:p-4 print:hidden">
-        <p className="text-[11px] font-bold uppercase tracking-wide text-[rgb(var(--text-light))] mb-2">
-          Period
-        </p>
-        <div className="flex p-1 rounded-xl bg-[rgb(var(--bg))] border border-[rgb(var(--border))]">
-          {FILTER_OPTIONS.map((opt) => (
+      <div className="mb-5 grid grid-cols-1 gap-3 print:hidden sm:grid-cols-2 xl:grid-cols-5">
+        {REPORT_TYPES.map((item) => {
+          const Icon = item.icon;
+          const active = reportType === item.key;
+          return (
             <button
-              key={opt.key}
+              key={item.key}
               type="button"
-              onClick={() => setFilterMode(opt.key)}
-              className={`flex-1 px-2 sm:px-3 py-2.5 rounded-lg text-xs sm:text-sm font-semibold transition ${
-                filterMode === opt.key
-                  ? "bg-[rgb(var(--primary))] text-white shadow-sm"
-                  : "text-[rgb(var(--text-muted))] hover:text-[rgb(var(--text))]"
+              onClick={() => setReportType(item.key)}
+              className={`rounded-2xl border p-4 text-left transition ${
+                active
+                  ? "border-[rgb(var(--primary))] bg-[rgba(var(--primary),0.08)] shadow-sm"
+                  : "border-[rgb(var(--border))] bg-[rgb(var(--surface))] hover:bg-[rgb(var(--bg))]"
               }`}
             >
-              {opt.label}
+              <div className="mb-2 flex h-10 w-10 items-center justify-center rounded-2xl bg-[rgba(var(--primary),0.1)] text-[rgb(var(--primary))]">
+                <Icon size={16} />
+              </div>
+              <p className="font-semibold">{item.title}</p>
+              <p className="mt-1 text-xs text-[rgb(var(--text-muted))]">
+                {item.blurb}
+              </p>
             </button>
-          ))}
-        </div>
+          );
+        })}
+      </div>
 
-        <div className="mt-3 flex flex-col sm:flex-row sm:flex-wrap gap-3 sm:items-end">
-          {filterMode === "fy" && (
+      <div className="mb-5 rounded-2xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))] p-4 print:hidden">
+        <p className="mb-3 text-[11px] font-bold uppercase tracking-wide text-[rgb(var(--text-muted))]">
+          Filters
+        </p>
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
+          {reportType === "daily" && (
             <label className="flex flex-col gap-1 text-xs font-medium text-[rgb(var(--text-muted))]">
-              Select financial year
-              <select
-                value={fyStartYear}
-                onChange={(e) => setFyStartYear(e.target.value)}
-                className="px-3 py-2 rounded-lg border text-sm bg-[rgb(var(--bg))] text-[rgb(var(--text))] min-w-[180px]"
-              >
-                {FY_OPTIONS.map((fy) => (
-                  <option key={fy.value} value={fy.value}>
-                    {fy.label}
-                  </option>
-                ))}
-              </select>
+              Date
+              <input
+                type="date"
+                value={day}
+                onChange={(e) => setDay(e.target.value)}
+                className="rounded-xl border border-[rgb(var(--border))] bg-[rgb(var(--bg))] px-3 py-2.5 text-sm text-[rgb(var(--text))]"
+              />
             </label>
           )}
-
-          {filterMode === "last_month" && (
-            <p className="text-sm text-[rgb(var(--text))]">
-              Showing{" "}
-              <span className="font-semibold">{getLastMonthBounds().label}</span>
-            </p>
+          {reportType === "weekly" && (
+            <label className="flex flex-col gap-1 text-xs font-medium text-[rgb(var(--text-muted))]">
+              Week starting (Monday)
+              <input
+                type="date"
+                value={weekStart}
+                onChange={(e) => setWeekStart(e.target.value)}
+                className="rounded-xl border border-[rgb(var(--border))] bg-[rgb(var(--bg))] px-3 py-2.5 text-sm text-[rgb(var(--text))]"
+              />
+            </label>
           )}
-
-          {filterMode === "custom" && (
+          {reportType === "collected" && (
             <>
               <label className="flex flex-col gap-1 text-xs font-medium text-[rgb(var(--text-muted))]">
                 From
                 <input
                   type="date"
-                  value={customFrom}
-                  max={customTo || undefined}
-                  onChange={(e) => setCustomFrom(e.target.value)}
-                  className="px-3 py-2 rounded-lg border text-sm bg-[rgb(var(--bg))] text-[rgb(var(--text))]"
+                  value={from}
+                  onChange={(e) => setFrom(e.target.value)}
+                  className="rounded-xl border border-[rgb(var(--border))] bg-[rgb(var(--bg))] px-3 py-2.5 text-sm text-[rgb(var(--text))]"
                 />
               </label>
               <label className="flex flex-col gap-1 text-xs font-medium text-[rgb(var(--text-muted))]">
                 To
                 <input
                   type="date"
-                  value={customTo}
-                  min={customFrom || undefined}
-                  onChange={(e) => setCustomTo(e.target.value)}
-                  className="px-3 py-2 rounded-lg border text-sm bg-[rgb(var(--bg))] text-[rgb(var(--text))]"
+                  value={to}
+                  onChange={(e) => setTo(e.target.value)}
+                  className="rounded-xl border border-[rgb(var(--border))] bg-[rgb(var(--bg))] px-3 py-2.5 text-sm text-[rgb(var(--text))]"
                 />
               </label>
-              <button
-                type="button"
-                onClick={() => fetchReport(customFrom, customTo)}
-                className="px-4 py-2 rounded-lg bg-[rgb(var(--primary))] text-white text-sm font-semibold"
-              >
-                Apply
-              </button>
             </>
           )}
+          <label className="flex flex-col gap-1 text-xs font-medium text-[rgb(var(--text-muted))]">
+            Class
+            <select
+              value={classId}
+              onChange={(e) => setClassId(e.target.value)}
+              className="rounded-xl border border-[rgb(var(--border))] bg-[rgb(var(--bg))] px-3 py-2.5 text-sm text-[rgb(var(--text))]"
+            >
+              <option value="">All classes</option>
+              {classes.map((cls) => (
+                <option key={cls._id} value={cls._id}>
+                  {cls.name}
+                </option>
+              ))}
+            </select>
+          </label>
         </div>
       </div>
 
-      {error && (
-        <div className="mb-4 p-3 rounded-xl bg-red-50 text-red-600 text-sm border border-red-100">
-          {error}
-        </div>
-      )}
-
-      {loading ? (
-        <div className="py-20 text-center text-[rgb(var(--text-light))]">
-          Loading report…
-        </div>
-      ) : !report ? (
-        <div className="py-20 text-center text-[rgb(var(--text-light))]">
-          No report data.
-        </div>
-      ) : (
-        <div id="financial-report-print" className="space-y-6">
-          <div className="rounded-2xl border bg-[rgb(var(--surface))] p-4">
-            <p className="text-sm font-bold">
-              {report.school?.name || "School"}
-            </p>
-            <p className="text-xs text-[rgb(var(--text-light))] mt-0.5">
-              Period: {range.label}
-            </p>
-            <p className="text-[11px] text-[rgb(var(--text-light))] mt-0.5">
-              {fmtYmd(range.from)} – {fmtYmd(range.to)}
+      <div id="fee-report-print" className="space-y-5">
+        <div className="rounded-2xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))] p-5">
+          <div className="flex flex-col gap-1 sm:flex-row sm:items-end sm:justify-between">
+            <div>
+              <h2 className="text-xl font-bold">
+                {report?.meta?.title || activeType.title}
+              </h2>
+              <p className="text-sm text-[rgb(var(--text-muted))]">
+                {report?.meta?.school?.name || "School"} · {periodLabel}
+              </p>
+            </div>
+            <p className="text-xs text-[rgb(var(--text-muted))]">
+              Generated {fmtDate(report?.meta?.generatedAt || new Date())}
             </p>
           </div>
+        </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-3">
-            <StatCard
-              label="Collected"
-              value={fmtINR(report.summary.totalCollected)}
-              hint={`${report.summary.paymentCount} payments`}
-              tone="emerald"
-            />
-            <StatCard
-              label="Average payment"
-              value={fmtINR(report.summary.avgPayment)}
-              tone="blue"
-            />
-            <StatCard
-              label="Outstanding dues"
-              value={fmtINR(report.summary.outstandingDue)}
-              hint={`${report.summary.studentsWithDue} students`}
-              tone="amber"
-            />
-            <StatCard
-              label="All-time paid"
-              value={fmtINR(report.summary.totalPaidAllTime)}
-              hint={`${report.summary.studentCount} students`}
-            />
-          </div>
-
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-            <div className="rounded-2xl border bg-[rgb(var(--surface))] p-4">
-              <h2 className="font-bold text-sm mb-3">By payment mode</h2>
-              {report.byMode.length === 0 ? (
-                <p className="text-sm text-[rgb(var(--text-light))]">No data</p>
-              ) : (
-                <div className="space-y-2">
-                  {report.byMode.map((r) => (
-                    <div
-                      key={r.mode}
-                      className="flex items-center justify-between text-sm border-b border-slate-100 pb-2"
-                    >
-                      <span className="font-medium">{r.mode}</span>
-                      <span className="text-[rgb(var(--text-light))]">
-                        {r.count} · {fmtINR(r.total)}
-                      </span>
-                    </div>
+        {loading ? (
+          <p className="rounded-2xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))] px-5 py-12 text-center text-[rgb(var(--text-muted))]">
+            Generating report…
+          </p>
+        ) : !report ? (
+          <p className="rounded-2xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))] px-5 py-12 text-center text-[rgb(var(--text-muted))]">
+            No report data for the selected filters.
+          </p>
+        ) : (
+          <>
+            <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+              {isPaymentReport ? (
+                <>
+                  <StatCard
+                    label="Total Collected"
+                    value={fmtINR(report.summary?.totalCollected)}
+                  />
+                  <StatCard
+                    label="Payments"
+                    value={report.summary?.paymentCount || 0}
+                  />
+                  {(report.summary?.byMode || []).slice(0, 2).map((mode) => (
+                    <StatCard
+                      key={mode.mode}
+                      label={mode.mode}
+                      value={fmtINR(mode.total)}
+                    />
                   ))}
-                </div>
+                </>
+              ) : (
+                <>
+                  <StatCard
+                    label="Students"
+                    value={report.summary?.studentCount || 0}
+                  />
+                  <StatCard
+                    label="Total Due"
+                    value={fmtINR(report.summary?.totalDue)}
+                  />
+                  <StatCard
+                    label="Already Paid"
+                    value={fmtINR(report.summary?.totalPaid)}
+                  />
+                </>
               )}
             </div>
 
-            <div className="rounded-2xl border bg-[rgb(var(--surface))] p-4">
-              <h2 className="font-bold text-sm mb-3">Monthly collection</h2>
-              {report.byMonth.length === 0 ? (
-                <p className="text-sm text-[rgb(var(--text-light))]">No data</p>
-              ) : (
-                <div className="space-y-2">
-                  {report.byMonth.map((r) => (
-                    <div key={`${r.year}-${r.month}`} className="text-sm">
-                      <div className="flex justify-between mb-1">
-                        <span className="font-medium">{r.monthLabel}</span>
-                        <span>{fmtINR(r.total)}</span>
-                      </div>
-                      <div className="h-2 rounded-full bg-slate-100 overflow-hidden">
-                        <div
-                          className="h-full bg-emerald-500 rounded-full"
-                          style={{
-                            width: `${Math.max(4, (r.total / maxMonth) * 100)}%`,
-                          }}
-                        />
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-          </div>
-
-          <div className="rounded-2xl border bg-[rgb(var(--surface))] p-4 overflow-x-auto">
-            {!selectedClass ? (
-              <>
-                <h2 className="font-bold text-sm mb-3">By class</h2>
-                <p className="text-xs text-[rgb(var(--text-light))] mb-3">
-                  Click a class to view its payments for this period
-                </p>
-                <table className="w-full text-sm">
-                  <thead>
-                    <tr className="text-left text-xs uppercase tracking-wider text-[rgb(var(--text-light))] border-b">
-                      <th className="py-2">Class</th>
-                      <th className="py-2">Payments</th>
-                      <th className="py-2 text-right">Collected</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {report.byClass.length === 0 ? (
+            <div className="overflow-hidden rounded-2xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))]">
+              <div className="overflow-x-auto">
+                <table className="min-w-full text-left text-sm">
+                  <thead className="bg-[rgb(var(--bg))] text-xs uppercase tracking-wide text-[rgb(var(--text-muted))]">
+                    {isPaymentReport ? (
                       <tr>
-                        <td colSpan={3} className="py-6 text-center text-[rgb(var(--text-light))]">
-                          No class-wise data
-                        </td>
+                        <th className="px-4 py-3">#</th>
+                        <th className="px-4 py-3">Receipt / Date</th>
+                        <th className="px-4 py-3">Student</th>
+                        <th className="px-4 py-3">Class</th>
+                        <th className="px-4 py-3">Mode</th>
+                        <th className="px-4 py-3 text-right">Amount</th>
                       </tr>
                     ) : (
-                      report.byClass.map((r) => (
-                        <tr
-                          key={r.classId || r.className}
-                          onClick={() => openClassDetail(r)}
-                          className="border-b border-slate-100 cursor-pointer hover:bg-[rgba(var(--primary),0.06)] transition"
+                      <tr>
+                        <th className="px-4 py-3">#</th>
+                        <th className="px-4 py-3">Student</th>
+                        <th className="px-4 py-3">Class</th>
+                        <th className="px-4 py-3">Mobile</th>
+                        <th className="px-4 py-3 text-right">Paid</th>
+                        <th className="px-4 py-3 text-right">Due</th>
+                      </tr>
+                    )}
+                  </thead>
+                  <tbody>
+                    {(report.rows || []).length === 0 ? (
+                      <tr>
+                        <td
+                          colSpan={6}
+                          className="px-4 py-10 text-center text-[rgb(var(--text-muted))]"
                         >
-                          <td className="py-2.5 font-medium text-[rgb(var(--primary))] underline underline-offset-2 decoration-dotted">
-                            {r.className}
+                          No records found for this report.
+                        </td>
+                      </tr>
+                    ) : isPaymentReport ? (
+                      report.rows.map((row) => (
+                        <tr
+                          key={`${row.receiptNo}-${row.sNo}`}
+                          className="border-t border-[rgb(var(--border))]"
+                        >
+                          <td className="px-4 py-3">{row.sNo}</td>
+                          <td className="px-4 py-3">
+                            <p className="font-semibold">{row.receiptNo || "—"}</p>
+                            <p className="text-xs text-[rgb(var(--text-muted))]">
+                              {fmtDate(row.paidDate)}
+                            </p>
                           </td>
-                          <td className="py-2.5">{r.count}</td>
-                          <td className="py-2.5 text-right font-semibold">
-                            {fmtINR(r.total)}
+                          <td className="px-4 py-3">
+                            <p className="font-semibold">{row.studentName || "—"}</p>
+                            <p className="text-xs text-[rgb(var(--text-muted))]">
+                              {row.studentCode || "—"}
+                              {row.rollNo ? ` · Roll ${row.rollNo}` : ""}
+                            </p>
+                          </td>
+                          <td className="px-4 py-3">
+                            {row.className || "—"}
+                            {row.sectionName ? ` · ${row.sectionName}` : ""}
+                          </td>
+                          <td className="px-4 py-3">{row.paymentMode || "—"}</td>
+                          <td className="px-4 py-3 text-right font-semibold">
+                            {fmtINR(row.amountPaid)}
+                          </td>
+                        </tr>
+                      ))
+                    ) : (
+                      report.rows.map((row) => (
+                        <tr
+                          key={`${row.studentCode}-${row.sNo}`}
+                          className="border-t border-[rgb(var(--border))]"
+                        >
+                          <td className="px-4 py-3">{row.sNo}</td>
+                          <td className="px-4 py-3">
+                            <p className="font-semibold">{row.studentName || "—"}</p>
+                            <p className="text-xs text-[rgb(var(--text-muted))]">
+                              {row.studentCode || "—"}
+                              {row.rollNo ? ` · Roll ${row.rollNo}` : ""}
+                            </p>
+                          </td>
+                          <td className="px-4 py-3">
+                            {row.className || "—"}
+                            {row.sectionName ? ` · ${row.sectionName}` : ""}
+                          </td>
+                          <td className="px-4 py-3">{row.parentMobile || "—"}</td>
+                          <td className="px-4 py-3 text-right">
+                            {fmtINR(row.totalPaid)}
+                          </td>
+                          <td className="px-4 py-3 text-right font-semibold text-rose-600">
+                            {fmtINR(row.dueAmount)}
                           </td>
                         </tr>
                       ))
                     )}
                   </tbody>
                 </table>
-              </>
-            ) : (
-              <>
-                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 mb-3">
-                  <div>
-                    <button
-                      type="button"
-                      onClick={resetClassView}
-                      className="inline-flex items-center gap-2 text-sm font-semibold text-[rgb(var(--primary))] mb-1"
-                    >
-                      <FaArrowLeft size={12} /> Back to all classes
-                    </button>
-                    <h2 className="font-bold text-sm">
-                      {selectedClass.className}
-                    </h2>
-                    <p className="text-xs text-[rgb(var(--text-light))] mt-0.5">
-                      Class collection for {range.label}
-                    </p>
-                  </div>
-                  {classDetail && (
-                    <div className="text-sm sm:text-right">
-                      <p className="font-bold text-emerald-700">
-                        {fmtINR(classDetail.total)}
-                      </p>
-                      <p className="text-xs text-[rgb(var(--text-light))]">
-                        {classDetail.count} payment
-                        {classDetail.count === 1 ? "" : "s"}
-                      </p>
-                    </div>
-                  )}
-                </div>
-
-                {classLoading ? (
-                  <p className="py-8 text-center text-sm text-[rgb(var(--text-light))]">
-                    Loading class data…
-                  </p>
-                ) : !classDetail ? (
-                  <p className="py-8 text-center text-sm text-[rgb(var(--text-light))]">
-                    No data for this class.
-                  </p>
-                ) : (
-                  <div className="space-y-4">
-                    {classDetail.byMode?.length > 0 && (
-                      <div className="flex flex-wrap gap-2">
-                        {classDetail.byMode.map((m) => (
-                          <span
-                            key={m.mode}
-                            className="text-xs px-2.5 py-1 rounded-full border bg-[rgb(var(--bg))]"
-                          >
-                            {m.mode}: {fmtINR(m.total)} ({m.count})
-                          </span>
-                        ))}
-                      </div>
-                    )}
-
-                    <div className="table-x-scroll">
-                    <table className="w-full text-sm">
-                      <thead>
-                        <tr className="text-left text-xs uppercase tracking-wider text-[rgb(var(--text-light))] border-b">
-                          <th className="py-2">Receipt</th>
-                          <th className="py-2">Student</th>
-                          <th className="py-2">Mode</th>
-                          <th className="py-2">Date</th>
-                          <th className="py-2 text-right">Amount</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {(classDetail.payments || []).length === 0 ? (
-                          <tr>
-                            <td
-                              colSpan={5}
-                              className="py-6 text-center text-[rgb(var(--text-light))]"
-                            >
-                              No payments in this period
-                            </td>
-                          </tr>
-                        ) : (
-                          classDetail.payments.map((p) => (
-                            <tr key={p._id} className="border-b border-slate-100">
-                              <td className="py-2.5 font-mono text-xs">
-                                {p.receiptNo}
-                              </td>
-                              <td className="py-2.5">
-                                {p.studentName || "—"}
-                                {p.studentCode ? (
-                                  <span className="block text-xs text-[rgb(var(--text-light))]">
-                                    {p.studentCode}
-                                    {p.rollNo ? ` · Roll ${p.rollNo}` : ""}
-                                  </span>
-                                ) : null}
-                              </td>
-                              <td className="py-2.5">{p.paymentMode}</td>
-                              <td className="py-2.5">{fmtDate(p.paidDate)}</td>
-                              <td className="py-2.5 text-right font-semibold">
-                                {fmtINR(p.amountPaid)}
-                              </td>
-                            </tr>
-                          ))
-                        )}
-                      </tbody>
-                    </table>
-                    </div>
-                  </div>
-                )}
-              </>
-            )}
-          </div>
-
-          <div className="rounded-2xl border bg-[rgb(var(--surface))] p-4 overflow-x-auto">
-            <h2 className="font-bold text-sm mb-3">Recent payments</h2>
-            <table className="w-full text-sm min-w-[640px]">
-              <thead>
-                <tr className="text-left text-xs uppercase tracking-wider text-[rgb(var(--text-light))] border-b">
-                  <th className="py-2">Receipt</th>
-                  <th className="py-2">Student</th>
-                  <th className="py-2">Mode</th>
-                  <th className="py-2">Date</th>
-                  <th className="py-2 text-right">Amount</th>
-                </tr>
-              </thead>
-              <tbody>
-                {(report.recentPayments || []).map((p) => (
-                  <tr key={p._id} className="border-b border-slate-100">
-                    <td className="py-2.5 font-mono text-xs">{p.receiptNo}</td>
-                    <td className="py-2.5">
-                      {p.studentName || "—"}
-                      {p.studentCode ? (
-                        <span className="block text-xs text-[rgb(var(--text-light))]">
-                          {p.studentCode}
-                        </span>
-                      ) : null}
-                    </td>
-                    <td className="py-2.5">{p.paymentMode}</td>
-                    <td className="py-2.5">{fmtDate(p.paidDate)}</td>
-                    <td className="py-2.5 text-right font-semibold">
-                      {fmtINR(p.amountPaid)}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </div>
-      )}
-
-      <style>{`
-        @media print {
-          body * { visibility: hidden !important; }
-          #financial-report-print, #financial-report-print * { visibility: visible !important; }
-          #financial-report-print {
-            position: absolute;
-            left: 0;
-            top: 0;
-            width: 100%;
-          }
-          @page { margin: 12mm; }
-        }
-      `}</style>
+              </div>
+            </div>
+          </>
+        )}
+      </div>
     </div>
   );
 }

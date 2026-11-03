@@ -26,6 +26,7 @@ export const MODULES = [
   { key: "marketing",  label: "Marketing AI",           default: true  },
   { key: "gatepass",   label: "Gate Passes",           default: false },
   { key: "leaveRequest",   label: "Leave Requests",           default: false },
+  { key: "staffLeave",     label: "Staff Leave Management",   default: false },
   { key: "message",   label: "Messages",           default: false },
 ];
 

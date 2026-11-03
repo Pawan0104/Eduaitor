@@ -36,6 +36,7 @@ const EMPTY_FORM = {
   purpose: "",
   whomVisiting: "",
   residentId: "",
+  visitorRelation: "Other",
   notes: "",
 };
 
@@ -52,6 +53,8 @@ const fmtDateTime = (d) =>
 
 const statusStyle = (status) => {
   switch (status) {
+    case "PendingParentAuth":
+      return "bg-sky-100 text-sky-800";
     case "Pending":
       return "bg-amber-100 text-amber-800";
     case "CheckedIn":
@@ -67,8 +70,10 @@ const statusStyle = (status) => {
 
 const statusLabel = (status) => {
   switch (status) {
+    case "PendingParentAuth":
+      return "Awaiting parent";
     case "Pending":
-      return "Pending approval";
+      return "Awaiting warden";
     case "CheckedIn":
       return "Entry granted";
     case "Rejected":
@@ -315,6 +320,7 @@ const HostelVisitors = () => {
       purpose: v.purpose || "",
       whomVisiting: v.whomVisiting || "",
       residentId: v.residentId?._id || "",
+      visitorRelation: v.visitorRelation || "Other",
       notes: v.notes || "",
     });
     setFormModal(true);
@@ -323,6 +329,11 @@ const HostelVisitors = () => {
   const handleFormSubmit = async () => {
     if (!form.hostelId) return toast.error("Select a hostel");
     if (!form.visitorName.trim()) return toast.error("Enter visitor name");
+    if (form.visitorRelation === "Other" && !form.residentId) {
+      return toast.error(
+        "Select the resident being visited — new visitors need parent authorization",
+      );
+    }
     if (!isEdit && !photoBlob) {
       return toast.error("Capture live visitor photo before submitting");
     }
@@ -338,6 +349,7 @@ const HostelVisitors = () => {
     fd.append("idProofNumber", form.idProofNumber.trim());
     fd.append("purpose", form.purpose.trim());
     fd.append("whomVisiting", form.whomVisiting.trim());
+    fd.append("visitorRelation", form.visitorRelation || "Other");
     if (form.residentId) fd.append("residentId", form.residentId);
     fd.append("notes", form.notes.trim());
     if (photoBlob) {
@@ -353,11 +365,13 @@ const HostelVisitors = () => {
         });
         toast.success("Visitor updated");
       } else {
-        await axios.post(`${API}/hostel/visitors`, fd, {
+        const { data } = await axios.post(`${API}/hostel/visitors`, fd, {
           withCredentials: true,
           headers: { "Content-Type": "multipart/form-data" },
         });
-        toast.success("Sent to hostel warden for approval");
+        toast.success(
+          data?.message || "Visitor request submitted",
+        );
       }
       setFormModal(false);
       setPhotoBlob(null);
@@ -459,6 +473,9 @@ const HostelVisitors = () => {
   });
 
   const pendingCount = visitors.filter((v) => v.status === "Pending").length;
+  const parentAuthCount = visitors.filter(
+    (v) => v.status === "PendingParentAuth",
+  ).length;
   const checkedInCount = visitors.filter((v) => v.status === "CheckedIn").length;
   const rejectedCount = visitors.filter((v) => v.status === "Rejected").length;
 
@@ -499,7 +516,7 @@ const HostelVisitors = () => {
           )}
           <h1 className="text-2xl sm:text-3xl font-bold">Visitor Management</h1>
           <p className="text-sm sm:text-base text-[rgb(var(--text-muted))]">
-            Security guard submits visitor + live photo → hostel warden approves entry
+            Parents → warden approval. New visitors → parent authorize first, then warden.
           </p>
         </div>
         <button
@@ -512,8 +529,9 @@ const HostelVisitors = () => {
         </button>
       </div>
 
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-8">
-        <StatCard title="PENDING APPROVAL" value={pendingCount} color="amber" />
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-8">
+        <StatCard title="AWAITING PARENT" value={parentAuthCount} color="sky" />
+        <StatCard title="AWAITING WARDEN" value={pendingCount} color="amber" />
         <StatCard title="CHECKED IN" value={checkedInCount} color="green" />
         <StatCard title="REJECTED" value={rejectedCount} color="rose" />
       </div>
@@ -545,7 +563,8 @@ const HostelVisitors = () => {
             onChange={(e) => setFilterStatus(e.target.value)}
             className="border rounded-lg px-3 py-2 text-sm bg-[rgb(var(--surface))]"
           >
-            <option value="Pending">Pending approval</option>
+            <option value="Pending">Awaiting warden</option>
+            <option value="PendingParentAuth">Awaiting parent</option>
             <option value="CheckedIn">Checked in</option>
             <option value="CheckedOut">Checked out</option>
             <option value="Rejected">Rejected</option>
@@ -589,7 +608,18 @@ const HostelVisitors = () => {
                         </div>
                       )}
                       <div>
-                        <p className="font-semibold">{v.visitorName}</p>
+                        <p className="font-semibold">
+                          {v.visitorName}
+                          {v.visitorRelation === "Parent" || v.isRegisteredContact ? (
+                            <span className="ml-2 text-[10px] font-bold uppercase text-emerald-700 bg-emerald-50 px-1.5 py-0.5 rounded">
+                              {v.matchedRelation || "Parent"}
+                            </span>
+                          ) : (
+                            <span className="ml-2 text-[10px] font-bold uppercase text-sky-700 bg-sky-50 px-1.5 py-0.5 rounded">
+                              New visitor
+                            </span>
+                          )}
+                        </p>
                         <p className="text-xs text-[rgb(var(--text-muted))]">
                           {v.phone || "No phone"}
                           {v.idProofNumber
@@ -665,6 +695,21 @@ const HostelVisitors = () => {
                             <FaTimes size={11} /> Reject
                           </button>
                         </>
+                      )}
+                      {v.status === "PendingParentAuth" && canApprove && (
+                        <button
+                          type="button"
+                          disabled={actionLoadingId === v._id}
+                          onClick={() => {
+                            setRejectTarget(v);
+                            setRejectReason("");
+                            setRejectModal(true);
+                          }}
+                          className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-rose-600 text-white text-xs font-semibold disabled:opacity-50"
+                          title="Reject while awaiting parent"
+                        >
+                          <FaTimes size={11} /> Reject
+                        </button>
                       )}
                       {v.status === "CheckedIn" && (
                         <button
@@ -771,6 +816,31 @@ const HostelVisitors = () => {
                   className="mt-1 w-full border rounded-lg px-3 py-2 text-sm bg-[rgb(var(--bg))]"
                   placeholder="Full name"
                 />
+              </label>
+
+              <label className="sm:col-span-2 text-xs font-bold uppercase text-[rgb(var(--text-muted))]">
+                Visitor type *
+                <select
+                  value={form.visitorRelation}
+                  onChange={(e) =>
+                    setForm((f) => ({
+                      ...f,
+                      visitorRelation: e.target.value,
+                    }))
+                  }
+                  className="mt-1 w-full border rounded-lg px-3 py-2 text-sm bg-[rgb(var(--bg))]"
+                >
+                  <option value="Parent">
+                    Parent / registered guardian → warden approval
+                  </option>
+                  <option value="Other">
+                    New visitor (not in records) → parent authorize first
+                  </option>
+                </select>
+                <span className="mt-1 block text-[11px] font-normal normal-case text-[rgb(var(--text-muted))]">
+                  System also matches name/phone with father, mother and guardian
+                  on the student record.
+                </span>
               </label>
 
               <label className="text-xs font-bold uppercase text-[rgb(var(--text-muted))]">
@@ -983,6 +1053,7 @@ const StatCard = ({ title, value, color }) => {
     green: "border-l-emerald-500",
     rose: "border-l-rose-500",
     blue: "border-l-blue-500",
+    sky: "border-l-sky-500",
     gray: "border-l-slate-400",
   }[color] || "border-l-blue-500";
   return (
