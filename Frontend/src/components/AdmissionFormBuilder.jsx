@@ -47,24 +47,34 @@ const Toggle = ({ checked, onChange, label, hint, disabled = false }) => (
   </label>
 );
 
-/** Structural fields the wizard/backend cannot create a student without. */
-const LOCKED_VISIBLE_FIELDS = LOCKED_VISIBLE_FIELD_KEYS;
-
 /**
- * Admission Form Builder.
+ * Shared form builder for Admission / Lead / Registration.
  *
- * `inline` renders the builder as a normal page section; otherwise it is shown
- * as a full-screen modal (used from the admission wizard).
+ * `inline` renders as a page section; otherwise a full-screen modal.
  */
 const AdmissionFormBuilder = ({
   inline = false,
   onClose,
   onSaved,
   initialSteps = null,
+  apiPath = "/admission-form",
+  mergeSteps = mergeAdmissionSteps,
+  fieldTypes = ADMISSION_FIELD_TYPES,
+  lockedFieldKeys = LOCKED_VISIBLE_FIELD_KEYS,
+  title = "Customize Admission Form",
+  description = "Add your own fields, choose which step they belong to, and mark them mandatory or optional.",
+  lockedDeleteHint = "Required to create a student record",
+  reviewStepKey = "builtin_8",
+  allowCustomSteps = true,
 }) => {
-  const [steps, setSteps] = useState(() => mergeAdmissionSteps(initialSteps));
+  const lockedKeys =
+    lockedFieldKeys instanceof Set
+      ? lockedFieldKeys
+      : new Set(lockedFieldKeys || []);
+
+  const [steps, setSteps] = useState(() => mergeSteps(initialSteps));
   const [activeKey, setActiveKey] = useState(() => {
-    const merged = mergeAdmissionSteps(initialSteps);
+    const merged = mergeSteps(initialSteps);
     return merged[0]?.key || "";
   });
   const [newStepTitle, setNewStepTitle] = useState("");
@@ -78,16 +88,16 @@ const AdmissionFormBuilder = ({
 
     (async () => {
       try {
-        const res = await axios.get(`${API}/admission-form`, {
+        const res = await axios.get(`${API}${apiPath}`, {
           withCredentials: true,
         });
         if (cancelled) return;
-        const loaded = mergeAdmissionSteps(res.data?.data?.steps);
+        const loaded = mergeSteps(res.data?.data?.steps);
         setSteps(loaded);
         setActiveKey(loaded[0]?.key || "");
       } catch {
         if (!cancelled) {
-          const loaded = mergeAdmissionSteps(null);
+          const loaded = mergeSteps(null);
           setSteps(loaded);
           setActiveKey(loaded[0]?.key || "");
         }
@@ -99,7 +109,7 @@ const AdmissionFormBuilder = ({
     return () => {
       cancelled = true;
     };
-  }, [initialSteps]);
+  }, [initialSteps, apiPath, mergeSteps]);
 
   const activeStep = useMemo(
     () => steps.find((step) => step.key === activeKey) || steps[0],
@@ -128,11 +138,36 @@ const AdmissionFormBuilder = ({
     }));
   };
 
-  const removeField = (stepKey, fieldKey) =>
-    updateStep(stepKey, (step) => ({
-      ...step,
-      fields: step.fields.filter((field) => field.key !== fieldKey),
-    }));
+  const removeField = (stepKey, fieldKey) => {
+    if (lockedKeys.has(fieldKey)) {
+      toast.error(lockedDeleteHint);
+      return;
+    }
+    const target = steps
+      .find((step) => step.key === stepKey)
+      ?.fields?.find((field) => field.key === fieldKey);
+    const label = target?.label || fieldKey;
+    if (
+      !window.confirm(
+        `Remove “${label}” from this form? You can restore defaults with Reset.`,
+      )
+    ) {
+      return;
+    }
+    updateStep(stepKey, (step) => {
+      const nextRemoved = [
+        ...new Set([
+          ...(Array.isArray(step.removedFieldKeys) ? step.removedFieldKeys : []),
+          ...(target?.builtin ? [fieldKey] : []),
+        ]),
+      ].filter((key) => !lockedKeys.has(key));
+      return {
+        ...step,
+        removedFieldKeys: nextRemoved,
+        fields: step.fields.filter((field) => field.key !== fieldKey),
+      };
+    });
+  };
 
   const moveField = (stepKey, index, direction) =>
     updateStep(stepKey, (step) => {
@@ -144,14 +179,23 @@ const AdmissionFormBuilder = ({
     });
 
   const addStep = () => {
-    const title = newStepTitle.trim();
-    if (!title) return toast.error("Enter a step name first");
+    if (!allowCustomSteps) return;
+    const titleText = newStepTitle.trim();
+    if (!titleText) return toast.error("Enter a step name first");
     const key = `cs_${Date.now().toString(36)}${Math.random()
       .toString(36)
       .slice(2, 5)}`;
-    const step = { key, title, builtin: false, fields: [] };
+    const step = {
+      key,
+      title: titleText,
+      builtin: false,
+      removedFieldKeys: [],
+      fields: [],
+    };
     setSteps((prev) => {
-      const reviewIndex = prev.findIndex((s) => s.key === "builtin_8");
+      const reviewIndex = reviewStepKey
+        ? prev.findIndex((s) => s.key === reviewStepKey)
+        : -1;
       if (reviewIndex === -1) return [...prev, step];
       const next = [...prev];
       next.splice(reviewIndex, 0, step);
@@ -178,10 +222,15 @@ const AdmissionFormBuilder = ({
       const index = prev.findIndex((step) => step.key === key);
       const target = index + direction;
       // Built-in steps stay in place; only custom steps can move, and never
-      // past the Review step.
+      // past the Review step (when present).
       if (index === -1 || prev[index].builtin) return prev;
-      const reviewIndex = prev.findIndex((s) => s.key === "builtin_8");
-      if (target <= 0 || target >= reviewIndex) return prev;
+      const reviewIndex = reviewStepKey
+        ? prev.findIndex((s) => s.key === reviewStepKey)
+        : prev.length;
+      if (target < 0 || target >= reviewIndex || target >= prev.length) {
+        return prev;
+      }
+      if (prev[target]?.builtin) return prev;
       const next = [...prev];
       [next[index], next[target]] = [next[target], next[index]];
       return next;
@@ -192,12 +241,12 @@ const AdmissionFormBuilder = ({
     try {
       setSaving(true);
       const res = await axios.put(
-        `${API}/admission-form`,
+        `${API}${apiPath}`,
         { steps },
         { withCredentials: true }
       );
       const saved = res.data?.data?.steps || steps;
-      toast.success("Admission form saved");
+      toast.success("Form saved");
       onSaved?.(saved);
       onClose?.();
     } catch (err) {
@@ -210,18 +259,18 @@ const AdmissionFormBuilder = ({
   const reset = async () => {
     if (
       !window.confirm(
-        "Reset the admission form to the default layout? Custom fields and steps will be removed."
+        "Reset this form to the default layout? Custom fields and steps will be removed."
       )
     ) {
       return;
     }
     try {
       setSaving(true);
-      await axios.delete(`${API}/admission-form`, { withCredentials: true });
-      const defaults = mergeAdmissionSteps(null);
+      await axios.delete(`${API}${apiPath}`, { withCredentials: true });
+      const defaults = mergeSteps(null);
       setSteps(defaults);
       setActiveKey(defaults[0]?.key || "");
-      toast.success("Admission form reset");
+      toast.success("Form reset");
       onSaved?.(null);
     } catch (err) {
       toast.error(err.response?.data?.message || "Could not reset the form");
@@ -233,7 +282,7 @@ const AdmissionFormBuilder = ({
   if (loading) {
     return (
       <div className="p-10 text-center text-sm text-[rgb(var(--text-muted))]">
-        Loading the admission form…
+        Loading the form…
       </div>
     );
   }
@@ -242,11 +291,8 @@ const AdmissionFormBuilder = ({
     <div className="bg-[rgb(var(--surface))] text-[rgb(var(--text))] w-full max-w-5xl rounded-xl shadow-xl border border-[rgb(var(--border))] flex flex-col max-h-[90vh]">
       <div className="flex items-start justify-between gap-3 p-4 border-b border-[rgb(var(--border))]">
         <div>
-          <h2 className="text-lg font-semibold">Customize Admission Form</h2>
-          <p className="text-xs text-[rgb(var(--text-muted))]">
-            Add your own fields, choose which step they belong to, and mark them
-            mandatory or optional.
-          </p>
+          <h2 className="text-lg font-semibold">{title}</h2>
+          <p className="text-xs text-[rgb(var(--text-muted))]">{description}</p>
         </div>
         <div className="flex items-center gap-2 shrink-0">
           <button
@@ -340,27 +386,29 @@ const AdmissionFormBuilder = ({
             ))}
           </div>
 
-          <div className="mt-4 border-t border-[rgb(var(--border))] pt-3">
-            <input
-              value={newStepTitle}
-              onChange={(e) => setNewStepTitle(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === "Enter") {
-                  e.preventDefault();
-                  addStep();
-                }
-              }}
-              placeholder="New step name"
-              className="w-full border rounded-lg px-2 py-1.5 text-sm bg-[rgb(var(--surface))]"
-            />
-            <button
-              type="button"
-              onClick={addStep}
-              className="mt-2 w-full flex items-center justify-center gap-1.5 rounded-lg border border-dashed py-1.5 text-xs font-semibold hover:bg-black/5"
-            >
-              <FaPlus size={10} /> Add step
-            </button>
-          </div>
+          {allowCustomSteps && (
+            <div className="mt-4 border-t border-[rgb(var(--border))] pt-3">
+              <input
+                value={newStepTitle}
+                onChange={(e) => setNewStepTitle(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") {
+                    e.preventDefault();
+                    addStep();
+                  }
+                }}
+                placeholder="New step name"
+                className="w-full border rounded-lg px-2 py-1.5 text-sm bg-[rgb(var(--surface))]"
+              />
+              <button
+                type="button"
+                onClick={addStep}
+                className="mt-2 w-full flex items-center justify-center gap-1.5 rounded-lg border border-dashed py-1.5 text-xs font-semibold hover:bg-black/5"
+              >
+                <FaPlus size={10} /> Add step
+              </button>
+            </div>
+          )}
         </div>
 
         {/* FIELDS */}
@@ -382,7 +430,7 @@ const AdmissionFormBuilder = ({
                   />
                   <p className="text-xs text-[rgb(var(--text-muted))] mt-1">
                     {activeStep.builtin
-                      ? "You can hide fields, change their label, or make them optional."
+                      ? "Hide, rename, make optional, or delete fields. Locked fields cannot be removed."
                       : "Fields below belong to this step."}
                   </p>
                 </div>
@@ -436,7 +484,7 @@ const AdmissionFormBuilder = ({
                                 : "Field type"
                             }
                           >
-                            {ADMISSION_FIELD_TYPES.map((type) => (
+                            {fieldTypes.map((type) => (
                               <option key={type.value} value={type.value}>
                                 {type.label}
                               </option>
@@ -465,22 +513,25 @@ const AdmissionFormBuilder = ({
                           </button>
                         </div>
 
-                        {!isBuiltin && (
-                          <button
-                            type="button"
-                            onClick={() => removeField(activeStep.key, field.key)}
-                            className="pt-1.5 text-red-400 hover:text-red-600"
-                            title="Delete field"
-                          >
-                            <FaTrash size={11} />
-                          </button>
-                        )}
+                        <button
+                          type="button"
+                          onClick={() => removeField(activeStep.key, field.key)}
+                          disabled={lockedKeys.has(field.key)}
+                          className="pt-1.5 text-red-400 hover:text-red-600 disabled:opacity-30 disabled:hover:text-red-400"
+                          title={
+                            lockedKeys.has(field.key)
+                              ? lockedDeleteHint
+                              : "Delete field"
+                          }
+                        >
+                          <FaTrash size={11} />
+                        </button>
                       </div>
 
                       <div className="mt-2 flex flex-wrap gap-4">
                         <Toggle
                           checked={field.visible !== false}
-                          disabled={LOCKED_VISIBLE_FIELDS.has(field.key)}
+                          disabled={lockedKeys.has(field.key)}
                           onChange={(value) =>
                             updateField(activeStep.key, field.key, {
                               visible: value,
@@ -488,8 +539,8 @@ const AdmissionFormBuilder = ({
                           }
                           label="Show this field"
                           hint={
-                            LOCKED_VISIBLE_FIELDS.has(field.key)
-                              ? "Required to create a student record."
+                            lockedKeys.has(field.key)
+                              ? lockedDeleteHint
                               : undefined
                           }
                         />

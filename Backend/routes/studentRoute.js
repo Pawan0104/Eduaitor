@@ -9,11 +9,14 @@ import {
   getAllStudents,
   getStudentsByTeacher,
   getNextRollNo,
+  getNextAdmissionNumber,
+  getStudentDocuments,
 } from "../controllers/studentController.js";
 import uploadSpreadsheet from "../middlewares/uploadSpreadsheet.js";
 import {
   bulkUploadStudents,
   downloadStudentTemplate,
+  getStudentBulkUploadFields,
 } from "../controllers/studentBulkController.js";
 
 const router = express.Router();
@@ -37,6 +40,11 @@ const withSpreadsheetUpload = (req, res, next) => {
 router.get("/all/admin", authMiddleware, getAllStudents);
 
 /* BULK UPLOAD ROUTES */
+router.get(
+  "/bulk-upload/fields",
+  authMiddleware,
+  getStudentBulkUploadFields,
+);
 router.get("/bulk-upload/template", authMiddleware, downloadStudentTemplate);
 router.post(
   "/bulk-upload",
@@ -52,8 +60,14 @@ router.get("/", authMiddleware, getStudents);
 
 router.get("/teacher/my-students", authMiddleware, getStudentsByTeacher);
 
-// Must stay above `/:id` so Express does not treat "next-roll-no" as an id.
+// Must stay above `/:id` so Express does not treat these as ids.
+router.get("/documents", authMiddleware, getStudentDocuments);
 router.get("/next-roll-no", authMiddleware, getNextRollNo);
+router.get(
+  "/next-admission-number",
+  authMiddleware,
+  getNextAdmissionNumber,
+);
 
 router.put("/:id", authMiddleware, withUpload, updateStudent);
 

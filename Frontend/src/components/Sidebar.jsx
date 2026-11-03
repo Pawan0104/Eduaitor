@@ -211,6 +211,7 @@ const Sidebar = ({ closeSidebar, unreadMessages = 0 }) => {
         { name: "All Students", path: "/school/students" },
         { name: "Add Student", path: "/school/student-manage" },
         { name: "Bulk Upload", path: "/school/students/bulk-upload" },
+        { name: "Documents", path: "/school/documents" },
         { name: "House Allocation", path: "/school/house" },
         { name: "Certificates", path: "/school/certificates" },
         {
@@ -948,14 +949,37 @@ const Sidebar = ({ closeSidebar, unreadMessages = 0 }) => {
     }
   };
 
+  const sortMenuAlpha = (items = []) => {
+    const byName = (a, b) =>
+      String(a?.name || "").localeCompare(String(b?.name || ""), undefined, {
+        sensitivity: "base",
+      });
+
+    return [...items]
+      .map((item) =>
+        item?.children?.length
+          ? { ...item, children: [...item.children].sort(byName) }
+          : item,
+      )
+      .sort((a, b) => {
+        // Keep Home first when present; sort everything else A→Z.
+        if (a?.name === "Home" && b?.name !== "Home") return -1;
+        if (b?.name === "Home" && a?.name !== "Home") return 1;
+        return byName(a, b);
+      });
+  };
+
   const finalMenu = (() => {
-    if (role === "super_admin") return menu;
-    if (role === "school_admin") return menu;
-    // Teachers: already filtered by personal permissions; also respect school subscription
-    if (role === "teacher_admin") {
-      return menu.filter((item) => !item.module || hasModule(item.module));
+    let next = menu;
+    if (role === "super_admin" || role === "school_admin") {
+      next = menu;
+    } else if (role === "teacher_admin") {
+      // Teachers: already filtered by personal permissions; also respect school subscription
+      next = menu.filter((item) => !item.module || hasModule(item.module));
+    } else {
+      next = menu.filter((item) => !item.module || hasModule(item.module));
     }
-    return menu.filter((item) => !item.module || hasModule(item.module));
+    return sortMenuAlpha(next);
   })();
 
   return (

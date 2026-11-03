@@ -1,4 +1,4 @@
-import { useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import axios from "axios";
 import * as XLSX from "xlsx";
 import { toast } from "react-toastify";
@@ -32,6 +32,59 @@ const BulkStudentUpload = ({ onComplete }) => {
   const [result, setResult] = useState(null);
   const [docsConfirmed, setDocsConfirmed] = useState(false);
 
+  const [fieldCatalog, setFieldCatalog] = useState([]);
+  const [fieldsLoading, setFieldsLoading] = useState(false);
+  const [templateModalOpen, setTemplateModalOpen] = useState(false);
+  const [selectedFields, setSelectedFields] = useState({});
+  const [templateDownloading, setTemplateDownloading] = useState(false);
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      setFieldsLoading(true);
+      try {
+        const { data } = await axios.get(
+          `${API}/students/bulk-upload/fields`,
+          { withCredentials: true },
+        );
+        if (cancelled) return;
+        const fields = data?.data || [];
+        setFieldCatalog(fields);
+        const initial = {};
+        fields.forEach((field) => {
+          initial[field.key] = Boolean(field.required);
+        });
+        setSelectedFields(initial);
+      } catch {
+        if (!cancelled) {
+          toast.error("Could not load bulk upload fields");
+        }
+      } finally {
+        if (!cancelled) setFieldsLoading(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const selectedFieldKeys = useMemo(
+    () =>
+      fieldCatalog
+        .filter((field) => selectedFields[field.key])
+        .map((field) => field.key),
+    [fieldCatalog, selectedFields],
+  );
+
+  const optionalFields = useMemo(
+    () => fieldCatalog.filter((field) => !field.required),
+    [fieldCatalog],
+  );
+
+  const allOptionalSelected =
+    optionalFields.length > 0 &&
+    optionalFields.every((field) => selectedFields[field.key]);
+
   const parseFileForPreview = (selectedFile) => {
     const reader = new FileReader();
     reader.onload = (e) => {
@@ -63,11 +116,59 @@ const BulkStudentUpload = ({ onComplete }) => {
     if (dropped) handleFileChange(dropped);
   };
 
+  const openTemplateModal = () => {
+    if (!fieldCatalog.length) {
+      toast.error("Field list is still loading. Please try again.");
+      return;
+    }
+    setSelectedFields((prev) => {
+      const next = { ...prev };
+      fieldCatalog.forEach((field) => {
+        if (field.required) next[field.key] = true;
+        else if (next[field.key] === undefined) next[field.key] = false;
+      });
+      return next;
+    });
+    setTemplateModalOpen(true);
+  };
+
+  const toggleField = (key, required) => {
+    if (required) return;
+    setSelectedFields((prev) => ({ ...prev, [key]: !prev[key] }));
+  };
+
+  const selectAllOptional = () => {
+    setSelectedFields((prev) => {
+      const next = { ...prev };
+      optionalFields.forEach((field) => {
+        next[field.key] = true;
+      });
+      return next;
+    });
+  };
+
+  const clearOptional = () => {
+    setSelectedFields((prev) => {
+      const next = { ...prev };
+      optionalFields.forEach((field) => {
+        next[field.key] = false;
+      });
+      return next;
+    });
+  };
+
   const handleDownloadTemplate = async () => {
+    if (!selectedFieldKeys.length) {
+      toast.error("Select at least the mandatory fields");
+      return;
+    }
+
+    setTemplateDownloading(true);
     try {
       const res = await axios.get(`${API}/students/bulk-upload/template`, {
         withCredentials: true,
         responseType: "blob",
+        params: { fields: selectedFieldKeys.join(",") },
       });
       // With responseType "blob" axios does not throw on 4xx/5xx, so an error
       // payload arrives as a JSON blob. Surface the message instead of
@@ -104,8 +205,14 @@ const BulkStudentUpload = ({ onComplete }) => {
       link.remove();
       // Revoking in the same tick can cancel the download before it starts.
       setTimeout(() => window.URL.revokeObjectURL(url), 1000);
+      setTemplateModalOpen(false);
+      toast.success(
+        `Template downloaded with ${selectedFieldKeys.length} column(s)`,
+      );
     } catch {
       toast.error("Could not download the template");
+    } finally {
+      setTemplateDownloading(false);
     }
   };
 
@@ -235,20 +342,20 @@ const BulkStudentUpload = ({ onComplete }) => {
 
   return (
     <div className="max-w-4xl mx-auto p-4 space-y-6">
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between gap-3 flex-wrap">
         <div>
           <h2 className="text-lg font-semibold">Bulk Student Upload</h2>
           <p className="text-sm text-gray-500">
-            Add many students at once from a spreadsheet.
+            Choose columns, download a matching sample, fill it in, then upload.
           </p>
         </div>
         <button
           type="button"
-          onClick={handleDownloadTemplate}
-          disabled={uploading}
+          onClick={openTemplateModal}
+          disabled={uploading || fieldsLoading}
           className="text-sm px-3 py-1.5 rounded-md border border-gray-300 hover:bg-gray-50 disabled:opacity-50"
         >
-          Download template
+          {fieldsLoading ? "Loading fields…" : "Download template"}
         </button>
       </div>
 
@@ -319,7 +426,7 @@ const BulkStudentUpload = ({ onComplete }) => {
             {issueCount > 0 && (
               <span className="text-red-600">
                 {" "}
-                · {issueCount} missing firstName/lastName
+                · {issueCount} missing firstName/lastName/documentsVerified
               </span>
             )}
           </p>
@@ -454,6 +561,120 @@ const BulkStudentUpload = ({ onComplete }) => {
               </table>
             </div>
           )}
+        </div>
+      )}
+
+      {/* ── FIELD PICKER MODAL ── */}
+      {templateModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+          <div className="flex w-full max-w-2xl max-h-[90vh] flex-col overflow-hidden rounded-2xl bg-white shadow-2xl">
+            <div className="flex items-start justify-between gap-3 border-b border-gray-200 px-5 py-4">
+              <div>
+                <h3 className="text-lg font-semibold text-gray-900">
+                  Choose template fields
+                </h3>
+                <p className="mt-0.5 text-sm text-gray-500">
+                  Mandatory fields stay selected. Only checked columns are
+                  included in the sample file you download and upload.
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setTemplateModalOpen(false)}
+                className="rounded-md px-2 py-1 text-sm text-gray-500 hover:bg-gray-100"
+              >
+                Close
+              </button>
+            </div>
+
+            <div className="flex items-center justify-between gap-2 border-b border-gray-100 px-5 py-2.5 text-xs">
+              <span className="text-gray-500">
+                {selectedFieldKeys.length} of {fieldCatalog.length} selected
+              </span>
+              <div className="flex gap-2">
+                <button
+                  type="button"
+                  onClick={selectAllOptional}
+                  disabled={allOptionalSelected}
+                  className="rounded-md border border-gray-200 px-2.5 py-1 font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-40"
+                >
+                  Select all
+                </button>
+                <button
+                  type="button"
+                  onClick={clearOptional}
+                  className="rounded-md border border-gray-200 px-2.5 py-1 font-medium text-gray-700 hover:bg-gray-50"
+                >
+                  Clear optional
+                </button>
+              </div>
+            </div>
+
+            <div className="overflow-y-auto px-5 py-4">
+              <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+                {fieldCatalog.map((field) => {
+                  const checked = Boolean(selectedFields[field.key]);
+                  return (
+                    <label
+                      key={field.key}
+                      className={`flex items-start gap-2.5 rounded-xl border px-3 py-2.5 text-sm ${
+                        field.required
+                          ? "cursor-not-allowed border-blue-200 bg-blue-50/60"
+                          : "cursor-pointer border-gray-200 hover:bg-gray-50"
+                      }`}
+                    >
+                      <input
+                        type="checkbox"
+                        className="mt-0.5"
+                        checked={checked}
+                        disabled={field.required}
+                        onChange={() => toggleField(field.key, field.required)}
+                      />
+                      <span className="min-w-0">
+                        <span className="block font-medium text-gray-800">
+                          {field.label}
+                          {field.required ? (
+                            <span className="ml-1 text-[11px] font-semibold uppercase tracking-wide text-blue-700">
+                              Required
+                            </span>
+                          ) : null}
+                        </span>
+                        <span className="block text-xs text-gray-400">
+                          {field.key}
+                        </span>
+                      </span>
+                    </label>
+                  );
+                })}
+              </div>
+            </div>
+
+            <div className="flex flex-wrap justify-end gap-2 border-t border-gray-200 px-5 py-4">
+              <button
+                type="button"
+                onClick={() => setTemplateModalOpen(false)}
+                className="rounded-md border border-gray-300 px-4 py-2 text-sm"
+                disabled={templateDownloading}
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={handleDownloadTemplate}
+                disabled={templateDownloading || !selectedFieldKeys.length}
+                className="inline-flex items-center gap-2 rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white disabled:opacity-50"
+              >
+                {templateDownloading ? (
+                  <>
+                    <span className="inline-block h-3.5 w-3.5 animate-spin rounded-full border-2 border-white border-t-transparent" />
+                    Preparing…
+                  </>
+                ) : (
+                  `Download ${selectedFieldKeys.length} column(s)`
+                )}
+              </button>
+            </div>
+          </div>
         </div>
       )}
     </div>

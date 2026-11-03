@@ -43,6 +43,15 @@ const studentSchema = new mongoose.Schema(
     aadhaarNumber: { type: String, default: "" },
     penNumber: { type: String, default: "" },
     admissionSource: { type: String, default: "" },
+    /**
+     * System-managed confirmation flag (not editable on the admission form).
+     * Direct admissions start as Non-Confirmed; registration admits as Confirmed.
+     */
+    confirmationStatus: {
+      type: String,
+      enum: ["Confirmed", "Non-Confirmed"],
+      default: "Non-Confirmed",
+    },
     isSpecialChild: { type: Boolean, default: false },
     isEws: { type: Boolean, default: false },
     isPhysicallyDisabled: { type: Boolean, default: false },

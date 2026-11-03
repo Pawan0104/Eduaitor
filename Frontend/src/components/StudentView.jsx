@@ -2,7 +2,7 @@ import { useEffect, useState, useCallback } from "react";
 import axios from "axios";
 import { useParams, useNavigate } from "react-router-dom";
 import { toast } from "react-toastify";
-import { FaArrowLeft, FaIdCard } from "react-icons/fa";
+import { FaArrowLeft, FaIdCard, FaPrint } from "react-icons/fa";
 import { useAuth } from "../context/AuthContext";
 
 const API = import.meta.env.VITE_API_URL;
@@ -107,7 +107,13 @@ const StudentView = () => {
               Student Profile
             </p>
           </div>
-          <div className="flex flex-wrap gap-2">
+          <div className="flex flex-wrap gap-2 print:hidden">
+            <button
+              onClick={() => window.print()}
+              className="px-4 py-2 bg-slate-700 text-white rounded-lg text-sm font-medium flex items-center gap-2"
+            >
+              <FaPrint /> Print Form
+            </button>
             <button
               onClick={() =>
                 navigate(
@@ -196,6 +202,14 @@ const StudentView = () => {
               </p>
               <p className="text-sm font-medium text-[rgb(var(--text))]">
                 {student.studentId || "—"}
+              </p>
+            </div>
+            <div>
+              <p className="text-xs text-[rgb(var(--text))] uppercase tracking-wide">
+                Confirmation
+              </p>
+              <p className="text-sm font-medium text-[rgb(var(--text))]">
+                {student.confirmationStatus || "Non-Confirmed"}
               </p>
             </div>
           </div>

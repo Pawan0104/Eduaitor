@@ -12,11 +12,23 @@ import {
   FaPhone,
   FaPlus,
   FaSchool,
+  FaSlidersH,
   FaTimes,
   FaTrash,
   FaUserGraduate,
   FaUserTie,
 } from "react-icons/fa";
+import AdmissionFormBuilder from "../components/AdmissionFormBuilder";
+import ConfigurableFormFields, {
+  buildCustomFieldsPayload,
+  emptyCustomValues,
+  validateConfigurableFields,
+} from "../components/ConfigurableFormFields";
+import {
+  LEAD_FIELD_TYPES,
+  LEAD_LOCKED_FIELD_KEYS,
+  mergeLeadSteps,
+} from "../lib/leadFormDefaults";
 
 const API = import.meta.env.VITE_API_URL;
 const leadStatusOptions = ["active", "processing", "admitted", "cancelled"];
@@ -49,7 +61,12 @@ const LeadManagement = () => {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [showModal, setShowModal] = useState(false);
+  const [builderOpen, setBuilderOpen] = useState(false);
+  const [formSteps, setFormSteps] = useState(() => mergeLeadSteps(null));
   const [form, setForm] = useState(emptyForm);
+  const [customValues, setCustomValues] = useState(() =>
+    emptyCustomValues(mergeLeadSteps(null)),
+  );
   const [statusUpdatingId, setStatusUpdatingId] = useState("");
   const [assigneeUpdatingId, setAssigneeUpdatingId] = useState("");
   const [editingAssigneeLeadId, setEditingAssigneeLeadId] = useState("");
@@ -98,6 +115,30 @@ const LeadManagement = () => {
     fetchPageData();
   }, [isStaffLogin]);
 
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await axios.get(`${API}/lead-form`, {
+          withCredentials: true,
+        });
+        if (cancelled) return;
+        const steps = mergeLeadSteps(res.data?.data?.steps);
+        setFormSteps(steps);
+        setCustomValues(emptyCustomValues(steps));
+      } catch {
+        if (!cancelled) {
+          const steps = mergeLeadSteps(null);
+          setFormSteps(steps);
+          setCustomValues(emptyCustomValues(steps));
+        }
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
   const assigneeOptions = useMemo(
     () =>
       assignees.map((assignee) => ({
@@ -114,20 +155,23 @@ const LeadManagement = () => {
 
   const resetForm = () => {
     setForm(emptyForm);
+    setCustomValues(emptyCustomValues(formSteps));
     setShowModal(false);
   };
 
   const validate = () => {
-    if (!form.studentName.trim()) return "Student name is required";
-    if (!form.parentName.trim()) return "Parent name is required";
-    if (!form.parentMobile.trim()) return "Parent mobile number is required";
-    if (!/^\d{10}$/.test(form.parentMobile.trim())) {
+    const configError = validateConfigurableFields(
+      formSteps,
+      form,
+      customValues,
+    );
+    if (configError) return configError;
+    if (form.parentMobile?.trim() && !/^\d{10}$/.test(form.parentMobile.trim())) {
       return "Parent mobile number must be 10 digits";
     }
     if (form.parentEmail && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.parentEmail)) {
       return "Enter a valid parent email";
     }
-    if (!form.assigneeKey) return "Please assign the lead";
     return null;
   };
 
@@ -138,7 +182,8 @@ const LeadManagement = () => {
       return;
     }
 
-    const [assignedToUserType, assignedToUserId] = form.assigneeKey.split(":");
+    const [assignedToUserType, assignedToUserId] = String(form.assigneeKey || "")
+      .split(":");
 
     try {
       setSaving(true);
@@ -154,6 +199,7 @@ const LeadManagement = () => {
           streamId: form.streamId || undefined,
           assignedToUserType,
           assignedToUserId,
+          customFields: buildCustomFieldsPayload(formSteps, customValues),
         },
         { withCredentials: true },
       );
@@ -383,14 +429,28 @@ const LeadManagement = () => {
           </p>
         </div>
 
-        {!isStaffLogin && (
-          <button
-            onClick={() => setShowModal(true)}
-            className="flex items-center gap-2 bg-[rgb(var(--primary))] text-white px-4 py-2.5 rounded-xl shadow text-sm font-medium hover:opacity-90 transition self-start sm:self-auto"
-          >
-            <FaPlus size={12} /> Add New Lead
-          </button>
-        )}
+        <div className="flex flex-wrap gap-2 self-start sm:self-auto">
+          {["school_admin", "staff_admin", "super_admin"].includes(
+            user?.role,
+          ) && (
+            <button
+              type="button"
+              onClick={() => setBuilderOpen(true)}
+              className="inline-flex items-center gap-2 rounded-xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))] px-4 py-2.5 text-sm font-semibold text-[rgb(var(--text))]"
+              title="Add, hide or reorder lead form fields"
+            >
+              <FaSlidersH size={12} /> Customize Form
+            </button>
+          )}
+          {!isStaffLogin && (
+            <button
+              onClick={() => setShowModal(true)}
+              className="flex items-center gap-2 bg-[rgb(var(--primary))] text-white px-4 py-2.5 rounded-xl shadow text-sm font-medium hover:opacity-90 transition"
+            >
+              <FaPlus size={12} /> Add New Lead
+            </button>
+          )}
+        </div>
       </div>
 
       <div className="grid grid-cols-1 xl:grid-cols-3 gap-4 mb-6">
@@ -470,6 +530,14 @@ const LeadManagement = () => {
                       )}
                     </div>
                     <p className="text-sm text-[rgb(var(--text-muted))]">Parent: {lead.parentName}</p>
+                    <p className="text-sm text-[rgb(var(--text-muted))]">
+                      Source:{" "}
+                      <span className="font-medium text-[rgb(var(--text))]">
+                        {lead.source === "website"
+                          ? "Website"
+                          : lead.createdByName || "Office"}
+                      </span>
+                    </p>
                   </div>
 
                   <div className="flex flex-wrap gap-3 text-xs text-[rgb(var(--text-muted))]">
@@ -647,111 +715,82 @@ const LeadManagement = () => {
             </div>
 
             <div className="p-6 grid grid-cols-1 md:grid-cols-2 gap-4 overflow-y-auto">
-              <label className="flex flex-col gap-2 text-sm font-medium">
-                Student Name
-                <input
-                  name="studentName"
-                  value={form.studentName}
-                  onChange={handleChange}
-                  className="px-3 py-2.5 rounded-xl border border-[rgb(var(--border))] bg-[rgb(var(--bg))]"
-                  placeholder="Enter student name"
-                />
-              </label>
-
-              <label className="flex flex-col gap-2 text-sm font-medium">
-                Parent Name
-                <input
-                  name="parentName"
-                  value={form.parentName}
-                  onChange={handleChange}
-                  className="px-3 py-2.5 rounded-xl border border-[rgb(var(--border))] bg-[rgb(var(--bg))]"
-                  placeholder="Enter parent name"
-                />
-              </label>
-
-              <label className="flex flex-col gap-2 text-sm font-medium">
-                Parent Mobile Number
-                <input
-                  name="parentMobile"
-                  value={form.parentMobile}
-                  onChange={handleChange}
-                  className="px-3 py-2.5 rounded-xl border border-[rgb(var(--border))] bg-[rgb(var(--bg))]"
-                  placeholder="10-digit mobile number"
-                />
-              </label>
-
-              <label className="flex flex-col gap-2 text-sm font-medium">
-                Parent Email ID
-                <input
-                  name="parentEmail"
-                  value={form.parentEmail}
-                  onChange={handleChange}
-                  className="px-3 py-2.5 rounded-xl border border-[rgb(var(--border))] bg-[rgb(var(--bg))]"
-                  placeholder="Enter parent email"
-                />
-              </label>
-
-              <label className="flex flex-col gap-2 text-sm font-medium">
-                Previous School Name
-                <input
-                  name="previousSchoolName"
-                  value={form.previousSchoolName}
-                  onChange={handleChange}
-                  className="px-3 py-2.5 rounded-xl border border-[rgb(var(--border))] bg-[rgb(var(--bg))]"
-                  placeholder="Enter previous school"
-                />
-              </label>
-
-              <label className="flex flex-col gap-2 text-sm font-medium">
-                Interested Class
-                <select
-                  name="classId"
-                  value={form.classId}
-                  onChange={handleChange}
-                  className="px-3 py-2.5 rounded-xl border border-[rgb(var(--border))] bg-[rgb(var(--bg))]"
-                >
-                  <option value="">Select class</option>
-                  {classes.map((cls) => (
-                    <option key={cls._id} value={cls._id}>
-                      {cls.name}
-                    </option>
-                  ))}
-                </select>
-              </label>
-
-              <label className="flex flex-col gap-2 text-sm font-medium">
-                Stream
-                <select
-                  name="streamId"
-                  value={form.streamId}
-                  onChange={handleChange}
-                  className="px-3 py-2.5 rounded-xl border border-[rgb(var(--border))] bg-[rgb(var(--bg))]"
-                >
-                  <option value="">Select stream (optional)</option>
-                  {streams.map((item) => (
-                    <option key={item._id} value={item._id}>
-                      {item.name}
-                    </option>
-                  ))}
-                </select>
-              </label>
-
-              <label className="flex flex-col gap-2 text-sm font-medium">
-                Assign Lead To
-                <select
-                  name="assigneeKey"
-                  value={form.assigneeKey}
-                  onChange={handleChange}
-                  className="px-3 py-2.5 rounded-xl border border-[rgb(var(--border))] bg-[rgb(var(--bg))]"
-                >
-                  <option value="">Select assignee</option>
-                  {assigneeOptions.map((option) => (
-                    <option key={option.value} value={option.value}>
-                      {option.label}
-                    </option>
-                  ))}
-                </select>
-              </label>
+              <ConfigurableFormFields
+                steps={formSteps}
+                values={form}
+                customValues={customValues}
+                onChangeBuiltin={(key, value) =>
+                  setForm((prev) => ({ ...prev, [key]: value }))
+                }
+                onChangeCustom={(key, value) =>
+                  setCustomValues((prev) => ({ ...prev, [key]: value }))
+                }
+                renderBuiltin={{
+                  classId: (field) => (
+                    <label className="flex flex-col gap-2 text-sm font-medium">
+                      <span>
+                        {field.label}
+                        {field.required ? " *" : ""}
+                      </span>
+                      <select
+                        name="classId"
+                        value={form.classId}
+                        onChange={handleChange}
+                        className="px-3 py-2.5 rounded-xl border border-[rgb(var(--border))] bg-[rgb(var(--bg))]"
+                      >
+                        <option value="">Select class</option>
+                        {classes.map((cls) => (
+                          <option key={cls._id} value={cls._id}>
+                            {cls.name}
+                          </option>
+                        ))}
+                      </select>
+                    </label>
+                  ),
+                  streamId: (field) => (
+                    <label className="flex flex-col gap-2 text-sm font-medium">
+                      <span>
+                        {field.label}
+                        {field.required ? " *" : ""}
+                      </span>
+                      <select
+                        name="streamId"
+                        value={form.streamId}
+                        onChange={handleChange}
+                        className="px-3 py-2.5 rounded-xl border border-[rgb(var(--border))] bg-[rgb(var(--bg))]"
+                      >
+                        <option value="">Select stream (optional)</option>
+                        {streams.map((item) => (
+                          <option key={item._id} value={item._id}>
+                            {item.name}
+                          </option>
+                        ))}
+                      </select>
+                    </label>
+                  ),
+                  assigneeKey: (field) => (
+                    <label className="flex flex-col gap-2 text-sm font-medium">
+                      <span>
+                        {field.label}
+                        {field.required ? " *" : ""}
+                      </span>
+                      <select
+                        name="assigneeKey"
+                        value={form.assigneeKey}
+                        onChange={handleChange}
+                        className="px-3 py-2.5 rounded-xl border border-[rgb(var(--border))] bg-[rgb(var(--bg))]"
+                      >
+                        <option value="">Select assignee</option>
+                        {assigneeOptions.map((option) => (
+                          <option key={option.value} value={option.value}>
+                            {option.label}
+                          </option>
+                        ))}
+                      </select>
+                    </label>
+                  ),
+                }}
+              />
             </div>
 
             <div className="px-6 py-4 border-t border-[rgb(var(--border))] flex justify-end gap-3 shrink-0">
@@ -825,6 +864,26 @@ const LeadManagement = () => {
             </div>
           </div>
         </div>
+      )}
+
+      {builderOpen && (
+        <AdmissionFormBuilder
+          apiPath="/lead-form"
+          mergeSteps={mergeLeadSteps}
+          fieldTypes={LEAD_FIELD_TYPES}
+          lockedFieldKeys={LEAD_LOCKED_FIELD_KEYS}
+          title="Customize Lead Form"
+          description="Add, hide, rename, or delete fields on the Add Lead form. Changes apply to your school only."
+          lockedDeleteHint="Required to create a lead"
+          reviewStepKey=""
+          allowCustomSteps={false}
+          onClose={() => setBuilderOpen(false)}
+          onSaved={(steps) => {
+            const merged = mergeLeadSteps(steps);
+            setFormSteps(merged);
+            setCustomValues(emptyCustomValues(merged));
+          }}
+        />
       )}
     </div>
   );

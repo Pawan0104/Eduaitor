@@ -1,4 +1,4 @@
-import mongoose from "mongoose";
+﻿import mongoose from "mongoose";
 import Student from "../models/student.js";
 import Lead from "../models/lead.js";
 import Registration from "../models/registration.js";
@@ -43,7 +43,7 @@ const sanitizeStudentObjectIds = (safeBody) => {
     }
     const raw = String(safeBody[key]).trim();
     if (!isValidObjectId(raw)) {
-      // Bad placeholders like "Section" — drop optional ids instead of failing create
+      // Bad placeholders like "Section" â€” drop optional ids instead of failing create
       if (optionalIds.has(key)) {
         safeBody[key] = null;
         continue;
@@ -202,7 +202,7 @@ const normalizeAdmissionNumber = (value) =>
 
 /**
  * Next STU#### for a school based on the highest existing STU number
- * (not document count — count+1 collides when IDs have gaps or custom prefixes).
+ * (not document count â€” count+1 collides when IDs have gaps or custom prefixes).
  */
 const generateStudentId = async (schoolId) => {
   const rows = await Student.find({ schoolId })
@@ -471,15 +471,15 @@ export const createStudent = async (req, res) => {
     delete safeBody.studentId;
     delete safeBody.admissionNumber;
 
-    // ── HASH PASSWORD (same password used for both, set at creation) ──
+    // â”€â”€ HASH PASSWORD (same password used for both, set at creation) â”€â”€
     const rawPassword = safeBody.password?.trim();
     const hashedPassword = rawPassword
       ? await bcrypt.hash(rawPassword, 10)
       : undefined;
 
-    // ── BUILD CREDENTIAL OBJECTS ──
+    // â”€â”€ BUILD CREDENTIAL OBJECTS â”€â”€
     const studentCredentials = {
-      username: studentId, // STU0001 — auto generated or custom admission no
+      username: studentId, // STU0001 â€” auto generated or custom admission no
       password: hashedPassword,
       temp_password: rawPassword || undefined,
       firstTimeLogin: true,
@@ -492,7 +492,7 @@ export const createStudent = async (req, res) => {
       rawPassword,
     });
 
-    // ── STRIP OLD TOP-LEVEL CREDENTIAL FIELDS ──
+    // â”€â”€ STRIP OLD TOP-LEVEL CREDENTIAL FIELDS â”€â”€
     delete safeBody.username;
     delete safeBody.password;
     delete safeBody.temp_password;
@@ -648,11 +648,24 @@ export const createStudent = async (req, res) => {
 
     // Create with a bounded retry. `generateStudentId` is read-then-write, so two
     // simultaneous admissions can pick the same number and the second one fails
-    // the unique index. That is a race, not a user error — so when the admission
+    // the unique index. That is a race, not a user error â€” so when the admission
     // number was AUTO-generated we transparently re-generate and retry. A number
     // the user typed themselves is never retried (a real duplicate must surface).
     const isAutoAdmission =
       !normalizeAdmissionNumber(safeBody.studentId || safeBody.admissionNumber);
+
+    // confirmationStatus is system-managed — never trust the client.
+    delete safeBody.confirmationStatus;
+    const confirmationStatus = registrationDoc
+      ? "Confirmed"
+      : "Non-Confirmed";
+
+    // Prefer the registration's academic year so admitted students appear in
+    // the same session as the registration; otherwise let the session plugin
+    // stamp the active header year.
+    const academicYearFromRegistration = String(
+      registrationDoc?.academicYear || "",
+    ).trim();
 
     const buildStudentDoc = (nextId) => ({
       ...safeBody,
@@ -669,6 +682,10 @@ export const createStudent = async (req, res) => {
       streamId: resolvedStreamOnAdmit.streamId,
       stream: resolvedStreamOnAdmit.stream,
       idCardIssuedAt: new Date(),
+      confirmationStatus,
+      ...(academicYearFromRegistration
+        ? { academicYear: academicYearFromRegistration }
+        : {}),
       convertedFromLeadId,
       convertedFromRegistrationId: registrationDoc?._id || null,
     });
@@ -818,6 +835,27 @@ export const createStudent = async (req, res) => {
  * Next auto-increment roll number for a class (+ optional section).
  * Scoped to the school so two schools can both have roll "1".
  */
+export const getNextAdmissionNumber = async (req, res) => {
+  try {
+    const schoolId = req.user?.school_id;
+    if (!schoolId) {
+      return res.status(400).json({
+        success: false,
+        message: "School ID is required",
+      });
+    }
+
+    const nextId = await generateStudentId(schoolId);
+    return res.json({ success: true, data: nextId });
+  } catch (error) {
+    console.error("Get next admission number error:", error);
+    return res.status(error.statusCode || 500).json({
+      success: false,
+      message: error.message || "Failed to resolve next admission number",
+    });
+  }
+};
+
 export const getNextRollNo = async (req, res) => {
   try {
     const schoolId = req.user?.school_id;
@@ -1005,6 +1043,11 @@ export const updateStudent = async (req, res) => {
       });
     }
 
+    // Locked system fields — not editable via the admission form.
+    delete safeBody.confirmationStatus;
+    delete safeBody.studentId;
+    delete safeBody.admissionNumber;
+
     normalizeStudentFeeFields(safeBody);
 
     const idErrors = sanitizeStudentObjectIds(safeBody);
@@ -1147,11 +1190,11 @@ export const updateStudent = async (req, res) => {
       });
     }
 
-    // ── STRIP OLD TOP-LEVEL CREDENTIAL FIELDS ──
+    // â”€â”€ STRIP OLD TOP-LEVEL CREDENTIAL FIELDS â”€â”€
     delete safeBody.username;
     delete safeBody.firstTimeLogin;
 
-    // ── Admission number (studentId) ──
+    // â”€â”€ Admission number (studentId) â”€â”€
     const requestedAdmission =
       safeBody.studentId || safeBody.admissionNumber || "";
     delete safeBody.admissionNumber;
@@ -1177,7 +1220,7 @@ export const updateStudent = async (req, res) => {
       delete safeBody.studentId;
     }
 
-    // ── BUILD SEPARATE $set FOR NESTED CREDENTIAL FIELDS ──
+    // â”€â”€ BUILD SEPARATE $set FOR NESTED CREDENTIAL FIELDS â”€â”€
     const credentialUpdate = {};
 
     if (safeBody.studentId) {
@@ -1216,11 +1259,11 @@ export const updateStudent = async (req, res) => {
       }
     }
 
-    // ── STRIP password from safeBody so it doesn't conflict ──
+    // â”€â”€ STRIP password from safeBody so it doesn't conflict â”€â”€
     delete safeBody.password;
     delete safeBody.temp_password;
 
-    // ── ALSO STRIP any nested credential objects if accidentally in safeBody ──
+    // â”€â”€ ALSO STRIP any nested credential objects if accidentally in safeBody â”€â”€
     delete safeBody.studentCredentials;
     delete safeBody.parentCredentials;
 
@@ -1570,5 +1613,127 @@ export const getStudentsByTeacher = async (req, res) => {
   } catch (error) {
     console.error("getStudentsByTeacher error:", error);
     res.status(500).json({ success: false, message: error.message });
+  }
+};
+/* ================= STUDENT DOCUMENTS DIRECTORY ================= */
+
+const DOCUMENT_LABELS = {
+  studentPhoto: "Student Photo",
+  fatherPhoto: "Father Photo",
+  motherPhoto: "Mother Photo",
+  guardianPhoto: "Guardian Photo",
+  birthCertificate: "Birth Certificate",
+  transferCertificate: "Transfer Certificate",
+  studentAadhar: "Student Aadhaar",
+  fatherAadhar: "Father Aadhaar",
+  motherAadhar: "Mother Aadhaar",
+};
+
+const pushDocRow = (rows, base, key, label, file, source) => {
+  const url = String(file?.url || "").trim();
+  if (!url) return;
+  rows.push({
+    ...base,
+    documentKey: key,
+    documentLabel: label || key,
+    url,
+    fileType: file?.type || "",
+    source,
+  });
+};
+
+export const getStudentDocuments = async (req, res) => {
+  try {
+    const schoolId = req.user?.school_id;
+    if (!schoolId) {
+      return res.status(400).json({
+        success: false,
+        message: "School ID is required",
+      });
+    }
+
+    const { classId, sectionId, search } = req.query;
+    const filter = { schoolId };
+
+    if (classId && mongoose.Types.ObjectId.isValid(String(classId))) {
+      filter.classId = classId;
+    }
+    if (sectionId && mongoose.Types.ObjectId.isValid(String(sectionId))) {
+      filter.sectionId = sectionId;
+    }
+
+    if (search?.trim()) {
+      const q = search.trim().replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+      const rx = new RegExp(q, "i");
+      filter.$or = [
+        { firstName: rx },
+        { lastName: rx },
+        { studentId: rx },
+        { rollNo: rx },
+      ];
+    }
+
+    const students = await Student.find(filter)
+      .select(
+        "firstName lastName studentId rollNo classId sectionId documents extraDocuments customFields",
+      )
+      .populate("classId", "name className")
+      .populate("sectionId", "name sectionName")
+      .sort({ createdAt: -1 })
+      .lean();
+
+    const rows = [];
+    for (const student of students) {
+      const base = {
+        studentMongoId: String(student._id),
+        studentId: student.studentId || "",
+        studentName: `${student.firstName || ""} ${student.lastName || ""}`.trim(),
+        rollNo: student.rollNo || "",
+        className:
+          student.classId?.name || student.classId?.className || "",
+        sectionName:
+          student.sectionId?.name || student.sectionId?.sectionName || "",
+      };
+
+      const docs = student.documents || {};
+      Object.entries(DOCUMENT_LABELS).forEach(([key, label]) => {
+        pushDocRow(rows, base, key, label, docs[key], "documents");
+      });
+
+      (student.extraDocuments || []).forEach((doc, index) => {
+        pushDocRow(
+          rows,
+          base,
+          doc.fieldName || `extra_${index}`,
+          doc.label || doc.fieldName || "Extra document",
+          doc,
+          "extraDocuments",
+        );
+      });
+
+      (student.customFields || []).forEach((field) => {
+        if (String(field?.type || "") !== "file") return;
+        pushDocRow(
+          rows,
+          base,
+          field.key || "custom_file",
+          field.label || field.key || "Custom document",
+          field.file,
+          "customFields",
+        );
+      });
+    }
+
+    return res.json({
+      success: true,
+      data: rows,
+      total: rows.length,
+    });
+  } catch (error) {
+    console.error("getStudentDocuments error:", error);
+    return res.status(500).json({
+      success: false,
+      message: error.message || "Failed to fetch student documents",
+    });
   }
 };

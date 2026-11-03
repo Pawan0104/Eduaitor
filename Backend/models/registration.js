@@ -123,6 +123,44 @@ const registrationSchema = new mongoose.Schema(
       type: mongoose.Schema.Types.ObjectId,
       default: null,
     },
+    /** Display name of who created the registration (or "Website" for public). */
+    createdByName: {
+      type: String,
+      default: "",
+      trim: true,
+    },
+    followUps: {
+      type: [
+        new mongoose.Schema(
+          {
+            comment: { type: String, required: true, trim: true },
+            addedBy: {
+              userId: { type: mongoose.Schema.Types.Mixed, required: true },
+              name: { type: String, default: "" },
+              role: { type: String, default: "" },
+            },
+            createdAt: { type: Date, default: Date.now },
+          },
+          { _id: false },
+        ),
+      ],
+      default: [],
+    },
+    /** Values for fields the school admin added via Registration Form Builder. */
+    customFields: {
+      type: [
+        new mongoose.Schema(
+          {
+            key: { type: String, required: true },
+            label: { type: String, default: "" },
+            type: { type: String, default: "text" },
+            value: { type: String, default: "" },
+          },
+          { _id: false },
+        ),
+      ],
+      default: [],
+    },
   },
   { timestamps: true },
 );

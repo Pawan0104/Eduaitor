@@ -10,10 +10,14 @@ import {
   FiCopy,
   FiEdit2,
   FiExternalLink,
+  FiEye,
   FiLink,
+  FiMessageSquare,
   FiPlus,
+  FiPrinter,
   FiRefreshCw,
   FiSearch,
+  FiSettings,
   FiTrash2,
   FiUserPlus,
   FiX,
@@ -21,6 +25,18 @@ import {
 import { toast } from "react-toastify";
 import { API } from "../config/api";
 import { useAuth } from "../context/AuthContext";
+import AdmissionFormBuilder from "../components/AdmissionFormBuilder";
+import ConfigurableFormFields, {
+  buildCustomFieldsPayload,
+  emptyCustomValues,
+  hydrateCustomValues,
+  validateConfigurableFields,
+} from "../components/ConfigurableFormFields";
+import {
+  REGISTRATION_FIELD_TYPES,
+  REGISTRATION_LOCKED_FIELD_KEYS,
+  mergeRegistrationSteps,
+} from "../lib/registrationFormDefaults";
 
 const STATUS_META = {
   registered: {
@@ -210,6 +226,13 @@ const Registrations = () => {
   const [regForm, setRegForm] = useState(emptyRegistration());
   const [regSaving, setRegSaving] = useState(false);
   const [leadInfo, setLeadInfo] = useState(null);
+  const [builderOpen, setBuilderOpen] = useState(false);
+  const [formSteps, setFormSteps] = useState(() =>
+    mergeRegistrationSteps(null),
+  );
+  const [customValues, setCustomValues] = useState(() =>
+    emptyCustomValues(mergeRegistrationSteps(null)),
+  );
 
   const [exams, setExams] = useState([]);
   const [examsLoading, setExamsLoading] = useState(false);
@@ -230,6 +253,21 @@ const Registrations = () => {
     open: false,
     loading: false,
     saving: false,
+    data: null,
+  });
+
+  const [followUpDrafts, setFollowUpDrafts] = useState({});
+  const [followUpSavingId, setFollowUpSavingId] = useState("");
+  const [followUpHistory, setFollowUpHistory] = useState({
+    open: false,
+    loading: false,
+    registrationId: "",
+    studentName: "",
+    followUps: [],
+  });
+  const [viewModal, setViewModal] = useState({
+    open: false,
+    loading: false,
     data: null,
   });
 
@@ -311,26 +349,56 @@ const Registrations = () => {
     if (tab === "exams") loadExams();
   }, [tab, loadExams]);
 
-  /* ------------------------- lead / registration prefill ------------------------- */
-  const applyRegistration = useCallback((registration) => {
-    setRegForm({
-      studentName: registration.studentName || "",
-      dob: dateInput(registration.dob),
-      gender: registration.gender || "",
-      bloodGroup: registration.bloodGroup || "",
-      classId: registration.classId || "",
-      sectionId: registration.sectionId || "",
-      streamId: registration.streamId ? String(registration.streamId) : "",
-      parentName: registration.parentName || "",
-      parentMobile: registration.parentMobile || "",
-      parentEmail: registration.parentEmail || "",
-      address: registration.address || "",
-      city: registration.city || "",
-      pincode: registration.pincode || "",
-      previousSchoolName: registration.previousSchoolName || "",
-      notes: registration.notes || "",
-    });
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const { data } = await axios.get(`${API}/registration-form`, {
+          withCredentials: true,
+        });
+        if (cancelled) return;
+        const steps = mergeRegistrationSteps(data?.data?.steps);
+        setFormSteps(steps);
+        setCustomValues(emptyCustomValues(steps));
+      } catch {
+        if (!cancelled) {
+          const steps = mergeRegistrationSteps(null);
+          setFormSteps(steps);
+          setCustomValues(emptyCustomValues(steps));
+        }
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
   }, []);
+
+  /* ------------------------- lead / registration prefill ------------------------- */
+  const applyRegistration = useCallback(
+    (registration) => {
+      setRegForm({
+        studentName: registration.studentName || "",
+        dob: dateInput(registration.dob),
+        gender: registration.gender || "",
+        bloodGroup: registration.bloodGroup || "",
+        classId: registration.classId || "",
+        sectionId: registration.sectionId || "",
+        streamId: registration.streamId ? String(registration.streamId) : "",
+        parentName: registration.parentName || "",
+        parentMobile: registration.parentMobile || "",
+        parentEmail: registration.parentEmail || "",
+        address: registration.address || "",
+        city: registration.city || "",
+        pincode: registration.pincode || "",
+        previousSchoolName: registration.previousSchoolName || "",
+        notes: registration.notes || "",
+      });
+      setCustomValues(
+        hydrateCustomValues(formSteps, registration.customFields || []),
+      );
+    },
+    [formSteps],
+  );
 
   const openEditById = useCallback(
     async (id) => {
@@ -375,11 +443,14 @@ const Registrations = () => {
         streamId: lead.streamId ? String(lead.streamId) : "",
         notes: lead.notes || "",
       });
+      setCustomValues(
+        hydrateCustomValues(formSteps, lead.customFields || []),
+      );
       setRegModal({ open: true, mode: "create", id: "", leadId: lead._id });
     } catch (error) {
       toast.error(error.response?.data?.message || "Could not open the lead.");
     }
-  }, [openEditById]);
+  }, [openEditById, formSteps]);
 
   useEffect(() => {
     const leadId = searchParams.get("leadId");
@@ -421,15 +492,17 @@ const Registrations = () => {
   const openCreate = () => {
     setLeadInfo(null);
     setRegForm(emptyRegistration());
+    setCustomValues(emptyCustomValues(formSteps));
     setRegModal({ open: true, mode: "create", id: "", leadId: "" });
   };
 
   const submitRegistration = async () => {
-    if (!regForm.studentName.trim())
-      return toast.error("Student name is required.");
-    if (!regForm.classId) return toast.error("Select the applied class.");
-    if (!regForm.parentName.trim())
-      return toast.error("Parent name is required.");
+    const configError = validateConfigurableFields(
+      formSteps,
+      regForm,
+      customValues,
+    );
+    if (configError) return toast.error(configError);
     if (String(regForm.parentMobile || "").replace(/\D/g, "").length !== 10)
       return toast.error("Parent mobile must be 10 digits.");
 
@@ -440,6 +513,7 @@ const Registrations = () => {
         sectionId: regForm.sectionId || null,
         dob: regForm.dob || null,
         leadId: regModal.leadId || undefined,
+        customFields: buildCustomFieldsPayload(formSteps, customValues),
       };
       if (regModal.mode === "edit") {
         await axios.put(`${API}/registrations/${regModal.id}`, payload, {
@@ -524,6 +598,87 @@ const Registrations = () => {
       return;
     }
     navigate(`${basePath}/student-manage?registrationId=${registration._id}`);
+  };
+
+  const sourceText = (registration) =>
+    registration?.sourceLabel ||
+    (registration?.source === "public"
+      ? "Website"
+      : registration?.source === "lead"
+        ? "Lead"
+        : registration?.createdByName || "Office");
+
+  const openViewRegistration = async (registration) => {
+    setViewModal({ open: true, loading: true, data: null });
+    try {
+      const { data } = await axios.get(
+        `${API}/registrations/${registration._id}`,
+        { withCredentials: true },
+      );
+      setViewModal({
+        open: true,
+        loading: false,
+        data: data?.data || registration,
+      });
+    } catch (error) {
+      setViewModal({ open: false, loading: false, data: null });
+      toast.error(
+        error.response?.data?.message || "Could not open registration.",
+      );
+    }
+  };
+
+  const printViewRegistration = () => {
+    window.print();
+  };
+
+  const handleAddFollowUp = async (registrationId) => {
+    const comment = String(followUpDrafts[registrationId] || "").trim();
+    if (!comment) {
+      toast.error("Enter a follow-up comment first.");
+      return;
+    }
+    setFollowUpSavingId(registrationId);
+    try {
+      await axios.post(
+        `${API}/registrations/${registrationId}/followups`,
+        { comment },
+        { withCredentials: true },
+      );
+      toast.success("Follow-up added.");
+      setFollowUpDrafts((prev) => ({ ...prev, [registrationId]: "" }));
+      await loadRegistrations();
+    } catch (error) {
+      toast.error(
+        error.response?.data?.message || "Could not add follow-up.",
+      );
+    } finally {
+      setFollowUpSavingId("");
+    }
+  };
+
+  const openFollowUpHistory = async (registration) => {
+    setFollowUpHistory({
+      open: true,
+      loading: true,
+      registrationId: registration._id,
+      studentName: registration.studentName,
+      followUps: [],
+    });
+    try {
+      const { data } = await axios.get(
+        `${API}/registrations/${registration._id}/followups`,
+        { withCredentials: true },
+      );
+      setFollowUpHistory((prev) => ({
+        ...prev,
+        loading: false,
+        followUps: data?.data?.followUps || [],
+      }));
+    } catch {
+      setFollowUpHistory((prev) => ({ ...prev, loading: false, followUps: [] }));
+      toast.error("Could not load follow-ups.");
+    }
   };
 
   /* ------------------------------ exam CRUD ------------------------------ */
@@ -773,6 +928,7 @@ const Registrations = () => {
   const closeRegModal = () => {
     setRegModal({ open: false, mode: "create", id: "", leadId: "" });
     setLeadInfo(null);
+    setCustomValues(emptyCustomValues(formSteps));
   };
 
   return (
@@ -798,6 +954,14 @@ const Registrations = () => {
           </p>
         </div>
         <div className="flex flex-wrap gap-2 self-start sm:self-auto">
+          <button
+            type="button"
+            onClick={() => setBuilderOpen(true)}
+            className={btnSecondary}
+            title="Add, hide or reorder registration form fields"
+          >
+            <FiSettings size={14} /> Customize Form
+          </button>
           <button type="button" onClick={openLinkModal} className={btnSecondary}>
             <FiLink size={14} /> Public form
           </button>
@@ -972,15 +1136,15 @@ const Registrations = () => {
                         {registration.sectionName
                           ? ` · ${registration.sectionName}`
                           : ""}
-                        {" · "}
-                        {registration.source === "public"
-                          ? "Public form"
-                          : registration.source === "lead"
-                            ? "From lead"
-                            : "ERP"}
                         {registration.academicYear
                           ? ` · ${registration.academicYear}`
                           : ""}
+                      </p>
+                      <p className="text-sm text-[rgb(var(--text-muted))]">
+                        Source:{" "}
+                        <span className="font-medium text-[rgb(var(--text))]">
+                          {sourceText(registration)}
+                        </span>
                       </p>
                       <p className="text-xs text-[rgb(var(--text-muted))]">
                         {registration.entranceExamId ? (
@@ -999,9 +1163,52 @@ const Registrations = () => {
                           "No entrance exam linked"
                         )}
                       </p>
+                      <div className="pt-1">
+                        <div className="flex gap-2">
+                          <textarea
+                            value={followUpDrafts[registration._id] || ""}
+                            onChange={(event) =>
+                              setFollowUpDrafts((prev) => ({
+                                ...prev,
+                                [registration._id]: event.target.value,
+                              }))
+                            }
+                            placeholder="Add follow-up comment"
+                            rows={2}
+                            className="w-full min-w-[220px] rounded-xl border border-[rgb(var(--border))] bg-[rgb(var(--bg))] px-3 py-2 text-sm resize-none"
+                          />
+                          <button
+                            type="button"
+                            onClick={() => handleAddFollowUp(registration._id)}
+                            disabled={followUpSavingId === registration._id}
+                            className={`${btnGhost} shrink-0`}
+                          >
+                            <FiMessageSquare size={12} /> Add
+                          </button>
+                        </div>
+                        <div className="mt-1.5 flex items-center justify-between">
+                          <p className="text-xs text-[rgb(var(--text-muted))]">
+                            Follow-ups: {registration.followUps?.length || 0}
+                          </p>
+                          <button
+                            type="button"
+                            onClick={() => openFollowUpHistory(registration)}
+                            className="text-xs font-semibold text-[rgb(var(--primary))]"
+                          >
+                            View history
+                          </button>
+                        </div>
+                      </div>
                     </div>
 
                     <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap lg:justify-end">
+                      <button
+                        type="button"
+                        onClick={() => openViewRegistration(registration)}
+                        className={btnGhost}
+                      >
+                        <FiEye size={12} /> View
+                      </button>
                       <button
                         type="button"
                         onClick={() => admit(registration)}
@@ -1223,200 +1430,99 @@ const Registrations = () => {
         }
       >
         <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-          <Field label="Student Name *">
-            <input
-              value={regForm.studentName}
-              onChange={(event) =>
-                setRegForm((prev) => ({ ...prev, studentName: event.target.value }))
-              }
-              className={inputClass}
-              placeholder="Enter student name"
-            />
-          </Field>
-          <Field label="Date of Birth">
-            <input
-              type="date"
-              value={regForm.dob}
-              onChange={(event) =>
-                setRegForm((prev) => ({ ...prev, dob: event.target.value }))
-              }
-              className={inputClass}
-            />
-          </Field>
-          <Field label="Gender">
-            <select
-              value={regForm.gender}
-              onChange={(event) =>
-                setRegForm((prev) => ({ ...prev, gender: event.target.value }))
-              }
-              className={inputClass}
-            >
-              <option value="">Select</option>
-              <option value="Male">Male</option>
-              <option value="Female">Female</option>
-              <option value="Other">Other</option>
-            </select>
-          </Field>
-          <Field label="Blood Group">
-            <input
-              value={regForm.bloodGroup}
-              onChange={(event) =>
-                setRegForm((prev) => ({ ...prev, bloodGroup: event.target.value }))
-              }
-              className={inputClass}
-              placeholder="e.g. O+"
-            />
-          </Field>
-          <Field label="Applied Class *">
-            <select
-              value={regForm.classId}
-              onChange={(event) =>
-                setRegForm((prev) => ({
-                  ...prev,
-                  classId: event.target.value,
-                  sectionId: "",
-                }))
-              }
-              className={inputClass}
-            >
-              <option value="">Select class</option>
-              {classes.map((cls) => (
-                <option key={cls._id} value={cls._id}>
-                  {cls.name}
-                </option>
-              ))}
-            </select>
-          </Field>
-          <Field label="Stream">
-            <select
-              value={regForm.streamId}
-              onChange={(event) =>
-                setRegForm((prev) => ({
-                  ...prev,
-                  streamId: event.target.value,
-                }))
-              }
-              className={inputClass}
-            >
-              <option value="">Select stream (optional)</option>
-              {streams.map((item) => (
-                <option key={item._id} value={item._id}>
-                  {item.name}
-                </option>
-              ))}
-            </select>
-          </Field>
-          <Field label="Section">
-            <select
-              value={regForm.sectionId}
-              onChange={(event) =>
-                setRegForm((prev) => ({ ...prev, sectionId: event.target.value }))
-              }
-              disabled={!selectedSections.length}
-              className={inputClass}
-            >
-              <option value="">
-                {selectedSections.length ? "Select section" : "No sections"}
-              </option>
-              {selectedSections.map((section) => (
-                <option key={section._id} value={section._id}>
-                  {section.name}
-                </option>
-              ))}
-            </select>
-          </Field>
-          <Field label="Parent Name *">
-            <input
-              value={regForm.parentName}
-              onChange={(event) =>
-                setRegForm((prev) => ({ ...prev, parentName: event.target.value }))
-              }
-              className={inputClass}
-              placeholder="Enter parent name"
-            />
-          </Field>
-          <Field label="Parent Mobile *">
-            <input
-              value={regForm.parentMobile}
-              onChange={(event) =>
-                setRegForm((prev) => ({ ...prev, parentMobile: event.target.value }))
-              }
-              className={inputClass}
-              inputMode="numeric"
-              maxLength={10}
-              placeholder="10-digit mobile number"
-            />
-          </Field>
-          <Field label="Parent Email">
-            <input
-              type="email"
-              value={regForm.parentEmail}
-              onChange={(event) =>
-                setRegForm((prev) => ({ ...prev, parentEmail: event.target.value }))
-              }
-              className={inputClass}
-              placeholder="Enter parent email"
-            />
-          </Field>
-          <Field label="Previous School Name">
-            <input
-              value={regForm.previousSchoolName}
-              onChange={(event) =>
-                setRegForm((prev) => ({
-                  ...prev,
-                  previousSchoolName: event.target.value,
-                }))
-              }
-              className={inputClass}
-              placeholder="Enter previous school"
-            />
-          </Field>
-          <Field label="Address">
-            <input
-              value={regForm.address}
-              onChange={(event) =>
-                setRegForm((prev) => ({ ...prev, address: event.target.value }))
-              }
-              className={inputClass}
-              placeholder="Enter address"
-            />
-          </Field>
-          <Field label="City">
-            <input
-              value={regForm.city}
-              onChange={(event) =>
-                setRegForm((prev) => ({ ...prev, city: event.target.value }))
-              }
-              className={inputClass}
-              placeholder="Enter city"
-            />
-          </Field>
-          <Field label="Pincode">
-            <input
-              value={regForm.pincode}
-              onChange={(event) =>
-                setRegForm((prev) => ({ ...prev, pincode: event.target.value }))
-              }
-              className={inputClass}
-              inputMode="numeric"
-              maxLength={6}
-              placeholder="6-digit pincode"
-            />
-          </Field>
-          <Field
-            label="Notes"
-            hint="Visible to the school office only."
-            className="md:col-span-2"
-          >
-            <input
-              value={regForm.notes}
-              onChange={(event) =>
-                setRegForm((prev) => ({ ...prev, notes: event.target.value }))
-              }
-              className={inputClass}
-              placeholder="Optional notes"
-            />
-          </Field>
+          <ConfigurableFormFields
+            steps={formSteps}
+            values={regForm}
+            customValues={customValues}
+            inputClass={inputClass}
+            onChangeBuiltin={(key, value) =>
+              setRegForm((prev) => ({
+                ...prev,
+                [key]: value,
+                ...(key === "classId" ? { sectionId: "" } : {}),
+              }))
+            }
+            onChangeCustom={(key, value) =>
+              setCustomValues((prev) => ({ ...prev, [key]: value }))
+            }
+            renderBuiltin={{
+              classId: (field) => (
+                <Field
+                  label={`${field.label}${field.required ? " *" : ""}`}
+                >
+                  <select
+                    value={regForm.classId}
+                    onChange={(event) =>
+                      setRegForm((prev) => ({
+                        ...prev,
+                        classId: event.target.value,
+                        sectionId: "",
+                      }))
+                    }
+                    className={inputClass}
+                  >
+                    <option value="">Select class</option>
+                    {classes.map((cls) => (
+                      <option key={cls._id} value={cls._id}>
+                        {cls.name}
+                      </option>
+                    ))}
+                  </select>
+                </Field>
+              ),
+              streamId: (field) => (
+                <Field
+                  label={`${field.label}${field.required ? " *" : ""}`}
+                >
+                  <select
+                    value={regForm.streamId}
+                    onChange={(event) =>
+                      setRegForm((prev) => ({
+                        ...prev,
+                        streamId: event.target.value,
+                      }))
+                    }
+                    className={inputClass}
+                  >
+                    <option value="">Select stream (optional)</option>
+                    {streams.map((item) => (
+                      <option key={item._id} value={item._id}>
+                        {item.name}
+                      </option>
+                    ))}
+                  </select>
+                </Field>
+              ),
+              sectionId: (field) => (
+                <Field
+                  label={`${field.label}${field.required ? " *" : ""}`}
+                >
+                  <select
+                    value={regForm.sectionId}
+                    onChange={(event) =>
+                      setRegForm((prev) => ({
+                        ...prev,
+                        sectionId: event.target.value,
+                      }))
+                    }
+                    disabled={!selectedSections.length}
+                    className={inputClass}
+                  >
+                    <option value="">
+                      {selectedSections.length
+                        ? "Select section"
+                        : "No sections"}
+                    </option>
+                    {selectedSections.map((section) => (
+                      <option key={section._id} value={section._id}>
+                        {section.name}
+                      </option>
+                    ))}
+                  </select>
+                </Field>
+              ),
+            }}
+          />
         </div>
       </Modal>
 
@@ -1862,6 +1968,173 @@ const Registrations = () => {
               </button>
             </div>
           </>
+        )}
+      </Modal>
+
+      {builderOpen && (
+        <AdmissionFormBuilder
+          apiPath="/registration-form"
+          mergeSteps={mergeRegistrationSteps}
+          fieldTypes={REGISTRATION_FIELD_TYPES}
+          lockedFieldKeys={REGISTRATION_LOCKED_FIELD_KEYS}
+          title="Customize Registration Form"
+          description="Add, hide, rename, or delete fields on the registration form. Changes apply to your school only (including the public form)."
+          lockedDeleteHint="Required to create a registration"
+          reviewStepKey=""
+          allowCustomSteps={false}
+          onClose={() => setBuilderOpen(false)}
+          onSaved={(steps) => {
+            const merged = mergeRegistrationSteps(steps);
+            setFormSteps(merged);
+            setCustomValues(emptyCustomValues(merged));
+          }}
+        />
+      )}
+
+      {/* Follow-up history */}
+      <Modal
+        open={followUpHistory.open}
+        onClose={() =>
+          setFollowUpHistory({
+            open: false,
+            loading: false,
+            registrationId: "",
+            studentName: "",
+            followUps: [],
+          })
+        }
+        title="Follow-up Feedback"
+        subtitle={followUpHistory.studentName}
+        width="max-w-2xl"
+      >
+        {followUpHistory.loading ? (
+          <p className="py-6 text-center text-sm text-[rgb(var(--text-muted))]">
+            Loading…
+          </p>
+        ) : followUpHistory.followUps.length === 0 ? (
+          <p className="py-6 text-center text-sm text-[rgb(var(--text-muted))]">
+            No follow-up feedback yet.
+          </p>
+        ) : (
+          <div className="space-y-3">
+            {followUpHistory.followUps.map((entry, index) => (
+              <div
+                key={`${entry.createdAt}-${index}`}
+                className="rounded-xl border border-[rgb(var(--border))] p-4"
+              >
+                <p className="text-sm text-[rgb(var(--text))]">{entry.comment}</p>
+                <div className="mt-2 flex flex-wrap gap-3 text-xs text-[rgb(var(--text-muted))]">
+                  <span>
+                    By: {entry.addedBy?.name || "Unknown"}
+                    {entry.addedBy?.role ? ` (${entry.addedBy.role})` : ""}
+                  </span>
+                  <span>
+                    {entry.createdAt
+                      ? new Date(entry.createdAt).toLocaleString()
+                      : "—"}
+                  </span>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </Modal>
+
+      {/* View / print registration */}
+      <Modal
+        open={viewModal.open}
+        onClose={() => setViewModal({ open: false, loading: false, data: null })}
+        title="Registration Form"
+        subtitle={
+          viewModal.data?.registrationNumber
+            ? `No. ${viewModal.data.registrationNumber}`
+            : "Filled registration details"
+        }
+        width="max-w-3xl"
+        footer={
+          <>
+            <button
+              type="button"
+              onClick={() =>
+                setViewModal({ open: false, loading: false, data: null })
+              }
+              className={btnGhost}
+            >
+              Close
+            </button>
+            <button
+              type="button"
+              onClick={printViewRegistration}
+              disabled={!viewModal.data}
+              className={btnPrimary}
+            >
+              <FiPrinter size={14} /> Print
+            </button>
+          </>
+        }
+      >
+        {viewModal.loading || !viewModal.data ? (
+          <p className="py-8 text-center text-sm text-[rgb(var(--text-muted))]">
+            Loading…
+          </p>
+        ) : (
+          <div id="registration-print-area" className="space-y-4 text-sm">
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+              {[
+                ["Student Name", viewModal.data.studentName],
+                ["Registration No.", viewModal.data.registrationNumber],
+                ["Status", viewModal.data.status],
+                ["Source", sourceText(viewModal.data)],
+                ["Class", viewModal.data.className],
+                ["Section", viewModal.data.sectionName],
+                ["Stream", viewModal.data.stream],
+                ["DOB", formatDate(viewModal.data.dob)],
+                ["Gender", viewModal.data.gender],
+                ["Blood Group", viewModal.data.bloodGroup],
+                ["Parent Name", viewModal.data.parentName],
+                ["Parent Mobile", viewModal.data.parentMobile],
+                ["Parent Email", viewModal.data.parentEmail],
+                ["Previous School", viewModal.data.previousSchoolName],
+                ["Address", viewModal.data.address],
+                ["City", viewModal.data.city],
+                ["Pincode", viewModal.data.pincode],
+                ["Academic Year", viewModal.data.academicYear],
+                ["Notes", viewModal.data.notes],
+              ].map(([label, value]) => (
+                <div key={label} className="rounded-lg border border-[rgb(var(--border))] px-3 py-2">
+                  <p className="text-[11px] font-semibold uppercase tracking-wide text-[rgb(var(--text-muted))]">
+                    {label}
+                  </p>
+                  <p className="mt-0.5 font-medium text-[rgb(var(--text))]">
+                    {value || "—"}
+                  </p>
+                </div>
+              ))}
+            </div>
+            {Array.isArray(viewModal.data.customFields) &&
+            viewModal.data.customFields.length > 0 ? (
+              <div>
+                <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-[rgb(var(--text-muted))]">
+                  Additional fields
+                </p>
+                <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                  {viewModal.data.customFields.map((field) => (
+                    <div
+                      key={field.key}
+                      className="rounded-lg border border-[rgb(var(--border))] px-3 py-2"
+                    >
+                      <p className="text-[11px] font-semibold uppercase tracking-wide text-[rgb(var(--text-muted))]">
+                        {field.label || field.key}
+                      </p>
+                      <p className="mt-0.5 font-medium text-[rgb(var(--text))]">
+                        {field.value || "—"}
+                      </p>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            ) : null}
+          </div>
         )}
       </Modal>
     </div>

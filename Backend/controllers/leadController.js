@@ -198,7 +198,22 @@ export const createLead = async (req, res) => {
       stream,
       assignedToUserId,
       assignedToUserType,
+      customFields,
     } = req.body;
+
+    const normalizedCustomFields = Array.isArray(customFields)
+      ? customFields
+          .filter((field) => field && typeof field.key === "string" && field.key)
+          .map((field) => ({
+            key: String(field.key).slice(0, 60),
+            label: String(field.label ?? "").slice(0, 120),
+            type: String(field.type ?? "text").slice(0, 20),
+            value:
+              field.value === undefined || field.value === null
+                ? ""
+                : String(field.value).slice(0, 4000),
+          }))
+      : [];
 
     if (!studentName?.trim()) {
       return res.status(400).json({ success: false, message: "Student name is required" });
@@ -240,6 +255,7 @@ export const createLead = async (req, res) => {
     }
 
     const resolvedStream = await resolveStream(schoolId, streamId || null);
+    const actor = resolveActor(req.user);
     const lead = await Lead.create({
       studentName: studentName.trim(),
       parentName: parentName.trim(),
@@ -257,8 +273,11 @@ export const createLead = async (req, res) => {
         name: assignee.name,
         roleLabel: assignee.roleLabel,
       },
+      customFields: normalizedCustomFields,
       schoolId,
       createdBy: req.user?._id || req.user?.id || req.user?.school_id,
+      createdByName: actor.name || "",
+      source: "erp",
     });
 
     return res.status(201).json({

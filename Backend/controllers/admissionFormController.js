@@ -1,4 +1,4 @@
-import AdmissionForm from "../models/admissionForm.js";
+import AdmissionForm, { SCHOOL_FORM_TYPES } from "../models/admissionForm.js";
 
 const getSchoolId = (req) => req.user?.school_id;
 
@@ -29,6 +29,17 @@ const cleanKey = (value) =>
   String(value ?? "")
     .replace(/[^a-zA-Z0-9_-]/g, "")
     .slice(0, 60);
+
+const resolveFormType = (req) => {
+  const raw =
+    req.formType ||
+    req.params?.formType ||
+    req.query?.formType ||
+    req.body?.formType ||
+    "admission";
+  const formType = String(raw || "admission").trim().toLowerCase();
+  return SCHOOL_FORM_TYPES.includes(formType) ? formType : "admission";
+};
 
 const sanitizeField = (raw = {}) => {
   const key = cleanKey(raw.key);
@@ -78,14 +89,36 @@ const sanitizeSteps = (input) => {
         return true;
       });
 
+      const removedFieldKeys = Array.isArray(rawStep.removedFieldKeys)
+        ? [
+            ...new Set(
+              rawStep.removedFieldKeys
+                .map((item) => cleanKey(item))
+                .filter(Boolean),
+            ),
+          ].slice(0, MAX_FIELDS_PER_STEP)
+        : [];
+
       return {
         key,
         title: cleanString(rawStep.title, 80) || `Step ${stepIndex + 1}`,
         builtin: Boolean(rawStep.builtin),
+        removedFieldKeys,
         fields: uniqueFields,
       };
     })
     .filter(Boolean);
+};
+
+const findFormConfig = async (schoolId, formType) => {
+  if (formType === "admission") {
+    // Back-compat: older docs were unique on schoolId and had no formType.
+    return AdmissionForm.findOne({
+      schoolId,
+      $or: [{ formType: "admission" }, { formType: { $exists: false } }],
+    }).lean();
+  }
+  return AdmissionForm.findOne({ schoolId, formType }).lean();
 };
 
 /* ---------------- GET CONFIG ---------------- */
@@ -99,12 +132,77 @@ export const getAdmissionForm = async (req, res, next) => {
       });
     }
 
-    const config = await AdmissionForm.findOne({ schoolId }).lean();
+    const formType = resolveFormType(req);
+    const config = await findFormConfig(schoolId, formType);
 
     return res.json({
       success: true,
       data: {
+        formType,
         // null means "no customization yet - use the built-in form".
+        steps: config?.steps?.length ? config.steps : null,
+        layoutMode:
+          config?.layoutMode === "single" ? "single" : "steps",
+        updatedAt: config?.updatedAt || null,
+      },
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+/* ---------------- SAVE LAYOUT MODE ---------------- */
+export const saveAdmissionFormLayout = async (req, res, next) => {
+  try {
+    const schoolId = getSchoolId(req);
+    if (!schoolId) {
+      return res.status(403).json({
+        success: false,
+        message: "School not identified.",
+      });
+    }
+
+    const formType = resolveFormType(req);
+    if (formType !== "admission") {
+      return res.status(400).json({
+        success: false,
+        message: "Layout mode is only available for the admission form.",
+      });
+    }
+
+    const layoutMode =
+      String(req.body?.layoutMode || "").trim().toLowerCase() === "single"
+        ? "single"
+        : "steps";
+
+    const filter = {
+      schoolId,
+      $or: [{ formType: "admission" }, { formType: { $exists: false } }],
+    };
+
+    let config = await AdmissionForm.findOneAndUpdate(
+      filter,
+      { $set: { layoutMode, formType: "admission" } },
+      { new: true, upsert: true, setDefaultsOnInsert: true },
+    ).lean();
+
+    if (!config) {
+      config = await AdmissionForm.findOneAndUpdate(
+        { schoolId, formType: "admission" },
+        { $set: { layoutMode, formType: "admission" } },
+        { new: true, upsert: true, setDefaultsOnInsert: true },
+      ).lean();
+    }
+
+    return res.json({
+      success: true,
+      message:
+        layoutMode === "single"
+          ? "Admission form set to single page."
+          : "Admission form set to step-by-step.",
+      data: {
+        formType: "admission",
+        layoutMode: config?.layoutMode === "single" ? "single" : "steps",
         steps: config?.steps?.length ? config.steps : null,
         updatedAt: config?.updatedAt || null,
       },
@@ -125,40 +223,67 @@ export const saveAdmissionForm = async (req, res, next) => {
       });
     }
 
+    const formType = resolveFormType(req);
     const steps = sanitizeSteps(req.body?.steps);
 
     if (steps.length === 0) {
       return res.status(400).json({
         success: false,
-        message: "The admission form needs at least one step.",
+        message: "The form needs at least one step.",
       });
     }
 
-    const config = await AdmissionForm.findOneAndUpdate(
-      { schoolId },
-      { $set: { steps } },
-      { new: true, upsert: true, setDefaultsOnInsert: true }
+    const filter =
+      formType === "admission"
+        ? {
+            schoolId,
+            $or: [{ formType: "admission" }, { formType: { $exists: false } }],
+          }
+        : { schoolId, formType };
+
+    let config = await AdmissionForm.findOneAndUpdate(
+      filter,
+      { $set: { steps, formType } },
+      { new: true, upsert: true, setDefaultsOnInsert: true },
     ).lean();
+
+    // Race / legacy unique(schoolId) collision — fall back to explicit create.
+    if (!config) {
+      config = await AdmissionForm.findOneAndUpdate(
+        { schoolId, formType },
+        { $set: { steps, formType } },
+        { new: true, upsert: true, setDefaultsOnInsert: true },
+      ).lean();
+    }
 
     return res.json({
       success: true,
-      message: "Admission form saved.",
-      data: { steps: config.steps, updatedAt: config.updatedAt },
+      message: "Form saved.",
+      data: {
+        formType,
+        steps: config.steps,
+        updatedAt: config.updatedAt,
+      },
     });
   } catch (error) {
     if (error?.code === 11000) {
-      // Two saves raced; retry as an update by re-running the query.
       try {
+        const schoolId = getSchoolId(req);
+        const formType = resolveFormType(req);
         const steps = sanitizeSteps(req.body?.steps);
         const config = await AdmissionForm.findOneAndUpdate(
-          { schoolId: getSchoolId(req) },
-          { $set: { steps } },
-          { new: true }
+          { schoolId, formType },
+          { $set: { steps, formType } },
+          { new: true, upsert: true, setDefaultsOnInsert: true },
         ).lean();
         return res.json({
           success: true,
-          message: "Admission form saved.",
-          data: { steps: config.steps, updatedAt: config.updatedAt },
+          message: "Form saved.",
+          data: {
+            formType,
+            steps: config.steps,
+            updatedAt: config.updatedAt,
+          },
         });
       } catch (retryError) {
         return next(retryError);
@@ -179,14 +304,28 @@ export const resetAdmissionForm = async (req, res, next) => {
       });
     }
 
-    await AdmissionForm.deleteOne({ schoolId });
+    const formType = resolveFormType(req);
+    if (formType === "admission") {
+      await AdmissionForm.deleteMany({
+        schoolId,
+        $or: [{ formType: "admission" }, { formType: { $exists: false } }],
+      });
+    } else {
+      await AdmissionForm.deleteOne({ schoolId, formType });
+    }
 
     return res.json({
       success: true,
-      message: "Admission form reset to the default layout.",
-      data: { steps: null },
+      message: "Form reset to the default layout.",
+      data: { formType, steps: null },
     });
   } catch (error) {
     next(error);
   }
+};
+
+/** Express middleware: bind a fixed formType onto the request. */
+export const withFormType = (formType) => (req, _res, next) => {
+  req.formType = formType;
+  next();
 };

@@ -11,70 +11,188 @@ import { notifyCredentialsAsync } from "../services/credentials/notifyCredential
 /* ================= TEMPLATE ================= */
 
 // Keep this list in sync with the fields read in bulkUploadStudents below.
-const TEMPLATE_HEADERS = [
-  "firstName",
-  "lastName",
-  "dob",
-  "gender",
-  "bloodGroup",
-  "admissionDate",
-  "fatherName",
-  "fatherMobile",
-  "fatherEmail",
-  "motherName",
-  "motherMobile",
-  "motherEmail",
-  "guardianName",
-  "guardianMobile",
-  "guardianRelation",
-  "address",
-  "className",
-  "sectionName",
-  "rollNo",
-  "studentType",
-  "totalFee",
-  "discountType",
-  "discountValue",
-  "finalFee",
-  "feeFrequency",
-  "password",
-  "documentsVerified",
+const TEMPLATE_FIELDS = [
+  { key: "firstName", label: "First Name", required: true, sample: "John" },
+  { key: "lastName", label: "Last Name", required: true, sample: "Doe" },
+  { key: "dob", label: "Date of Birth", required: false, sample: "2012-05-21" },
+  { key: "gender", label: "Gender", required: false, sample: "Male" },
+  { key: "bloodGroup", label: "Blood Group", required: false, sample: "O+" },
+  {
+    key: "admissionDate",
+    label: "Admission Date",
+    required: false,
+    sample: "2024-04-01",
+  },
+  {
+    key: "fatherName",
+    label: "Father Name",
+    required: false,
+    sample: "Richard Doe",
+  },
+  {
+    key: "fatherMobile",
+    label: "Father Mobile",
+    required: false,
+    sample: "9876543210",
+  },
+  {
+    key: "fatherEmail",
+    label: "Father Email",
+    required: false,
+    sample: "richard@example.com",
+  },
+  {
+    key: "motherName",
+    label: "Mother Name",
+    required: false,
+    sample: "Jane Doe",
+  },
+  {
+    key: "motherMobile",
+    label: "Mother Mobile",
+    required: false,
+    sample: "9876500000",
+  },
+  {
+    key: "motherEmail",
+    label: "Mother Email",
+    required: false,
+    sample: "jane@example.com",
+  },
+  {
+    key: "guardianName",
+    label: "Guardian Name",
+    required: false,
+    sample: "",
+  },
+  {
+    key: "guardianMobile",
+    label: "Guardian Mobile",
+    required: false,
+    sample: "",
+  },
+  {
+    key: "guardianRelation",
+    label: "Guardian Relation",
+    required: false,
+    sample: "",
+  },
+  {
+    key: "address",
+    label: "Address",
+    required: false,
+    sample: "123 Main Street",
+  },
+  {
+    key: "className",
+    label: "Class Name",
+    required: false,
+    sample: "5",
+  },
+  {
+    key: "sectionName",
+    label: "Section Name",
+    required: false,
+    sample: "A",
+  },
+  { key: "rollNo", label: "Roll No", required: false, sample: "21" },
+  {
+    key: "studentType",
+    label: "Student Type",
+    required: false,
+    sample: "Day Scholar",
+  },
+  { key: "totalFee", label: "Total Fee", required: false, sample: 50000 },
+  {
+    key: "discountType",
+    label: "Discount Type",
+    required: false,
+    sample: "",
+  },
+  {
+    key: "discountValue",
+    label: "Discount Value",
+    required: false,
+    sample: 0,
+  },
+  { key: "finalFee", label: "Final Fee", required: false, sample: 50000 },
+  {
+    key: "feeFrequency",
+    label: "Fee Frequency",
+    required: false,
+    sample: "annually",
+  },
+  {
+    key: "password",
+    label: "Password",
+    required: false,
+    sample: "Welcome@123",
+  },
+  {
+    key: "documentsVerified",
+    label: "Documents Verified",
+    required: true,
+    sample: "Yes",
+  },
 ];
+
+const TEMPLATE_FIELD_KEYS = new Set(TEMPLATE_FIELDS.map((field) => field.key));
+const REQUIRED_TEMPLATE_KEYS = TEMPLATE_FIELDS.filter(
+  (field) => field.required,
+).map((field) => field.key);
+
+const resolveTemplateHeaders = (requestedKeys) => {
+  const requested = new Set(
+    (Array.isArray(requestedKeys) ? requestedKeys : [])
+      .map((key) => String(key || "").trim())
+      .filter((key) => TEMPLATE_FIELD_KEYS.has(key)),
+  );
+
+  // Always keep mandatory columns, even if the client omits them.
+  REQUIRED_TEMPLATE_KEYS.forEach((key) => requested.add(key));
+
+  // If nothing optional was chosen (or request was empty), return all columns
+  // so a plain template download still works.
+  if (requested.size === REQUIRED_TEMPLATE_KEYS.length && !requestedKeys?.length) {
+    return TEMPLATE_FIELDS.map((field) => field.key);
+  }
+
+  return TEMPLATE_FIELDS.filter((field) => requested.has(field.key)).map(
+    (field) => field.key,
+  );
+};
+
+export const getStudentBulkUploadFields = (_req, res) => {
+  res.json({
+    success: true,
+    data: TEMPLATE_FIELDS.map(({ key, label, required }) => ({
+      key,
+      label,
+      required: Boolean(required),
+    })),
+  });
+};
 
 export const downloadStudentTemplate = (req, res) => {
   try {
-    const sampleRow = {
-      firstName: "John",
-      lastName: "Doe",
-      dob: "2012-05-21",
-      gender: "Male",
-      bloodGroup: "O+",
-      admissionDate: "2024-04-01",
-      fatherName: "Richard Doe",
-      fatherMobile: "9876543210",
-      fatherEmail: "richard@example.com",
-      motherName: "Jane Doe",
-      motherMobile: "9876500000",
-      motherEmail: "jane@example.com",
-      guardianName: "",
-      guardianMobile: "",
-      guardianRelation: "",
-      address: "123 Main Street",
-      className: "5", // must match an existing class name for this school
-      sectionName: "A", // must match an existing section name for this school
-      rollNo: "21",
-      studentType: "Day Scholar",
-      totalFee: 50000,
-      discountType: "",
-      discountValue: 0,
-      finalFee: 50000,
-      feeFrequency: "annually",
-      password: "Welcome@123", // optional — defaults to Student@123 if left blank
-      documentsVerified: "Yes", // required: Yes after physical/digital docs verified
-    };
+    const rawFields = req.query.fields ?? req.body?.fields;
+    const requestedKeys = Array.isArray(rawFields)
+      ? rawFields
+      : String(rawFields || "")
+          .split(",")
+          .map((key) => key.trim())
+          .filter(Boolean);
+
+    const headers = resolveTemplateHeaders(requestedKeys);
+    const sampleByKey = Object.fromEntries(
+      TEMPLATE_FIELDS.map((field) => [field.key, field.sample]),
+    );
+    const sampleRow = Object.fromEntries(
+      headers.map((key) => [key, sampleByKey[key] ?? ""]),
+    );
 
     const worksheet = XLSX.utils.json_to_sheet([sampleRow], {
-      header: TEMPLATE_HEADERS,
+      header: headers,
     });
     const workbook = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(workbook, worksheet, "Students");

@@ -237,10 +237,23 @@ const cloneField = (field) => ({
   options: Array.isArray(field.options) ? [...field.options] : [],
 });
 
+const normalizeRemovedKeys = (raw) => {
+  if (!Array.isArray(raw)) return [];
+  return [
+    ...new Set(
+      raw
+        .map((key) => String(key || "").trim())
+        .filter(Boolean)
+        .filter((key) => !LOCKED_VISIBLE_FIELD_KEYS.has(key)),
+    ),
+  ];
+};
+
 const mergeStep = (defaultStep, storedStep) => {
   if (!storedStep) {
     return {
       ...defaultStep,
+      removedFieldKeys: [],
       fields: defaultStep.fields.map(cloneField),
     };
   }
@@ -248,8 +261,10 @@ const mergeStep = (defaultStep, storedStep) => {
   const defaultByKey = new Map(
     defaultStep.fields.map((field) => [field.key, field])
   );
+  const removedFieldKeys = normalizeRemovedKeys(storedStep.removedFieldKeys);
+  const removedSet = new Set(removedFieldKeys);
   const storedFields = (storedStep.fields || []).filter(
-    (field) => field && field.key
+    (field) => field && field.key && !removedSet.has(field.key)
   );
 
   // Respect the order the admin saved (they can move fields around). Built-in
@@ -272,14 +287,17 @@ const mergeStep = (defaultStep, storedStep) => {
     return cloneField({ ...field, builtin: false });
   });
 
-  // Any built-in field missing from the saved config (e.g. introduced by a
-  // later release) still shows up at the end instead of silently vanishing.
-  defaultByKey.forEach((field) => mergedFields.push(cloneField(field)));
+  // New product defaults still appear unless the admin explicitly deleted them.
+  defaultByKey.forEach((field) => {
+    if (removedSet.has(field.key)) return;
+    mergedFields.push(cloneField(field));
+  });
 
   return {
     key: defaultStep.key,
     title: storedStep.title?.trim() || defaultStep.title,
     builtin: true,
+    removedFieldKeys,
     fields: mergedFields,
   };
 };
@@ -292,6 +310,7 @@ export const mergeAdmissionSteps = (storedSteps) => {
   if (!Array.isArray(storedSteps) || storedSteps.length === 0) {
     return ADMISSION_STEPS.map((step) => ({
       ...step,
+      removedFieldKeys: [],
       fields: step.fields.map(cloneField),
     }));
   }
@@ -315,6 +334,7 @@ export const mergeAdmissionSteps = (storedSteps) => {
       key: String(step.key),
       title: step.title?.trim() || "Additional Details",
       builtin: false,
+      removedFieldKeys: normalizeRemovedKeys(step.removedFieldKeys),
       fields: (step.fields || [])
         .filter((field) => field && field.key)
         .map((field) => cloneField({ ...field, builtin: false })),

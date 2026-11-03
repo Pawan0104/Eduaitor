@@ -19,6 +19,7 @@ import FinancialReport from "./pages/FinancialReport";
 
 import SchoolMenu from "./pages/SchoolMenu";
 import Students from "./pages/Students";
+import StudentDocuments from "./pages/StudentDocuments";
 import StudentManagement from "./pages/StudentManagement";
 import AdmissionFormSettings from "./pages/AdmissionFormSettings";
 import AcademicSessions from "./pages/AcademicSessions";
@@ -212,6 +213,7 @@ const App = () => {
           <Route path="dashboard" element={<Navigate to="/school/menu" replace />} />
           <Route path="notification" element={<NotificationPage />} />
           <Route path="students" element={<Students />} />
+          <Route path="documents" element={<StudentDocuments />} />
           <Route path="leads" element={<LeadManagement />} />
           <Route path="registrations" element={<Registrations />} />
           <Route path="admission-reports" element={<AdmissionReports />} />
@@ -476,6 +478,7 @@ const App = () => {
 
           {/* module gated pages — reuse existing components where possible */}
           <Route path="students" element={<Students />} />
+          <Route path="documents" element={<StudentDocuments />} />
           <Route path="student-manage" element={<StudentManagement />} />
           <Route path="student-manage/:id" element={<StudentManagement />} />
           <Route path="admission-form" element={<AdmissionFormSettings />} />

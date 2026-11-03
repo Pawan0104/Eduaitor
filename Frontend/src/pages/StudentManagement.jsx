@@ -148,6 +148,7 @@ const emptyForm = {
   aadhaarNumber: "",
   penNumber: "",
   admissionSource: "",
+  confirmationStatus: "Non-Confirmed",
   isSpecialChild: false,
   isEws: false,
   isPhysicallyDisabled: false,
@@ -325,6 +326,15 @@ const DUMMY_STEP_HINTS = {
   8: "every field on all steps at once",
 };
 
+const SectionHeading = ({ title }) => {
+  if (!title) return null;
+  return (
+    <h3 className="mb-5 border-b border-[rgb(var(--border))] pb-2 text-lg font-semibold tracking-tight text-[rgb(var(--text))]">
+      {title}
+    </h3>
+  );
+};
+
 const DummyFillBar = ({ onFill, step }) => (
   <div className="mb-6 flex flex-wrap items-center justify-between gap-3 rounded-lg border border-dashed border-amber-400 bg-amber-50 px-4 py-3">
     <div className="min-w-0">
@@ -381,6 +391,11 @@ const StudentManagement = () => {
     mergeAdmissionSteps(null)
   );
   const [builderOpen, setBuilderOpen] = useState(false);
+  const [layoutMode, setLayoutMode] = useState("steps"); // steps | single
+  const [layoutSaving, setLayoutSaving] = useState(false);
+
+  const isSinglePage = layoutMode === "single";
+  const canChangeLayout = ["school_admin", "super_admin"].includes(user?.role);
 
   const customStepDefs = formStepDefs.filter((s) => !s.builtin);
   // First seven steps are the built-in wizard steps; custom steps follow them
@@ -407,6 +422,9 @@ const StudentManagement = () => {
         });
         if (cancelled) return;
         setFormStepDefs(mergeAdmissionSteps(res.data?.data?.steps));
+        setLayoutMode(
+          res.data?.data?.layoutMode === "single" ? "single" : "steps",
+        );
       } catch {
         /* keep the built-in layout */
       }
@@ -423,6 +441,31 @@ const StudentManagement = () => {
       window.removeEventListener("admission-form-updated", handleUpdate);
     };
   }, []);
+
+  const saveLayoutMode = async (nextMode) => {
+    const layout = nextMode === "single" ? "single" : "steps";
+    setLayoutSaving(true);
+    try {
+      const { data } = await axios.patch(
+        `${API}/admission-form/layout`,
+        { layoutMode: layout },
+        { withCredentials: true },
+      );
+      setLayoutMode(data?.data?.layoutMode === "single" ? "single" : "steps");
+      if (layout === "single") setStep(1);
+      toast.success(
+        layout === "single"
+          ? "Admission form is now a single page"
+          : "Admission form is now step-by-step",
+      );
+    } catch (error) {
+      toast.error(
+        error.response?.data?.message || "Could not update form layout",
+      );
+    } finally {
+      setLayoutSaving(false);
+    }
+  };
 
 
   const isMobile = window.innerWidth <= 768;
@@ -568,7 +611,7 @@ const StudentManagement = () => {
   // never overwrite an existing roll number while editing).
   useEffect(() => {
     if (isEdit) return;
-    if (step !== 5) return;
+    if (!isSinglePage && step !== 5) return;
     if (!form.classId) return;
 
     let cancelled = false;
@@ -585,7 +628,7 @@ const StudentManagement = () => {
     return () => {
       cancelled = true;
     };
-  }, [form.classId, form.sectionId, step, isEdit]);
+  }, [form.classId, form.sectionId, step, isEdit, isSinglePage]);
 
   /* FETCH CLASS */
   useEffect(() => {
@@ -783,6 +826,7 @@ const StudentManagement = () => {
             : prev.streamId,
           stream: registration.stream || prev.stream,
           username: registration.parentMobile || prev.username,
+          confirmationStatus: "Confirmed",
         }));
       } catch (err) {
         toast.error(
@@ -794,6 +838,29 @@ const StudentManagement = () => {
 
     fetchRegistration();
   }, [isEdit, registrationIdParam, basePath, navigate]);
+
+  /* Prefetch next admission number for create mode (locked field). */
+  useEffect(() => {
+    if (isEdit) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await axios.get(`${API}/students/next-admission-number`, {
+          withCredentials: true,
+        });
+        const nextId = res.data?.data;
+        if (cancelled || !nextId) return;
+        setForm((prev) =>
+          prev.studentId ? prev : { ...prev, studentId: String(nextId) },
+        );
+      } catch {
+        /* server still auto-generates on save if this fails */
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [isEdit]);
 
   /* PREFILL FROM LEAD (legacy/direct — prefer registration when present) */
   useEffect(() => {
@@ -929,6 +996,10 @@ const StudentManagement = () => {
           aadhaarNumber: student.aadhaarNumber || "",
           penNumber: student.penNumber || "",
           admissionSource: student.admissionSource || "",
+          confirmationStatus:
+            student.confirmationStatus === "Confirmed"
+              ? "Confirmed"
+              : "Non-Confirmed",
           isSpecialChild: Boolean(student.isSpecialChild),
           isEws: Boolean(student.isEws),
           isPhysicallyDisabled: Boolean(student.isPhysicallyDisabled),
@@ -1252,10 +1323,10 @@ const StudentManagement = () => {
       return value !== "" && value !== null && value !== undefined;
     });
 
-  const validateStep = () => {
+  const validateStep = (targetStep = step) => {
     const errors = [];
 
-    if (step === 1) {
+    if (targetStep === 1) {
       if (!form.firstName?.trim()) errors.push("First Name required");
       if (!form.lastName?.trim()) errors.push("Last Name required");
       if (!form.dob) {
@@ -1295,7 +1366,7 @@ const StudentManagement = () => {
       }
     }
 
-    if (step === 2) {
+    if (targetStep === 2) {
       if (!form.fatherName?.trim()) errors.push("Father name required");
       if (!form.fatherMobile?.trim()) errors.push("Father mobile required");
       if (!form.motherName?.trim()) errors.push("Mother name required");
@@ -1323,7 +1394,7 @@ const StudentManagement = () => {
         errors.push("Invalid Mother Email");
     }
 
-    if (step === 4) {
+    if (targetStep === 4) {
       // Check Student Photo
       if (!form.studentPhoto && !form?.documents?.studentPhoto?.url) {
         errors.push("Student Photo is required");
@@ -1338,13 +1409,13 @@ const StudentManagement = () => {
       }
     }
 
-    if (step === 5) {
+    if (targetStep === 5) {
       if (!form.classId) errors.push("Class required");
 
       if (!form.rollNo) errors.push("Roll number required");
     }
 
-    if (step === 6) {
+    if (targetStep === 6) {
       if (form.totalFee === "" || form.totalFee === null) {
         errors.push("Total fee required");
       }
@@ -1362,7 +1433,7 @@ const StudentManagement = () => {
       }
     }
 
-    if (step === 7) {
+    if (targetStep === 7) {
       const resolvedUsername = (form.username || form.fatherMobile || "").trim();
       const resolvedPassword = (form.password || "").trim();
 
@@ -1373,7 +1444,7 @@ const StudentManagement = () => {
     }
 
     // ── Admin-defined fields on this step ──
-    const stepCustomFields = customFieldsForStep(step);
+    const stepCustomFields = customFieldsForStep(targetStep);
     stepCustomFields.forEach((field) => {
       if (field.visible === false) return;
       const value = form.custom?.[field.key];
@@ -1409,66 +1480,72 @@ const StudentManagement = () => {
     });
   };
 
+  const validateAllSteps = () => {
+    const allErrors = [];
+    for (let i = 1; i < reviewStep; i += 1) {
+      allErrors.push(...validateStep(i));
+    }
+    return allErrors;
+  };
+
+  const applyValidationErrors = (stepErrorsArray) => {
+    const errorMap = {};
+
+    stepErrorsArray.forEach((err) => {
+      // Admin-defined field: "CF::<key>::<message>"
+      if (String(err).startsWith(CUSTOM_ERROR_PREFIX)) {
+        const [, key, ...rest] = String(err).split("::");
+        if (key) errorMap[key] = rest.join("::");
+        return;
+      }
+
+      const lowerErr = err.toLowerCase();
+
+      if (lowerErr.includes("first name")) errorMap.firstName = err;
+      if (lowerErr.includes("last name")) errorMap.lastName = err;
+      if (lowerErr.includes("date of birth")) errorMap.dob = err;
+      if (lowerErr.includes("age must be above 3 years")) errorMap.dob = err;
+      if (lowerErr.includes("gender")) errorMap.gender = err;
+      if (lowerErr.includes("blood group")) errorMap.bloodGroup = err;
+      if (lowerErr.includes("category")) errorMap.category = err;
+      if (lowerErr.includes("community")) errorMap.community = err;
+      if (lowerErr.includes("admission date")) errorMap.admissionDate = err;
+      if (lowerErr.includes("father name")) errorMap.fatherName = err;
+      if (
+        lowerErr.includes("father mobile") ||
+        lowerErr.includes("invalid father mobile")
+      )
+        errorMap.fatherMobile = err;
+      if (lowerErr.includes("mother name")) errorMap.motherName = err;
+      if (
+        lowerErr.includes("mother mobile") ||
+        lowerErr.includes("invalid mother mobile")
+      )
+        errorMap.motherMobile = err;
+      if (lowerErr.includes("father email")) errorMap.fatherEmail = err;
+      if (lowerErr.includes("mother email")) errorMap.motherEmail = err;
+      if (lowerErr.includes("address")) errorMap.address = err;
+      if (lowerErr.includes("student photo")) errorMap.studentPhoto = err;
+      if (lowerErr.includes("father aadhar")) errorMap.fatherAadhar = err;
+      if (lowerErr.includes("mother aadhar")) errorMap.motherAadhar = err;
+      if (lowerErr.includes("class")) errorMap.classId = err;
+      if (lowerErr.includes("section")) errorMap.sectionId = err;
+      if (lowerErr.includes("roll number")) errorMap.rollNo = err;
+      if (lowerErr.includes("total fee")) errorMap.totalFee = err;
+      if (lowerErr.includes("transport route")) errorMap.transport = err;
+      if (lowerErr.includes("bus fee quarter")) errorMap.busFeeQuarter = err;
+      if (lowerErr.includes("username")) errorMap.username = err;
+      if (lowerErr.includes("password")) errorMap.password = err;
+    });
+
+    setErrors(errorMap);
+  };
+
   const next = () => {
     const stepErrorsArray = validateStep();
 
     if (stepErrorsArray.length > 0) {
-      const errorMap = {};
-
-      stepErrorsArray.forEach((err) => {
-        // Admin-defined field: "CF::<key>::<message>"
-        if (String(err).startsWith(CUSTOM_ERROR_PREFIX)) {
-          const [, key, ...rest] = String(err).split("::");
-          if (key) errorMap[key] = rest.join("::");
-          return;
-        }
-
-        // Create a lowercase version for matching
-        const lowerErr = err.toLowerCase();
-
-        // Step 1 & 2
-        if (lowerErr.includes("first name")) errorMap.firstName = err;
-        if (lowerErr.includes("last name")) errorMap.lastName = err;
-        if (lowerErr.includes("date of birth")) errorMap.dob = err;
-        if (lowerErr.includes("age must be above 3 years")) errorMap.dob = err;
-        if (lowerErr.includes("gender")) errorMap.gender = err;
-        if (lowerErr.includes("blood group")) errorMap.bloodGroup = err;
-        if (lowerErr.includes("category")) errorMap.category = err;
-        if (lowerErr.includes("community")) errorMap.community = err;
-        if (lowerErr.includes("admission date")) errorMap.admissionDate = err;
-        if (lowerErr.includes("father name")) errorMap.fatherName = err;
-        if (
-          lowerErr.includes("father mobile") ||
-          lowerErr.includes("invalid father mobile")
-        )
-          errorMap.fatherMobile = err;
-        if (lowerErr.includes("mother name")) errorMap.motherName = err;
-        if (
-          lowerErr.includes("mother mobile") ||
-          lowerErr.includes("invalid mother mobile")
-        )
-          errorMap.motherMobile = err;
-        if (lowerErr.includes("father email")) errorMap.fatherEmail = err;
-        if (lowerErr.includes("mother email")) errorMap.motherEmail = err;
-        if (lowerErr.includes("address")) errorMap.address = err;
-
-        // Step 3 - FIXED CASE SENSITIVITY
-        if (lowerErr.includes("student photo")) errorMap.studentPhoto = err;
-        if (lowerErr.includes("father aadhar")) errorMap.fatherAadhar = err;
-        if (lowerErr.includes("mother aadhar")) errorMap.motherAadhar = err;
-
-        // Step 4, 5, 6
-        if (lowerErr.includes("class")) errorMap.classId = err;
-        if (lowerErr.includes("section")) errorMap.sectionId = err;
-        if (lowerErr.includes("roll number")) errorMap.rollNo = err;
-        if (lowerErr.includes("total fee")) errorMap.totalFee = err;
-        if (lowerErr.includes("transport route")) errorMap.transport = err;
-        if (lowerErr.includes("bus fee quarter")) errorMap.busFeeQuarter = err;
-        if (lowerErr.includes("username")) errorMap.username = err;
-        if (lowerErr.includes("password")) errorMap.password = err;
-      });
-
-      setErrors(errorMap);
+      applyValidationErrors(stepErrorsArray);
       toast.error("Please fill in the required fields.");
       return;
     }
@@ -1541,10 +1618,27 @@ const StudentManagement = () => {
   };
 
   const resetForm = () => {
-    const doReset = () => {
-      setForm(applySourcePrefill(emptyForm));
+    const doReset = async () => {
+      const next = applySourcePrefill({
+        ...emptyForm,
+        confirmationStatus: registrationId ? "Confirmed" : "Non-Confirmed",
+      });
+      setForm(next);
       setStep(1);
       setErrors({});
+      if (!isEdit) {
+        try {
+          const res = await axios.get(`${API}/students/next-admission-number`, {
+            withCredentials: true,
+          });
+          const nextId = res.data?.data;
+          if (nextId) {
+            setForm((prev) => ({ ...prev, studentId: String(nextId) }));
+          }
+        } catch {
+          /* ignore */
+        }
+      }
     };
 
     if (!isDirty()) {
@@ -1558,6 +1652,20 @@ const StudentManagement = () => {
   };
 
   const handleSubmit = () => {
+    if (isSinglePage) {
+      setForm((prev) => ({
+        ...prev,
+        username: prev.username || prev.fatherMobile,
+      }));
+      const allErrors = validateAllSteps();
+      if (allErrors.length > 0) {
+        applyValidationErrors(allErrors);
+        toast.error("Please fill in the required fields.");
+        return;
+      }
+      setErrors({});
+    }
+
     setConfirmMessage(
       isEdit
         ? "Are you sure you want to update this student?"
@@ -1813,6 +1921,36 @@ const forbidden = [
         </div>
 
         <div className="flex items-center gap-2 flex-wrap">
+          {canChangeLayout && (
+            <div className="inline-flex items-center rounded-lg border border-[rgb(var(--border))] p-0.5 text-sm">
+              <button
+                type="button"
+                disabled={layoutSaving}
+                onClick={() => saveLayoutMode("steps")}
+                className={`rounded-md px-3 py-1.5 font-semibold transition ${
+                  !isSinglePage
+                    ? "bg-[rgb(var(--primary))] text-white"
+                    : "text-[rgb(var(--text))] hover:bg-[rgb(var(--bg))]"
+                } disabled:opacity-60`}
+                title="Require each step to be completed before moving on"
+              >
+                Step-wise
+              </button>
+              <button
+                type="button"
+                disabled={layoutSaving}
+                onClick={() => saveLayoutMode("single")}
+                className={`rounded-md px-3 py-1.5 font-semibold transition ${
+                  isSinglePage
+                    ? "bg-[rgb(var(--primary))] text-white"
+                    : "text-[rgb(var(--text))] hover:bg-[rgb(var(--bg))]"
+                } disabled:opacity-60`}
+                title="Show the full admission form on one page"
+              >
+                Single page
+              </button>
+            </div>
+          )}
           {["school_admin", "staff_admin", "super_admin"].includes(
             user?.role
           ) && (
@@ -1854,37 +1992,38 @@ const forbidden = [
       <div className="grid grid-cols-12 gap-6">
         {/* STEP SIDEBAR */}
 
-        <div className="col-span-12 lg:col-span-3">
-          <div className="bg-[rgb(var(--surface))] rounded-xl  border border-[rgb(var(--border))] shadow p-4 sticky top-6">
-            {wizardSteps.map((s, i) => {
-              const index = i + 1;
-              const status =
-                step === index
-                  ? "active"
-                  : step > index
-                    ? "complete"
-                    : "pending";
+        {!isSinglePage && (
+          <div className="col-span-12 lg:col-span-3">
+            <div className="bg-[rgb(var(--surface))] rounded-xl  border border-[rgb(var(--border))] shadow p-4 sticky top-6">
+              {wizardSteps.map((s, i) => {
+                const index = i + 1;
+                const status =
+                  step === index
+                    ? "active"
+                    : step > index
+                      ? "complete"
+                      : "pending";
 
-              return (
-                <div
-                  key={i}
-                  onClick={() => {
-                    const errors = validateStep();
-                    if (index > step && errors.length > 0) {
-                      toast.error("Complete this step first");
-                      return;
-                    }
-                    setStep(index);
-                  }}
-                  className={`flex items-center gap-3 p-3 rounded-lg mb-2 cursor-pointer
+                return (
+                  <div
+                    key={i}
+                    onClick={() => {
+                      const errors = validateStep();
+                      if (index > step && errors.length > 0) {
+                        toast.error("Complete this step first");
+                        return;
+                      }
+                      setStep(index);
+                    }}
+                    className={`flex items-center gap-3 p-3 rounded-lg mb-2 cursor-pointer
                     ${
                       status === "active"
                         ? "bg-[rgb(var(--primary))] text-[rgb(var(--text))]"
                         : ""
                     }`}
-                >
-                  <div
-                    className={`w-7 h-7 flex items-center justify-center rounded-full text-sm font-semibold
+                  >
+                    <div
+                      className={`w-7 h-7 flex items-center justify-center rounded-full text-sm font-semibold
                       ${
                         status === "complete"
                           ? "bg-green-500 text-white"
@@ -1892,62 +2031,92 @@ const forbidden = [
                             ? "bg-white text-indigo-600"
                             : "bg-[rgb(var(--primary))]"
                       }`}
-                  >
-                    {status === "complete" ? "✓" : index}
-                  </div>
+                    >
+                      {status === "complete" ? "✓" : index}
+                    </div>
 
-                  <span className="text-sm font-medium">{s}</span>
-                </div>
-              );
-            })}
+                    <span className="text-sm font-medium">{s}</span>
+                  </div>
+                );
+              })}
+            </div>
           </div>
-        </div>
+        )}
 
         {/* FORM AREA */}
 
-        <div className="col-span-12 lg:col-span-9">
+        <div
+          className={`col-span-12 ${isSinglePage ? "" : "lg:col-span-9"}`}
+        >
           <div className="bg-[rgb(var(--surface))] text-[rgb(var(--text))]  border border-[rgb(var(--border))] rounded-xl shadow p-6 lg:p-8">
             {/* PROGRESS */}
 
-            <div className="mb-6">
-              <div className="flex justify-between text-sm mb-2">
-                <span>
-                  Step {step} of {wizardSteps.length}
-                </span>
-                <span>{Math.round(progress)}%</span>
-              </div>
+            {!isSinglePage && (
+              <div className="mb-6">
+                <div className="flex justify-between text-sm mb-2">
+                  <span>
+                    Step {step} of {wizardSteps.length}
+                  </span>
+                  <span>{Math.round(progress)}%</span>
+                </div>
 
-              <div className="w-full bg-gray-200 h-2 rounded-full">
-                <div
-                  className="bg-indigo-600 h-2 rounded-full transition-all"
-                  style={{ width: `${progress}%` }}
-                />
+                <div className="w-full bg-gray-200 h-2 rounded-full">
+                  <div
+                    className="bg-indigo-600 h-2 rounded-full transition-all"
+                    style={{ width: `${progress}%` }}
+                  />
+                </div>
               </div>
+            )}
+
+            {isSinglePage && (
+              <div className="mb-6 rounded-xl border border-[rgb(var(--border))] bg-[rgb(var(--bg))] px-4 py-3 text-sm text-[rgb(var(--text-muted))]">
+                Single-page admission — all sections are visible below. Required
+                fields are checked when you submit.
+              </div>
+            )}
+
+            {/* Locked system fields — always visible at the top */}
+            <div className="mb-6 grid gap-4 rounded-xl border border-[rgb(var(--border))] bg-[rgb(var(--bg))] p-4 md:grid-cols-2">
+              <label className="flex flex-col gap-1.5 text-sm font-medium">
+                <span>Admission Number</span>
+                <input
+                  value={form.studentId || (isEdit ? "" : "Loading…")}
+                  readOnly
+                  disabled
+                  className="w-full cursor-not-allowed rounded-lg border border-[rgb(var(--border))] bg-[rgb(var(--surface))] px-3 py-2.5 text-sm opacity-90"
+                />
+                <span className="text-[11px] font-normal text-[rgb(var(--text-muted))]">
+                  Auto-assigned. Cannot be edited on this form.
+                </span>
+              </label>
+              <label className="flex flex-col gap-1.5 text-sm font-medium">
+                <span>Confirmation Status</span>
+                <select
+                  value={form.confirmationStatus || "Non-Confirmed"}
+                  disabled
+                  className="w-full cursor-not-allowed rounded-lg border border-[rgb(var(--border))] bg-[rgb(var(--surface))] px-3 py-2.5 text-sm opacity-90"
+                >
+                  <option value="Confirmed">Confirmed</option>
+                  <option value="Non-Confirmed">Non-Confirmed</option>
+                </select>
+                <span className="text-[11px] font-normal text-[rgb(var(--text-muted))]">
+                  System-managed. Registration admits are Confirmed; direct
+                  admissions are Non-Confirmed.
+                </span>
+              </label>
             </div>
 
             {/* STEP 1 */}
 
-{step === 1 && (
-                <>
-                  <DummyFillBar onFill={fillDummyData} step={step} />
+{(isSinglePage || step === 1) && (
+                <div className={isSinglePage ? "mb-10" : undefined}>
+                  {isSinglePage ? (
+                    <SectionHeading title={wizardSteps[0]} />
+                  ) : (
+                    <DummyFillBar onFill={fillDummyData} step={step} />
+                  )}
                   <div className="grid md:grid-cols-2 gap-6">
-                <Input
-                  label="Admission Number"
-                  placeholder={
-                    isEdit
-                      ? "Admission number"
-                      : "Leave blank to auto-generate (e.g. STU0001)"
-                  }
-                  name="studentId"
-                  value={form.studentId}
-                  onChange={handleChange}
-                  error={errors.studentId}
-                />
-                <div className="md:col-span-2 -mt-2 mb-1 text-xs text-[rgb(var(--text-muted))]">
-                  {isEdit
-                    ? "This is the student admission number (unique per school)."
-                    : "Optional. If left blank, the system assigns the next STU#### number. Duplicates are not allowed."}
-                </div>
                 <Input
                   label="First Name *"
                   placeholder="Enter first name"
@@ -2130,13 +2299,17 @@ const forbidden = [
                   max={new Date().toISOString().split("T")[0]}
                 />
               </div>
-                </>
+                </div>
               )}
             {/* STEP 2 */}
 
-{step === 2 && (
-                <>
-                  <DummyFillBar onFill={fillDummyData} step={step} />
+{(isSinglePage || step === 2) && (
+                <div className={isSinglePage ? "mb-10" : undefined}>
+                  {isSinglePage ? (
+                    <SectionHeading title={wizardSteps[1]} />
+                  ) : (
+                    <DummyFillBar onFill={fillDummyData} step={step} />
+                  )}
                   <div className="space-y-6">
                 <Input
                   label="Father Name *"
@@ -2238,13 +2411,17 @@ const forbidden = [
                   error={errors.address}
                 />
 </div>
-                </>
+                </div>
               )}
             {/* STEP 3 */}
 
-{step === 3 && (
-                <>
-                  <DummyFillBar onFill={fillDummyData} step={step} />
+{(isSinglePage || step === 3) && (
+                <div className={isSinglePage ? "mb-10" : undefined}>
+                  {isSinglePage ? (
+                    <SectionHeading title={wizardSteps[2]} />
+                  ) : (
+                    <DummyFillBar onFill={fillDummyData} step={step} />
+                  )}
                   <div className="grid gap-6">
                 <Input
                   label="Previous School Name"
@@ -2275,13 +2452,17 @@ const forbidden = [
                   onChange={handleChange}
                 />
 </div>
-                </>
+                </div>
               )}
             {/* STEP 4 */}
 
-{step === 4 && (
-                <>
-                  <DummyFillBar onFill={fillDummyData} step={step} />
+{(isSinglePage || step === 4) && (
+                <div className={isSinglePage ? "mb-10" : undefined}>
+                  {isSinglePage ? (
+                    <SectionHeading title={wizardSteps[3]} />
+                  ) : (
+                    <DummyFillBar onFill={fillDummyData} step={step} />
+                  )}
                   <div className="grid gap-4">
                 <File
                   label="Student Photo *"
@@ -2410,14 +2591,18 @@ const forbidden = [
                   )}
                 </div>
               </div>
-                </>
+                </div>
               )}
 
             {/* STEP 5 */}
 
-{step === 5 && (
-                <>
-                  <DummyFillBar onFill={fillDummyData} step={step} />
+{(isSinglePage || step === 5) && (
+                <div className={isSinglePage ? "mb-10" : undefined}>
+                  {isSinglePage ? (
+                    <SectionHeading title={wizardSteps[4]} />
+                  ) : (
+                    <DummyFillBar onFill={fillDummyData} step={step} />
+                  )}
                   <div className="grid gap-4">
                     <Select
                       label="Class *"
@@ -2486,15 +2671,19 @@ const forbidden = [
                   configures heads separately for each batch).
                 </p>
               </div>
-                </>
+                </div>
               )}
 
             {/* STEP 5 */}
 
             {/* STEP 6 */}
-            {step === 6 && (
-                <>
-                  <DummyFillBar onFill={fillDummyData} step={step} />
+            {(isSinglePage || step === 6) && (
+                <div className={isSinglePage ? "mb-10" : undefined}>
+                  {isSinglePage ? (
+                    <SectionHeading title={wizardSteps[5]} />
+                  ) : (
+                    <DummyFillBar onFill={fillDummyData} step={step} />
+                  )}
                   <div className="grid gap-4">
                     {feeStructure.length === 0 && form.classId && (
                   <div className="text-sm text-[rgb(var(--text))] ">
@@ -2718,34 +2907,42 @@ const forbidden = [
                   readOnly
                 />
               </div>
-                </>
+                </div>
               )}
 
             {/* STEP 6 PARENT LOGIN */}
-{step === 7 && (
-                <>
-                  <DummyFillBar onFill={fillDummyData} step={step} />
+{(isSinglePage || step === 7) && (
+                <div className={isSinglePage ? "mb-10" : undefined}>
+                  {isSinglePage ? (
+                    <SectionHeading title={wizardSteps[6]} />
+                  ) : (
+                    <DummyFillBar onFill={fillDummyData} step={step} />
+                  )}
                   <ParentLoginStep
                     form={form}
                     handleChange={handleChange}
                     isEdit={isEdit}
                   />
-                </>
+                </div>
               )}
 
             {/* ADMIN-DEFINED FIELDS ON BUILT-IN STEPS */}
-            {step >= 1 &&
-              step <= 7 &&
-              customFieldsForStep(step).filter(
-                (field) => field.visible !== false
-              ).length > 0 && (
-                <div className="mt-6 grid gap-4">
-                  <h3 className="text-sm font-semibold text-[rgb(var(--text-muted))] uppercase tracking-wide">
-                    Additional Details
-                  </h3>
-                  {customFieldsForStep(step)
-                    .filter((field) => field.visible !== false)
-                    .map((field) => (
+            {[1, 2, 3, 4, 5, 6, 7]
+              .filter((stepNumber) => isSinglePage || step === stepNumber)
+              .map((stepNumber) => {
+                const fields = customFieldsForStep(stepNumber).filter(
+                  (field) => field.visible !== false,
+                );
+                if (!fields.length) return null;
+                return (
+                  <div key={`custom-builtin-${stepNumber}`} className="mt-6 grid gap-4">
+                    <h3 className="text-sm font-semibold text-[rgb(var(--text-muted))] uppercase tracking-wide">
+                      Additional Details
+                      {isSinglePage && wizardSteps[stepNumber - 1]
+                        ? ` · ${wizardSteps[stepNumber - 1]}`
+                        : ""}
+                    </h3>
+                    {fields.map((field) => (
                       <CustomField
                         key={field.key}
                         field={field}
@@ -2754,18 +2951,25 @@ const forbidden = [
                         onChange={(value) => setCustomValue(field.key, value)}
                       />
                     ))}
-                </div>
-              )}
+                  </div>
+                );
+              })}
 
             {/* ADMIN-DEFINED STEPS */}
             {customStepDefs.map((stepDef, index) => {
-              if (step !== 8 + index) return null;
+              if (!isSinglePage && step !== 8 + index) return null;
               const fields = (stepDef.fields || []).filter(
                 (field) => field.visible !== false
               );
 
               return (
-                <div key={stepDef.key} className="grid gap-4">
+                <div
+                  key={stepDef.key}
+                  className={isSinglePage ? "mb-10 grid gap-4" : "grid gap-4"}
+                >
+                  {isSinglePage ? (
+                    <SectionHeading title={stepDef.title || `Section ${8 + index}`} />
+                  ) : null}
                   {fields.length === 0 ? (
                     <p className="text-sm text-[rgb(var(--text-muted))]">
                       This step has no fields yet.
@@ -2786,9 +2990,13 @@ const forbidden = [
             })}
 
             {/* REVIEW */}
-            {step === reviewStep && (
-              <>
-                <DummyFillBar onFill={fillDummyData} step={step} />
+            {(isSinglePage || step === reviewStep) && (
+              <div className={isSinglePage ? "mb-10" : undefined}>
+                {isSinglePage ? (
+                  <SectionHeading title={wizardSteps[reviewStep - 1] || "Review"} />
+                ) : (
+                  <DummyFillBar onFill={fillDummyData} step={step} />
+                )}
                 <ReviewStep
                   form={form}
                   classes={classes}
@@ -2800,13 +3008,17 @@ const forbidden = [
                     (stepDef.fields || []).filter((field) => !field.builtin)
                   )}
                 />
-              </>
+              </div>
             )}
 
             {/* NAV */}
 
-            <div className="flex justify-between mt-8">
-              {step > 1 && (
+            <div
+              className={`flex mt-8 ${
+                isSinglePage ? "justify-end" : "justify-between"
+              }`}
+            >
+              {!isSinglePage && step > 1 && (
                 <button
                   onClick={prev}
                   className="px-6 py-2 bg-[rgb(var(--surface))] text-[rgb(var(--text))] rounded-lg cursor-pointer border border-[rgb(var(--border))]"
@@ -2815,7 +3027,7 @@ const forbidden = [
                 </button>
               )}
 
-              {step < wizardSteps.length ? (
+              {!isSinglePage && step < wizardSteps.length ? (
                 <button
                   onClick={next}
                   className={`px-6 py-2 rounded-lg text-[rgb(var(--text))]
@@ -3410,7 +3622,11 @@ const ReviewStep = ({
       </div>
 
       <Section title="Student details" headerClass="">
-        <Field label="Admission number" value={form.studentId || "(auto on save)"} />
+        <Field label="Admission number" value={form.studentId || "—"} />
+        <Field
+          label="Confirmation"
+          value={form.confirmationStatus || "Non-Confirmed"}
+        />
         <Field label="First name" value={form.firstName} />
         <Field label="Last name" value={form.lastName} />
         <Field label="Date of birth" value={form.dob} />

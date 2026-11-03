@@ -5,6 +5,7 @@ import Class from "../models/class.js";
 import Section from "../models/section.js";
 import School from "../models/school.js";
 import Stream from "../models/stream.js";
+import AdmissionForm from "../models/admissionForm.js";
 import { resolveStream } from "../utils/resolveStream.js";
 import {
   activeSessionName,
@@ -107,6 +108,12 @@ export const getPublicRegistrationForm = async (req, res) => {
       .lean();
 
     const activeYear = await activeSessionName(school._id);
+    const formConfig = await AdmissionForm.findOne({
+      schoolId: school._id,
+      formType: "registration",
+    })
+      .select("steps")
+      .lean();
 
     return res.json({
       success: true,
@@ -120,6 +127,7 @@ export const getPublicRegistrationForm = async (req, res) => {
         },
         academicYear: activeYear,
         instructions: school.registrationForm?.instructions || "",
+        formSteps: formConfig?.steps || null,
         classes: classes.map((cls) => ({
           _id: cls._id,
           name: cls.name,
@@ -285,7 +293,9 @@ export const submitPublicRegistration = async (req, res) => {
       pincode: sanitize(body.pincode, 10),
       previousSchoolName: sanitize(body.previousSchoolName, 160),
       notes: sanitize(body.notes, 600),
+      customFields: Array.isArray(body.customFields) ? body.customFields : [],
       source: "public",
+      createdByName: "Website",
       status: "registered",
     });
 

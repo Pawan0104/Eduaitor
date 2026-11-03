@@ -49,6 +49,7 @@ export const COLOR_MAP = {
 
   // Student / Principal
   Students: { bg: "#EFF6FF", icon: "#3B82F6", dot: "#BFDBFE" },
+  Documents: { bg: "#ECFDF5", icon: "#059669", dot: "#A7F3D0" },
   Certificates: { bg: "#F5F3FF", icon: "#7C3AED", dot: "#DDD6FE" },
   "Lead Management": { bg: "#FFF7ED", icon: "#EA580C", dot: "#FED7AA" },
   Registration: { bg: "#ECFDF5", icon: "#059669", dot: "#A7F3D0" },
@@ -426,6 +427,7 @@ export default function SchoolMenu() {
         { name: "Add Student", path: "/school/student-manage" },
         { name: "Admission Form", path: "/school/admission-form" },
         { name: "Bulk Upload", path: "/school/students/bulk-upload" },
+        { name: "Documents", path: "/school/documents" },
         { name: "House Allocation", path: "/school/house" },
         { name: "Certificates", path: "/school/certificates" },
         {

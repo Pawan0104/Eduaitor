@@ -111,6 +111,22 @@ const leadSchema = new mongoose.Schema(
       type: mongoose.Schema.Types.ObjectId,
       required: true,
     },
+    /** Who captured the lead — stored for list/detail display. */
+    createdByName: {
+      type: String,
+      default: "",
+      trim: true,
+    },
+    /**
+     * Origin of the lead.
+     * - erp: entered in the office by a staff/admin user
+     * - website: submitted from the public/online form
+     */
+    source: {
+      type: String,
+      enum: ["erp", "website"],
+      default: "erp",
+    },
     status: {
       type: String,
       enum: ["active", "processing", "admitted", "cancelled"],
@@ -130,6 +146,21 @@ const leadSchema = new mongoose.Schema(
     },
     followUps: {
       type: [followUpSchema],
+      default: [],
+    },
+    /** Values for fields the school admin added via Lead Form Builder. */
+    customFields: {
+      type: [
+        new mongoose.Schema(
+          {
+            key: { type: String, required: true },
+            label: { type: String, default: "" },
+            type: { type: String, default: "text" },
+            value: { type: String, default: "" },
+          },
+          { _id: false },
+        ),
+      ],
       default: [],
     },
   },

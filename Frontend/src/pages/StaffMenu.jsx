@@ -20,6 +20,7 @@ import {
   FaIdCard,
   FaHotel,
   FaBullhorn,
+  FaFileAlt,
 } from "react-icons/fa";
 import { FaBookJournalWhills, FaUserGroup } from "react-icons/fa6";
 import { FiUsers } from "react-icons/fi";
@@ -42,6 +43,7 @@ const COLOR_MAP = {
   ...TEACHER_COLORS,
   Fees: { bg: "#FFFBEB", icon: "#D97706", dot: "#FDE68A" },
   "My ID Card": { bg: "#ECFDF5", icon: "#059669", dot: "#A7F3D0" },
+  Documents: { bg: "#ECFDF5", icon: "#059669", dot: "#A7F3D0" },
   "House Allocation": { bg: "#F0FDF4", icon: "#22C55E", dot: "#BBF7D0" },
   Transport: { bg: "#F0FDFA", icon: "#0D9488", dot: "#99F6E4" },
   Assignments: { bg: "#F8FAFC", icon: "#64748B", dot: "#CBD5E1" },
@@ -103,6 +105,12 @@ export default function StaffMenu() {
         name: "Students",
         icon: <FaUserGraduate />,
         path: "/staff/students",
+        module: "students",
+      },
+      {
+        name: "Documents",
+        icon: <FaFileAlt />,
+        path: "/staff/documents",
         module: "students",
       },
       {

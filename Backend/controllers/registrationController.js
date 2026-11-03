@@ -76,10 +76,24 @@ const resolveSection = async (schoolId, sectionId) => {
     : { sectionId: null, sectionName: "" };
 };
 
+const resolveActor = (user = {}) => ({
+  userId: user._id || user.id || user.staff_id || user.teacher_id || user.school_id,
+  name: user.name || user.email || "Unknown User",
+  role: user.role || "",
+});
+
+const sourceLabelOf = (plain = {}) => {
+  if (plain.source === "public") return "Website";
+  if (plain.source === "lead") return "Lead";
+  const name = String(plain.createdByName || "").trim();
+  return name || "Office";
+};
+
 const toPayload = (doc) => {
   const plain = typeof doc.toObject === "function" ? doc.toObject() : doc;
   return {
     ...plain,
+    sourceLabel: sourceLabelOf(plain),
     canAdmit:
       plain.status !== "cancelled" &&
       plain.status !== "admitted" &&
@@ -273,6 +287,20 @@ export const createRegistration = async (req, res) => {
       }
     }
 
+    const normalizedCustomFields = Array.isArray(body.customFields)
+      ? body.customFields
+          .filter((field) => field && typeof field.key === "string" && field.key)
+          .map((field) => ({
+            key: String(field.key).slice(0, 60),
+            label: String(field.label ?? "").slice(0, 120),
+            type: String(field.type ?? "text").slice(0, 20),
+            value:
+              field.value === undefined || field.value === null
+                ? ""
+                : String(field.value).slice(0, 4000),
+          }))
+      : [];
+
     const registration = new Registration({
       schoolId,
       registrationNumber: await nextRegistrationNumber(schoolId),
@@ -297,11 +325,16 @@ export const createRegistration = async (req, res) => {
       pincode: sanitize(body.pincode, 10),
       previousSchoolName: sanitize(body.previousSchoolName, 160),
       notes: sanitize(body.notes, 600),
+      customFields: normalizedCustomFields,
       source,
       leadId: lead?._id || null,
       createdBy: req.user?._id && mongoose.Types.ObjectId.isValid(req.user._id)
         ? req.user._id
         : null,
+      createdByName:
+        source === "public"
+          ? "Website"
+          : resolveActor(req.user).name || "",
       status: "registered",
     });
 
@@ -421,6 +454,21 @@ export const updateRegistration = async (req, res) => {
       registration.previousSchoolName = sanitize(body.previousSchoolName, 160);
     }
     if (body.notes !== undefined) registration.notes = sanitize(body.notes, 600);
+    if (body.customFields !== undefined) {
+      registration.customFields = Array.isArray(body.customFields)
+        ? body.customFields
+            .filter((field) => field && typeof field.key === "string" && field.key)
+            .map((field) => ({
+              key: String(field.key).slice(0, 60),
+              label: String(field.label ?? "").slice(0, 120),
+              type: String(field.type ?? "text").slice(0, 20),
+              value:
+                field.value === undefined || field.value === null
+                  ? ""
+                  : String(field.value).slice(0, 4000),
+            }))
+        : [];
+    }
 
     let classChanged = false;
     if (body.streamId !== undefined) {
@@ -702,6 +750,94 @@ export const updateRegistrationLink = async (req, res) => {
     return res.status(error.statusCode || 500).json({
       success: false,
       message: error.message || "Could not update the registration link.",
+    });
+  }
+};
+
+/* ------------------------------------------------------------------ *
+ * FOLLOW-UPS
+ * ------------------------------------------------------------------ */
+export const addRegistrationFollowUp = async (req, res) => {
+  try {
+    assertAdmin(req);
+    const schoolId = schoolIdOf(req);
+    const comment = String(req.body?.comment || "").trim();
+    if (!comment) {
+      return res
+        .status(400)
+        .json({ success: false, message: "Feedback comment is required" });
+    }
+
+    const actor = resolveActor(req.user);
+    if (!actor.userId) {
+      return res
+        .status(400)
+        .json({ success: false, message: "Invalid user context" });
+    }
+
+    const followUp = {
+      comment,
+      addedBy: actor,
+      createdAt: new Date(),
+    };
+
+    const registration = await Registration.findOneAndUpdate(
+      { _id: req.params.id, schoolId },
+      { $push: { followUps: followUp } },
+      { new: true },
+    );
+
+    if (!registration) {
+      return res
+        .status(404)
+        .json({ success: false, message: "Registration not found" });
+    }
+
+    return res.json({
+      success: true,
+      message: "Feedback added successfully",
+      data: toPayload(registration),
+    });
+  } catch (error) {
+    return res.status(error.statusCode || 500).json({
+      success: false,
+      message: error.message || "Failed to add feedback",
+    });
+  }
+};
+
+export const getRegistrationFollowUps = async (req, res) => {
+  try {
+    assertAdmin(req);
+    const registration = await Registration.findOne({
+      _id: req.params.id,
+      schoolId: schoolIdOf(req),
+    })
+      .select("studentName followUps")
+      .lean();
+
+    if (!registration) {
+      return res
+        .status(404)
+        .json({ success: false, message: "Registration not found" });
+    }
+
+    const followUps = [...(registration.followUps || [])].sort(
+      (a, b) => new Date(b.createdAt) - new Date(a.createdAt),
+    );
+
+    return res.json({
+      success: true,
+      data: {
+        registrationId: req.params.id,
+        studentName: registration.studentName,
+        followUps,
+      },
+    });
+  } catch (error) {
+    return res.status(error.statusCode || 500).json({
+      success: false,
+      message: error.message || "Failed to load feedback",
     });
   }
 };

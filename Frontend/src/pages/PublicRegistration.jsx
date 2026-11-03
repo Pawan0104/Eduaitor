@@ -9,6 +9,12 @@ import {
   FiSend,
 } from "react-icons/fi";
 import { API } from "../config/api";
+import ConfigurableFormFields, {
+  buildCustomFieldsPayload,
+  emptyCustomValues,
+  validateConfigurableFields,
+} from "../components/ConfigurableFormFields";
+import { mergeRegistrationSteps } from "../lib/registrationFormDefaults";
 
 const emptyForm = () => ({
   studentName: "",
@@ -48,6 +54,10 @@ const PublicRegistration = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [form, setForm] = useState(emptyForm());
+  const [formSteps, setFormSteps] = useState(() => mergeRegistrationSteps(null));
+  const [customValues, setCustomValues] = useState(() =>
+    emptyCustomValues(mergeRegistrationSteps(null)),
+  );
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState("");
   const [result, setResult] = useState(null);
@@ -58,11 +68,15 @@ const PublicRegistration = () => {
       setError("");
       try {
         const { data } = await axios.get(`${API}/public/registration/${token}`);
-        setConfig(data?.data || null);
+        const payload = data?.data || null;
+        setConfig(payload);
+        const steps = mergeRegistrationSteps(payload?.formSteps);
+        setFormSteps(steps);
+        setCustomValues(emptyCustomValues(steps));
       } catch (err) {
         setError(
           err.response?.data?.message ||
-            "This registration link is not available."
+            "This registration link is not available.",
         );
       } finally {
         setLoading(false);
@@ -77,32 +91,32 @@ const PublicRegistration = () => {
     return cls?.sections || [];
   }, [config, form.classId]);
 
-  const update = (key, value) =>
-    setForm((prev) => ({ ...prev, [key]: value }));
-
   const submit = async (event) => {
     event.preventDefault();
     setSubmitError("");
 
-    if (!form.studentName.trim())
-      return setSubmitError("Please enter the student's name.");
-    if (!form.classId) return setSubmitError("Please select a class.");
-    if (!form.parentName.trim())
-      return setSubmitError("Please enter the parent / guardian name.");
+    const configError = validateConfigurableFields(
+      formSteps,
+      form,
+      customValues,
+    );
+    if (configError) return setSubmitError(configError);
     if (String(form.parentMobile || "").replace(/\D/g, "").length !== 10)
       return setSubmitError("Please enter a valid 10-digit mobile number.");
 
     setSubmitting(true);
     try {
-      const { data } = await axios.post(
-        `${API}/public/registration/${token}`,
-        { ...form, sectionId: form.sectionId || null, dob: form.dob || null }
-      );
+      const { data } = await axios.post(`${API}/public/registration/${token}`, {
+        ...form,
+        sectionId: form.sectionId || null,
+        dob: form.dob || null,
+        customFields: buildCustomFieldsPayload(formSteps, customValues),
+      });
       setResult(data);
     } catch (err) {
       setSubmitError(
         err.response?.data?.message ||
-          "Could not submit the application. Please try again."
+          "Could not submit the application. Please try again.",
       );
     } finally {
       setSubmitting(false);
@@ -209,7 +223,7 @@ const PublicRegistration = () => {
                       <span className="font-semibold text-slate-900">
                         {result.data.entrance.examDate
                           ? new Date(
-                              result.data.entrance.examDate
+                              result.data.entrance.examDate,
                             ).toLocaleDateString("en-IN", {
                               day: "2-digit",
                               month: "short",
@@ -231,167 +245,94 @@ const PublicRegistration = () => {
           ) : (
             <form onSubmit={submit} className="px-5 py-6 sm:px-7">
               <h2 className="text-sm font-bold uppercase tracking-wide text-slate-500">
-                Student details
+                Application details
               </h2>
               <div className="mt-3 grid grid-cols-1 gap-4 sm:grid-cols-2">
-                <Field label="Student name" required>
-                  <input
-                    value={form.studentName}
-                    onChange={(event) => update("studentName", event.target.value)}
-                    className={inputClass}
-                    placeholder="Full name"
-                  />
-                </Field>
-                <Field label="Date of birth">
-                  <input
-                    type="date"
-                    value={form.dob}
-                    onChange={(event) => update("dob", event.target.value)}
-                    className={inputClass}
-                  />
-                </Field>
-                <Field label="Gender">
-                  <select
-                    value={form.gender}
-                    onChange={(event) => update("gender", event.target.value)}
-                    className={inputClass}
-                  >
-                    <option value="">Select</option>
-                    <option value="Male">Male</option>
-                    <option value="Female">Female</option>
-                    <option value="Other">Other</option>
-                  </select>
-                </Field>
-                <Field label="Blood group">
-                  <input
-                    value={form.bloodGroup}
-                    onChange={(event) => update("bloodGroup", event.target.value)}
-                    className={inputClass}
-                    placeholder="e.g. O+"
-                  />
-                </Field>
-                <Field label="Class applying for" required>
-                  <select
-                    value={form.classId}
-                    onChange={(event) =>
-                      setForm((prev) => ({
-                        ...prev,
-                        classId: event.target.value,
-                        sectionId: "",
-                      }))
-                    }
-                    className={inputClass}
-                  >
-                    <option value="">Select class</option>
-                    {(config?.classes || []).map((cls) => (
-                      <option key={cls._id} value={cls._id}>
-                        {cls.name}
-                      </option>
-                    ))}
-                  </select>
-                </Field>
-                <Field label="Stream">
-                  <select
-                    value={form.streamId}
-                    onChange={(event) => update("streamId", event.target.value)}
-                    className={inputClass}
-                  >
-                    <option value="">Select stream (optional)</option>
-                    {(config?.streams || []).map((item) => (
-                      <option key={item._id} value={item._id}>
-                        {item.name}
-                      </option>
-                    ))}
-                  </select>
-                </Field>
-                <Field label="Section">
-                  <select
-                    value={form.sectionId}
-                    onChange={(event) => update("sectionId", event.target.value)}
-                    className={inputClass}
-                    disabled={!sections.length}
-                  >
-                    <option value="">
-                      {sections.length ? "Select section" : "No sections"}
-                    </option>
-                    {sections.map((section) => (
-                      <option key={section._id} value={section._id}>
-                        {section.name}
-                      </option>
-                    ))}
-                  </select>
-                </Field>
-              </div>
-
-              <h2 className="mt-7 text-sm font-bold uppercase tracking-wide text-slate-500">
-                Parent / guardian details
-              </h2>
-              <div className="mt-3 grid grid-cols-1 gap-4 sm:grid-cols-2">
-                <Field label="Parent / guardian name" required>
-                  <input
-                    value={form.parentName}
-                    onChange={(event) => update("parentName", event.target.value)}
-                    className={inputClass}
-                  />
-                </Field>
-                <Field label="Mobile number" required>
-                  <input
-                    value={form.parentMobile}
-                    onChange={(event) => update("parentMobile", event.target.value)}
-                    className={inputClass}
-                    inputMode="numeric"
-                    maxLength={10}
-                    placeholder="10-digit number"
-                  />
-                </Field>
-                <Field label="Email">
-                  <input
-                    type="email"
-                    value={form.parentEmail}
-                    onChange={(event) => update("parentEmail", event.target.value)}
-                    className={inputClass}
-                  />
-                </Field>
-                <Field label="Previous school">
-                  <input
-                    value={form.previousSchoolName}
-                    onChange={(event) =>
-                      update("previousSchoolName", event.target.value)
-                    }
-                    className={inputClass}
-                  />
-                </Field>
-                <Field label="Address">
-                  <input
-                    value={form.address}
-                    onChange={(event) => update("address", event.target.value)}
-                    className={inputClass}
-                  />
-                </Field>
-                <Field label="City">
-                  <input
-                    value={form.city}
-                    onChange={(event) => update("city", event.target.value)}
-                    className={inputClass}
-                  />
-                </Field>
-                <Field label="Pincode">
-                  <input
-                    value={form.pincode}
-                    onChange={(event) => update("pincode", event.target.value)}
-                    className={inputClass}
-                    inputMode="numeric"
-                    maxLength={6}
-                  />
-                </Field>
-                <Field label="Anything else the school should know?">
-                  <input
-                    value={form.notes}
-                    onChange={(event) => update("notes", event.target.value)}
-                    className={inputClass}
-                    placeholder="Optional"
-                  />
-                </Field>
+                <ConfigurableFormFields
+                  steps={formSteps}
+                  values={form}
+                  customValues={customValues}
+                  inputClass={inputClass}
+                  onChangeBuiltin={(key, value) =>
+                    setForm((prev) => ({
+                      ...prev,
+                      [key]: value,
+                      ...(key === "classId" ? { sectionId: "" } : {}),
+                    }))
+                  }
+                  onChangeCustom={(key, value) =>
+                    setCustomValues((prev) => ({ ...prev, [key]: value }))
+                  }
+                  renderBuiltin={{
+                    classId: (field) => (
+                      <Field label={field.label} required={field.required}>
+                        <select
+                          value={form.classId}
+                          onChange={(event) =>
+                            setForm((prev) => ({
+                              ...prev,
+                              classId: event.target.value,
+                              sectionId: "",
+                            }))
+                          }
+                          className={inputClass}
+                        >
+                          <option value="">Select class</option>
+                          {(config?.classes || []).map((cls) => (
+                            <option key={cls._id} value={cls._id}>
+                              {cls.name}
+                            </option>
+                          ))}
+                        </select>
+                      </Field>
+                    ),
+                    streamId: (field) => (
+                      <Field label={field.label} required={field.required}>
+                        <select
+                          value={form.streamId}
+                          onChange={(event) =>
+                            setForm((prev) => ({
+                              ...prev,
+                              streamId: event.target.value,
+                            }))
+                          }
+                          className={inputClass}
+                        >
+                          <option value="">Select stream (optional)</option>
+                          {(config?.streams || []).map((item) => (
+                            <option key={item._id} value={item._id}>
+                              {item.name}
+                            </option>
+                          ))}
+                        </select>
+                      </Field>
+                    ),
+                    sectionId: (field) => (
+                      <Field label={field.label} required={field.required}>
+                        <select
+                          value={form.sectionId}
+                          onChange={(event) =>
+                            setForm((prev) => ({
+                              ...prev,
+                              sectionId: event.target.value,
+                            }))
+                          }
+                          className={inputClass}
+                          disabled={!sections.length}
+                        >
+                          <option value="">
+                            {sections.length ? "Select section" : "No sections"}
+                          </option>
+                          {sections.map((section) => (
+                            <option key={section._id} value={section._id}>
+                              {section.name}
+                            </option>
+                          ))}
+                        </select>
+                      </Field>
+                    ),
+                  }}
+                />
               </div>
 
               {submitError ? (
