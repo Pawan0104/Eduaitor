@@ -238,14 +238,16 @@ export default function Login() {
       err?.code === "ECONNABORTED" || /timeout/i.test(rawMsg);
     const isNetwork =
       !err?.response &&
-      (/Network/i.test(rawMsg) || /Failed to fetch/i.test(rawMsg));
+      (/Network/i.test(rawMsg) ||
+        /Failed to fetch/i.test(rawMsg) ||
+        err?.code === "ERR_NETWORK");
     return (
       err?.response?.data?.message ||
       err?.response?.data?.error ||
       (isTimeout
         ? "API is waking up (Render cold start). Wait ~30s and try again."
         : isNetwork
-          ? "Cannot reach API. Check the app was built with VITE_API_URL=https://eduaitor-api.onrender.com/api, and Render allows your app origin (CLIENT_URL / CLIENT_URLS)."
+          ? "Cannot reach API. If Render just woke up, wait ~30s and retry. Also confirm you are on https://eduaitor.com (or an allowed CLIENT_URLS origin)."
           : "Invalid credentials")
     );
   };

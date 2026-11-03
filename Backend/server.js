@@ -45,6 +45,20 @@ const app = express();
 
 const normalizeOrigin = (value) => String(value || "").trim().replace(/\/$/, "");
 
+const isEduaitorOrigin = (origin) => {
+  try {
+    const { protocol, hostname } = new URL(origin);
+    if (protocol !== "http:" && protocol !== "https:") return false;
+    // eduaitor.com and any subdomain (admin., app., school., …)
+    return (
+      hostname === "eduaitor.com" ||
+      hostname.endsWith(".eduaitor.com")
+    );
+  } catch {
+    return false;
+  }
+};
+
 const productionAllowedOrigins = () => {
   const fromEnv = [
     process.env.CLIENT_URL,
@@ -103,7 +117,12 @@ app.use(
             const isNetlify =
               /\.netlify\.app$/i.test(normalized) ||
               /\.netlify\.com$/i.test(normalized);
-            if (!origin || allowed.has(normalized) || isNetlify) {
+            if (
+              !origin ||
+              allowed.has(normalized) ||
+              isNetlify ||
+              isEduaitorOrigin(normalized)
+            ) {
               callback(null, true);
             } else {
               // Do not throw — throwing becomes HTTP 500 and the UI shows
@@ -153,7 +172,10 @@ import schoolRoutes from "./routes/schoolRoute.js";
 import subscriptionRoutes from "./routes/subscriptionRoute.js";
 
 import studentRoutes from "./routes/studentRoute.js";
-import admissionFormRoute from "./routes/admissionFormRoute.js";
+import admissionFormRoute, {
+  leadFormRoute,
+  registrationFormRoute,
+} from "./routes/admissionFormRoute.js";
 import academicYearRoute from "./routes/academicYearRoute.js";
 import registrationRoute from "./routes/registrationRoute.js";
 import admissionReportRoute from "./routes/admissionReportRoute.js";
@@ -502,6 +524,8 @@ app.use("/api/subscriptions", subscriptionRoutes);
 
 app.use("/api/students", studentRoutes);
 app.use("/api/admission-form", admissionFormRoute);
+app.use("/api/lead-form", leadFormRoute);
+app.use("/api/registration-form", registrationFormRoute);
 app.use("/api/teachers", teacherRoutes);
 app.use("/api/sections", sectionRoute);
 app.use("/api/classes", classRoute);
