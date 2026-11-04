@@ -41,13 +41,13 @@ const admissionFormSchema = new mongoose.Schema(
       type: mongoose.Schema.Types.ObjectId,
       ref: "School",
       required: true,
-      index: true,
+      // Compound unique below covers schoolId lookups. Do NOT add a
+      // schoolId-only unique index — lead/registration forms share schoolId.
     },
     formType: {
       type: String,
       enum: FORM_TYPES,
       default: "admission",
-      index: true,
     },
     steps: {
       type: [mongoose.Schema.Types.Mixed],

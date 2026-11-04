@@ -265,6 +265,7 @@ const connectDB = async () => {
         console.log("MongoDB Connected Successfully (Atlas)");
         await ensureParentUsernameIndex();
         await ensureNotificationSystemKeyIndex();
+        await ensureAdmissionFormIndexes();
         startNotificationCron();
         return conn;
       } catch (primaryError) {
@@ -281,6 +282,7 @@ const connectDB = async () => {
           );
           await ensureParentUsernameIndex();
           await ensureNotificationSystemKeyIndex();
+          await ensureAdmissionFormIndexes();
           startNotificationCron();
           return retryConn;
         } catch (retryError) {
@@ -307,6 +309,7 @@ const connectDB = async () => {
           );
           await ensureParentUsernameIndex();
           await ensureNotificationSystemKeyIndex();
+          await ensureAdmissionFormIndexes();
           startNotificationCron();
           return conn;
         }
@@ -331,6 +334,7 @@ const connectDB = async () => {
     console.log("MongoDB Connected Successfully (in-memory fallback)");
     await ensureParentUsernameIndex();
     await ensureNotificationSystemKeyIndex();
+    await ensureAdmissionFormIndexes();
     startNotificationCron();
     return mongoose.connection;
   } catch (error) {
@@ -400,6 +404,69 @@ export async function ensureNotificationSystemKeyIndex() {
     }
   } catch (err) {
     console.warn("Notification systemKey index migrate skipped:", err.message);
+  }
+}
+
+/**
+ * Older admissionforms had unique(schoolId) — one form per school.
+ * Lead/registration form builders need one doc per { schoolId, formType }.
+ */
+export async function ensureAdmissionFormIndexes() {
+  try {
+    const col = mongoose.connection.collection("admissionforms");
+    const indexes = await col.indexes();
+
+    const legacyUniqueSchoolId = indexes.find((idx) => {
+      if (!idx?.key || idx.key.schoolId !== 1 || !idx.unique) return false;
+      const keys = Object.keys(idx.key);
+      return keys.length === 1 && keys[0] === "schoolId";
+    });
+
+    if (legacyUniqueSchoolId?.name) {
+      await col.dropIndex(legacyUniqueSchoolId.name);
+      console.log(
+        `Dropped legacy unique admissionforms.${legacyUniqueSchoolId.name} (blocks lead/registration forms)`,
+      );
+    }
+
+    // Non-unique schoolId-only index is redundant with compound unique.
+    const plainSchoolId = indexes.find((idx) => {
+      if (!idx?.key || idx.key.schoolId !== 1 || idx.unique) return false;
+      const keys = Object.keys(idx.key);
+      return keys.length === 1 && keys[0] === "schoolId";
+    });
+    if (plainSchoolId?.name) {
+      try {
+        await col.dropIndex(plainSchoolId.name);
+      } catch {
+        /* ignore if already gone */
+      }
+    }
+
+    await col.updateMany(
+      {
+        $or: [
+          { formType: { $exists: false } },
+          { formType: null },
+          { formType: "" },
+        ],
+      },
+      { $set: { formType: "admission" } },
+    );
+
+    const compound = (await col.indexes()).find(
+      (idx) =>
+        idx.key?.schoolId === 1 && idx.key?.formType === 1 && idx.unique,
+    );
+    if (!compound) {
+      await col.createIndex(
+        { schoolId: 1, formType: 1 },
+        { unique: true, name: "schoolId_1_formType_1" },
+      );
+      console.log("Ensured admissionforms.schoolId_1_formType_1 unique index");
+    }
+  } catch (err) {
+    console.warn("Admission form index migrate skipped:", err.message);
   }
 }
 

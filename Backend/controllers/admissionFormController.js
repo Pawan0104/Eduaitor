@@ -1,6 +1,42 @@
 import AdmissionForm, { SCHOOL_FORM_TYPES } from "../models/admissionForm.js";
+import { ensureAdmissionFormIndexes } from "../config/db.js";
 
 const getSchoolId = (req) => req.user?.school_id;
+
+/**
+ * Prefer find → update/create over upsert+$or.
+ * Legacy unique(schoolId) made upserts for lead/registration collide.
+ */
+const upsertFormConfig = async (schoolId, formType, setFields) => {
+  const filter =
+    formType === "admission"
+      ? {
+          schoolId,
+          $or: [{ formType: "admission" }, { formType: { $exists: false } }],
+        }
+      : { schoolId, formType };
+
+  let existing = await AdmissionForm.findOne(filter);
+  if (!existing && formType === "admission") {
+    existing = await AdmissionForm.findOne({ schoolId, formType: "admission" });
+  }
+  if (!existing && formType !== "admission") {
+    existing = await AdmissionForm.findOne({ schoolId, formType });
+  }
+
+  if (existing) {
+    Object.assign(existing, setFields, { formType });
+    await existing.save();
+    return existing.toObject();
+  }
+
+  const created = await AdmissionForm.create({
+    schoolId,
+    formType,
+    ...setFields,
+  });
+  return created.toObject();
+};
 
 const FIELD_TYPES = new Set([
   "text",
@@ -175,23 +211,13 @@ export const saveAdmissionFormLayout = async (req, res, next) => {
         ? "single"
         : "steps";
 
-    const filter = {
-      schoolId,
-      $or: [{ formType: "admission" }, { formType: { $exists: false } }],
-    };
-
-    let config = await AdmissionForm.findOneAndUpdate(
-      filter,
-      { $set: { layoutMode, formType: "admission" } },
-      { new: true, upsert: true, setDefaultsOnInsert: true },
-    ).lean();
-
-    if (!config) {
-      config = await AdmissionForm.findOneAndUpdate(
-        { schoolId, formType: "admission" },
-        { $set: { layoutMode, formType: "admission" } },
-        { new: true, upsert: true, setDefaultsOnInsert: true },
-      ).lean();
+    let config;
+    try {
+      config = await upsertFormConfig(schoolId, "admission", { layoutMode });
+    } catch (error) {
+      if (error?.code !== 11000) throw error;
+      await ensureAdmissionFormIndexes();
+      config = await upsertFormConfig(schoolId, "admission", { layoutMode });
     }
 
     return res.json({
@@ -233,27 +259,14 @@ export const saveAdmissionForm = async (req, res, next) => {
       });
     }
 
-    const filter =
-      formType === "admission"
-        ? {
-            schoolId,
-            $or: [{ formType: "admission" }, { formType: { $exists: false } }],
-          }
-        : { schoolId, formType };
-
-    let config = await AdmissionForm.findOneAndUpdate(
-      filter,
-      { $set: { steps, formType } },
-      { new: true, upsert: true, setDefaultsOnInsert: true },
-    ).lean();
-
-    // Race / legacy unique(schoolId) collision — fall back to explicit create.
-    if (!config) {
-      config = await AdmissionForm.findOneAndUpdate(
-        { schoolId, formType },
-        { $set: { steps, formType } },
-        { new: true, upsert: true, setDefaultsOnInsert: true },
-      ).lean();
+    let config;
+    try {
+      config = await upsertFormConfig(schoolId, formType, { steps });
+    } catch (error) {
+      if (error?.code !== 11000) throw error;
+      // Drop legacy unique(schoolId) then retry once.
+      await ensureAdmissionFormIndexes();
+      config = await upsertFormConfig(schoolId, formType, { steps });
     }
 
     return res.json({
@@ -266,29 +279,6 @@ export const saveAdmissionForm = async (req, res, next) => {
       },
     });
   } catch (error) {
-    if (error?.code === 11000) {
-      try {
-        const schoolId = getSchoolId(req);
-        const formType = resolveFormType(req);
-        const steps = sanitizeSteps(req.body?.steps);
-        const config = await AdmissionForm.findOneAndUpdate(
-          { schoolId, formType },
-          { $set: { steps, formType } },
-          { new: true, upsert: true, setDefaultsOnInsert: true },
-        ).lean();
-        return res.json({
-          success: true,
-          message: "Form saved.",
-          data: {
-            formType,
-            steps: config.steps,
-            updatedAt: config.updatedAt,
-          },
-        });
-      } catch (retryError) {
-        return next(retryError);
-      }
-    }
     next(error);
   }
 };
