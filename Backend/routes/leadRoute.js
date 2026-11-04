@@ -3,11 +3,11 @@ import { authMiddleware } from "../auth/auth.js";
 import {
   addLeadFollowUp,
   createLead,
-  deleteLead,
   getLeadAssignees,
   getLeadById,
   getLeadFollowUps,
   getLeads,
+  updateLead,
   updateLeadAssignee,
   updateLeadStatus,
 } from "../controllers/leadController.js";
@@ -18,10 +18,10 @@ router.get("/assignable-users", authMiddleware, getLeadAssignees);
 router.get("/", authMiddleware, getLeads);
 router.post("/", authMiddleware, createLead);
 router.get("/:id", authMiddleware, getLeadById);
+router.put("/:id", authMiddleware, updateLead);
 router.patch("/:id/status", authMiddleware, updateLeadStatus);
 router.patch("/:id/assignee", authMiddleware, updateLeadAssignee);
 router.get("/:id/followups", authMiddleware, getLeadFollowUps);
 router.post("/:id/followups", authMiddleware, addLeadFollowUp);
-router.delete("/:id", authMiddleware, deleteLead);
 
 export default router;

@@ -159,6 +159,7 @@ const emptyForm = {
   penNumber: "",
   admissionSource: "",
   confirmationStatus: "Non-Confirmed",
+  isActive: true,
   isSpecialChild: false,
   isEws: false,
   isPhysicallyDisabled: false,
@@ -811,6 +812,11 @@ const StudentManagement = () => {
         const { firstName, lastName } = splitStudentName(
           registration.studentName,
         );
+        const carriedCustom = Object.fromEntries(
+          (registration.customFields || [])
+            .filter((field) => field?.key)
+            .map((field) => [field.key, field.value || ""]),
+        );
         setSourceRegistration(registration);
         setRegistrationId(registration._id);
         if (registration.leadId) setLeadId(String(registration.leadId));
@@ -829,6 +835,8 @@ const StudentManagement = () => {
           address: registration.address || prev.address,
           previousSchoolName:
             registration.previousSchoolName || prev.previousSchoolName,
+          medicalConditionRemarks:
+            registration.notes || prev.medicalConditionRemarks,
           classId: registration.classId
             ? String(registration.classId)
             : prev.classId,
@@ -841,6 +849,7 @@ const StudentManagement = () => {
           stream: registration.stream || prev.stream,
           username: registration.parentMobile || prev.username,
           confirmationStatus: prev.confirmationStatus || "Non-Confirmed",
+          custom: { ...prev.custom, ...carriedCustom },
         }));
       } catch (err) {
         toast.error(
@@ -910,6 +919,14 @@ const StudentManagement = () => {
         }
 
         const { firstName, lastName } = splitStudentName(lead.studentName);
+        const carriedCustom = Object.fromEntries(
+          (lead.customFields || [])
+            .filter((field) => field?.key)
+            .map((field) => [field.key, field.value || ""]),
+        );
+        const latestRemark = [...(lead.followUps || [])]
+          .reverse()
+          .find((entry) => String(entry?.comment || "").trim())?.comment;
         setSourceLead(lead);
         setLeadId(lead._id);
         setForm((prev) => ({
@@ -920,7 +937,13 @@ const StudentManagement = () => {
           fatherMobile: lead.parentMobile || prev.fatherMobile,
           fatherEmail: lead.parentEmail || prev.fatherEmail,
           previousSchoolName: lead.previousSchoolName || prev.previousSchoolName,
+          medicalConditionRemarks:
+            latestRemark || prev.medicalConditionRemarks,
+          classId: lead.classId ? String(lead.classId) : prev.classId,
+          streamId: lead.streamId ? String(lead.streamId) : prev.streamId,
+          stream: lead.stream || prev.stream,
           username: lead.parentMobile || prev.username,
+          custom: { ...prev.custom, ...carriedCustom },
         }));
       } catch (err) {
         toast.error(err?.response?.data?.message || "Failed to load lead");
@@ -1014,6 +1037,7 @@ const StudentManagement = () => {
             student.confirmationStatus === "Confirmed"
               ? "Confirmed"
               : "Non-Confirmed",
+          isActive: student.isActive !== false,
           isSpecialChild: Boolean(student.isSpecialChild),
           isEws: Boolean(student.isEws),
           isPhysicallyDisabled: Boolean(student.isPhysicallyDisabled),
@@ -1605,6 +1629,11 @@ const StudentManagement = () => {
       const { firstName, lastName } = splitStudentName(
         sourceRegistration.studentName,
       );
+      const carriedCustom = Object.fromEntries(
+        (sourceRegistration.customFields || [])
+          .filter((field) => field?.key)
+          .map((field) => [field.key, field.value || ""]),
+      );
       return {
         ...base,
         firstName,
@@ -1619,6 +1648,7 @@ const StudentManagement = () => {
         fatherEmail: sourceRegistration.parentEmail || "",
         address: sourceRegistration.address || "",
         previousSchoolName: sourceRegistration.previousSchoolName || "",
+        medicalConditionRemarks: sourceRegistration.notes || "",
         classId: sourceRegistration.classId
           ? String(sourceRegistration.classId)
           : "",
@@ -1630,10 +1660,19 @@ const StudentManagement = () => {
           : "",
         stream: sourceRegistration.stream || "",
         username: sourceRegistration.parentMobile || "",
+        custom: { ...(base.custom || {}), ...carriedCustom },
       };
     }
     if (sourceLead) {
       const { firstName, lastName } = splitStudentName(sourceLead.studentName);
+      const carriedCustom = Object.fromEntries(
+        (sourceLead.customFields || [])
+          .filter((field) => field?.key)
+          .map((field) => [field.key, field.value || ""]),
+      );
+      const latestRemark = [...(sourceLead.followUps || [])]
+        .reverse()
+        .find((entry) => String(entry?.comment || "").trim())?.comment;
       return {
         ...base,
         firstName,
@@ -1642,10 +1681,12 @@ const StudentManagement = () => {
         fatherMobile: sourceLead.parentMobile || "",
         fatherEmail: sourceLead.parentEmail || "",
         previousSchoolName: sourceLead.previousSchoolName || "",
+        medicalConditionRemarks: latestRemark || "",
         classId: sourceLead.classId ? String(sourceLead.classId) : "",
         streamId: sourceLead.streamId ? String(sourceLead.streamId) : "",
         stream: sourceLead.stream || "",
         username: sourceLead.parentMobile || "",
+        custom: { ...(base.custom || {}), ...carriedCustom },
       };
     }
     return { ...base };
@@ -2118,7 +2159,7 @@ const StudentManagement = () => {
             )}
 
             {/* Locked system fields — always visible at the top */}
-            <div className="mb-6 grid gap-4 rounded-xl border border-[rgb(var(--border))] bg-[rgb(var(--bg))] p-4 md:grid-cols-2">
+            <div className="mb-6 grid gap-4 rounded-xl border border-[rgb(var(--border))] bg-[rgb(var(--bg))] p-4 md:grid-cols-2 lg:grid-cols-3">
               <label className="flex flex-col gap-1.5 text-sm font-medium">
                 <span>Admission Number</span>
                 <input
@@ -2146,6 +2187,26 @@ const StudentManagement = () => {
                 <span className="text-[11px] font-normal text-[rgb(var(--text-muted))]">
                   Non-Confirmed: no fields are mandatory. Confirmed: required
                   fields must be filled.
+                </span>
+              </label>
+              <label className="flex flex-col gap-1.5 text-sm font-medium">
+                <span>Student Status</span>
+                <select
+                  name="isActive"
+                  value={form.isActive === false ? "false" : "true"}
+                  onChange={(e) =>
+                    setForm((prev) => ({
+                      ...prev,
+                      isActive: e.target.value === "true",
+                    }))
+                  }
+                  className="w-full rounded-lg border border-[rgb(var(--border))] bg-[rgb(var(--surface))] px-3 py-2.5 text-sm outline-none focus:border-[rgb(var(--primary))]"
+                >
+                  <option value="true">Active</option>
+                  <option value="false">Inactive</option>
+                </select>
+                <span className="text-[11px] font-normal text-[rgb(var(--text-muted))]">
+                  Inactive students are hidden from the default student list.
                 </span>
               </label>
             </div>

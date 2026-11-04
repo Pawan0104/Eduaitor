@@ -290,6 +290,138 @@ export const createLead = async (req, res) => {
   }
 };
 
+export const updateLead = async (req, res) => {
+  try {
+    const schoolId = req.user?.school_id;
+
+    if (!schoolId) {
+      return res.status(400).json({ success: false, message: "School ID is required" });
+    }
+
+    if (req.user?.role === "staff_admin") {
+      return res.status(403).json({
+        success: false,
+        message: "Staff can update feedback and status, not lead details",
+      });
+    }
+
+    const query = { _id: req.params.id, schoolId };
+    const existing = await Lead.findOne(query);
+    if (!existing) {
+      return res.status(404).json({ success: false, message: "Lead not found" });
+    }
+
+    if (existing.studentId || String(existing.status || "").toLowerCase() === "admitted") {
+      return res.status(400).json({
+        success: false,
+        message: "Admitted leads cannot be edited",
+      });
+    }
+
+    const {
+      studentName,
+      parentName,
+      parentMobile,
+      parentEmail,
+      previousSchoolName,
+      classId,
+      streamId,
+      stream,
+      assignedToUserId,
+      assignedToUserType,
+      customFields,
+    } = req.body;
+
+    if (!studentName?.trim()) {
+      return res.status(400).json({ success: false, message: "Student name is required" });
+    }
+    if (!parentName?.trim()) {
+      return res.status(400).json({ success: false, message: "Parent name is required" });
+    }
+    if (!parentMobile?.trim()) {
+      return res.status(400).json({ success: false, message: "Parent mobile number is required" });
+    }
+    if (!assignedToUserId || !assignedToUserType) {
+      return res.status(400).json({ success: false, message: "Lead assignee is required" });
+    }
+
+    const assignableUsers = await buildAssignableUsers(schoolId);
+    const assignee = assignableUsers.find(
+      (user) =>
+        String(user.userId) === String(assignedToUserId) &&
+        user.userType === assignedToUserType,
+    );
+    if (!assignee) {
+      return res.status(400).json({
+        success: false,
+        message: "Selected assignee is not available",
+      });
+    }
+
+    let resolvedClassId = null;
+    let resolvedClassName = "";
+    if (classId && mongoose.Types.ObjectId.isValid(classId)) {
+      const cls = await Class.findOne({ _id: classId, schoolId })
+        .select("name")
+        .lean();
+      if (!cls) {
+        return res.status(400).json({
+          success: false,
+          message: "Selected class was not found",
+        });
+      }
+      resolvedClassId = cls._id;
+      resolvedClassName = cls.name || "";
+    }
+
+    const resolvedStream = await resolveStream(schoolId, streamId || null);
+    const normalizedCustomFields = Array.isArray(customFields)
+      ? customFields
+          .filter((field) => field && typeof field.key === "string" && field.key)
+          .map((field) => ({
+            key: String(field.key).slice(0, 60),
+            label: String(field.label ?? "").slice(0, 120),
+            type: String(field.type ?? "text").slice(0, 20),
+            value:
+              field.value === undefined || field.value === null
+                ? ""
+                : String(field.value).slice(0, 4000),
+          }))
+      : [];
+
+    existing.studentName = studentName.trim();
+    existing.parentName = parentName.trim();
+    existing.parentMobile = parentMobile.trim();
+    existing.parentEmail = parentEmail?.trim() || "";
+    existing.previousSchoolName = previousSchoolName?.trim() || "";
+    existing.classId = resolvedClassId;
+    existing.className = resolvedClassName;
+    existing.streamId = resolvedStream.streamId;
+    existing.stream =
+      resolvedStream.stream ||
+      (typeof stream === "string" ? stream.trim() : "");
+    existing.assignedTo = {
+      userId: assignee.userId,
+      userType: assignee.userType,
+      name: assignee.name,
+      roleLabel: assignee.roleLabel,
+    };
+    existing.customFields = normalizedCustomFields;
+    await existing.save();
+
+    return res.json({
+      success: true,
+      message: "Lead updated successfully",
+      data: existing,
+    });
+  } catch (error) {
+    return res.status(500).json({
+      success: false,
+      message: error.message || "Failed to update lead",
+    });
+  }
+};
+
 export const deleteLead = async (req, res) => {
   try {
     const schoolId = req.user?.school_id;
@@ -347,11 +479,31 @@ export const updateLeadStatus = async (req, res) => {
       });
     }
 
-    const lead = await Lead.findOneAndUpdate(
-      query,
-      { $set: { status: nextStatus } },
-      { new: true },
-    );
+    const previousStatus = String(existing.status || "active").toLowerCase();
+    const update =
+      previousStatus === nextStatus
+        ? { $set: { status: nextStatus } }
+        : {
+            $set: { status: nextStatus },
+            $push: {
+              followUps: {
+                comment: `Status changed from ${previousStatus} to ${nextStatus}.`,
+                addedBy: {
+                  userId:
+                    req.user?._id ||
+                    req.user?.id ||
+                    req.user?.staff_id ||
+                    req.user?.school_id ||
+                    "system",
+                  name: req.user?.name || req.user?.email || "System",
+                  role: req.user?.role || "system",
+                },
+                createdAt: new Date(),
+              },
+            },
+          };
+
+    const lead = await Lead.findOneAndUpdate(query, update, { new: true });
 
     if (!lead) {
       return res.status(404).json({ success: false, message: "Lead not found" });

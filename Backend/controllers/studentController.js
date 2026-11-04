@@ -31,6 +31,24 @@ import {
 const isValidObjectId = (value) =>
   Boolean(value) && mongoose.Types.ObjectId.isValid(String(value));
 
+const resolveAdmitActor = (user = {}) => ({
+  userId: user._id || user.id || user.staff_id || user.teacher_id || user.school_id || "system",
+  name: user.name || user.email || "System",
+  role: user.role || "system",
+});
+
+const makeAdmitFollowUp = (actor, comment) => ({
+  comment: String(comment || "")
+    .trim()
+    .slice(0, 1000),
+  addedBy: {
+    userId: actor?.userId || "system",
+    name: actor?.name || "System",
+    role: actor?.role || "system",
+  },
+  createdAt: new Date(),
+});
+
 /** Coerce FormData ObjectId fields; optional fields become null when missing/invalid. */
 const sanitizeStudentObjectIds = (safeBody) => {
   const errors = [];
@@ -659,6 +677,41 @@ export const createStudent = async (req, res) => {
           convertedFromLeadId = linkedLead._id;
         }
       }
+
+      // Carry registration custom fields / notes into the student when omitted.
+      if (Array.isArray(registrationDoc.customFields) && registrationDoc.customFields.length) {
+        const byKey = new Map(
+          (customFields || []).map((field) => [field.key, field]),
+        );
+        for (const src of registrationDoc.customFields) {
+          if (!src?.key) continue;
+          const current = byKey.get(src.key);
+          if (current) {
+            if (!String(current.value || "").trim() && src.value) {
+              current.value = String(src.value).slice(0, 4000);
+            }
+          } else {
+            customFields.push({
+              key: String(src.key).slice(0, 60),
+              label: String(src.label || "").slice(0, 120),
+              type: String(src.type || "text").slice(0, 20),
+              value:
+                src.value === undefined || src.value === null
+                  ? ""
+                  : String(src.value).slice(0, 4000),
+            });
+          }
+        }
+      }
+      if (
+        registrationDoc.notes &&
+        !String(safeBody.medicalConditionRemarks || "").trim()
+      ) {
+        safeBody.medicalConditionRemarks = String(registrationDoc.notes).slice(
+          0,
+          600,
+        );
+      }
     }
 
     let resolvedStreamOnAdmit = { streamId: null, stream: "" };
@@ -734,6 +787,7 @@ export const createStudent = async (req, res) => {
       stream: resolvedStreamOnAdmit.stream,
       idCardIssuedAt: new Date(),
       confirmationStatus,
+      isActive: true,
       ...(academicYear ? { academicYear } : {}),
       convertedFromLeadId,
       convertedFromRegistrationId: registrationDoc?._id || null,
@@ -767,22 +821,45 @@ export const createStudent = async (req, res) => {
       }
     }
 
+    const admitActor = resolveAdmitActor(req.user);
+    const admitRemark = `Admitted as student ${student.studentId}${
+      registrationDoc?.registrationNumber
+        ? ` via Registration ${registrationDoc.registrationNumber}`
+        : ""
+    }.`;
+
+    if (registrationDoc) {
+      registrationDoc.status = "admitted";
+      registrationDoc.studentId = student._id;
+      registrationDoc.admittedAt = new Date();
+      registrationDoc.followUps = registrationDoc.followUps || [];
+      registrationDoc.followUps.push(
+        makeAdmitFollowUp(admitActor, admitRemark),
+      );
+      await registrationDoc.save();
+    }
+
     if (convertedFromLeadId) {
+      const leadUpdate = {
+        $set: {
+          status: "admitted",
+          studentId: student._id,
+          ...(registrationDoc?._id
+            ? { registrationId: registrationDoc._id }
+            : {}),
+        },
+        $push: {
+          followUps: makeAdmitFollowUp(admitActor, admitRemark),
+        },
+      };
       await Lead.findOneAndUpdate(
         {
           _id: convertedFromLeadId,
           schoolId,
           $or: [{ studentId: null }, { studentId: { $exists: false } }],
         },
-        { $set: { status: "admitted", studentId: student._id } },
+        leadUpdate,
       );
-    }
-
-    if (registrationDoc) {
-      registrationDoc.status = "admitted";
-      registrationDoc.studentId = student._id;
-      registrationDoc.admittedAt = new Date();
-      await registrationDoc.save();
     }
 
     // AUTO ADD TO GROUPS (non-blocking for admit)
@@ -967,9 +1044,11 @@ export const getStudents = async (req, res) => {
     }
 
     const { page, limit, skip, paginate } = parsePagination(req.query);
-    const { search, classId, gender, category } = req.query;
+    const { search, classId, gender, category, status } = req.query;
 
     const filter = { schoolId };
+
+    const andClauses = [];
 
     if (classId && mongoose.Types.ObjectId.isValid(String(classId))) {
       filter.classId = classId;
@@ -981,38 +1060,57 @@ export const getStudents = async (req, res) => {
 
     if (category) {
       if (category === "General") {
-        filter.$or = [
-          { category: "General" },
-          { category: { $exists: false } },
-          { category: null },
-        ];
+        andClauses.push({
+          $or: [
+            { category: "General" },
+            { category: { $exists: false } },
+            { category: null },
+          ],
+        });
       } else {
         filter.category = category;
       }
     }
 
+    // Default: Active only (legacy rows without isActive count as Active).
+    const statusKey = String(status || "Active").trim().toLowerCase();
+    if (statusKey === "inactive") {
+      filter.isActive = false;
+    } else if (statusKey === "all") {
+      /* no status filter */
+    } else {
+      andClauses.push({
+        $or: [
+          { isActive: true },
+          { isActive: { $exists: false } },
+          { isActive: null },
+        ],
+      });
+    }
+
     if (search?.trim()) {
       const q = search.trim().replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
       const rx = new RegExp(q, "i");
-      const searchOr = [
-        { firstName: rx },
-        { lastName: rx },
-        { studentId: rx },
-        { rollNo: rx },
-        { fatherName: rx },
-        { motherName: rx },
-        { guardianName: rx },
-        { fatherMobile: rx },
-        { motherMobile: rx },
-        { guardianMobile: rx },
-      ];
+      andClauses.push({
+        $or: [
+          { firstName: rx },
+          { lastName: rx },
+          { studentId: rx },
+          { rollNo: rx },
+          { fatherName: rx },
+          { motherName: rx },
+          { guardianName: rx },
+          { fatherMobile: rx },
+          { motherMobile: rx },
+          { guardianMobile: rx },
+        ],
+      });
+    }
 
-      if (filter.$or) {
-        filter.$and = [{ $or: filter.$or }, { $or: searchOr }];
-        delete filter.$or;
-      } else {
-        filter.$or = searchOr;
-      }
+    if (andClauses.length === 1) {
+      Object.assign(filter, andClauses[0]);
+    } else if (andClauses.length > 1) {
+      filter.$and = andClauses;
     }
 
     // skipSession: apply year filter ourselves so untagged admits (empty
@@ -1062,10 +1160,12 @@ export const getStudent = async (req, res) => {
       });
     }
 
+    // skipSession: list/delete already include untagged admits; view must too.
     const student = await Student.findOne({
       _id: req.params.id,
       schoolId,
     })
+      .setOptions({ skipSession: true })
       .populate("classId", "name className")
       .populate("sectionId", "name sectionName")
       .populate("transport", "name routeId");
@@ -1105,7 +1205,7 @@ export const updateStudent = async (req, res) => {
       });
     }
 
-    // Admission number stays system-locked; confirmation status is editable.
+    // Admission number stays system-locked; confirmation / active are editable.
     delete safeBody.studentId;
     delete safeBody.admissionNumber;
     if (safeBody.confirmationStatus !== undefined) {
@@ -1113,6 +1213,14 @@ export const updateStudent = async (req, res) => {
         String(safeBody.confirmationStatus || "").trim() === "Confirmed"
           ? "Confirmed"
           : "Non-Confirmed";
+    }
+    if (safeBody.isActive !== undefined) {
+      const raw = safeBody.isActive;
+      safeBody.isActive =
+        raw === true ||
+        raw === "true" ||
+        raw === "1" ||
+        String(raw).trim().toLowerCase() === "active";
     }
 
     normalizeStudentFeeFields(safeBody);
@@ -1125,10 +1233,12 @@ export const updateStudent = async (req, res) => {
       });
     }
 
+    // skipSession: blank/untagged admits are visible in the list but would 404
+    // under the normal academic-year filter.
     const student = await Student.findOne({
       _id: req.params.id,
       schoolId,
-    });
+    }).setOptions({ skipSession: true });
 
     if (!student) {
       return res.status(404).json({
@@ -1360,6 +1470,7 @@ export const updateStudent = async (req, res) => {
       },
       { new: true },
     )
+      .setOptions({ skipSession: true })
       .populate("classId", "name className")
       .populate("sectionId", "name sectionName")
       .populate("transport", "name routeId");
@@ -1792,7 +1903,10 @@ export const getStudentDocuments = async (req, res) => {
       ];
     }
 
+    applyAcademicYearInclusive(req, filter);
+
     const students = await Student.find(filter)
+      .setOptions({ skipSession: true })
       .select(
         "firstName lastName studentId rollNo classId sectionId documents extraDocuments customFields",
       )
@@ -1814,6 +1928,7 @@ export const getStudentDocuments = async (req, res) => {
           student.sectionId?.name || student.sectionId?.sectionName || "",
       };
 
+      const before = rows.length;
       const docs = student.documents || {};
       Object.entries(DOCUMENT_LABELS).forEach(([key, label]) => {
         pushDocRow(rows, base, key, label, docs[key], "documents");
@@ -1841,6 +1956,18 @@ export const getStudentDocuments = async (req, res) => {
           "customFields",
         );
       });
+
+      // Keep students with no uploads in the Documents list so staff can upload.
+      if (rows.length === before) {
+        rows.push({
+          ...base,
+          documentKey: "",
+          documentLabel: "",
+          url: "",
+          fileType: "",
+          source: "none",
+        });
+      }
     }
 
     return res.json({

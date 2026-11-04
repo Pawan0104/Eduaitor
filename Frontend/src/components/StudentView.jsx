@@ -27,6 +27,7 @@ const StudentView = () => {
   const [student, setStudent] = useState(null);
   const [loading, setLoading] = useState(true);
   const [photoBroken, setPhotoBroken] = useState(false);
+  const [statusSaving, setStatusSaving] = useState(false);
 
   const fetchStudent = useCallback(async () => {
     try {
@@ -55,8 +56,36 @@ const StudentView = () => {
     return () => window.removeEventListener("focus", onFocus);
   }, [fetchStudent]);
 
+  const toggleActiveStatus = async () => {
+    if (!student?._id || statusSaving) return;
+    const nextActive = student.isActive === false;
+    try {
+      setStatusSaving(true);
+      const data = new FormData();
+      data.append("isActive", nextActive ? "true" : "false");
+      const res = await axios.put(`${API}/students/${student._id}`, data, {
+        withCredentials: true,
+      });
+      setStudent(res.data?.data || { ...student, isActive: nextActive });
+      toast.success(
+        nextActive ? "Student marked Active" : "Student marked Inactive",
+      );
+    } catch (err) {
+      toast.error(err.response?.data?.message || "Could not update status");
+    } finally {
+      setStatusSaving(false);
+    }
+  };
+
   if (loading) return <Loader />;
   if (!student) return <Empty />;
+
+  const isActiveStudent = student.isActive !== false;
+  const canToggleStatus = [
+    "school_admin",
+    "staff_admin",
+    "super_admin",
+  ].includes(user?.role);
 
   const docsRaw = student.documents;
   const docs =
@@ -94,27 +123,59 @@ const StudentView = () => {
               : "/school/students",
           );
         }}
-        className="flex items-center gap-2 text-[rgb(var(--text))]  bg-[rgb(var(--primary))] mb-4 cursor-pointer m-4 p-2 rounded-xl"
+        className="flex items-center gap-2 text-[rgb(var(--text))]  bg-[rgb(var(--primary))] mb-4 cursor-pointer m-4 p-2 rounded-xl print:hidden"
       >
         <FaArrowLeft />
         Back to Students
       </button>
 
-      <div className="bg-[rgb(var(--surface))] px-6 py-5 sm:px-8 border-b-[rgb(var(--border))]">
+      <div className="bg-[rgb(var(--surface))] px-6 py-5 sm:px-8 border-b-[rgb(var(--border))] print:hidden">
         <div className="flex items-center justify-between">
           <div>
             <p className="text-[rgb(var(--text))] text-base sm:text-2xl mb-0.5">
               Student Profile
             </p>
+            <p className="text-xs text-[rgb(var(--text-muted))]">
+              Status:{" "}
+              <span
+                className={
+                  isActiveStudent
+                    ? "font-semibold text-emerald-700"
+                    : "font-semibold text-slate-500"
+                }
+              >
+                {isActiveStudent ? "Active" : "Inactive"}
+              </span>
+            </p>
           </div>
-          <div className="flex flex-wrap gap-2 print:hidden">
+          <div className="flex flex-wrap gap-2">
+            {canToggleStatus && (
+              <button
+                type="button"
+                onClick={toggleActiveStatus}
+                disabled={statusSaving}
+                className={`px-4 py-2 rounded-lg text-sm font-medium disabled:opacity-60 ${
+                  isActiveStudent
+                    ? "bg-slate-200 text-slate-800"
+                    : "bg-emerald-600 text-white"
+                }`}
+              >
+                {statusSaving
+                  ? "Saving…"
+                  : isActiveStudent
+                    ? "Mark Inactive"
+                    : "Mark Active"}
+              </button>
+            )}
             <button
+              type="button"
               onClick={() => window.print()}
               className="px-4 py-2 bg-slate-700 text-white rounded-lg text-sm font-medium flex items-center gap-2"
             >
               <FaPrint /> Print Form
             </button>
             <button
+              type="button"
               onClick={() =>
                 navigate(
                   user?.role === "teacher_admin"
@@ -130,6 +191,7 @@ const StudentView = () => {
             </button>
             {user?.role === "school_admin" && (
               <button
+                type="button"
                 onClick={() =>
                   navigate(`/school/student-manage/${student._id}`)
                 }
@@ -142,7 +204,18 @@ const StudentView = () => {
         </div>
       </div>
 
-      <div className="px-4 sm:px-6 lg:px-8 py-6 max-w-7xl mx-auto">
+      <div
+        id="student-form-print"
+        className="px-4 sm:px-6 lg:px-8 py-6 max-w-7xl mx-auto"
+      >
+        <div className="mb-4 hidden print:block">
+          <h1 className="text-xl font-semibold text-black">Student Form</h1>
+          <p className="text-sm text-slate-600">
+            {[student.firstName, student.lastName].filter(Boolean).join(" ") ||
+              "Student"}
+            {student.studentId ? ` · ${student.studentId}` : ""}
+          </p>
+        </div>
         <div className="bg-[rgb(var(--surface))] rounded-2xl border border-gray-100 shadow-sm p-6 mb-6 flex flex-col sm:flex-row gap-6 items-center sm:items-start text-[rgb(var(--text))]">
           {photoUrl && !photoBroken ? (
             <img
@@ -354,7 +427,7 @@ const StudentView = () => {
         )}
 
         {user?.role === "school_admin" && (
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 print:hidden">
             <CredentialsCard
               title="Student Login"
               icon="🎓"
@@ -368,6 +441,32 @@ const StudentView = () => {
           </div>
         )}
       </div>
+
+      <style>{`
+        @media print {
+          body * { visibility: hidden !important; }
+          #student-form-print, #student-form-print * { visibility: visible !important; }
+          #student-form-print {
+            position: absolute;
+            left: 0;
+            top: 0;
+            width: 100%;
+            max-width: none;
+            margin: 0;
+            padding: 12mm;
+            background: #fff !important;
+            color: #111 !important;
+            box-shadow: none !important;
+          }
+          #student-form-print .shadow-sm,
+          #student-form-print .rounded-2xl,
+          #student-form-print .rounded-xl {
+            box-shadow: none !important;
+          }
+          #student-form-print a { color: inherit; text-decoration: none; }
+          @page { size: auto; margin: 10mm; }
+        }
+      `}</style>
     </div>
   );
 };

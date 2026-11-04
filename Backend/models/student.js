@@ -50,6 +50,12 @@ const studentSchema = new mongoose.Schema(
       enum: ["Confirmed", "Non-Confirmed"],
       default: "Non-Confirmed",
     },
+    /** Directory visibility — All Students defaults to Active only. */
+    isActive: {
+      type: Boolean,
+      default: true,
+      index: true,
+    },
     isSpecialChild: { type: Boolean, default: false },
     isEws: { type: Boolean, default: false },
     isPhysicallyDisabled: { type: Boolean, default: false },

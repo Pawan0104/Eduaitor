@@ -22,6 +22,7 @@ const Students = () => {
   const [searchQuery, setSearchQuery] = useState("");
   const [filterCategory, setFilterCategory] = useState("");
   const [filterGender, setFilterGender] = useState("");
+  const [filterStatus, setFilterStatus] = useState("Active");
   const [classes, setClasses] = useState([]);
   const [loading, setLoading] = useState(true);
   const [page, setPage] = useState(1);
@@ -51,7 +52,11 @@ const Students = () => {
   const fetchStudents = async (pageNo = page, pageLimit = limit) => {
     try {
       setLoading(true);
-      const params = { page: pageNo, limit: pageLimit };
+      const params = {
+        page: pageNo,
+        limit: pageLimit,
+        status: filterStatus || "Active",
+      };
       if (selectedClass) params.classId = selectedClass;
       if (filterGender) params.gender = filterGender;
       if (filterCategory) params.category = filterCategory;
@@ -94,7 +99,15 @@ const Students = () => {
   useEffect(() => {
     fetchStudents(page, limit);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [page, limit, selectedClass, filterGender, filterCategory, searchQuery]);
+  }, [
+    page,
+    limit,
+    selectedClass,
+    filterGender,
+    filterCategory,
+    filterStatus,
+    searchQuery,
+  ]);
 
   const handleFilterChange = (setter) => (value) => {
     setter(value);
@@ -104,7 +117,11 @@ const Students = () => {
   const filteredStudents = students;
 
   const hasActiveFilters = Boolean(
-    searchQuery.trim() || selectedClass || filterCategory || filterGender,
+    searchQuery.trim() ||
+      selectedClass ||
+      filterCategory ||
+      filterGender ||
+      (filterStatus && filterStatus !== "Active"),
   );
 
   const clearAllFilters = () => {
@@ -112,6 +129,7 @@ const Students = () => {
     setSelectedClass("");
     setFilterCategory("");
     setFilterGender("");
+    setFilterStatus("Active");
     setPage(1);
   };
 
@@ -156,7 +174,7 @@ const Students = () => {
     }));
 
   const fetchExportRows = async () => {
-    const params = { all: true };
+    const params = { all: true, status: filterStatus || "Active" };
     if (selectedClass) params.classId = selectedClass;
     if (filterGender) params.gender = filterGender;
     if (filterCategory) params.category = filterCategory;
@@ -350,7 +368,7 @@ const Students = () => {
           )}
         </div>
 
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
           <div className="sm:col-span-2 lg:col-span-1">
             <p className="text-sm font-medium mb-2 text-[rgb(var(--text))]">
               Search
@@ -367,6 +385,23 @@ const Students = () => {
               Matches student, father, mother or guardian name and any mobile
               number
             </p>
+          </div>
+
+          <div>
+            <p className="text-sm font-medium mb-2 text-[rgb(var(--text))]">
+              Status
+            </p>
+            <select
+              value={filterStatus}
+              onChange={(e) =>
+                handleFilterChange(setFilterStatus)(e.target.value)
+              }
+              className="border rounded-lg px-4 py-2 w-full text-[rgb(var(--text))] bg-[rgb(var(--surface))]"
+            >
+              <option value="Active">Active</option>
+              <option value="Inactive">Inactive</option>
+              <option value="all">All</option>
+            </select>
           </div>
 
           <div>
@@ -488,6 +523,11 @@ const Students = () => {
                         <span className="truncate">
                           {student.firstName} {student.lastName}
                         </span>
+                        {student.isActive === false && (
+                          <span className="shrink-0 rounded-full bg-slate-200 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-slate-600">
+                            Inactive
+                          </span>
+                        )}
                       </div>
                     </td>
 

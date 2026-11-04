@@ -5,8 +5,10 @@ import { useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import {
   FaArrowLeft,
+  FaBan,
   FaClipboardList,
   FaCommentDots,
+  FaEdit,
   FaEnvelope,
   FaEye,
   FaPhone,
@@ -14,7 +16,6 @@ import {
   FaSchool,
   FaSlidersH,
   FaTimes,
-  FaTrash,
   FaUserGraduate,
   FaUserTie,
 } from "react-icons/fa";
@@ -22,6 +23,7 @@ import AdmissionFormBuilder from "../components/AdmissionFormBuilder";
 import ConfigurableFormFields, {
   buildCustomFieldsPayload,
   emptyCustomValues,
+  hydrateCustomValues,
   validateConfigurableFields,
 } from "../components/ConfigurableFormFields";
 import {
@@ -61,6 +63,7 @@ const LeadManagement = () => {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [showModal, setShowModal] = useState(false);
+  const [editingLeadId, setEditingLeadId] = useState("");
   const [builderOpen, setBuilderOpen] = useState(false);
   const [formSteps, setFormSteps] = useState(() => mergeLeadSteps(null));
   const [form, setForm] = useState(emptyForm);
@@ -79,6 +82,10 @@ const LeadManagement = () => {
     studentName: "",
     loading: false,
     followUps: [],
+  });
+  const [viewModal, setViewModal] = useState({
+    open: false,
+    lead: null,
   });
 
   const fetchPageData = async () => {
@@ -158,7 +165,44 @@ const LeadManagement = () => {
   const resetForm = () => {
     setForm(emptyForm);
     setCustomValues(emptyCustomValues(formSteps));
+    setEditingLeadId("");
     setShowModal(false);
+  };
+
+  const openCreateModal = () => {
+    setEditingLeadId("");
+    setForm(emptyForm);
+    setCustomValues(emptyCustomValues(formSteps));
+    setShowModal(true);
+  };
+
+  const openViewModal = (lead) => {
+    if (!lead?._id) return;
+    setViewModal({ open: true, lead });
+  };
+
+  const openEditModal = (lead) => {
+    if (!lead?._id) return;
+    if (lead.studentId || String(lead.status || "").toLowerCase() === "admitted") {
+      toast.error("Admitted leads cannot be edited");
+      return;
+    }
+    setEditingLeadId(lead._id);
+    setForm({
+      studentName: lead.studentName || "",
+      parentName: lead.parentName || "",
+      parentMobile: lead.parentMobile || "",
+      parentEmail: lead.parentEmail || "",
+      previousSchoolName: lead.previousSchoolName || "",
+      classId: lead.classId ? String(lead.classId) : "",
+      streamId: lead.streamId ? String(lead.streamId) : "",
+      assigneeKey:
+        lead.assignedTo?.userType && lead.assignedTo?.userId
+          ? `${lead.assignedTo.userType}:${lead.assignedTo.userId}`
+          : "",
+    });
+    setCustomValues(hydrateCustomValues(formSteps, lead.customFields || []));
+    setShowModal(true);
   };
 
   const validate = () => {
@@ -177,7 +221,7 @@ const LeadManagement = () => {
     return null;
   };
 
-  const handleCreateLead = async () => {
+  const handleSaveLead = async () => {
     const validationError = validate();
     if (validationError) {
       toast.error(validationError);
@@ -187,42 +231,81 @@ const LeadManagement = () => {
     const [assignedToUserType, assignedToUserId] = String(form.assigneeKey || "")
       .split(":");
 
+    const payload = {
+      studentName: form.studentName.trim(),
+      parentName: form.parentName.trim(),
+      parentMobile: form.parentMobile.trim(),
+      parentEmail: form.parentEmail.trim(),
+      previousSchoolName: form.previousSchoolName.trim(),
+      classId: form.classId || undefined,
+      streamId: form.streamId || undefined,
+      assignedToUserType,
+      assignedToUserId,
+      customFields: buildCustomFieldsPayload(formSteps, customValues),
+    };
+
     try {
       setSaving(true);
-      const { data } = await axios.post(
-        `${API}/leads`,
-        {
-          studentName: form.studentName.trim(),
-          parentName: form.parentName.trim(),
-          parentMobile: form.parentMobile.trim(),
-          parentEmail: form.parentEmail.trim(),
-          previousSchoolName: form.previousSchoolName.trim(),
-          classId: form.classId || undefined,
-          streamId: form.streamId || undefined,
-          assignedToUserType,
-          assignedToUserId,
-          customFields: buildCustomFieldsPayload(formSteps, customValues),
-        },
-        { withCredentials: true },
-      );
-
-      toast.success(data.message || "Lead created successfully");
+      if (editingLeadId) {
+        const { data } = await axios.put(
+          `${API}/leads/${editingLeadId}`,
+          payload,
+          { withCredentials: true },
+        );
+        toast.success(data.message || "Lead updated successfully");
+      } else {
+        const { data } = await axios.post(`${API}/leads`, payload, {
+          withCredentials: true,
+        });
+        toast.success(data.message || "Lead created successfully");
+      }
       await fetchPageData();
       resetForm();
     } catch (error) {
-      toast.error(error.response?.data?.message || "Failed to create lead");
+      toast.error(
+        error.response?.data?.message ||
+          (editingLeadId ? "Failed to update lead" : "Failed to create lead"),
+      );
     } finally {
       setSaving(false);
     }
   };
 
-  const handleDeleteLead = async (leadId) => {
+  const handleCancelLead = async (lead) => {
+    if (!lead?._id) return;
+    if (lead.studentId || String(lead.status || "").toLowerCase() === "admitted") {
+      toast.error("Admitted leads cannot be cancelled");
+      return;
+    }
+    if (String(lead.status || "").toLowerCase() === "cancelled") {
+      toast.info("Lead is already cancelled");
+      return;
+    }
+    if (
+      !window.confirm(
+        `Cancel lead for “${lead.studentName || "this student"}”? They will no longer be available for registration.`,
+      )
+    ) {
+      return;
+    }
+
     try {
-      await axios.delete(`${API}/leads/${leadId}`, { withCredentials: true });
-      toast.success("Lead deleted successfully");
-      setLeads((prev) => prev.filter((lead) => lead._id !== leadId));
+      setStatusUpdatingId(lead._id);
+      await axios.patch(
+        `${API}/leads/${lead._id}/status`,
+        { status: "cancelled" },
+        { withCredentials: true },
+      );
+      setLeads((prev) =>
+        prev.map((item) =>
+          item._id === lead._id ? { ...item, status: "cancelled" } : item,
+        ),
+      );
+      toast.success("Lead cancelled");
     } catch (error) {
-      toast.error(error.response?.data?.message || "Failed to delete lead");
+      toast.error(error.response?.data?.message || "Failed to cancel lead");
+    } finally {
+      setStatusUpdatingId("");
     }
   };
 
@@ -446,7 +529,7 @@ const LeadManagement = () => {
           )}
           {!isStaffLogin && (
             <button
-              onClick={() => setShowModal(true)}
+              onClick={openCreateModal}
               className="flex items-center gap-2 bg-[rgb(var(--primary))] text-white px-4 py-2.5 rounded-xl shadow text-sm font-medium hover:opacity-90 transition"
             >
               <FaPlus size={12} /> Add New Lead
@@ -653,12 +736,19 @@ const LeadManagement = () => {
                         onClick={() => handleOpenHistory(lead)}
                         className="inline-flex items-center gap-1 text-xs font-semibold text-[rgb(var(--primary))]"
                       >
-                        <FaEye size={11} /> View
+                        <FaEye size={11} /> History
                       </button>
                     </div>
                   </div>
 
                   <div className="flex flex-col gap-2">
+                    <button
+                      type="button"
+                      onClick={() => openViewModal(lead)}
+                      className="inline-flex items-center justify-center gap-2 px-3 py-2 rounded-xl border border-[rgb(var(--border))] text-[rgb(var(--text))] hover:bg-[rgb(var(--bg))] transition text-sm font-medium"
+                    >
+                      <FaEye size={12} /> View
+                    </button>
                     {lead.studentId || String(lead.status || "").toLowerCase() === "admitted" ? (
                       <button
                         type="button"
@@ -682,14 +772,31 @@ const LeadManagement = () => {
                       </button>
                     ) : null}
 
-                    {!isStaffLogin && (
-                      <button
-                        onClick={() => handleDeleteLead(lead._id)}
-                        className="inline-flex items-center justify-center gap-2 px-3 py-2 rounded-xl border border-red-200 text-red-500 hover:bg-red-50 transition text-sm font-medium"
-                      >
-                        <FaTrash size={12} /> Delete
-                      </button>
-                    )}
+                    {!isStaffLogin &&
+                      !lead.studentId &&
+                      String(lead.status || "").toLowerCase() !== "admitted" && (
+                        <button
+                          type="button"
+                          onClick={() => openEditModal(lead)}
+                          className="inline-flex items-center justify-center gap-2 px-3 py-2 rounded-xl border border-[rgb(var(--border))] text-[rgb(var(--text))] hover:bg-[rgb(var(--bg))] transition text-sm font-medium"
+                        >
+                          <FaEdit size={12} /> Edit
+                        </button>
+                      )}
+
+                    {!isStaffLogin &&
+                      !lead.studentId &&
+                      String(lead.status || "").toLowerCase() !== "admitted" &&
+                      String(lead.status || "").toLowerCase() !== "cancelled" && (
+                        <button
+                          type="button"
+                          onClick={() => handleCancelLead(lead)}
+                          disabled={statusUpdatingId === lead._id}
+                          className="inline-flex items-center justify-center gap-2 px-3 py-2 rounded-xl border border-amber-200 text-amber-700 bg-amber-50 hover:bg-amber-100 transition text-sm font-medium disabled:opacity-60"
+                        >
+                          <FaBan size={12} /> Cancel
+                        </button>
+                      )}
                   </div>
                 </div>
               </div>
@@ -703,9 +810,13 @@ const LeadManagement = () => {
           <div className="bg-[rgb(var(--surface))] text-[rgb(var(--text))] rounded-2xl shadow-2xl w-full max-w-2xl max-h-[94vh] flex flex-col overflow-hidden">
             <div className="flex items-center justify-between px-6 py-4 border-b border-[rgb(var(--border))] shrink-0">
               <div>
-                <h2 className="text-lg font-semibold">Add New Lead</h2>
+                <h2 className="text-lg font-semibold">
+                  {editingLeadId ? "Edit Lead" : "Add New Lead"}
+                </h2>
                 <p className="text-xs text-[rgb(var(--text-muted))] mt-0.5">
-                  Capture enquiry details and assign the lead to an admin group member.
+                  {editingLeadId
+                    ? "Update enquiry details and assignee for this lead."
+                    : "Capture enquiry details and assign the lead to an admin group member."}
                 </p>
               </div>
               <button
@@ -800,14 +911,145 @@ const LeadManagement = () => {
                 onClick={resetForm}
                 className="px-4 py-2.5 rounded-xl border border-[rgb(var(--border))] text-sm font-medium"
               >
-                Cancel
+                Close
               </button>
               <button
-                onClick={handleCreateLead}
+                onClick={handleSaveLead}
                 disabled={saving}
                 className="px-4 py-2.5 rounded-xl bg-[rgb(var(--primary))] text-white text-sm font-medium disabled:opacity-60"
               >
-                {saving ? "Saving..." : "Create Lead"}
+                {saving
+                  ? "Saving..."
+                  : editingLeadId
+                    ? "Update Lead"
+                    : "Create Lead"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {viewModal.open && viewModal.lead && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-[rgb(var(--surface))] text-[rgb(var(--text))] rounded-2xl shadow-2xl w-full max-w-2xl max-h-[90vh] overflow-hidden flex flex-col">
+            <div className="flex items-center justify-between px-6 py-4 border-b border-[rgb(var(--border))]">
+              <div>
+                <h3 className="text-lg font-semibold">Lead Details</h3>
+                <p className="text-xs text-[rgb(var(--text-muted))] mt-0.5">
+                  {viewModal.lead.leadNumber
+                    ? `Lead No. ${viewModal.lead.leadNumber}`
+                    : "Enquiry details"}
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setViewModal({ open: false, lead: null })}
+                className="text-[rgb(var(--text-muted))] hover:text-red-400 transition"
+              >
+                <FaTimes size={18} />
+              </button>
+            </div>
+
+            <div className="p-6 overflow-y-auto space-y-4 text-sm">
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                {[
+                  ["Student Name", viewModal.lead.studentName],
+                  ["Parent Name", viewModal.lead.parentName],
+                  ["Parent Mobile", viewModal.lead.parentMobile],
+                  ["Parent Email", viewModal.lead.parentEmail],
+                  ["Previous School", viewModal.lead.previousSchoolName],
+                  ["Class", viewModal.lead.className],
+                  ["Stream", viewModal.lead.stream],
+                  [
+                    "Status",
+                    formatLeadStatus(
+                      String(viewModal.lead.status || "active").toLowerCase(),
+                    ),
+                  ],
+                  ["Assigned To", viewModal.lead.assignedTo?.name],
+                  [
+                    "Assignee Role",
+                    viewModal.lead.assignedTo?.roleLabel,
+                  ],
+                  [
+                    "Source",
+                    viewModal.lead.source === "website"
+                      ? "Website"
+                      : viewModal.lead.createdByName || "Office",
+                  ],
+                  [
+                    "Created",
+                    viewModal.lead.createdAt
+                      ? new Date(viewModal.lead.createdAt).toLocaleString()
+                      : "",
+                  ],
+                  [
+                    "Follow-ups",
+                    String(viewModal.lead.followUps?.length || 0),
+                  ],
+                ].map(([label, value]) => (
+                  <div
+                    key={label}
+                    className="rounded-lg border border-[rgb(var(--border))] px-3 py-2"
+                  >
+                    <p className="text-[11px] font-semibold uppercase tracking-wide text-[rgb(var(--text-muted))]">
+                      {label}
+                    </p>
+                    <p className="mt-0.5 font-medium text-[rgb(var(--text))]">
+                      {value || "—"}
+                    </p>
+                  </div>
+                ))}
+              </div>
+
+              {Array.isArray(viewModal.lead.customFields) &&
+              viewModal.lead.customFields.length > 0 ? (
+                <div>
+                  <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-[rgb(var(--text-muted))]">
+                    Additional fields
+                  </p>
+                  <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                    {viewModal.lead.customFields.map((field) => (
+                      <div
+                        key={field.key}
+                        className="rounded-lg border border-[rgb(var(--border))] px-3 py-2"
+                      >
+                        <p className="text-[11px] font-semibold uppercase tracking-wide text-[rgb(var(--text-muted))]">
+                          {field.label || field.key}
+                        </p>
+                        <p className="mt-0.5 font-medium text-[rgb(var(--text))]">
+                          {field.value || "—"}
+                        </p>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              ) : null}
+            </div>
+
+            <div className="flex flex-wrap justify-end gap-2 border-t border-[rgb(var(--border))] px-6 py-4">
+              {!isStaffLogin &&
+                !viewModal.lead.studentId &&
+                String(viewModal.lead.status || "").toLowerCase() !==
+                  "admitted" && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const lead = viewModal.lead;
+                      setViewModal({ open: false, lead: null });
+                      openEditModal(lead);
+                    }}
+                    className="inline-flex items-center gap-2 rounded-xl border border-[rgb(var(--border))] px-4 py-2 text-sm font-medium"
+                  >
+                    <FaEdit size={12} /> Edit
+                  </button>
+                )}
+              <button
+                type="button"
+                onClick={() => setViewModal({ open: false, lead: null })}
+                className="rounded-xl bg-[rgb(var(--primary))] px-4 py-2 text-sm font-medium text-white"
+              >
+                Close
               </button>
             </div>
           </div>

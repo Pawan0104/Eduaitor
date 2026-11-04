@@ -433,6 +433,9 @@ const Registrations = () => {
         await openEditById(lead.registrationId);
         return;
       }
+      const latestRemark = [...(lead.followUps || [])]
+        .reverse()
+        .find((entry) => String(entry?.comment || "").trim())?.comment || "";
       setLeadInfo({ _id: lead._id, name: lead.studentName });
       setRegForm({
         ...emptyRegistration(),
@@ -443,7 +446,7 @@ const Registrations = () => {
         previousSchoolName: lead.previousSchoolName || "",
         classId: lead.classId ? String(lead.classId) : "",
         streamId: lead.streamId ? String(lead.streamId) : "",
-        notes: lead.notes || "",
+        notes: latestRemark,
       });
       setCustomValues(
         hydrateCustomValues(formSteps, lead.customFields || []),
@@ -642,11 +645,21 @@ const Registrations = () => {
     }
     setFollowUpSavingId(registrationId);
     try {
-      await axios.post(
+      const { data } = await axios.post(
         `${API}/registrations/${registrationId}/followups`,
         { comment },
         { withCredentials: true },
       );
+      const updated = data?.data;
+      if (updated?._id) {
+        setRegistrations((prev) =>
+          prev.map((row) =>
+            String(row._id) === String(registrationId)
+              ? { ...row, ...updated }
+              : row,
+          ),
+        );
+      }
       toast.success("Follow-up added.");
       setFollowUpDrafts((prev) => ({ ...prev, [registrationId]: "" }));
       await loadRegistrations();
@@ -1110,11 +1123,23 @@ const Registrations = () => {
               </p>
             ) : (
               <div className="divide-y divide-[rgb(var(--border))]">
-                {registrations.map((registration) => (
+                {registrations.map((registration) => {
+                  const followUpCount = Array.isArray(registration.followUps)
+                    ? registration.followUps.length
+                    : 0;
+                  const latestFollowUp = followUpCount
+                    ? [...registration.followUps].sort(
+                        (a, b) =>
+                          new Date(b.createdAt || 0) -
+                          new Date(a.createdAt || 0),
+                      )[0]
+                    : null;
+                  return (
                   <div
                     key={registration._id}
-                    className="flex flex-col gap-4 px-5 py-4 lg:flex-row lg:items-center lg:justify-between"
+                    className="space-y-3 px-5 py-4"
                   >
+                    <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
                     <div className="min-w-0 space-y-2">
                       <div className="flex flex-wrap items-center gap-2">
                         <p className="text-lg font-semibold text-[rgb(var(--text))]">
@@ -1165,42 +1190,6 @@ const Registrations = () => {
                           "No entrance exam linked"
                         )}
                       </p>
-                      <div className="pt-1">
-                        <div className="flex gap-2">
-                          <textarea
-                            value={followUpDrafts[registration._id] || ""}
-                            onChange={(event) =>
-                              setFollowUpDrafts((prev) => ({
-                                ...prev,
-                                [registration._id]: event.target.value,
-                              }))
-                            }
-                            placeholder="Add follow-up comment"
-                            rows={2}
-                            className="w-full min-w-[220px] rounded-xl border border-[rgb(var(--border))] bg-[rgb(var(--bg))] px-3 py-2 text-sm resize-none"
-                          />
-                          <button
-                            type="button"
-                            onClick={() => handleAddFollowUp(registration._id)}
-                            disabled={followUpSavingId === registration._id}
-                            className={`${btnGhost} shrink-0`}
-                          >
-                            <FiMessageSquare size={12} /> Add
-                          </button>
-                        </div>
-                        <div className="mt-1.5 flex items-center justify-between">
-                          <p className="text-xs text-[rgb(var(--text-muted))]">
-                            Follow-ups: {registration.followUps?.length || 0}
-                          </p>
-                          <button
-                            type="button"
-                            onClick={() => openFollowUpHistory(registration)}
-                            className="text-xs font-semibold text-[rgb(var(--primary))]"
-                          >
-                            View history
-                          </button>
-                        </div>
-                      </div>
                     </div>
 
                     <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap lg:justify-end">
@@ -1262,8 +1251,66 @@ const Registrations = () => {
                         <FiTrash2 size={12} /> Delete
                       </button>
                     </div>
+                    </div>
+
+                    <div className="rounded-xl border border-[rgb(var(--border))] bg-[rgb(var(--bg))] p-3">
+                      <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
+                        <p className="text-xs font-semibold uppercase tracking-wide text-[rgb(var(--text-muted))]">
+                          Follow-up
+                        </p>
+                        <button
+                          type="button"
+                          onClick={() => openFollowUpHistory(registration)}
+                          className="inline-flex items-center gap-1 text-xs font-semibold text-[rgb(var(--primary))]"
+                        >
+                          <FiMessageSquare size={11} />
+                          History ({followUpCount})
+                        </button>
+                      </div>
+                      {latestFollowUp ? (
+                        <p className="mb-2 line-clamp-2 text-xs text-[rgb(var(--text-muted))]">
+                          Latest: {latestFollowUp.comment}
+                          {latestFollowUp.addedBy?.name
+                            ? ` — ${latestFollowUp.addedBy.name}`
+                            : ""}
+                        </p>
+                      ) : (
+                        <p className="mb-2 text-xs text-[rgb(var(--text-muted))]">
+                          No follow-ups yet. Add the first note below.
+                        </p>
+                      )}
+                      <textarea
+                        value={followUpDrafts[registration._id] || ""}
+                        onChange={(event) =>
+                          setFollowUpDrafts((prev) => ({
+                            ...prev,
+                            [registration._id]: event.target.value,
+                          }))
+                        }
+                        placeholder="Write a follow-up note…"
+                        rows={2}
+                        className="w-full rounded-lg border border-[rgb(var(--border))] bg-[rgb(var(--surface))] px-3 py-2 text-sm text-[rgb(var(--text))] outline-none transition focus:border-[rgb(var(--primary))]"
+                      />
+                      <div className="mt-2 flex justify-end">
+                        <button
+                          type="button"
+                          onClick={() => handleAddFollowUp(registration._id)}
+                          disabled={
+                            followUpSavingId === registration._id ||
+                            !String(followUpDrafts[registration._id] || "").trim()
+                          }
+                          className={`${btnPrimary} disabled:cursor-not-allowed disabled:opacity-40`}
+                        >
+                          <FiMessageSquare size={12} />
+                          {followUpSavingId === registration._id
+                            ? "Saving…"
+                            : "Add follow-up"}
+                        </button>
+                      </div>
+                    </div>
                   </div>
-                ))}
+                  );
+                })}
               </div>
             )}
 
@@ -2139,6 +2186,25 @@ const Registrations = () => {
           </div>
         )}
       </Modal>
+
+      <style>{`
+        @media print {
+          body * { visibility: hidden !important; }
+          #registration-print-area, #registration-print-area * {
+            visibility: visible !important;
+          }
+          #registration-print-area {
+            position: absolute;
+            left: 0;
+            top: 0;
+            width: 100%;
+            padding: 12mm;
+            background: #fff !important;
+            color: #111 !important;
+          }
+          @page { size: auto; margin: 10mm; }
+        }
+      `}</style>
     </div>
   );
 };

@@ -77,10 +77,55 @@ const resolveSection = async (schoolId, sectionId) => {
 };
 
 const resolveActor = (user = {}) => ({
-  userId: user._id || user.id || user.staff_id || user.teacher_id || user.school_id,
-  name: user.name || user.email || "Unknown User",
+  userId:
+    user._id ||
+    user.id ||
+    user.staff_id ||
+    user.teacher_id ||
+    user.school_id ||
+    user.userId ||
+    "system",
+  name: user.name || user.email || user.role || "Unknown User",
   role: user.role || "",
 });
+
+const makeFollowUp = (actor, comment) => ({
+  comment: String(comment || "")
+    .trim()
+    .slice(0, 1000),
+  addedBy: {
+    userId: actor?.userId || "system",
+    name: actor?.name || "System",
+    role: actor?.role || "system",
+  },
+  createdAt: new Date(),
+});
+
+const normalizeCustomFieldList = (list = []) =>
+  (Array.isArray(list) ? list : [])
+    .filter((field) => field && typeof field.key === "string" && field.key)
+    .map((field) => ({
+      key: String(field.key).slice(0, 60),
+      label: String(field.label ?? "").slice(0, 120),
+      type: String(field.type ?? "text").slice(0, 20),
+      value:
+        field.value === undefined || field.value === null
+          ? ""
+          : String(field.value).slice(0, 4000),
+    }));
+
+const cloneFollowUps = (list = []) =>
+  (Array.isArray(list) ? list : [])
+    .filter((entry) => entry && String(entry.comment || "").trim())
+    .map((entry) => ({
+      comment: String(entry.comment).trim().slice(0, 1000),
+      addedBy: {
+        userId: entry.addedBy?.userId ?? "system",
+        name: String(entry.addedBy?.name || "System").slice(0, 120),
+        role: String(entry.addedBy?.role || "").slice(0, 60),
+      },
+      createdAt: entry.createdAt ? new Date(entry.createdAt) : new Date(),
+    }));
 
 const sourceLabelOf = (plain = {}) => {
   if (plain.source === "public") return "Website";
@@ -260,10 +305,23 @@ export const createRegistration = async (req, res) => {
           .status(404)
           .json({ success: false, message: "Lead not found." });
       }
-      if (lead.studentId) {
+      if (lead.studentId || lead.status === "admitted") {
         return res.status(400).json({
           success: false,
           message: "This lead has already been admitted.",
+        });
+      }
+      if (lead.status === "cancelled") {
+        return res.status(400).json({
+          success: false,
+          message: "Cancelled leads cannot be registered.",
+        });
+      }
+      if (lead.registrationId) {
+        return res.status(400).json({
+          success: false,
+          message:
+            "This lead already has a registration. Open that registration instead.",
         });
       }
       source = "lead";
@@ -287,23 +345,43 @@ export const createRegistration = async (req, res) => {
       }
     }
 
-    const normalizedCustomFields = Array.isArray(body.customFields)
-      ? body.customFields
-          .filter((field) => field && typeof field.key === "string" && field.key)
-          .map((field) => ({
-            key: String(field.key).slice(0, 60),
-            label: String(field.label ?? "").slice(0, 120),
-            type: String(field.type ?? "text").slice(0, 20),
-            value:
-              field.value === undefined || field.value === null
-                ? ""
-                : String(field.value).slice(0, 4000),
-          }))
-      : [];
+    let normalizedCustomFields = normalizeCustomFieldList(body.customFields);
+    // Carry custom fields from the lead when the registration form did not send any.
+    if (!normalizedCustomFields.length && lead?.customFields?.length) {
+      normalizedCustomFields = normalizeCustomFieldList(lead.customFields);
+    }
+
+    const actor = resolveActor(req.user);
+    const registrationNumber = await nextRegistrationNumber(schoolId);
+    const followUps = lead ? cloneFollowUps(lead.followUps) : [];
+    if (lead) {
+      followUps.push(
+        makeFollowUp(
+          actor,
+          `Created from Lead ${lead.leadNumber || lead._id}. Status moved to Registration.`,
+        ),
+      );
+    } else {
+      followUps.push(
+        makeFollowUp(
+          actor,
+          `Registration ${registrationNumber} created.`,
+        ),
+      );
+    }
+
+    // Prefer submitted notes; otherwise seed from the lead's latest follow-up.
+    let notes = sanitize(body.notes, 600);
+    if (!notes && lead?.followUps?.length) {
+      const latest = [...lead.followUps]
+        .reverse()
+        .find((entry) => String(entry?.comment || "").trim());
+      if (latest) notes = sanitize(latest.comment, 600);
+    }
 
     const registration = new Registration({
       schoolId,
-      registrationNumber: await nextRegistrationNumber(schoolId),
+      registrationNumber,
       academicYear,
       studentName,
       dob: parseDate(body.dob),
@@ -323,9 +401,13 @@ export const createRegistration = async (req, res) => {
       address: sanitize(body.address, 400),
       city: sanitize(body.city, 80),
       pincode: sanitize(body.pincode, 10),
-      previousSchoolName: sanitize(body.previousSchoolName, 160),
-      notes: sanitize(body.notes, 600),
+      previousSchoolName: sanitize(
+        body.previousSchoolName || lead?.previousSchoolName,
+        160,
+      ),
+      notes,
       customFields: normalizedCustomFields,
+      followUps,
       source,
       leadId: lead?._id || null,
       createdBy: req.user?._id && mongoose.Types.ObjectId.isValid(req.user._id)
@@ -334,7 +416,7 @@ export const createRegistration = async (req, res) => {
       createdByName:
         source === "public"
           ? "Website"
-          : resolveActor(req.user).name || "",
+          : actor.name || "",
       status: "registered",
     });
 
@@ -353,13 +435,24 @@ export const createRegistration = async (req, res) => {
     await registration.save();
 
     if (lead) {
-      await Lead.updateOne(
-        { _id: lead._id, schoolId, status: "active" },
-        { $set: { registrationId: registration._id, status: "processing" } },
-      );
-      await Lead.updateOne(
-        { _id: lead._id, schoolId, status: { $ne: "active" } },
-        { $set: { registrationId: registration._id } },
+      await Lead.findOneAndUpdate(
+        {
+          _id: lead._id,
+          schoolId,
+          status: { $nin: ["admitted", "cancelled"] },
+        },
+        {
+          $set: {
+            registrationId: registration._id,
+            status: "processing",
+          },
+          $push: {
+            followUps: makeFollowUp(
+              actor,
+              `Moved to Registration ${registration.registrationNumber}. Status set to Processing.`,
+            ),
+          },
+        },
       );
     }
 
@@ -567,10 +660,27 @@ export const updateRegistrationStatus = async (req, res) => {
       });
     }
 
+    const actor = resolveActor(req.user);
+    const previousStatus = registration.status;
+
     if (next === "cancelled") {
       registration.status = "cancelled";
+      registration.followUps = registration.followUps || [];
+      registration.followUps.push(
+        makeFollowUp(
+          actor,
+          `Registration cancelled (was ${previousStatus}).`,
+        ),
+      );
     } else {
       registration.status = "registered";
+      registration.followUps = registration.followUps || [];
+      registration.followUps.push(
+        makeFollowUp(
+          actor,
+          `Registration restored to Registered (was ${previousStatus}).`,
+        ),
+      );
       if (registration.entranceExamId) {
         const exam = await EntranceExam.findOne({
           _id: registration.entranceExamId,
@@ -590,6 +700,50 @@ export const updateRegistrationStatus = async (req, res) => {
     }
 
     await registration.save();
+
+    // Keep the linked lead in sync with registration lifecycle.
+    if (registration.leadId) {
+      if (next === "cancelled") {
+        await Lead.findOneAndUpdate(
+          {
+            _id: registration.leadId,
+            schoolId,
+            status: { $nin: ["admitted", "cancelled"] },
+          },
+          {
+            $set: { status: "active" },
+            $unset: { registrationId: 1 },
+            $push: {
+              followUps: makeFollowUp(
+                actor,
+                `Registration ${registration.registrationNumber} cancelled. Lead returned to Active.`,
+              ),
+            },
+          },
+        );
+      } else {
+        await Lead.findOneAndUpdate(
+          {
+            _id: registration.leadId,
+            schoolId,
+            status: { $nin: ["admitted", "cancelled"] },
+          },
+          {
+            $set: {
+              status: "processing",
+              registrationId: registration._id,
+            },
+            $push: {
+              followUps: makeFollowUp(
+                actor,
+                `Registration ${registration.registrationNumber} restored. Lead set to Processing.`,
+              ),
+            },
+          },
+        );
+      }
+    }
+
     return res.json({
       success: true,
       message: `Registration marked ${registration.status}.`,
@@ -768,18 +922,12 @@ export const addRegistrationFollowUp = async (req, res) => {
         .json({ success: false, message: "Feedback comment is required" });
     }
 
-    const actor = resolveActor(req.user);
-    if (!actor.userId) {
+    const followUp = makeFollowUp(resolveActor(req.user), comment);
+    if (!followUp.comment) {
       return res
         .status(400)
-        .json({ success: false, message: "Invalid user context" });
+        .json({ success: false, message: "Feedback comment is required" });
     }
-
-    const followUp = {
-      comment,
-      addedBy: actor,
-      createdAt: new Date(),
-    };
 
     const registration = await Registration.findOneAndUpdate(
       { _id: req.params.id, schoolId },
@@ -799,6 +947,7 @@ export const addRegistrationFollowUp = async (req, res) => {
       data: toPayload(registration),
     });
   } catch (error) {
+    console.error("addRegistrationFollowUp failed:", error);
     return res.status(error.statusCode || 500).json({
       success: false,
       message: error.message || "Failed to add feedback",
