@@ -719,6 +719,7 @@ export const createStudent = async (req, res) => {
       resolvedStreamOnAdmit = await resolveStream(
         schoolId,
         safeBody.streamId || null,
+        safeBody.classId || null,
       );
     } catch (streamErr) {
       return res.status(streamErr.statusCode || 400).json({

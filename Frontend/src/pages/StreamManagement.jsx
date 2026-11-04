@@ -12,6 +12,7 @@ const emptyForm = () => ({
   code: "",
   description: "",
   status: "Active",
+  classIds: [],
 });
 
 export default function StreamManagement() {
@@ -22,6 +23,7 @@ export default function StreamManagement() {
     user?.role === "school_admin" || user?.role === "super_admin";
 
   const [streams, setStreams] = useState([]);
+  const [classes, setClasses] = useState([]);
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [showModal, setShowModal] = useState(false);
@@ -42,8 +44,20 @@ export default function StreamManagement() {
     }
   };
 
+  const fetchClasses = async () => {
+    try {
+      const { data } = await axios.get(`${API}/classes/all`, {
+        withCredentials: true,
+      });
+      setClasses(data?.classes || []);
+    } catch {
+      setClasses([]);
+    }
+  };
+
   useEffect(() => {
     fetchStreams();
+    fetchClasses();
   }, []);
 
   const openCreate = () => {
@@ -59,6 +73,7 @@ export default function StreamManagement() {
       code: stream.code || "",
       description: stream.description || "",
       status: stream.status || "Active",
+      classIds: (stream.classIds || []).map(String),
     });
     setShowModal(true);
   };
@@ -69,22 +84,44 @@ export default function StreamManagement() {
     setForm(emptyForm());
   };
 
+  const toggleClass = (classId) => {
+    const id = String(classId);
+    setForm((prev) => {
+      const has = prev.classIds.includes(id);
+      return {
+        ...prev,
+        classIds: has
+          ? prev.classIds.filter((item) => item !== id)
+          : [...prev.classIds, id],
+      };
+    });
+  };
+
   const saveStream = async () => {
     if (!form.name.trim()) {
       toast.error("Stream name is required");
       return;
     }
+    if (!form.classIds.length) {
+      toast.error("Select at least one class for this stream");
+      return;
+    }
     try {
       setSaving(true);
+      const payload = {
+        name: form.name.trim(),
+        code: form.code.trim(),
+        description: form.description.trim(),
+        status: form.status,
+        classIds: form.classIds,
+      };
       if (editing?._id) {
-        await axios.put(
-          `${API}/streams/update/${editing._id}`,
-          form,
-          { withCredentials: true },
-        );
+        await axios.put(`${API}/streams/update/${editing._id}`, payload, {
+          withCredentials: true,
+        });
         toast.success("Stream updated");
       } else {
-        await axios.post(`${API}/streams/create`, form, {
+        await axios.post(`${API}/streams/create`, payload, {
           withCredentials: true,
         });
         toast.success("Stream created");
@@ -109,6 +146,13 @@ export default function StreamManagement() {
     } catch (error) {
       toast.error(error.response?.data?.message || "Delete failed");
     }
+  };
+
+  const classLabel = (stream) => {
+    const names = stream.classNames || stream.classes?.map((c) => c.name) || [];
+    if (names.length) return names.join(", ");
+    if (!(stream.classIds || []).length) return "All classes";
+    return "Linked classes";
   };
 
   return (
@@ -139,7 +183,8 @@ export default function StreamManagement() {
             Streams
           </h1>
           <p className="mt-0.5 text-sm text-[rgb(var(--text-muted))]">
-            Manage academic streams used in leads, registration and admission.
+            Link each stream to one or more classes for leads, registration and
+            admission.
           </p>
         </div>
         {canManage && (
@@ -160,7 +205,8 @@ export default function StreamManagement() {
           </p>
         ) : streams.length === 0 ? (
           <p className="px-5 py-10 text-center text-[rgb(var(--text-muted))]">
-            No streams yet. Add Science, Commerce, Arts or any custom stream.
+            No streams yet. Add Science, Commerce, Arts and assign them to
+            classes.
           </p>
         ) : (
           <div className="divide-y divide-[rgb(var(--border))]">
@@ -187,6 +233,9 @@ export default function StreamManagement() {
                       {stream.status}
                     </span>
                   </div>
+                  <p className="mt-1 text-sm text-[rgb(var(--text-muted))]">
+                    Classes: {classLabel(stream)}
+                  </p>
                   {stream.description ? (
                     <p className="mt-1 text-sm text-[rgb(var(--text-muted))]">
                       {stream.description}
@@ -219,13 +268,13 @@ export default function StreamManagement() {
 
       {showModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-          <div className="w-full max-w-lg overflow-hidden rounded-2xl bg-[rgb(var(--surface))] text-[rgb(var(--text))] shadow-2xl">
+          <div className="flex max-h-[92vh] w-full max-w-lg flex-col overflow-hidden rounded-2xl bg-[rgb(var(--surface))] text-[rgb(var(--text))] shadow-2xl">
             <div className="border-b border-[rgb(var(--border))] px-6 py-4">
               <h2 className="text-lg font-semibold">
                 {editing ? "Edit Stream" : "Add Stream"}
               </h2>
             </div>
-            <div className="grid grid-cols-1 gap-4 p-6 sm:grid-cols-2">
+            <div className="grid flex-1 grid-cols-1 gap-4 overflow-y-auto p-6 sm:grid-cols-2">
               <label className="flex flex-col gap-2 text-sm font-medium sm:col-span-2">
                 Stream Name *
                 <input
@@ -261,6 +310,64 @@ export default function StreamManagement() {
                   <option value="Inactive">Inactive</option>
                 </select>
               </label>
+              <div className="sm:col-span-2">
+                <div className="mb-2 flex items-center justify-between gap-2">
+                  <p className="text-sm font-medium">Classes *</p>
+                  <div className="flex gap-2">
+                    <button
+                      type="button"
+                      onClick={() =>
+                        setForm((prev) => ({
+                          ...prev,
+                          classIds: classes.map((cls) => String(cls._id)),
+                        }))
+                      }
+                      className="text-[11px] font-semibold text-[rgb(var(--primary))]"
+                    >
+                      Select all
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() =>
+                        setForm((prev) => ({ ...prev, classIds: [] }))
+                      }
+                      className="text-[11px] font-semibold text-[rgb(var(--text-muted))]"
+                    >
+                      Clear
+                    </button>
+                  </div>
+                </div>
+                {classes.length === 0 ? (
+                  <p className="rounded-xl border border-dashed border-[rgb(var(--border))] px-3 py-4 text-sm text-[rgb(var(--text-muted))]">
+                    No classes found. Create classes first, then link streams.
+                  </p>
+                ) : (
+                  <div className="max-h-48 space-y-2 overflow-y-auto rounded-xl border border-[rgb(var(--border))] p-3">
+                    {classes.map((cls) => {
+                      const id = String(cls._id);
+                      const checked = form.classIds.includes(id);
+                      return (
+                        <label
+                          key={id}
+                          className={`flex cursor-pointer items-center gap-3 rounded-lg border px-3 py-2 text-sm ${
+                            checked
+                              ? "border-[rgb(var(--primary))] bg-[rgba(var(--primary),0.06)]"
+                              : "border-[rgb(var(--border))]"
+                          }`}
+                        >
+                          <input
+                            type="checkbox"
+                            checked={checked}
+                            onChange={() => toggleClass(id)}
+                            className="h-4 w-4 accent-[rgb(var(--primary))]"
+                          />
+                          <span className="font-medium">{cls.name}</span>
+                        </label>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
               <label className="flex flex-col gap-2 text-sm font-medium sm:col-span-2">
                 Description
                 <textarea

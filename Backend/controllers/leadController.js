@@ -254,7 +254,11 @@ export const createLead = async (req, res) => {
       resolvedClassName = cls.name || "";
     }
 
-    const resolvedStream = await resolveStream(schoolId, streamId || null);
+    const resolvedStream = await resolveStream(
+      schoolId,
+      streamId || null,
+      resolvedClassId,
+    );
     const actor = resolveActor(req.user);
     const lead = await Lead.create({
       studentName: studentName.trim(),
@@ -374,7 +378,11 @@ export const updateLead = async (req, res) => {
       resolvedClassName = cls.name || "";
     }
 
-    const resolvedStream = await resolveStream(schoolId, streamId || null);
+    const resolvedStream = await resolveStream(
+      schoolId,
+      streamId || null,
+      resolvedClassId,
+    );
     const normalizedCustomFields = Array.isArray(customFields)
       ? customFields
           .filter((field) => field && typeof field.key === "string" && field.key)

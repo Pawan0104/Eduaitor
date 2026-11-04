@@ -1,6 +1,76 @@
+import mongoose from "mongoose";
 import Stream from "../models/stream.js";
+import Class from "../models/class.js";
 
 const schoolIdOf = (req) => req.user?.school_id;
+
+const normalizeClassIds = async (schoolId, raw) => {
+  const list = Array.isArray(raw)
+    ? raw
+    : raw
+      ? [raw]
+      : [];
+  const unique = [
+    ...new Set(
+      list
+        .map((id) => String(id || "").trim())
+        .filter((id) => mongoose.Types.ObjectId.isValid(id)),
+    ),
+  ];
+  if (!unique.length) return [];
+
+  const classes = await Class.find({
+    schoolId,
+    _id: { $in: unique },
+  })
+    .select("_id")
+    .lean();
+  const allowed = new Set(classes.map((c) => String(c._id)));
+  return unique
+    .filter((id) => allowed.has(id))
+    .map((id) => new mongoose.Types.ObjectId(id));
+};
+
+const decorateStreams = async (schoolId, streams) => {
+  const classIdSet = new Set();
+  for (const stream of streams) {
+    for (const id of stream.classIds || []) {
+      classIdSet.add(String(id));
+    }
+  }
+  if (!classIdSet.size) {
+    return streams.map((stream) => ({
+      ...stream,
+      classIds: (stream.classIds || []).map(String),
+      classNames: [],
+      classes: [],
+    }));
+  }
+
+  const classes = await Class.find({
+    schoolId,
+    _id: { $in: [...classIdSet] },
+  })
+    .select("name")
+    .lean();
+  const byId = Object.fromEntries(
+    classes.map((cls) => [String(cls._id), cls.name || ""]),
+  );
+
+  return streams.map((stream) => {
+    const classIds = (stream.classIds || []).map((id) => String(id));
+    const classNames = classIds.map((id) => byId[id]).filter(Boolean);
+    return {
+      ...stream,
+      classIds,
+      classNames,
+      classes: classIds.map((id) => ({
+        _id: id,
+        name: byId[id] || "",
+      })),
+    };
+  });
+};
 
 export const getStreams = async (req, res) => {
   try {
@@ -23,8 +93,24 @@ export const getStreams = async (req, res) => {
       ];
     }
 
+    const classId = String(req.query.classId || "").trim();
+    if (classId && mongoose.Types.ObjectId.isValid(classId)) {
+      const classOid = new mongoose.Types.ObjectId(classId);
+      filter.$and = [
+        ...(filter.$and || []),
+        {
+          $or: [
+            { classIds: { $exists: false } },
+            { classIds: { $size: 0 } },
+            { classIds: classOid },
+          ],
+        },
+      ];
+    }
+
     const streams = await Stream.find(filter).sort({ name: 1 }).lean();
-    return res.json({ success: true, streams, data: streams });
+    const decorated = await decorateStreams(schoolId, streams);
+    return res.json({ success: true, streams: decorated, data: decorated });
   } catch (error) {
     return res.status(500).json({
       success: false,
@@ -49,6 +135,14 @@ export const createStream = async (req, res) => {
         .json({ success: false, message: "Stream name is required." });
     }
 
+    const classIds = await normalizeClassIds(schoolId, req.body?.classIds);
+    if (!classIds.length) {
+      return res.status(400).json({
+        success: false,
+        message: "Select at least one class for this stream.",
+      });
+    }
+
     const exists = await Stream.findOne({ schoolId, name }).select("_id").lean();
     if (exists) {
       return res.status(400).json({
@@ -62,13 +156,15 @@ export const createStream = async (req, res) => {
       name,
       code: String(req.body?.code || "").trim().toUpperCase(),
       description: String(req.body?.description || "").trim(),
+      classIds,
       status: req.body?.status === "Inactive" ? "Inactive" : "Active",
     });
 
+    const [decorated] = await decorateStreams(schoolId, [stream.toObject()]);
     return res.status(201).json({
       success: true,
       message: "Stream created successfully",
-      data: stream,
+      data: decorated,
     });
   } catch (error) {
     if (error.code === 11000) {
@@ -127,12 +223,23 @@ export const updateStream = async (req, res) => {
       stream.status =
         req.body.status === "Inactive" ? "Inactive" : "Active";
     }
+    if (req.body?.classIds !== undefined) {
+      const classIds = await normalizeClassIds(schoolId, req.body.classIds);
+      if (!classIds.length) {
+        return res.status(400).json({
+          success: false,
+          message: "Select at least one class for this stream.",
+        });
+      }
+      stream.classIds = classIds;
+    }
 
     await stream.save();
+    const [decorated] = await decorateStreams(schoolId, [stream.toObject()]);
     return res.json({
       success: true,
       message: "Stream updated successfully",
-      data: stream,
+      data: decorated,
     });
   } catch (error) {
     if (error.code === 11000) {

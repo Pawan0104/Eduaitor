@@ -157,9 +157,32 @@ const LeadManagement = () => {
     [assignees],
   );
 
+  const streamsForClass = (classId) => {
+    const selected = String(classId || "");
+    return (streams || []).filter((item) => {
+      const linked = (item.classIds || []).map(String);
+      if (!linked.length) return true;
+      if (!selected) return true;
+      return linked.includes(selected);
+    });
+  };
+
   const handleChange = (event) => {
     const { name, value } = event.target;
-    setForm((prev) => ({ ...prev, [name]: value }));
+    setForm((prev) => {
+      if (name === "classId") {
+        const nextStreams = streamsForClass(value);
+        const keepStream = nextStreams.some(
+          (item) => String(item._id) === String(prev.streamId),
+        );
+        return {
+          ...prev,
+          classId: value,
+          streamId: keepStream ? prev.streamId : "",
+        };
+      }
+      return { ...prev, [name]: value };
+    });
   };
 
   const resetForm = () => {
@@ -869,8 +892,12 @@ const LeadManagement = () => {
                         onChange={handleChange}
                         className="px-3 py-2.5 rounded-xl border border-[rgb(var(--border))] bg-[rgb(var(--bg))]"
                       >
-                        <option value="">Select stream (optional)</option>
-                        {streams.map((item) => (
+                        <option value="">
+                          {form.classId
+                            ? "Select stream (optional)"
+                            : "Select class first"}
+                        </option>
+                        {streamsForClass(form.classId).map((item) => (
                           <option key={item._id} value={item._id}>
                             {item.name}
                           </option>

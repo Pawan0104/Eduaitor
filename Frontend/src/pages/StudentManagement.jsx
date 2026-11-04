@@ -1212,6 +1212,24 @@ const StudentManagement = () => {
       }),
       ...(name === "classId" && {
         sectionId: "",
+        streamId: (() => {
+          const linkedOk = (streams || []).some((s) => {
+            if (String(s._id) !== String(prev.streamId)) return false;
+            const linked = (s.classIds || []).map(String);
+            if (!linked.length) return true;
+            return linked.includes(String(nextValue));
+          });
+          return linkedOk ? prev.streamId : "";
+        })(),
+        stream: (() => {
+          const linkedOk = (streams || []).some((s) => {
+            if (String(s._id) !== String(prev.streamId)) return false;
+            const linked = (s.classIds || []).map(String);
+            if (!linked.length) return true;
+            return linked.includes(String(nextValue));
+          });
+          return linkedOk ? prev.stream : "";
+        })(),
         transport: "",
         useTransport: false,
         selectedOptionalFees: [],
@@ -1226,6 +1244,11 @@ const StudentManagement = () => {
       }),
       ...(name === "busFeeFrequency" && {
         busFeeQuarter: value === "quarterly" ? form.busFeeQuarter : "",
+      }),
+      ...(name === "streamId" && {
+        stream:
+          (streams || []).find((s) => String(s._id) === String(nextValue))
+            ?.name || "",
       }),
     }));
 
@@ -2735,10 +2758,17 @@ const StudentManagement = () => {
                   label="Stream"
                   name="streamId"
                   value={form.streamId}
-                  options={(streams || []).map((s) => ({
-                    label: s.name,
-                    value: s._id,
-                  }))}
+                  options={(streams || [])
+                    .filter((s) => {
+                      const linked = (s.classIds || []).map(String);
+                      if (!linked.length) return true;
+                      if (!form.classId) return false;
+                      return linked.includes(String(form.classId));
+                    })
+                    .map((s) => ({
+                      label: s.name,
+                      value: s._id,
+                    }))}
                   onChange={handleChange}
                   error={errors.streamId}
                 />

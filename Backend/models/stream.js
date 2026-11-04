@@ -24,6 +24,16 @@ const streamSchema = new mongoose.Schema(
       trim: true,
       default: "",
     },
+    /** Classes this stream applies to. Empty = available for all classes (legacy). */
+    classIds: {
+      type: [
+        {
+          type: mongoose.Schema.Types.ObjectId,
+          ref: "Class",
+        },
+      ],
+      default: [],
+    },
     status: {
       type: String,
       enum: ["Active", "Inactive"],
@@ -41,5 +51,6 @@ streamSchema.index(
     partialFilterExpression: { code: { $type: "string", $ne: "" } },
   },
 );
+streamSchema.index({ schoolId: 1, classIds: 1 });
 
 export default mongoose.models.Stream || mongoose.model("Stream", streamSchema);

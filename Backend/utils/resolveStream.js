@@ -3,9 +3,10 @@ import Stream from "../models/stream.js";
 
 /**
  * Resolve a school stream id to { streamId, stream }.
- * Returns empty values when no id is provided.
+ * When classId is provided and the stream is class-scoped, the stream must
+ * belong to that class (empty classIds = all classes).
  */
-export const resolveStream = async (schoolId, streamId) => {
+export const resolveStream = async (schoolId, streamId, classId = null) => {
   if (!streamId) return { streamId: null, stream: "" };
   if (!mongoose.Types.ObjectId.isValid(streamId)) {
     const error = new Error("Invalid stream selected.");
@@ -18,11 +19,22 @@ export const resolveStream = async (schoolId, streamId) => {
     schoolId,
     status: "Active",
   })
-    .select("name")
+    .select("name classIds")
     .lean();
 
   if (!doc) {
     const error = new Error("Selected stream was not found.");
+    error.statusCode = 400;
+    throw error;
+  }
+
+  const linked = Array.isArray(doc.classIds) ? doc.classIds : [];
+  if (
+    classId &&
+    linked.length > 0 &&
+    !linked.some((id) => String(id) === String(classId))
+  ) {
+    const error = new Error("Selected stream is not available for this class.");
     error.statusCode = 400;
     throw error;
   }

@@ -282,7 +282,11 @@ export const createRegistration = async (req, res) => {
 
     const className = await resolveClassName(schoolId, body.classId);
     const section = await resolveSection(schoolId, body.sectionId);
-    const resolvedStream = await resolveStream(schoolId, body.streamId || null);
+    const resolvedStream = await resolveStream(
+      schoolId,
+      body.streamId || null,
+      body.classId,
+    );
 
     const requestedYear = sanitize(body.academicYear, 12);
     const academicYear =
@@ -564,17 +568,38 @@ export const updateRegistration = async (req, res) => {
     }
 
     let classChanged = false;
-    if (body.streamId !== undefined) {
-      const resolvedStream = await resolveStream(schoolId, body.streamId || null);
-      registration.streamId = resolvedStream.streamId;
-      registration.stream = resolvedStream.stream;
-    }
-
     if (body.classId !== undefined && String(body.classId) !== String(registration.classId)) {
       const className = await resolveClassName(schoolId, body.classId);
       registration.classId = body.classId;
       registration.className = className;
       classChanged = true;
+    }
+
+    if (body.streamId !== undefined || classChanged) {
+      const nextStreamId =
+        body.streamId !== undefined
+          ? body.streamId || null
+          : registration.streamId;
+      try {
+        const resolvedStream = await resolveStream(
+          schoolId,
+          nextStreamId,
+          registration.classId,
+        );
+        registration.streamId = resolvedStream.streamId;
+        registration.stream = resolvedStream.stream;
+      } catch (streamErr) {
+        if (classChanged && body.streamId === undefined) {
+          // Class changed and previous stream is not valid for the new class.
+          registration.streamId = null;
+          registration.stream = "";
+        } else {
+          return res.status(streamErr.statusCode || 400).json({
+            success: false,
+            message: streamErr.message || "Invalid stream selected.",
+          });
+        }
+      }
     }
 
     if (body.sectionId !== undefined || classChanged) {

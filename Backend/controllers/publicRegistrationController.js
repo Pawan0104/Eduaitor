@@ -242,7 +242,11 @@ export const submitPublicRegistration = async (req, res) => {
 
     let resolvedPublicStream = { streamId: null, stream: "" };
     try {
-      resolvedPublicStream = await resolveStream(school._id, body.streamId || null);
+      resolvedPublicStream = await resolveStream(
+        school._id,
+        body.streamId || null,
+        body.classId || null,
+      );
     } catch (streamErr) {
       return res.status(streamErr.statusCode || 400).json({
         success: false,

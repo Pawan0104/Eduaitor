@@ -490,6 +490,16 @@ const Registrations = () => {
 
   const sectionOptions = (classId) => classSections.get(classId) || [];
 
+  const streamsForClass = (classId) => {
+    const selected = String(classId || "");
+    return (streams || []).filter((item) => {
+      const linked = (item.classIds || []).map(String);
+      if (!linked.length) return true;
+      if (!selected) return true;
+      return linked.includes(selected);
+    });
+  };
+
   const setFilter = (patch) =>
     setFilters((prev) => ({ ...prev, ...patch, page: patch.page ?? 1 }));
 
@@ -1502,13 +1512,20 @@ const Registrations = () => {
                 >
                   <select
                     value={regForm.classId}
-                    onChange={(event) =>
+                    onChange={(event) => {
+                      const nextClassId = event.target.value;
+                      const available = streamsForClass(nextClassId);
                       setRegForm((prev) => ({
                         ...prev,
-                        classId: event.target.value,
+                        classId: nextClassId,
                         sectionId: "",
-                      }))
-                    }
+                        streamId: available.some(
+                          (item) => String(item._id) === String(prev.streamId),
+                        )
+                          ? prev.streamId
+                          : "",
+                      }));
+                    }}
                     className={inputClass}
                   >
                     <option value="">Select class</option>
@@ -1534,8 +1551,12 @@ const Registrations = () => {
                     }
                     className={inputClass}
                   >
-                    <option value="">Select stream (optional)</option>
-                    {streams.map((item) => (
+                    <option value="">
+                      {regForm.classId
+                        ? "Select stream (optional)"
+                        : "Select class first"}
+                    </option>
+                    {streamsForClass(regForm.classId).map((item) => (
                       <option key={item._id} value={item._id}>
                         {item.name}
                       </option>
