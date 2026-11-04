@@ -1831,6 +1831,8 @@ const StudentManagement = () => {
           return;
         }
 
+        // Active/Inactive is managed from the student list, not this form.
+        if (key === "isActive") return;
         if (value === null || value === "") return;
 
         if (
@@ -1850,6 +1852,9 @@ const StudentManagement = () => {
       });
 
       data.set("feeFrequency", freqFilter);
+      if (!isEdit) {
+        data.set("isActive", "true");
+      }
       if (!isEdit && registrationId) {
         data.set("registrationId", registrationId);
       } else if (!isEdit && leadId) {
@@ -2210,26 +2215,6 @@ const StudentManagement = () => {
                 <span className="text-[11px] font-normal text-[rgb(var(--text-muted))]">
                   Non-Confirmed: no fields are mandatory. Confirmed: required
                   fields must be filled.
-                </span>
-              </label>
-              <label className="flex flex-col gap-1.5 text-sm font-medium">
-                <span>Student Status</span>
-                <select
-                  name="isActive"
-                  value={form.isActive === false ? "false" : "true"}
-                  onChange={(e) =>
-                    setForm((prev) => ({
-                      ...prev,
-                      isActive: e.target.value === "true",
-                    }))
-                  }
-                  className="w-full rounded-lg border border-[rgb(var(--border))] bg-[rgb(var(--surface))] px-3 py-2.5 text-sm outline-none focus:border-[rgb(var(--primary))]"
-                >
-                  <option value="true">Active</option>
-                  <option value="false">Inactive</option>
-                </select>
-                <span className="text-[11px] font-normal text-[rgb(var(--text-muted))]">
-                  Inactive students are hidden from the default student list.
                 </span>
               </label>
             </div>

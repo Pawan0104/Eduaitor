@@ -102,10 +102,6 @@ export default function StreamManagement() {
       toast.error("Stream name is required");
       return;
     }
-    if (!form.classIds.length) {
-      toast.error("Select at least one class for this stream");
-      return;
-    }
     try {
       setSaving(true);
       const payload = {
@@ -183,8 +179,8 @@ export default function StreamManagement() {
             Streams
           </h1>
           <p className="mt-0.5 text-sm text-[rgb(var(--text-muted))]">
-            Link each stream to one or more classes for leads, registration and
-            admission.
+            Optionally link streams to classes for leads, registration and
+            admission. Leave classes empty to allow the stream on all classes.
           </p>
         </div>
         {canManage && (
@@ -312,7 +308,12 @@ export default function StreamManagement() {
               </label>
               <div className="sm:col-span-2">
                 <div className="mb-2 flex items-center justify-between gap-2">
-                  <p className="text-sm font-medium">Classes *</p>
+                  <p className="text-sm font-medium">
+                    Classes{" "}
+                    <span className="font-normal text-[rgb(var(--text-muted))]">
+                      (optional)
+                    </span>
+                  </p>
                   <div className="flex gap-2">
                     <button
                       type="button"
@@ -337,9 +338,13 @@ export default function StreamManagement() {
                     </button>
                   </div>
                 </div>
+                <p className="mb-2 text-xs text-[rgb(var(--text-muted))]">
+                  Leave empty to make this stream available for every class.
+                </p>
                 {classes.length === 0 ? (
                   <p className="rounded-xl border border-dashed border-[rgb(var(--border))] px-3 py-4 text-sm text-[rgb(var(--text-muted))]">
-                    No classes found. Create classes first, then link streams.
+                    No classes found. You can still save the stream without
+                    linking classes.
                   </p>
                 ) : (
                   <div className="max-h-48 space-y-2 overflow-y-auto rounded-xl border border-[rgb(var(--border))] p-3">

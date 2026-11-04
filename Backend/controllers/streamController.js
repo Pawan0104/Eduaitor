@@ -136,12 +136,6 @@ export const createStream = async (req, res) => {
     }
 
     const classIds = await normalizeClassIds(schoolId, req.body?.classIds);
-    if (!classIds.length) {
-      return res.status(400).json({
-        success: false,
-        message: "Select at least one class for this stream.",
-      });
-    }
 
     const exists = await Stream.findOne({ schoolId, name }).select("_id").lean();
     if (exists) {
@@ -224,14 +218,7 @@ export const updateStream = async (req, res) => {
         req.body.status === "Inactive" ? "Inactive" : "Active";
     }
     if (req.body?.classIds !== undefined) {
-      const classIds = await normalizeClassIds(schoolId, req.body.classIds);
-      if (!classIds.length) {
-        return res.status(400).json({
-          success: false,
-          message: "Select at least one class for this stream.",
-        });
-      }
-      stream.classIds = classIds;
+      stream.classIds = await normalizeClassIds(schoolId, req.body.classIds);
     }
 
     await stream.save();

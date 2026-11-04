@@ -1,9 +1,8 @@
 import { useEffect, useState } from "react";
 import axios from "axios";
-import { FaPlus, FaArrowLeft, FaEye, FaEdit, FaFileExcel, FaFilePdf } from "react-icons/fa";
+import { FaPlus, FaArrowLeft, FaEye, FaEdit, FaFileExcel, FaFilePdf, FaUserCheck, FaUserSlash } from "react-icons/fa";
 import { useNavigate, useLocation } from "react-router-dom";
 import { toast } from "react-toastify";
-import { FiTrash2 } from "react-icons/fi";
 import * as XLSX from "xlsx";
 import MessageButton from "../components/MessageButton";
 import UserAvatar from "../components/UserAvatar";
@@ -133,24 +132,46 @@ const Students = () => {
     setPage(1);
   };
 
-  const handleDelete = (id) => {
-    setConfirmMessage("Are you sure you want to delete this student?");
-    setConfirmAction(() => () => deleteStudent(id));
+  const handleToggleActive = (student) => {
+    const currentlyActive = student.isActive !== false;
+    const nextActive = !currentlyActive;
+    setConfirmMessage(
+      nextActive
+        ? `Mark “${student.firstName || ""} ${student.lastName || ""}” as Active?`
+        : `Mark “${student.firstName || ""} ${student.lastName || ""}” as Inactive? They will be hidden from the default Active list.`,
+    );
+    setConfirmAction(() => () => toggleStudentActive(student, nextActive));
     setConfirmOpen(true);
   };
 
-  const deleteStudent = async (id) => {
+  const toggleStudentActive = async (student, nextActive) => {
     try {
-      await axios.delete(`${API}/students/${id}`, { withCredentials: true });
-
-      toast.success("Student deleted successfully");
-
-      // remove from UI instantly
-      setStudents((prev) => prev.filter((s) => s._id !== id));
+      const data = new FormData();
+      data.append("isActive", nextActive ? "true" : "false");
+      await axios.put(`${API}/students/${student._id}`, data, {
+        withCredentials: true,
+      });
+      toast.success(
+        nextActive ? "Student marked Active" : "Student marked Inactive",
+      );
+      // Drop from current list when it no longer matches the status filter.
+      const status = filterStatus || "Active";
+      if (status === "Active" && !nextActive) {
+        setStudents((prev) => prev.filter((s) => s._id !== student._id));
+      } else if (status === "Inactive" && nextActive) {
+        setStudents((prev) => prev.filter((s) => s._id !== student._id));
+      } else {
+        setStudents((prev) =>
+          prev.map((s) =>
+            s._id === student._id ? { ...s, isActive: nextActive } : s,
+          ),
+        );
+      }
+      fetchStudents(page, limit);
     } catch (err) {
       console.error(err);
       toast.error(
-        err?.response?.data?.message || "Failed to delete student",
+        err?.response?.data?.message || "Failed to update student status",
       );
     }
   };
@@ -354,7 +375,7 @@ const Students = () => {
           <p className="text-sm font-semibold text-[rgb(var(--text))]">
             Filter Students
             <span className="ml-2 text-xs font-normal text-[rgb(var(--text-muted))]">
-              {filteredStudents.length} of {students.length} shown
+              {pagination.total || filteredStudents.length} shown
             </span>
           </p>
           {hasActiveFilters && (
@@ -368,7 +389,31 @@ const Students = () => {
           )}
         </div>
 
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
+        <div className="mb-4 flex flex-wrap gap-2">
+          {[
+            { value: "Active", label: "Active" },
+            { value: "Inactive", label: "Inactive" },
+            { value: "all", label: "All" },
+          ].map((item) => {
+            const selected = filterStatus === item.value;
+            return (
+              <button
+                key={item.value}
+                type="button"
+                onClick={() => handleFilterChange(setFilterStatus)(item.value)}
+                className={`rounded-full px-4 py-1.5 text-sm font-semibold transition ${
+                  selected
+                    ? "bg-[rgb(var(--primary))] text-white"
+                    : "border border-[rgb(var(--border))] text-[rgb(var(--text))] hover:bg-[rgb(var(--bg))]"
+                }`}
+              >
+                {item.label}
+              </button>
+            );
+          })}
+        </div>
+
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
           <div className="sm:col-span-2 lg:col-span-1">
             <p className="text-sm font-medium mb-2 text-[rgb(var(--text))]">
               Search
@@ -385,23 +430,6 @@ const Students = () => {
               Matches student, father, mother or guardian name and any mobile
               number
             </p>
-          </div>
-
-          <div>
-            <p className="text-sm font-medium mb-2 text-[rgb(var(--text))]">
-              Status
-            </p>
-            <select
-              value={filterStatus}
-              onChange={(e) =>
-                handleFilterChange(setFilterStatus)(e.target.value)
-              }
-              className="border rounded-lg px-4 py-2 w-full text-[rgb(var(--text))] bg-[rgb(var(--surface))]"
-            >
-              <option value="Active">Active</option>
-              <option value="Inactive">Inactive</option>
-              <option value="all">All</option>
-            </select>
           </div>
 
           <div>
@@ -565,10 +593,24 @@ const Students = () => {
                         </button>
 
                         <button
-                          onClick={() => handleDelete(student._id)}
-                          className="bg-red-100 text-red-600 p-2 rounded-md hover:bg-red-200"
+                          type="button"
+                          title={
+                            student.isActive === false
+                              ? "Mark Active"
+                              : "Mark Inactive"
+                          }
+                          onClick={() => handleToggleActive(student)}
+                          className={
+                            student.isActive === false
+                              ? "bg-emerald-100 text-emerald-700 p-2 rounded-md hover:bg-emerald-200"
+                              : "bg-amber-100 text-amber-700 p-2 rounded-md hover:bg-amber-200"
+                          }
                         >
-                          <FiTrash2 />
+                          {student.isActive === false ? (
+                            <FaUserCheck />
+                          ) : (
+                            <FaUserSlash />
+                          )}
                         </button>
                       </div>
                     </td>
@@ -621,7 +663,7 @@ const Students = () => {
                 }}
                 className="px-4 py-2 bg-[rgb(var(--primary))] text-[rgb(var(--text))]  rounded-lg"
               >
-                Delete
+                Confirm
               </button>
             </div>
           </div>
