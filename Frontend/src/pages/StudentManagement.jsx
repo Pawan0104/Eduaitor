@@ -2087,7 +2087,8 @@ const forbidden = [
                   className="w-full cursor-not-allowed rounded-lg border border-[rgb(var(--border))] bg-[rgb(var(--surface))] px-3 py-2.5 text-sm opacity-90"
                 />
                 <span className="text-[11px] font-normal text-[rgb(var(--text-muted))]">
-                  Auto-assigned. Cannot be edited on this form.
+                  Preview only — the final unique number is assigned when you
+                  save. Cannot be edited on this form.
                 </span>
               </label>
               <label className="flex flex-col gap-1.5 text-sm font-medium">

@@ -221,7 +221,16 @@ const generateStudentId = async (schoolId) => {
 
   for (let n = maxStu + 1; n <= maxStu + 5000; n++) {
     const candidate = `STU${String(n).padStart(4, "0")}`;
-    if (!used.has(candidate)) return candidate;
+    if (used.has(candidate)) continue;
+
+    // Re-check live so a concurrent admit between the scan and return
+    // does not hand out a number that is already taken.
+    const clash = await Student.findOne({ schoolId, studentId: candidate })
+      .select("_id")
+      .setOptions({ skipSession: true })
+      .lean();
+    if (!clash) return candidate;
+    used.add(candidate);
   }
 
   const err = new Error("Could not generate a unique admission number");
@@ -456,20 +465,23 @@ export const createStudent = async (req, res) => {
       }
     }
 
+    // Admission number is system-assigned (locked on the form). Never trust a
+    // client-supplied value — the preview can go stale between open and save,
+    // which used to surface as "Admission number already exists".
+    delete safeBody.studentId;
+    delete safeBody.admissionNumber;
+
     let studentId;
     try {
-      studentId = await resolveAdmissionNumber(
-        schoolId,
-        safeBody.studentId || safeBody.admissionNumber,
-      );
+      studentId = await generateStudentId(schoolId);
     } catch (err) {
       return res.status(err.statusCode || 400).json({
         success: false,
         message: err.message || "Invalid admission number",
       });
     }
-    delete safeBody.studentId;
-    delete safeBody.admissionNumber;
+    // Always auto on create so unique-index races retry with a fresh STU####.
+    const isAutoAdmission = true;
 
     // â”€â”€ HASH PASSWORD (same password used for both, set at creation) â”€â”€
     const rawPassword = safeBody.password?.trim();
@@ -479,7 +491,7 @@ export const createStudent = async (req, res) => {
 
     // â”€â”€ BUILD CREDENTIAL OBJECTS â”€â”€
     const studentCredentials = {
-      username: studentId, // STU0001 â€” auto generated or custom admission no
+      username: studentId, // STU0001 â€” auto generated
       password: hashedPassword,
       temp_password: rawPassword || undefined,
       firstTimeLogin: true,
@@ -648,11 +660,7 @@ export const createStudent = async (req, res) => {
 
     // Create with a bounded retry. `generateStudentId` is read-then-write, so two
     // simultaneous admissions can pick the same number and the second one fails
-    // the unique index. That is a race, not a user error â€” so when the admission
-    // number was AUTO-generated we transparently re-generate and retry. A number
-    // the user typed themselves is never retried (a real duplicate must surface).
-    const isAutoAdmission =
-      !normalizeAdmissionNumber(safeBody.studentId || safeBody.admissionNumber);
+    // the unique index. That is a race, not a user error — re-generate and retry.
 
     // confirmationStatus is system-managed — never trust the client.
     delete safeBody.confirmationStatus;
@@ -691,17 +699,21 @@ export const createStudent = async (req, res) => {
     });
 
     let student = null;
-    for (let attempt = 0; attempt < 5; attempt += 1) {
+    for (let attempt = 0; attempt < 8; attempt += 1) {
       try {
         student = await Student.create(buildStudentDoc(studentId));
         break;
       } catch (createErr) {
+        const keyPattern = createErr?.keyPattern || {};
+        const keyValue = createErr?.keyValue || {};
+        const clashBlob = `${JSON.stringify(keyPattern)} ${JSON.stringify(keyValue)} ${createErr?.message || ""}`;
         const isAdmissionClash =
           createErr?.code === 11000 &&
-          (createErr?.keyPattern?.studentId ||
-            createErr?.keyPattern?.["studentCredentials.username"]);
+          (keyPattern.studentId ||
+            keyPattern["studentCredentials.username"] ||
+            /studentId|studentCredentials\.username/i.test(clashBlob));
 
-        if (isAdmissionClash && isAutoAdmission && attempt < 4) {
+        if (isAdmissionClash && isAutoAdmission && attempt < 7) {
           const nextId = await generateStudentId(schoolId);
           if (nextId && nextId !== studentId) {
             studentId = nextId;
