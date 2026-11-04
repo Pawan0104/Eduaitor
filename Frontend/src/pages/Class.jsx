@@ -34,6 +34,7 @@ const EMPTY_FORM = {
   name: "",
   details: [{ ...EMPTY_DETAIL }],
   status: "Active",
+  streamIds: [],
 };
 
 export default function ClassPage() {
@@ -45,6 +46,7 @@ export default function ClassPage() {
   const [sections, setSections] = useState([]);
   const [teachers, setTeachers] = useState([]);
   const [subjects, setSubjects] = useState([]);
+  const [streams, setStreams] = useState([]);
   const [loading, setLoading] = useState(true);
 
   const [showModal, setShowModal] = useState(false);
@@ -129,16 +131,21 @@ export default function ClassPage() {
         setSubjects(sub.data.subjects || []);
       } else {
         // Admin: fetch everything
-        const [cls, sec, sub, tch] = await Promise.all([
+        const [cls, sec, sub, tch, strm] = await Promise.all([
           axios.get(`${API}/classes/all`, { withCredentials: true }),
           axios.get(`${API}/sections/all`, { withCredentials: true }),
           axios.get(`${API}/subjects/all`, { withCredentials: true }),
           axios.get(`${API}/teachers`, { withCredentials: true }),
+          axios.get(`${API}/streams/all`, {
+            params: { status: "Active" },
+            withCredentials: true,
+          }),
         ]);
         setClasses(cls.data.classes || []);
         setSections(sec.data.sections || []);
         setSubjects(sub.data.subjects || []);
         setTeachers(tch.data.data || []);
+        setStreams(strm.data?.streams || strm.data?.data || []);
       }
     } catch {
       toast.error("Failed to load data");
@@ -162,6 +169,7 @@ export default function ClassPage() {
   const buildPayload = () => ({
     name: form.name.trim(),
     status: form.status || "Active",
+    streamIds: form.streamIds || [],
     details: form.details.map((d) => ({
       ...(d._id ? { _id: d._id } : {}),
       sectionId: d.sectionId || null,
@@ -176,6 +184,19 @@ export default function ClassPage() {
         })),
     })),
   });
+
+  const toggleStream = (streamId) => {
+    const id = String(streamId);
+    setForm((prev) => {
+      const has = (prev.streamIds || []).includes(id);
+      return {
+        ...prev,
+        streamIds: has
+          ? prev.streamIds.filter((item) => item !== id)
+          : [...(prev.streamIds || []), id],
+      };
+    });
+  };
 
   /* ── detail helpers (admin only) ── */
   const updateDetail = (index, field, value) => {
@@ -226,9 +247,21 @@ export default function ClassPage() {
   };
 
   const openEdit = (cls) => {
+    const linkedStreamIds = (
+      Array.isArray(cls.streamIds) && cls.streamIds.length
+        ? cls.streamIds
+        : streams
+            .filter((stream) =>
+              (stream.classIds || [])
+                .map(String)
+                .includes(String(cls._id)),
+            )
+            .map((stream) => stream._id)
+    ).map(String);
     const f = {
       name: cls.name,
       status: cls.status,
+      streamIds: linkedStreamIds,
       details: (cls.details || []).map((d) => ({
         _id: d._id,
         sectionId: d.sectionId?._id || "",
@@ -1108,6 +1141,45 @@ export default function ClassPage() {
                             />
                           </div>
                         </div>
+                        {index === 0 && (
+                          <div>
+                            <label className="block text-xs font-medium text-[rgb(var(--text))] mb-2">
+                              Assign Streams{" "}
+                              <span className="font-normal text-[rgb(var(--text-muted))]">
+                                (optional)
+                              </span>
+                            </label>
+                            {streams.length === 0 ? (
+                              <p className="rounded-xl border border-dashed border-gray-200 px-3 py-3 text-xs text-[rgb(var(--text-muted))]">
+                                No streams yet. Create streams from Streams
+                                management, or leave unassigned.
+                              </p>
+                            ) : (
+                              <div className="border border-gray-100 bg-[rgb(var(--surface))] rounded-xl p-3 grid grid-cols-2 sm:grid-cols-3 gap-2 max-h-36 overflow-y-auto">
+                                {streams.map((stream) => {
+                                  const id = String(stream._id);
+                                  const checked = (form.streamIds || []).includes(
+                                    id,
+                                  );
+                                  return (
+                                    <label
+                                      key={id}
+                                      className="flex items-center gap-2 text-xs text-[rgb(var(--text))] cursor-pointer"
+                                    >
+                                      <input
+                                        type="checkbox"
+                                        checked={checked}
+                                        onChange={() => toggleStream(id)}
+                                        className="bg-[rgb(var(--primary))]"
+                                      />
+                                      {stream.name}
+                                    </label>
+                                  );
+                                })}
+                              </div>
+                            )}
+                          </div>
+                        )}
                         <div>
                           <label className="block text-xs font-medium text-[rgb(var(--text))] mb-2">
                             Assign Subjects

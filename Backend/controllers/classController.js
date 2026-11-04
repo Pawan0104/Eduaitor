@@ -2,11 +2,52 @@ import mongoose from "mongoose";
 import Class from "../models/class.js";
 import Teacher from "../models/teacher.js";
 import Student from "../models/student.js";
+import Stream from "../models/stream.js";
 import {
   autoCreateClassGroups,
   syncClassGroupsMembers,
   removeTeacherFromClassGroups,
 } from "../utils/groupSync.js";
+
+/** Link/unlink streams for a class. Empty streamIds clears explicit links only. */
+const syncClassStreams = async (schoolId, classId, streamIds = []) => {
+  if (!schoolId || !classId) return;
+  const classOid = new mongoose.Types.ObjectId(classId);
+  const selected = [
+    ...new Set(
+      (Array.isArray(streamIds) ? streamIds : [])
+        .map((id) => String(id || "").trim())
+        .filter((id) => mongoose.Types.ObjectId.isValid(id)),
+    ),
+  ].map((id) => new mongoose.Types.ObjectId(id));
+
+  await Stream.updateMany(
+    {
+      schoolId,
+      classIds: classOid,
+      ...(selected.length ? { _id: { $nin: selected } } : {}),
+    },
+    { $pull: { classIds: classOid } },
+  );
+
+  if (selected.length) {
+    await Stream.updateMany(
+      { schoolId, _id: { $in: selected } },
+      { $addToSet: { classIds: classOid } },
+    );
+  }
+};
+
+const streamIdsForClass = async (schoolId, classId) => {
+  if (!schoolId || !classId) return [];
+  const rows = await Stream.find({
+    schoolId,
+    classIds: classId,
+  })
+    .select("_id")
+    .lean();
+  return rows.map((row) => String(row._id));
+};
 
 /** Convert form values to ObjectId or null (never pass "" to mongoose). */
 const toIdOrNull = (value) => {
@@ -238,7 +279,7 @@ const teacherScopedClassFilter = async (req) => {
 export const createClass = async (req, res) => {
   try {
     const schoolId = req.user?.school_id;
-    let { name, details, status } = req.body;
+    let { name, details, status, streamIds } = req.body;
 
     if (!schoolId)
       return res.status(400).json({
@@ -336,16 +377,24 @@ export const createClass = async (req, res) => {
       console.error("Group auto-create/sync failed for new class:", groupErr);
     }
 
+    try {
+      await syncClassStreams(schoolId, newClass._id, streamIds);
+    } catch (streamErr) {
+      console.error("Stream sync failed for new class:", streamErr);
+    }
+
     const populated = await Class.findById(newClass._id)
       .populate("details.sectionId", "name status")
       .populate("details.teacherId", "fullName")
       .populate("details.subjectTeachers.teacherId", "fullName")
       .populate("details.subjectTeachers.subjectId", "name");
 
+    const linkedStreamIds = await streamIdsForClass(schoolId, newClass._id);
+
     res.status(201).json({
       success: true,
       message: "Class created successfully",
-      class: populated,
+      class: { ...populated.toObject(), streamIds: linkedStreamIds },
     });
   } catch (err) {
     res.status(500).json({ success: false, message: err.message });
@@ -505,7 +554,7 @@ export const getClassesFlat = async (req, res) => {
 export const updateClass = async (req, res) => {
   try {
     const schoolId = req.user?.school_id;
-    const { name, details, status } = req.body;
+    const { name, details, status, streamIds } = req.body;
 
     if (!schoolId)
       return res.status(400).json({
@@ -632,16 +681,26 @@ export const updateClass = async (req, res) => {
       console.error("Group sync failed for updated class:", groupErr);
     }
 
+    if (streamIds !== undefined) {
+      try {
+        await syncClassStreams(schoolId, cls._id, streamIds);
+      } catch (streamErr) {
+        console.error("Stream sync failed for updated class:", streamErr);
+      }
+    }
+
     const populated = await Class.findById(cls._id)
       .populate("details.sectionId", "name status")
       .populate("details.teacherId", "fullName")
       .populate("details.subjectTeachers.subjectId", "name")
       .populate("details.subjectTeachers.teacherId", "fullName");
 
+    const linkedStreamIds = await streamIdsForClass(schoolId, cls._id);
+
     res.json({
       success: true,
       message: "Class updated successfully",
-      class: populated,
+      class: { ...populated.toObject(), streamIds: linkedStreamIds },
     });
   } catch (err) {
     res.status(500).json({ success: false, message: err.message });
@@ -663,6 +722,11 @@ export const deleteClass = async (req, res) => {
         success: false,
         message: "Class not found",
       });
+
+    await Stream.updateMany(
+      { schoolId, classIds: cls._id },
+      { $pull: { classIds: cls._id } },
+    );
 
     await cls.deleteOne();
 
