@@ -240,14 +240,24 @@ const AdmissionFormBuilder = ({
   const save = async () => {
     try {
       setSaving(true);
-      const res = await axios.put(
-        `${API}${apiPath}`,
-        { steps },
-        { withCredentials: true }
-      );
-      const saved = res.data?.data?.steps || steps;
+      await axios.put(`${API}${apiPath}`, { steps }, { withCredentials: true });
+      // Re-read after write so the live form applies what Mongo actually stored
+      // (avoids trusting an in-memory response that never persisted).
+      let saved = steps;
+      try {
+        const verify = await axios.get(`${API}${apiPath}`, {
+          withCredentials: true,
+        });
+        if (Array.isArray(verify.data?.data?.steps)) {
+          saved = verify.data.data.steps;
+        }
+      } catch {
+        /* fall back to the payload we just sent */
+      }
+      const merged = mergeSteps(saved);
+      setSteps(merged);
       toast.success("Form saved");
-      onSaved?.(saved);
+      onSaved?.(merged);
       onClose?.();
     } catch (err) {
       toast.error(err.response?.data?.message || "Could not save the form");

@@ -351,17 +351,19 @@ const Registrations = () => {
 
   useEffect(() => {
     let cancelled = false;
+    let loadGen = 0;
     (async () => {
+      const gen = ++loadGen;
       try {
         const { data } = await axios.get(`${API}/registration-form`, {
           withCredentials: true,
         });
-        if (cancelled) return;
+        if (cancelled || gen !== loadGen) return;
         const steps = mergeRegistrationSteps(data?.data?.steps);
         setFormSteps(steps);
         setCustomValues(emptyCustomValues(steps));
       } catch {
-        if (!cancelled) {
+        if (!cancelled && gen === loadGen) {
           const steps = mergeRegistrationSteps(null);
           setFormSteps(steps);
           setCustomValues(emptyCustomValues(steps));

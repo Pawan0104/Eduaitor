@@ -131,7 +131,9 @@ const Students = () => {
       setStudents((prev) => prev.filter((s) => s._id !== id));
     } catch (err) {
       console.error(err);
-      toast.error("Failed to delete student");
+      toast.error(
+        err?.response?.data?.message || "Failed to delete student",
+      );
     }
   };
 

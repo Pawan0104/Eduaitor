@@ -117,17 +117,19 @@ const LeadManagement = () => {
 
   useEffect(() => {
     let cancelled = false;
+    let loadGen = 0;
     (async () => {
+      const gen = ++loadGen;
       try {
         const res = await axios.get(`${API}/lead-form`, {
           withCredentials: true,
         });
-        if (cancelled) return;
+        if (cancelled || gen !== loadGen) return;
         const steps = mergeLeadSteps(res.data?.data?.steps);
         setFormSteps(steps);
         setCustomValues(emptyCustomValues(steps));
       } catch {
-        if (!cancelled) {
+        if (!cancelled && gen === loadGen) {
           const steps = mergeLeadSteps(null);
           setFormSteps(steps);
           setCustomValues(emptyCustomValues(steps));

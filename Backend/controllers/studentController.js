@@ -23,6 +23,10 @@ import bcrypt from "bcryptjs";
 import { resolveParentCredentialsForCreate } from "../utils/parentChildren.js";
 import { notifyCredentialsAsync } from "../services/credentials/notifyCredentials.js";
 import { resolveStream } from "../utils/resolveStream.js";
+import {
+  applyAcademicYearInclusive,
+  sessionForWrite,
+} from "../middlewares/academicSession.js";
 
 const isValidObjectId = (value) =>
   Boolean(value) && mongoose.Types.ObjectId.isValid(String(value));
@@ -202,16 +206,29 @@ const normalizeAdmissionNumber = (value) =>
 
 /**
  * Next STU#### for a school based on the highest existing STU number
- * (not document count â€” count+1 collides when IDs have gaps or custom prefixes).
+ * (not document count — count+1 collides when IDs have gaps or custom prefixes).
+ * Scans every academic year (skipSession) because uniqueness is per school,
+ * not per session. `avoid` skips IDs that just failed a unique-index insert.
  */
-const generateStudentId = async (schoolId) => {
+const generateStudentId = async (schoolId, avoid = []) => {
+  const avoidSet = new Set(
+    (Array.isArray(avoid) ? avoid : [avoid])
+      .map((id) => normalizeAdmissionNumber(id))
+      .filter(Boolean),
+  );
+
   const rows = await Student.find({ schoolId })
-    .select("studentId")
+    .select("studentId studentCredentials.username")
     .setOptions({ skipSession: true })
     .lean();
-  const used = new Set(
-    rows.map((r) => normalizeAdmissionNumber(r.studentId)).filter(Boolean),
-  );
+
+  const used = new Set(avoidSet);
+  for (const row of rows) {
+    const sid = normalizeAdmissionNumber(row.studentId);
+    const uname = normalizeAdmissionNumber(row.studentCredentials?.username);
+    if (sid) used.add(sid);
+    if (uname) used.add(uname);
+  }
 
   let maxStu = 0;
   for (const id of used) {
@@ -225,7 +242,13 @@ const generateStudentId = async (schoolId) => {
 
     // Re-check live so a concurrent admit between the scan and return
     // does not hand out a number that is already taken.
-    const clash = await Student.findOne({ schoolId, studentId: candidate })
+    const clash = await Student.findOne({
+      schoolId,
+      $or: [
+        { studentId: candidate },
+        { "studentCredentials.username": candidate },
+      ],
+    })
       .select("_id")
       .setOptions({ skipSession: true })
       .lean();
@@ -435,21 +458,45 @@ export const createStudent = async (req, res) => {
       });
     }
 
-    if (!String(safeBody.password || "").trim()) {
+    // Resolve confirmation early — Non-Confirmed skips every mandatory check
+    // so draft admissions can be saved incomplete.
+    const confirmationStatus =
+      String(safeBody.confirmationStatus || "").trim() === "Confirmed"
+        ? "Confirmed"
+        : "Non-Confirmed";
+    delete safeBody.confirmationStatus;
+    const requireFields = confirmationStatus === "Confirmed";
+
+    if (requireFields && !String(safeBody.password || "").trim()) {
       return res.status(400).json({
         success: false,
         message: "Password is required to create student and parent login credentials",
       });
     }
-    if (!String(safeBody.fatherMobile || safeBody.username || "").trim()) {
+    if (
+      requireFields &&
+      !String(safeBody.fatherMobile || safeBody.username || "").trim()
+    ) {
       return res.status(400).json({
         success: false,
         message: "Father mobile (parent username) is required",
       });
     }
+    if (requireFields && !String(safeBody.firstName || "").trim()) {
+      return res.status(400).json({
+        success: false,
+        message: "First name is required for confirmed admissions",
+      });
+    }
+    if (requireFields && !String(safeBody.lastName || "").trim()) {
+      return res.status(400).json({
+        success: false,
+        message: "Last name is required for confirmed admissions",
+      });
+    }
     // Guardian is optional. When a guardian name is provided, the guardian's
     // mobile and relation become mandatory so the record is never half-filled.
-    if (String(safeBody.guardianName || "").trim()) {
+    if (requireFields && String(safeBody.guardianName || "").trim()) {
       if (!String(safeBody.guardianMobile || "").trim()) {
         return res.status(400).json({
           success: false,
@@ -662,18 +709,14 @@ export const createStudent = async (req, res) => {
     // simultaneous admissions can pick the same number and the second one fails
     // the unique index. That is a race, not a user error — re-generate and retry.
 
-    // confirmationStatus is system-managed — never trust the client.
-    delete safeBody.confirmationStatus;
-    const confirmationStatus = registrationDoc
-      ? "Confirmed"
-      : "Non-Confirmed";
-
-    // Prefer the registration's academic year so admitted students appear in
-    // the same session as the registration; otherwise let the session plugin
-    // stamp the active header year.
-    const academicYearFromRegistration = String(
-      registrationDoc?.academicYear || "",
-    ).trim();
+    // Prefer the registration's academic year; otherwise stamp the request
+    // session from `req` (not AsyncLocalStorage). Multipart/multer admits often
+    // lose ALS, so the session plugin never stamps and the student vanishes
+    // from the session-scoped All Students list.
+    const academicYear =
+      String(registrationDoc?.academicYear || "").trim() ||
+      sessionForWrite(req) ||
+      "";
 
     const buildStudentDoc = (nextId) => ({
       ...safeBody,
@@ -691,14 +734,13 @@ export const createStudent = async (req, res) => {
       stream: resolvedStreamOnAdmit.stream,
       idCardIssuedAt: new Date(),
       confirmationStatus,
-      ...(academicYearFromRegistration
-        ? { academicYear: academicYearFromRegistration }
-        : {}),
+      ...(academicYear ? { academicYear } : {}),
       convertedFromLeadId,
       convertedFromRegistrationId: registrationDoc?._id || null,
     });
 
     let student = null;
+    const failedAdmissionIds = [];
     for (let attempt = 0; attempt < 8; attempt += 1) {
       try {
         student = await Student.create(buildStudentDoc(studentId));
@@ -714,11 +756,12 @@ export const createStudent = async (req, res) => {
             /studentId|studentCredentials\.username/i.test(clashBlob));
 
         if (isAdmissionClash && isAutoAdmission && attempt < 7) {
-          const nextId = await generateStudentId(schoolId);
-          if (nextId && nextId !== studentId) {
-            studentId = nextId;
-            continue;
-          }
+          failedAdmissionIds.push(studentId);
+          // Always advance past the ID that just collided — generate can
+          // otherwise return the same value when a legacy global unique index
+          // (or another school) owns that STU####.
+          studentId = await generateStudentId(schoolId, failedAdmissionIds);
+          continue;
         }
         throw createErr;
       }
@@ -972,10 +1015,17 @@ export const getStudents = async (req, res) => {
       }
     }
 
-    const total = await Student.countDocuments(filter);
+    // skipSession: apply year filter ourselves so untagged admits (empty
+    // academicYear after multer lost ALS) still show in the active session.
+    applyAcademicYearInclusive(req, filter);
+
+    const total = await Student.countDocuments(filter).setOptions({
+      skipSession: true,
+    });
 
     const students = await applyPagination(
       Student.find(filter)
+        .setOptions({ skipSession: true })
         .populate("classId", "name className")
         .populate("sectionId", "name sectionName")
         .populate("transport", "name routeId")
@@ -1055,10 +1105,15 @@ export const updateStudent = async (req, res) => {
       });
     }
 
-    // Locked system fields — not editable via the admission form.
-    delete safeBody.confirmationStatus;
+    // Admission number stays system-locked; confirmation status is editable.
     delete safeBody.studentId;
     delete safeBody.admissionNumber;
+    if (safeBody.confirmationStatus !== undefined) {
+      safeBody.confirmationStatus =
+        String(safeBody.confirmationStatus || "").trim() === "Confirmed"
+          ? "Confirmed"
+          : "Non-Confirmed";
+    }
 
     normalizeStudentFeeFields(safeBody);
 
@@ -1394,10 +1449,19 @@ export const deleteStudent = async (req, res) => {
       });
     }
 
+    if (!mongoose.Types.ObjectId.isValid(String(req.params.id || ""))) {
+      return res.status(400).json({
+        success: false,
+        message: "Invalid student id",
+      });
+    }
+
+    // skipSession: draft/blank admits may have no academicYear and would 404
+    // under the normal session filter (they still appear in the inclusive list).
     const student = await Student.findOne({
       _id: req.params.id,
       schoolId,
-    });
+    }).setOptions({ skipSession: true });
 
     if (!student) {
       return res.status(404).json({
@@ -1408,10 +1472,31 @@ export const deleteStudent = async (req, res) => {
 
     const docs = student.documents || {};
 
-    // Delete all files from Cloudinary
+    // Delete all files from Cloudinary (ignore individual failures).
     for (const key in docs) {
       if (docs[key]?.public_id) {
-        await deleteFromCloudinary(docs[key].public_id);
+        try {
+          await deleteFromCloudinary(docs[key].public_id);
+        } catch (cloudErr) {
+          console.warn(
+            `Cloudinary cleanup failed for ${key}:`,
+            cloudErr?.message || cloudErr,
+          );
+        }
+      }
+    }
+
+    if (Array.isArray(student.extraDocuments)) {
+      for (const doc of student.extraDocuments) {
+        if (!doc?.public_id) continue;
+        try {
+          await deleteFromCloudinary(doc.public_id);
+        } catch (cloudErr) {
+          console.warn(
+            `Cloudinary cleanup failed for extra doc:`,
+            cloudErr?.message || cloudErr,
+          );
+        }
       }
     }
 
@@ -1427,7 +1512,29 @@ export const deleteStudent = async (req, res) => {
       },
     );
 
-    await student.deleteOne();
+    // Detach registration / lead links so they can be re-admitted if needed.
+    try {
+      await Registration.updateMany(
+        { schoolId, studentId: student._id },
+        {
+          $unset: { studentId: 1, admittedAt: 1 },
+          $set: { status: "registered" },
+        },
+      );
+      await Lead.updateMany(
+        { schoolId, studentId: student._id },
+        { $unset: { studentId: 1 }, $set: { status: "active" } },
+      );
+    } catch (linkErr) {
+      console.warn(
+        "Student link cleanup skipped:",
+        linkErr?.message || linkErr,
+      );
+    }
+
+    await Student.deleteOne({ _id: student._id, schoolId }).setOptions({
+      skipSession: true,
+    });
 
     res.json({
       success: true,

@@ -16,20 +16,30 @@ const API = import.meta.env.VITE_API_URL;
 /**
  * Field-level overrides from the school's Admission Form Builder.
  * `Input`, `Select` and `File` read this to hide fields or swap the label.
+ * `enforceRequired` is false when Confirmation Status is Non-Confirmed.
  */
-const AdmissionFieldsContext = createContext(new Map());
+const AdmissionFieldsContext = createContext({
+  fields: new Map(),
+  enforceRequired: true,
+});
 
 const useAdmissionField = (name) => {
-  const fields = useContext(AdmissionFieldsContext);
+  const { fields } = useContext(AdmissionFieldsContext);
   return name ? fields.get(name) : undefined;
 };
 
+const useEnforceRequired = () =>
+  useContext(AdmissionFieldsContext).enforceRequired !== false;
+
 /** Labels in the wizard carry " *" for required fields; keep that in sync. */
-const applyFieldMetaToLabel = (label, meta) => {
-  if (!meta) return label;
+const applyFieldMetaToLabel = (label, meta, enforceRequired = true) => {
+  if (!meta) {
+    if (!enforceRequired) return String(label || "").replace(/\s*\*$/, "");
+    return label;
+  }
   const base = String(label || "").replace(/\s*\*$/, "");
   const text = meta.label || base;
-  return meta.required ? `${text} *` : text;
+  return enforceRequired && meta.required ? `${text} *` : text;
 };
 
 /** Map a validation message back to the field it belongs to. */
@@ -414,13 +424,15 @@ const StudentManagement = () => {
 
   useEffect(() => {
     let cancelled = false;
+    let loadGen = 0;
 
     (async () => {
+      const gen = ++loadGen;
       try {
         const res = await axios.get(`${API}/admission-form`, {
           withCredentials: true,
         });
-        if (cancelled) return;
+        if (cancelled || gen !== loadGen) return;
         setFormStepDefs(mergeAdmissionSteps(res.data?.data?.steps));
         setLayoutMode(
           res.data?.data?.layoutMode === "single" ? "single" : "steps",
@@ -432,6 +444,8 @@ const StudentManagement = () => {
 
     // The standalone builder page fires this after saving.
     const handleUpdate = (event) => {
+      // Invalidate any in-flight GET so it cannot overwrite a fresh save.
+      loadGen += 1;
       setFormStepDefs(mergeAdmissionSteps(event.detail));
     };
     window.addEventListener("admission-form-updated", handleUpdate);
@@ -826,7 +840,7 @@ const StudentManagement = () => {
             : prev.streamId,
           stream: registration.stream || prev.stream,
           username: registration.parentMobile || prev.username,
-          confirmationStatus: "Confirmed",
+          confirmationStatus: prev.confirmationStatus || "Non-Confirmed",
         }));
       } catch (err) {
         toast.error(
@@ -1323,15 +1337,21 @@ const StudentManagement = () => {
       return value !== "" && value !== null && value !== undefined;
     });
 
+  const enforceRequiredFields =
+    String(form.confirmationStatus || "").trim() === "Confirmed";
+
   const validateStep = (targetStep = step) => {
     const errors = [];
+    // Non-Confirmed admissions skip every mandatory check; format checks still
+    // run when a value is present.
+    const require = enforceRequiredFields;
 
     if (targetStep === 1) {
-      if (!form.firstName?.trim()) errors.push("First Name required");
-      if (!form.lastName?.trim()) errors.push("Last Name required");
-      if (!form.dob) {
+      if (require && !form.firstName?.trim()) errors.push("First Name required");
+      if (require && !form.lastName?.trim()) errors.push("Last Name required");
+      if (require && !form.dob) {
         errors.push("Date of Birth required");
-      } else {
+      } else if (form.dob) {
         const selectedDob = new Date(form.dob);
         const today = new Date();
 
@@ -1352,34 +1372,36 @@ const StudentManagement = () => {
           errors.push("Age must be above 3 years");
         }
       }
-      if (!form.gender) errors.push("Gender required");
-      if (!form.admissionDate) errors.push("Admission Date required");
+      if (require && !form.gender) errors.push("Gender required");
+      if (require && !form.admissionDate) errors.push("Admission Date required");
 
       // Blood group is optional — only validate the format when provided.
       if (form.bloodGroup?.trim() && !BLOOD_GROUP_RE.test(form.bloodGroup.trim())) {
         errors.push("Invalid Blood Group");
       }
 
-      if (!form.category) errors.push("Category required");
-      if (form.category === "Minority" && !form.community) {
+      if (require && !form.category) errors.push("Category required");
+      if (require && form.category === "Minority" && !form.community) {
         errors.push("Community required");
       }
     }
 
     if (targetStep === 2) {
-      if (!form.fatherName?.trim()) errors.push("Father name required");
-      if (!form.fatherMobile?.trim()) errors.push("Father mobile required");
-      if (!form.motherName?.trim()) errors.push("Mother name required");
-      if (!form.motherMobile?.trim()) errors.push("Mother mobile required");
+      if (require && !form.fatherName?.trim()) errors.push("Father name required");
+      if (require && !form.fatherMobile?.trim())
+        errors.push("Father mobile required");
+      if (require && !form.motherName?.trim()) errors.push("Mother name required");
+      if (require && !form.motherMobile?.trim())
+        errors.push("Mother mobile required");
       // Guardian is optional. Only validate mobile/relation once a guardian
       // name is entered — the fields are revealed conditionally in the form.
-      if (form.guardianName?.trim()) {
+      if (require && form.guardianName?.trim()) {
         if (!form.guardianMobile?.trim())
           errors.push("Guardian mobile required");
         if (!form.guardianRelation?.trim())
           errors.push("Guardian relation required");
       }
-      if (!form.address?.trim()) errors.push("Address required");
+      if (require && !form.address?.trim()) errors.push("Address required");
       if (form.fatherMobile && !/^\d{10}$/.test(String(form.fatherMobile)))
         errors.push("Invalid Father Mobile Number");
       if (form.motherMobile && !/^\d{10}$/.test(String(form.motherMobile)))
@@ -1395,36 +1417,45 @@ const StudentManagement = () => {
     }
 
     if (targetStep === 4) {
-      // Check Student Photo
-      if (!form.studentPhoto && !form?.documents?.studentPhoto?.url) {
+      if (
+        require &&
+        !form.studentPhoto &&
+        !form?.documents?.studentPhoto?.url
+      ) {
         errors.push("Student Photo is required");
       }
-      // Check Father Aadhar
-      if (!form.fatherAadhar && !form?.documents?.fatherAadhar?.url) {
+      if (
+        require &&
+        !form.fatherAadhar &&
+        !form?.documents?.fatherAadhar?.url
+      ) {
         errors.push("Father Aadhar is required");
       }
-      // Check Mother Aadhar
-      if (!form.motherAadhar && !form?.documents?.motherAadhar?.url) {
+      if (
+        require &&
+        !form.motherAadhar &&
+        !form?.documents?.motherAadhar?.url
+      ) {
         errors.push("Mother Aadhar is required");
       }
     }
 
     if (targetStep === 5) {
-      if (!form.classId) errors.push("Class required");
-
-      if (!form.rollNo) errors.push("Roll number required");
+      if (require && !form.classId) errors.push("Class required");
+      if (require && !form.rollNo) errors.push("Roll number required");
     }
 
     if (targetStep === 6) {
-      if (form.totalFee === "" || form.totalFee === null) {
+      if (require && (form.totalFee === "" || form.totalFee === null)) {
         errors.push("Total fee required");
       }
 
-      if (form.useTransport && !form.transport) {
+      if (require && form.useTransport && !form.transport) {
         errors.push("Transport route required when bus service is selected");
       }
 
       if (
+        require &&
         form.useTransport &&
         form.busFeeFrequency === "quarterly" &&
         !form.busFeeQuarter
@@ -1437,8 +1468,9 @@ const StudentManagement = () => {
       const resolvedUsername = (form.username || form.fatherMobile || "").trim();
       const resolvedPassword = (form.password || "").trim();
 
-      if (!resolvedUsername) errors.push("Username is required");
-      if (!isEdit && !resolvedPassword) errors.push("Password is required");
+      if (require && !resolvedUsername) errors.push("Username is required");
+      if (require && !isEdit && !resolvedPassword)
+        errors.push("Password is required");
       if (resolvedPassword && resolvedPassword.length < 5)
         errors.push("Password must be at least 5 characters");
     }
@@ -1450,7 +1482,7 @@ const StudentManagement = () => {
       const value = form.custom?.[field.key];
       const label = field.label || "This field";
 
-      if (field.required && isEmptyCustomValue(value)) {
+      if (require && field.required && isEmptyCustomValue(value)) {
         errors.push(`${CUSTOM_ERROR_PREFIX}${field.key}::${label} is required`);
         return;
       }
@@ -1466,16 +1498,18 @@ const StudentManagement = () => {
       }
     });
 
-    // Respect the admin's choices for built-in fields: a hidden field never
-    // blocks the wizard, and an optional field ignores "required" errors.
+    // Respect the admin's choices for built-in fields: a hidden/removed field
+    // never blocks the wizard, and an optional field ignores "required" errors.
     return errors.filter((error) => {
-      if (String(error).startsWith(CUSTOM_ERROR_PREFIX)) return true;
+      const text = String(error);
+      if (!require && /required/i.test(text)) return false;
+      if (text.startsWith(CUSTOM_ERROR_PREFIX)) return true;
       const key = errorFieldKey(error);
       if (!key) return true;
       const meta = fieldIndex.get(key);
       if (!meta) return true;
-      if (meta.visible === false) return false;
-      if (!meta.required && /required/i.test(error)) return false;
+      if (meta.visible === false || meta.removed) return false;
+      if (!meta.required && /required/i.test(text)) return false;
       return true;
     });
   };
@@ -1621,7 +1655,7 @@ const StudentManagement = () => {
     const doReset = async () => {
       const next = applySourcePrefill({
         ...emptyForm,
-        confirmationStatus: registrationId ? "Confirmed" : "Non-Confirmed",
+        confirmationStatus: "Non-Confirmed",
       });
       setForm(next);
       setStep(1);
@@ -1694,7 +1728,7 @@ const StudentManagement = () => {
       }
 
       const data = new FormData();
-const forbidden = [
+      const forbidden = [
         "_id",
         "__v",
         "createdAt",
@@ -1703,6 +1737,8 @@ const forbidden = [
         "useTransport",
         "studentCredentials",
         "parentCredentials",
+        // System-assigned on the server — never send a stale preview value.
+        "studentId",
       ];
 
       Object.entries(form).forEach(([key, value]) => {
@@ -1861,7 +1897,12 @@ const forbidden = [
   }, [form]);
 
   return (
-    <AdmissionFieldsContext.Provider value={fieldIndex}>
+    <AdmissionFieldsContext.Provider
+      value={{
+        fields: fieldIndex,
+        enforceRequired: enforceRequiredFields,
+      }}
+    >
       <div className="p-4 lg:p-8  min-h-screen">
       {/* BACK BUTTON */}
       {isMobile && (
@@ -2094,16 +2135,17 @@ const forbidden = [
               <label className="flex flex-col gap-1.5 text-sm font-medium">
                 <span>Confirmation Status</span>
                 <select
+                  name="confirmationStatus"
                   value={form.confirmationStatus || "Non-Confirmed"}
-                  disabled
-                  className="w-full cursor-not-allowed rounded-lg border border-[rgb(var(--border))] bg-[rgb(var(--surface))] px-3 py-2.5 text-sm opacity-90"
+                  onChange={handleChange}
+                  className="w-full rounded-lg border border-[rgb(var(--border))] bg-[rgb(var(--surface))] px-3 py-2.5 text-sm outline-none focus:border-[rgb(var(--primary))]"
                 >
-                  <option value="Confirmed">Confirmed</option>
                   <option value="Non-Confirmed">Non-Confirmed</option>
+                  <option value="Confirmed">Confirmed</option>
                 </select>
                 <span className="text-[11px] font-normal text-[rgb(var(--text-muted))]">
-                  System-managed. Registration admits are Confirmed; direct
-                  admissions are Non-Confirmed.
+                  Non-Confirmed: no fields are mandatory. Confirmed: required
+                  fields must be filled.
                 </span>
               </label>
             </div>
@@ -3112,7 +3154,12 @@ const forbidden = [
       {builderOpen && (
         <AdmissionFormBuilder
           onClose={() => setBuilderOpen(false)}
-          onSaved={(steps) => setFormStepDefs(mergeAdmissionSteps(steps))}
+          onSaved={(steps) => {
+            setFormStepDefs(mergeAdmissionSteps(steps));
+            window.dispatchEvent(
+              new CustomEvent("admission-form-updated", { detail: steps }),
+            );
+          }}
         />
       )}
       </div>
@@ -3126,12 +3173,13 @@ export default StudentManagement;
 
 const Input = ({ label, error, ...props }) => {
   const meta = useAdmissionField(props.name);
+  const enforceRequired = useEnforceRequired();
   if (meta?.visible === false) return null;
 
   return (
     <div>
       <label className="block text-sm font-medium text-[rgb(var(--text))] mb-1">
-        {applyFieldMetaToLabel(label, meta)}
+        {applyFieldMetaToLabel(label, meta, enforceRequired)}
       </label>
 
       <input
@@ -3149,12 +3197,13 @@ const Input = ({ label, error, ...props }) => {
 
 const Select = ({ label, error, options, ...props }) => {
   const meta = useAdmissionField(props.name);
+  const enforceRequired = useEnforceRequired();
   if (meta?.visible === false) return null;
 
   return (
     <div>
       <label className="block text-sm font-medium text-[rgb(var(--text))] mb-1">
-        {applyFieldMetaToLabel(label, meta)}
+        {applyFieldMetaToLabel(label, meta, enforceRequired)}
       </label>
 
       <select
@@ -3197,6 +3246,7 @@ const PHOTO_FIELD_NAMES = new Set([
 
 const File = ({ label, name, onChange, existingUrl, error }) => {
   const meta = useAdmissionField(name);
+  const enforceRequired = useEnforceRequired();
   const [preview, setPreview] = useState(existingUrl || null);
   const [localFile, setLocalFile] = useState(false);
   const isPhotoField = PHOTO_FIELD_NAMES.has(name);
@@ -3275,7 +3325,7 @@ const File = ({ label, name, onChange, existingUrl, error }) => {
       <label
         className={`block text-sm font-medium mb-2 ${error ? "text-red-600" : "text-[rgb(var(--text))]"}`}
       >
-        {applyFieldMetaToLabel(label, meta)}
+        {applyFieldMetaToLabel(label, meta, enforceRequired)}
       </label>
 
       <input
@@ -3321,7 +3371,9 @@ const File = ({ label, name, onChange, existingUrl, error }) => {
 /* CUSTOM FIELD (admin-defined) */
 
 const CustomField = ({ field, value, error, onChange }) => {
-  const label = field.required ? `${field.label} *` : field.label;
+  const enforceRequired = useEnforceRequired();
+  const label =
+    enforceRequired && field.required ? `${field.label} *` : field.label;
   const inputClass =
     "w-full border px-3 py-2 rounded-lg bg-[rgb(var(--surface))] text-[rgb(var(--text))]";
   const help = field.help ? (
@@ -3471,6 +3523,7 @@ const ParentLoginStep = ({ form, handleChange, isEdit }) => {
   const [showPassword, setShowPassword] = useState(false);
   const usernameMeta = useAdmissionField("username");
   const passwordMeta = useAdmissionField("password");
+  const enforceRequired = useEnforceRequired();
 
   return (
     <div className="grid gap-5">
@@ -3481,7 +3534,7 @@ const ParentLoginStep = ({ form, handleChange, isEdit }) => {
       {usernameMeta?.visible !== false && (
         <div>
           <label className="block text-sm font-medium text-[rgb(var(--text))] mb-1">
-            {applyFieldMetaToLabel("Username *", usernameMeta)}
+            {applyFieldMetaToLabel("Username *", usernameMeta, enforceRequired)}
           </label>
           <input
             name="username"
@@ -3499,7 +3552,11 @@ const ParentLoginStep = ({ form, handleChange, isEdit }) => {
           <label className="block text-sm font-medium text-[rgb(var(--text))] mb-1">
             {isEdit
               ? "New Password (leave blank to keep current)"
-              : applyFieldMetaToLabel("Password *", passwordMeta)}
+              : applyFieldMetaToLabel(
+                  "Password *",
+                  passwordMeta,
+                  enforceRequired,
+                )}
           </label>
           <div className="relative">
             <input
@@ -3576,12 +3633,15 @@ const ReviewStep = ({
     </div>
   );
 
-  const Field = ({ label, value }) => {
+  const Field = ({ label, value, name }) => {
+    const meta = useAdmissionField(name);
+    const enforceRequired = useEnforceRequired();
+    if (meta?.visible === false) return null;
     if (!value && value !== 0) return null;
     return (
       <div className="px-4 py-2.5 border-b border-r text-[rgb(var(--text))] bg-[rgb(var(--surface))] border border-[rgb(var(--border))]">
         <div className="text-[11px] uppercase tracking-wide  mb-0.5">
-          {label}
+          {applyFieldMetaToLabel(label, meta, enforceRequired)}
         </div>
         <div className="text-sm font-medium min-w-0 break-words">{value}</div>
       </div>
@@ -3623,72 +3683,75 @@ const ReviewStep = ({
       </div>
 
       <Section title="Student details" headerClass="">
-        <Field label="Admission number" value={form.studentId || "—"} />
+        <Field name="studentId" label="Admission number" value={form.studentId || "—"} />
         <Field
           label="Confirmation"
           value={form.confirmationStatus || "Non-Confirmed"}
         />
-        <Field label="First name" value={form.firstName} />
-        <Field label="Last name" value={form.lastName} />
-        <Field label="Date of birth" value={form.dob} />
-        <Field label="Gender" value={form.gender} />
-        <Field label="Blood group" value={form.bloodGroup} />
-        <Field label="Nationality" value={form.nationality} />
-        <Field label="Place of birth" value={form.placeOfBirth} />
-        <Field label="Caste" value={form.caste} />
-        <Field label="Category" value={form.category} />
+        <Field name="firstName" label="First name" value={form.firstName} />
+        <Field name="lastName" label="Last name" value={form.lastName} />
+        <Field name="dob" label="Date of birth" value={form.dob} />
+        <Field name="gender" label="Gender" value={form.gender} />
+        <Field name="bloodGroup" label="Blood group" value={form.bloodGroup} />
+        <Field name="nationality" label="Nationality" value={form.nationality} />
+        <Field name="placeOfBirth" label="Place of birth" value={form.placeOfBirth} />
+        <Field name="caste" label="Caste" value={form.caste} />
+        <Field name="category" label="Category" value={form.category} />
         {form.category === "Minority" && (
-          <Field label="Community" value={form.community} />
+          <Field name="community" label="Community" value={form.community} />
         )}
-        <Field label="Aadhaar number" value={form.aadhaarNumber} />
-        <Field label="PEN number" value={form.penNumber} />
-        <Field label="Admission source" value={form.admissionSource} />
+        <Field name="aadhaarNumber" label="Aadhaar number" value={form.aadhaarNumber} />
+        <Field name="penNumber" label="PEN number" value={form.penNumber} />
+        <Field name="admissionSource" label="Admission source" value={form.admissionSource} />
         <Field
+          name="isSpecialChild"
           label="Special child"
           value={form.isSpecialChild ? "Yes" : "No"}
         />
-        <Field label="EWS" value={form.isEws ? "Yes" : "No"} />
+        <Field name="isEws" label="EWS" value={form.isEws ? "Yes" : "No"} />
         <Field
+          name="isPhysicallyDisabled"
           label="Physically disabled"
           value={form.isPhysicallyDisabled ? "Yes" : "No"}
         />
         <Field
+          name="medicalConditionRemarks"
           label="Medical condition / history"
           value={form.medicalConditionRemarks}
         />
-        <Field label="Admission date" value={form.admissionDate} />
+        <Field name="admissionDate" label="Admission date" value={form.admissionDate} />
       </Section>
 
       <Section title="Parent / guardian" headerClass="">
-        <Field label="Father name" value={form.fatherName} />
-        <Field label="Father mobile" value={form.fatherMobile} />
-        <Field label="Father email" value={form.fatherEmail} />
-        <Field label="Mother name" value={form.motherName} />
-        <Field label="Mother mobile" value={form.motherMobile} />
-        <Field label="Mother email" value={form.motherEmail} />
+        <Field name="fatherName" label="Father name" value={form.fatherName} />
+        <Field name="fatherMobile" label="Father mobile" value={form.fatherMobile} />
+        <Field name="fatherEmail" label="Father email" value={form.fatherEmail} />
+        <Field name="motherName" label="Mother name" value={form.motherName} />
+        <Field name="motherMobile" label="Mother mobile" value={form.motherMobile} />
+        <Field name="motherEmail" label="Mother email" value={form.motherEmail} />
 {form.guardianName?.trim() && (
               <>
-                <Field label="Guardian name" value={form.guardianName} />
-                <Field label="Guardian mobile" value={form.guardianMobile} />
-                <Field label="Relation" value={form.guardianRelation} />
+                <Field name="guardianName" label="Guardian name" value={form.guardianName} />
+                <Field name="guardianMobile" label="Guardian mobile" value={form.guardianMobile} />
+                <Field name="guardianRelation" label="Relation" value={form.guardianRelation} />
               </>
             )}
-        <Field label="Address" value={form.address} />
+        <Field name="address" label="Address" value={form.address} />
       </Section>
 
       <Section title="Previous School" headerClass="">
-        <Field label="Previous School Name" value={form.previousSchoolName} />
-        <Field label="Previous School Class" value={form.previousSchoolClass} />
-        <Field label="Previous School Result" value={form.previousSchoolResult} />
-        <Field label="TC Number" value={form.previousSchoolTcNumber} />
+        <Field name="previousSchoolName" label="Previous School Name" value={form.previousSchoolName} />
+        <Field name="previousSchoolClass" label="Previous School Class" value={form.previousSchoolClass} />
+        <Field name="previousSchoolResult" label="Previous School Result" value={form.previousSchoolResult} />
+        <Field name="previousSchoolTcNumber" label="TC Number" value={form.previousSchoolTcNumber} />
       </Section>
 
       <Section title="Class details" headerClass="">
-        <Field label="Class" value={className} />
-        <Field label="Section" value={sectionName} />
-        <Field label="Roll number" value={form.rollNo} />
-        <Field label="Student type" value={form.studentType} />
-        <Field label="Transport route" value={transportName} />
+        <Field name="classId" label="Class" value={className} />
+        <Field name="sectionId" label="Section" value={sectionName} />
+        <Field name="rollNo" label="Roll number" value={form.rollNo} />
+        <Field name="studentType" label="Student type" value={form.studentType} />
+        <Field name="transport" label="Transport route" value={transportName} />
       </Section>
 
       <Section title="Fee structure" headerClass="">

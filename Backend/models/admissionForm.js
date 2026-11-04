@@ -49,8 +49,10 @@ const admissionFormSchema = new mongoose.Schema(
       enum: FORM_TYPES,
       default: "admission",
     },
+    // Whole step tree is opaque JSON (custom fields/steps). Use Mixed — not
+    // [Mixed] — so $set / markModified always persist nested edits.
     steps: {
-      type: [mongoose.Schema.Types.Mixed],
+      type: mongoose.Schema.Types.Mixed,
       default: [],
     },
     /**

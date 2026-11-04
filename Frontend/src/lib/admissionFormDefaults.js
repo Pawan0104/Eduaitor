@@ -349,6 +349,18 @@ export const mergeAdmissionSteps = (storedSteps) => {
 export const buildFieldIndex = (steps) => {
   const index = new Map();
   for (const step of steps) {
+    // Deleted built-ins must stay addressable so the hardcoded wizard can hide
+    // them (Input/Select only skip when meta.visible === false).
+    for (const key of step.removedFieldKeys || []) {
+      if (!key || index.has(key)) continue;
+      index.set(key, {
+        key,
+        visible: false,
+        required: false,
+        removed: true,
+        stepKey: step.key,
+      });
+    }
     for (const field of step.fields) {
       index.set(field.key, { ...field, stepKey: step.key });
     }

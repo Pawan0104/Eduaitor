@@ -131,6 +131,32 @@ export const applyAcademicYear = (req, filter = {}) => {
   return filter;
 };
 
+/**
+ * List filter for session-scoped collections. Includes records with a missing
+ * academic year so creates that lost AsyncLocalStorage (common with multipart
+ * uploads) still appear in the active session list.
+ */
+export const applyAcademicYearInclusive = (req, filter = {}) => {
+  if (req?.academicYearAll || !req?.academicYear) return filter;
+  const yearClause = {
+    $or: [
+      { academicYear: req.academicYear },
+      { academicYear: { $exists: false } },
+      { academicYear: null },
+      { academicYear: "" },
+    ],
+  };
+  if (filter.$and) {
+    filter.$and.push(yearClause);
+  } else if (filter.$or) {
+    filter.$and = [{ $or: filter.$or }, yearClause];
+    delete filter.$or;
+  } else {
+    Object.assign(filter, yearClause);
+  }
+  return filter;
+};
+
 /** Label to store on a new record. */
 export const sessionForWrite = (req) => req?.academicYear || "";
 

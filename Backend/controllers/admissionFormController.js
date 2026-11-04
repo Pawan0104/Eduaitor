@@ -4,38 +4,49 @@ import { ensureAdmissionFormIndexes } from "../config/db.js";
 const getSchoolId = (req) => req.user?.school_id;
 
 /**
- * Prefer find → update/create over upsert+$or.
- * Legacy unique(schoolId) made upserts for lead/registration collide.
+ * Prefer findOneAndUpdate($set) over document.save().
+ * `steps` is Mixed JSON — Object.assign + save often skipped writing nested
+ * changes, so Customize Form looked saved in the API response but the live
+ * admission / lead / registration forms never picked up the new layout.
+ *
+ * Admission resolves typed docs first, then legacy docs with no formType, so
+ * GET and PUT always touch the same record.
  */
 const upsertFormConfig = async (schoolId, formType, setFields) => {
-  const filter =
+  const $set = { ...setFields, formType, schoolId };
+
+  const tryUpdate = (filter) =>
+    AdmissionForm.findOneAndUpdate(filter, { $set }, {
+      new: true,
+      runValidators: true,
+    }).lean();
+
+  let updated =
     formType === "admission"
-      ? {
-          schoolId,
-          $or: [{ formType: "admission" }, { formType: { $exists: false } }],
-        }
-      : { schoolId, formType };
+      ? (await tryUpdate({ schoolId, formType: "admission" })) ||
+        (await tryUpdate({ schoolId, formType: { $exists: false } }))
+      : await tryUpdate({ schoolId, formType });
 
-  let existing = await AdmissionForm.findOne(filter);
-  if (!existing && formType === "admission") {
-    existing = await AdmissionForm.findOne({ schoolId, formType: "admission" });
-  }
-  if (!existing && formType !== "admission") {
-    existing = await AdmissionForm.findOne({ schoolId, formType });
-  }
+  if (updated) return updated;
 
-  if (existing) {
-    Object.assign(existing, setFields, { formType });
-    await existing.save();
-    return existing.toObject();
+  try {
+    const created = await AdmissionForm.create({
+      schoolId,
+      formType,
+      ...setFields,
+    });
+    return created.toObject();
+  } catch (error) {
+    // Concurrent create for the same school+formType — update the winner.
+    if (error?.code !== 11000) throw error;
+    updated =
+      formType === "admission"
+        ? (await tryUpdate({ schoolId, formType: "admission" })) ||
+          (await tryUpdate({ schoolId, formType: { $exists: false } }))
+        : await tryUpdate({ schoolId, formType });
+    if (updated) return updated;
+    throw error;
   }
-
-  const created = await AdmissionForm.create({
-    schoolId,
-    formType,
-    ...setFields,
-  });
-  return created.toObject();
 };
 
 const FIELD_TYPES = new Set([
@@ -148,10 +159,15 @@ const sanitizeSteps = (input) => {
 
 const findFormConfig = async (schoolId, formType) => {
   if (formType === "admission") {
-    // Back-compat: older docs were unique on schoolId and had no formType.
+    // Prefer typed docs; fall back to legacy unique(schoolId) rows.
+    const typed = await AdmissionForm.findOne({
+      schoolId,
+      formType: "admission",
+    }).lean();
+    if (typed) return typed;
     return AdmissionForm.findOne({
       schoolId,
-      $or: [{ formType: "admission" }, { formType: { $exists: false } }],
+      formType: { $exists: false },
     }).lean();
   }
   return AdmissionForm.findOne({ schoolId, formType }).lean();

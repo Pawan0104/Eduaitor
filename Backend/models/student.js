@@ -20,8 +20,9 @@ const extraDocumentSchema = new mongoose.Schema(
 
 const studentSchema = new mongoose.Schema(
   {
-    firstName: { type: String, required: true },
-    lastName: { type: String, required: true },
+    // Optional when confirmationStatus is Non-Confirmed (draft admission).
+    firstName: { type: String, default: "" },
+    lastName: { type: String, default: "" },
     dob: Date,
     gender: String,
     bloodGroup: String,
@@ -43,10 +44,7 @@ const studentSchema = new mongoose.Schema(
     aadhaarNumber: { type: String, default: "" },
     penNumber: { type: String, default: "" },
     admissionSource: { type: String, default: "" },
-    /**
-     * System-managed confirmation flag (not editable on the admission form).
-     * Direct admissions start as Non-Confirmed; registration admits as Confirmed.
-     */
+    /** Admission confirmation — editable on the form; defaults to Non-Confirmed. */
     confirmationStatus: {
       type: String,
       enum: ["Confirmed", "Non-Confirmed"],

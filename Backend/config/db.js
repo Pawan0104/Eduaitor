@@ -266,6 +266,7 @@ const connectDB = async () => {
         await ensureParentUsernameIndex();
         await ensureNotificationSystemKeyIndex();
         await ensureAdmissionFormIndexes();
+        await ensureStudentAdmissionIndexes();
         startNotificationCron();
         return conn;
       } catch (primaryError) {
@@ -283,6 +284,7 @@ const connectDB = async () => {
           await ensureParentUsernameIndex();
           await ensureNotificationSystemKeyIndex();
           await ensureAdmissionFormIndexes();
+          await ensureStudentAdmissionIndexes();
           startNotificationCron();
           return retryConn;
         } catch (retryError) {
@@ -310,6 +312,7 @@ const connectDB = async () => {
           await ensureParentUsernameIndex();
           await ensureNotificationSystemKeyIndex();
           await ensureAdmissionFormIndexes();
+          await ensureStudentAdmissionIndexes();
           startNotificationCron();
           return conn;
         }
@@ -335,6 +338,7 @@ const connectDB = async () => {
     await ensureParentUsernameIndex();
     await ensureNotificationSystemKeyIndex();
     await ensureAdmissionFormIndexes();
+    await ensureStudentAdmissionIndexes();
     startNotificationCron();
     return mongoose.connection;
   } catch (error) {
@@ -467,6 +471,83 @@ export async function ensureAdmissionFormIndexes() {
     }
   } catch (err) {
     console.warn("Admission form index migrate skipped:", err.message);
+  }
+}
+
+/**
+ * Older DBs had a global unique(studentId) / unique(studentCredentials.username).
+ * That makes School B fail with "Admission number already exists" when School A
+ * already holds STU0001. Uniqueness must be per school only.
+ */
+export async function ensureStudentAdmissionIndexes() {
+  try {
+    const col = mongoose.connection.collection("students");
+    const indexes = await col.indexes();
+
+    const dropIf = async (predicate, label) => {
+      const hit = indexes.find(predicate);
+      if (!hit?.name) return;
+      await col.dropIndex(hit.name);
+      console.log(`Dropped legacy students.${hit.name} (${label})`);
+    };
+
+    await dropIf(
+      (idx) => {
+        if (!idx?.unique || !idx.key) return false;
+        const keys = Object.keys(idx.key);
+        return keys.length === 1 && keys[0] === "studentId";
+      },
+      "global studentId unique — blocks multi-school STU####",
+    );
+
+    await dropIf(
+      (idx) => {
+        if (!idx?.unique || !idx.key) return false;
+        const keys = Object.keys(idx.key);
+        return (
+          keys.length === 1 && keys[0] === "studentCredentials.username"
+        );
+      },
+      "global student username unique — blocks multi-school STU####",
+    );
+
+    const compoundStudentId = (await col.indexes()).find(
+      (idx) =>
+        idx.unique &&
+        idx.key?.schoolId === 1 &&
+        idx.key?.studentId === 1 &&
+        Object.keys(idx.key).length === 2,
+    );
+    if (!compoundStudentId) {
+      await col.createIndex(
+        { schoolId: 1, studentId: 1 },
+        { unique: true, name: "schoolId_1_studentId_1" },
+      );
+      console.log("Ensured students.schoolId_1_studentId_1 unique index");
+    }
+
+    const compoundUsername = (await col.indexes()).find(
+      (idx) =>
+        idx.unique &&
+        idx.key?.schoolId === 1 &&
+        idx.key?.["studentCredentials.username"] === 1 &&
+        Object.keys(idx.key).length === 2,
+    );
+    if (!compoundUsername) {
+      await col.createIndex(
+        { schoolId: 1, "studentCredentials.username": 1 },
+        {
+          unique: true,
+          sparse: true,
+          name: "schoolId_1_studentCredentials.username_1",
+        },
+      );
+      console.log(
+        "Ensured students.schoolId_1_studentCredentials.username_1 unique index",
+      );
+    }
+  } catch (err) {
+    console.warn("Student admission index migrate skipped:", err.message);
   }
 }
 
