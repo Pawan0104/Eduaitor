@@ -277,6 +277,13 @@ const LeadManagement = () => {
       toast.error("Admitted leads cannot be cancelled");
       return;
     }
+    if (
+      lead.registrationId ||
+      String(lead.status || "").toLowerCase() === "processing"
+    ) {
+      toast.error("Cancel from Registration instead — this lead is already registered");
+      return;
+    }
     if (String(lead.status || "").toLowerCase() === "cancelled") {
       toast.info("Lead is already cancelled");
       return;
@@ -774,19 +781,9 @@ const LeadManagement = () => {
 
                     {!isStaffLogin &&
                       !lead.studentId &&
-                      String(lead.status || "").toLowerCase() !== "admitted" && (
-                        <button
-                          type="button"
-                          onClick={() => openEditModal(lead)}
-                          className="inline-flex items-center justify-center gap-2 px-3 py-2 rounded-xl border border-[rgb(var(--border))] text-[rgb(var(--text))] hover:bg-[rgb(var(--bg))] transition text-sm font-medium"
-                        >
-                          <FaEdit size={12} /> Edit
-                        </button>
-                      )}
-
-                    {!isStaffLogin &&
-                      !lead.studentId &&
+                      !lead.registrationId &&
                       String(lead.status || "").toLowerCase() !== "admitted" &&
+                      String(lead.status || "").toLowerCase() !== "processing" &&
                       String(lead.status || "").toLowerCase() !== "cancelled" && (
                         <button
                           type="button"
@@ -1031,7 +1028,9 @@ const LeadManagement = () => {
               {!isStaffLogin &&
                 !viewModal.lead.studentId &&
                 String(viewModal.lead.status || "").toLowerCase() !==
-                  "admitted" && (
+                  "admitted" &&
+                String(viewModal.lead.status || "").toLowerCase() !==
+                  "cancelled" && (
                   <button
                     type="button"
                     onClick={() => {

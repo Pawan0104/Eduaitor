@@ -213,6 +213,10 @@ function FeeCollection() {
     [selectedHeads],
   );
 
+  const remainingDue = Math.max(0, Number(feeSummary.totalDue) || 0);
+  const collectCap =
+    Math.round(Math.min(selectedTotal, remainingDue) * 100) / 100;
+
   const loadStudentHeads = async (student) => {
     setHeadsLoading(true);
     try {
@@ -221,36 +225,52 @@ function FeeCollection() {
         { withCredentials: true },
       );
       const list = (data.heads || []).filter((h) => Number(h.amount) > 0);
+      const dueBalance = Math.max(
+        0,
+        Number(
+          data.totalDue ??
+            Math.round(
+              ((Number(data.finalFee ?? student.finalFee) || 0) -
+                (Number(data.totalPaid ?? student.totalPaid) || 0)) *
+                100,
+            ) / 100,
+        ) || 0,
+      );
       setHeads(list);
       setOpenVouchers(data.openVouchers || []);
       setRecentPayments(data.recentPayments || []);
       setFeeSummary({
-        finalFee: data.finalFee || student.finalFee || 0,
-        totalPaid: data.totalPaid || student.totalPaid || 0,
-        totalDue: data.totalDue || student.totalDue || 0,
+        finalFee: data.finalFee ?? student.finalFee ?? 0,
+        totalPaid: data.totalPaid ?? student.totalPaid ?? 0,
+        totalDue: dueBalance,
       });
       const dueIds = list
         .filter((h) => Number(h.due) > 0)
         .map((h) => String(h._id));
       setSelectedHeadIds(dueIds);
-      setAmountToPay(
-        String(
-          Math.round(
-            list
-              .filter((h) => dueIds.includes(String(h._id)))
-              .reduce((s, h) => s + Number(h.due || 0), 0) * 100,
-          ) / 100,
-        ),
-      );
+      const headsDue =
+        Math.round(
+          list
+            .filter((h) => dueIds.includes(String(h._id)))
+            .reduce((s, h) => s + Number(h.due || 0), 0) * 100,
+        ) / 100;
+      setAmountToPay(String(Math.min(headsDue, dueBalance)));
     } catch (err) {
       toast.error(err?.response?.data?.message || "Failed to load fee heads");
       setHeads([]);
       setSelectedHeadIds([]);
-      setAmountToPay(String(student.totalDue || ""));
+      const fallbackDue = Math.max(
+        0,
+        Math.round(
+          ((Number(student.finalFee) || 0) - (Number(student.totalPaid) || 0)) *
+            100,
+        ) / 100,
+      );
+      setAmountToPay(String(fallbackDue));
       setFeeSummary({
         finalFee: student.finalFee || 0,
         totalPaid: student.totalPaid || 0,
-        totalDue: student.totalDue || 0,
+        totalDue: fallbackDue,
       });
     } finally {
       setHeadsLoading(false);
@@ -281,7 +301,8 @@ function FeeCollection() {
             .filter((h) => next.includes(String(h._id)))
             .reduce((s, h) => s + Number(h.due || 0), 0) * 100,
         ) / 100;
-      setAmountToPay(String(total));
+      const dueCap = Math.max(0, Number(feeSummary.totalDue) || 0);
+      setAmountToPay(String(Math.min(total, dueCap)));
       return next;
     });
   };
@@ -297,7 +318,8 @@ function FeeCollection() {
           .filter((h) => dueIds.includes(String(h._id)))
           .reduce((s, h) => s + Number(h.due || 0), 0) * 100,
       ) / 100;
-    setAmountToPay(String(total));
+    const dueCap = Math.max(0, Number(feeSummary.totalDue) || 0);
+    setAmountToPay(String(Math.min(total, dueCap)));
   };
 
   const clearHeads = () => {
@@ -358,13 +380,23 @@ function FeeCollection() {
       toast.error("Select at least one fee head");
       return;
     }
+    if (remainingDue <= 0) {
+      toast.error("No remaining fee due for this student");
+      return;
+    }
     const payAmt = Number(amountToPay);
     if (!payAmt || payAmt <= 0) {
       toast.error("Please enter a valid amount");
       return;
     }
-    if (payAmt > selectedTotal + 0.009) {
-      toast.error(`Amount cannot exceed selected total ₹${selectedTotal}`);
+    if (payAmt > collectCap + 0.009) {
+      toast.error(
+        `Amount cannot exceed remaining due ₹${collectCap}${
+          selectedTotal > remainingDue
+            ? ` (student balance ₹${remainingDue})`
+            : ""
+        }`,
+      );
       return;
     }
     if (paymentMode === "UPI" && !utr.trim()) {
@@ -726,7 +758,15 @@ function FeeCollection() {
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap text-sm ">
                           <div className="font-medium ">
-                            ₹{student.totalDue}
+                            ₹
+                            {Math.max(
+                              0,
+                              Math.round(
+                                ((Number(student.finalFee) || 0) -
+                                  (Number(student.totalPaid) || 0)) *
+                                  100,
+                              ) / 100,
+                            )}
                           </div>
                           {student.discountValue > 0 && (
                             <div className="text-xs text-red-500">
@@ -737,9 +777,16 @@ function FeeCollection() {
                         <td className=" whitespace-nowrap text-sm font-medium">
                           <button
                             onClick={() => handleCollectFee(student)}
+                            disabled={
+                              Math.max(
+                                0,
+                                (Number(student.finalFee) || 0) -
+                                  (Number(student.totalPaid) || 0),
+                              ) <= 0
+                            }
                             className="inline-flex items-center px-4 py-2 border border-transparent 
                     text-sm font-medium rounded-md shadow-sm text-white bg-[rgb(var(--primary))]
-                    focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[rgb(var(--primary))] transition-colors"
+                    focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[rgb(var(--primary))] transition-colors disabled:cursor-not-allowed disabled:opacity-40"
                           >
                             Collect Fee
                           </button>
@@ -813,7 +860,7 @@ function FeeCollection() {
                     Due
                   </p>
                   <p className="text-sm font-bold text-red-600">
-                    ₹{feeSummary.totalDue}
+                    ₹{remainingDue}
                   </p>
                 </div>
               </div>
@@ -977,7 +1024,7 @@ function FeeCollection() {
                       <div className="flex gap-2">
                         <button
                           type="button"
-                          onClick={() => setAmountToPay(String(selectedTotal))}
+                          onClick={() => setAmountToPay(String(collectCap))}
                           className="text-[10px] font-semibold text-[rgb(var(--primary))]"
                         >
                           Full due
@@ -986,7 +1033,7 @@ function FeeCollection() {
                           type="button"
                           onClick={() => {
                             const half =
-                              Math.round((selectedTotal / 2) * 100) / 100;
+                              Math.round((collectCap / 2) * 100) / 100;
                             setAmountToPay(half > 0 ? String(half) : "0");
                           }}
                           className="text-[10px] font-semibold text-amber-700"
@@ -1002,7 +1049,7 @@ function FeeCollection() {
                       <input
                         type="number"
                         min="1"
-                        max={selectedTotal || undefined}
+                        max={collectCap || undefined}
                         step="0.01"
                         value={amountToPay}
                         onChange={(e) => setAmountToPay(e.target.value)}
@@ -1012,7 +1059,7 @@ function FeeCollection() {
                     </div>
                     <p className="text-[11px] text-[rgb(var(--text-muted))] mt-1.5 ml-1">
                       Partial payment allowed — enter any amount up to ₹
-                      {selectedTotal}. Remaining stays due.
+                      {collectCap} (student due ₹{remainingDue}).
                     </p>
                   </div>
 
@@ -1116,7 +1163,12 @@ function FeeCollection() {
                   </button>
                   <button
                     onClick={confirmPayment}
-                    disabled={submitting || !selectedHeads.length}
+                    disabled={
+                      submitting ||
+                      !selectedHeads.length ||
+                      remainingDue <= 0 ||
+                      collectCap <= 0
+                    }
                     className="flex-[1.4] min-w-[120px] py-3 bg-[rgb(var(--primary))] text-white rounded-xl font-bold shadow-lg active:scale-95 transition-all disabled:opacity-50"
                   >
                     Pay Now

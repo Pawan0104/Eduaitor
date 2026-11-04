@@ -1212,14 +1212,15 @@ const Registrations = () => {
                         <FiCheckCircle size={12} />
                         {registration.status === "admitted" ? "Admitted" : "Admit"}
                       </button>
-                      <button
-                        type="button"
-                        onClick={() => openEditById(registration._id)}
-                        disabled={registration.status === "admitted"}
-                        className={`${btnGhost} disabled:cursor-not-allowed disabled:opacity-40`}
-                      >
-                        <FiEdit2 size={12} /> Edit
-                      </button>
+                      {registration.status !== "admitted" ? (
+                        <button
+                          type="button"
+                          onClick={() => openEditById(registration._id)}
+                          className={btnGhost}
+                        >
+                          <FiEdit2 size={12} /> Edit
+                        </button>
+                      ) : null}
                       {registration.status === "cancelled" ? (
                         <button
                           type="button"
@@ -1230,26 +1231,26 @@ const Registrations = () => {
                         >
                           Restore
                         </button>
-                      ) : (
+                      ) : registration.status !== "admitted" ? (
                         <button
                           type="button"
                           onClick={() =>
                             changeStatus(registration, "cancelled")
                           }
-                          disabled={registration.status === "admitted"}
-                          className={`${btnGhost} disabled:cursor-not-allowed disabled:opacity-40`}
+                          className={btnGhost}
                         >
                           Cancel
                         </button>
-                      )}
-                      <button
-                        type="button"
-                        onClick={() => deleteRegistration(registration)}
-                        disabled={registration.status === "admitted"}
-                        className="inline-flex items-center justify-center gap-2 rounded-xl border border-red-200 px-3 py-2 text-sm font-medium text-red-500 transition hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-40"
-                      >
-                        <FiTrash2 size={12} /> Delete
-                      </button>
+                      ) : null}
+                      {registration.status !== "admitted" ? (
+                        <button
+                          type="button"
+                          onClick={() => deleteRegistration(registration)}
+                          className="inline-flex items-center justify-center gap-2 rounded-xl border border-red-200 px-3 py-2 text-sm font-medium text-red-500 transition hover:bg-red-50"
+                        >
+                          <FiTrash2 size={12} /> Delete
+                        </button>
+                      ) : null}
                     </div>
                     </div>
 

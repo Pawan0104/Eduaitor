@@ -337,6 +337,27 @@ export const initiateRazorpayOrder = async (req, res) => {
       });
     }
 
+    const studentDue = Math.max(
+      0,
+      Math.round(
+        ((Number(student.finalFee) || 0) - (Number(student.totalPaid) || 0)) *
+          100,
+      ) / 100,
+    );
+    if (studentDue <= 0) {
+      return res.status(400).json({
+        success: false,
+        message: "No remaining fee due for this student",
+      });
+    }
+    if (amount > studentDue + 0.009) {
+      return res.status(400).json({
+        success: false,
+        message: `Amount cannot exceed remaining due ₹${studentDue}`,
+      });
+    }
+    amount = Math.min(amount, studentDue);
+
     // Development: no real Razorpay keys yet → mock checkout order
     if (!hasRealRazorpayKeys(school)) {
       const orderId = `order_local_${Date.now()}`;
@@ -616,6 +637,13 @@ const collectStudentFeeInternal = async (req, res) => {
       ) / 100,
     );
 
+    if (studentDue <= 0) {
+      return res.status(400).json({
+        success: false,
+        message: "No remaining fee due for this student",
+      });
+    }
+
     if (periodKeys.length) {
       const feeDetails = await buildStudentFeeResponse({
         studentId: sId,
@@ -641,8 +669,12 @@ const collectStudentFeeInternal = async (req, res) => {
       const headsMax =
         Math.round(feeHeads.reduce((s, h) => s + Number(h.amount), 0) * 100) /
         100;
+      // Always cap by remaining student due — never use `studentDue || headsMax`
+      // (that treated due=0 as falsy and allowed over-collection).
       const payAmt =
-        amountPaid > 0 ? Math.min(amountPaid, headsMax, studentDue || headsMax) : headsMax;
+        amountPaid > 0
+          ? Math.min(amountPaid, headsMax, studentDue)
+          : Math.min(headsMax, studentDue);
       if (payAmt <= 0) {
         return res.status(400).json({
           success: false,
@@ -655,6 +687,12 @@ const collectStudentFeeInternal = async (req, res) => {
           message: `Amount cannot exceed selected heads total ₹${headsMax}`,
         });
       }
+      if (amountPaid > studentDue + 0.009) {
+        return res.status(400).json({
+          success: false,
+          message: `Amount cannot exceed remaining due ₹${studentDue}`,
+        });
+      }
       feeHeads = allocateHeadsFifo(feeHeads, payAmt);
       amountPaid =
         Math.round(feeHeads.reduce((s, h) => s + Number(h.amount), 0) * 100) /
@@ -663,7 +701,16 @@ const collectStudentFeeInternal = async (req, res) => {
         amountPaid < headsMax - 0.009
           ? `${feeHeads.map((h) => h.name).join(", ")} (partial)`
           : feeHeads.map((h) => h.name).join(", ");
-    } else if (amountPaid > studentDue + 0.009) {
+    }
+
+    amountPaid = Math.round((Number(amountPaid) || 0) * 100) / 100;
+    if (amountPaid <= 0) {
+      return res.status(400).json({
+        success: false,
+        message: "Enter a valid payment amount",
+      });
+    }
+    if (amountPaid > studentDue + 0.009) {
       return res.status(400).json({
         success: false,
         message: `Amount cannot exceed remaining due ₹${studentDue}`,
@@ -718,10 +765,16 @@ const collectStudentFeeInternal = async (req, res) => {
       );
     }
 
-    student.totalPaid = (Number(student.totalPaid) || 0) + Number(amountPaid);
-    student.totalDue =
-      Math.round(((Number(student.finalFee) || 0) - student.totalPaid) * 100) /
-      100;
+    student.totalPaid =
+      Math.round(
+        ((Number(student.totalPaid) || 0) + Number(amountPaid)) * 100,
+      ) / 100;
+    student.totalDue = Math.max(
+      0,
+      Math.round(
+        ((Number(student.finalFee) || 0) - student.totalPaid) * 100,
+      ) / 100,
+    );
     await student.save();
 
     await createNotificationHelper({
@@ -1424,35 +1477,50 @@ const buildStudentFeeResponse = async ({ studentId, schoolId }) => {
     }))
     .filter((fee) => fee.amount > 0);
 
-  // Head-wise paid/due for checkbox payment UI (admin + parent)
-  const heads = (() => {
-    try {
-      return typeof computeHeadBalances === "function"
-        ? computeHeadBalances(breakdown, payments)
-        : breakdown.map((f) => ({
-            ...f,
-            paid: 0,
-            due: Number(f.amount) || 0,
-          }));
-    } catch {
-      return breakdown.map((f) => ({
-        ...f,
-        paid: 0,
-        due: Number(f.amount) || 0,
-      }));
-    }
-  })();
-
   const totalFee = Number(student.totalFee) || Number(student.finalFee) || 0;
   const finalFee = Number(student.finalFee) || 0;
   const totalPaid = Number(student.totalPaid) || 0;
-  const storedDue = Number(student.totalDue);
   const discountValue = Number(student.discountValue) || 0;
   const discountAmount = Math.max(0, totalFee - finalFee);
+  // Always recompute from finalFee − paid so over-collection cannot show as
+  // a negative due (and head dues stay within the real remaining balance).
   const totalDue = Math.max(
     0,
-    Number.isFinite(storedDue) ? storedDue : finalFee - totalPaid,
+    Math.round((finalFee - totalPaid) * 100) / 100,
   );
+
+  // Heal legacy rows where over-collection left a negative / stale totalDue.
+  const storedDue = Number(student.totalDue);
+  if (
+    !Number.isFinite(storedDue) ||
+    storedDue < 0 ||
+    Math.abs(storedDue - totalDue) > 0.009
+  ) {
+    Student.updateOne(
+      { _id: student._id, schoolId },
+      { $set: { totalDue } },
+    ).catch(() => {});
+  }
+
+  // Head-wise paid/due for checkbox payment UI (admin + parent),
+  // capped so head dues cannot exceed the student's remaining finalFee due.
+  let cappedHeads;
+  try {
+    cappedHeads =
+      typeof computeHeadBalances === "function"
+        ? computeHeadBalances(breakdown, payments, totalDue)
+        : breakdown.map((f) => ({
+            ...f,
+            paid: 0,
+            due: Math.min(Number(f.amount) || 0, totalDue),
+          }));
+  } catch {
+    cappedHeads = breakdown.map((f) => ({
+      ...f,
+      paid: 0,
+      due: Math.min(Number(f.amount) || 0, totalDue),
+    }));
+  }
 
   const structureFrequency = normalizeFeeFrequency(feeStructure?.frequency);
   const studentFrequency = student.feeFrequency
@@ -1477,7 +1545,7 @@ const buildStudentFeeResponse = async ({ studentId, schoolId }) => {
       rollNo: student.rollNo || "",
     },
     feeStructure: breakdown,
-    heads,
+    heads: cappedHeads,
     feeFrequency: frequency,
     installmentCount,
     installments,
@@ -1733,7 +1801,14 @@ export const getFeeReceipt = async (req, res) => {
         sectionName: student.sectionId?.name || "",
         finalFee: student.finalFee || 0,
         totalPaid: student.totalPaid || 0,
-        totalDue: student.totalDue || 0,
+        totalDue: Math.max(
+          0,
+          Math.round(
+            ((Number(student.finalFee) || 0) -
+              (Number(student.totalPaid) || 0)) *
+              100,
+          ) / 100,
+        ),
       },
       school: {
         name: school?.school_name || "",
@@ -2554,7 +2629,7 @@ export const getFeeTypedReport = async (req, res) => {
 
 const round2 = (n) => Math.round((Number(n) || 0) * 100) / 100;
 
-const computeHeadBalances = (breakdown, payments = []) => {
+const computeHeadBalances = (breakdown, payments = [], remainingCap = null) => {
   const paidMap = {};
   let unallocated = 0;
 
@@ -2577,7 +2652,7 @@ const computeHeadBalances = (breakdown, payments = []) => {
   }
 
   let leftover = Math.max(0, unallocated);
-  return breakdown.map((fee) => {
+  const rows = breakdown.map((fee) => {
     const key = String(fee._id || fee.name);
     let paid = Math.max(0, paidMap[key] || 0);
     const amount = round2(fee.amount);
@@ -2596,6 +2671,23 @@ const computeHeadBalances = (breakdown, payments = []) => {
       due,
     };
   });
+
+  // Cap aggregate head dues to the student's remaining finalFee balance
+  // (heads can otherwise exceed finalFee when discounts apply).
+  if (remainingCap !== null && remainingCap !== undefined) {
+    const cap = Math.max(0, round2(remainingCap));
+    let dueSum = round2(rows.reduce((sum, row) => sum + Number(row.due || 0), 0));
+    if (dueSum > cap + 0.009) {
+      let excess = round2(dueSum - cap);
+      for (let i = rows.length - 1; i >= 0 && excess > 0.009; i -= 1) {
+        const cut = Math.min(rows[i].due, excess);
+        rows[i].due = round2(rows[i].due - cut);
+        excess = round2(excess - cut);
+      }
+    }
+  }
+
+  return rows;
 };
 
 export const getStudentFeeHeads = async (req, res) => {
@@ -2616,7 +2708,11 @@ export const getStudentFeeHeads = async (req, res) => {
     }
 
     const payments = feeDetails.payments || [];
-    const heads = computeHeadBalances(feeDetails.feeStructure || [], payments);
+    const heads = computeHeadBalances(
+      feeDetails.feeStructure || [],
+      payments,
+      feeDetails.totalDue,
+    );
     const openVouchers = payments
       .filter((p) => p.entryType === "voucher" && p.status === "open")
       .map((p) => ({
@@ -2853,9 +2949,13 @@ export const refundStudentFee = async (req, res) => {
       paidDate: new Date(),
     });
 
-    student.totalPaid = round2((Number(student.totalPaid) || 0) - amount);
-    student.totalDue = round2(
-      (Number(student.finalFee) || 0) - student.totalPaid,
+    student.totalPaid = Math.max(
+      0,
+      round2((Number(student.totalPaid) || 0) - amount),
+    );
+    student.totalDue = Math.max(
+      0,
+      round2((Number(student.finalFee) || 0) - student.totalPaid),
     );
     await student.save();
 
