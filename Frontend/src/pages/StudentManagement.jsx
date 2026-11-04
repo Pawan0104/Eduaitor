@@ -190,6 +190,7 @@ const emptyForm = {
   sectionId: "",
   streamId: "",
   stream: "",
+  optionalSubjectIds: [],
   rollNo: "",
   studentType: "",
     feeBatch: "New",
@@ -1060,6 +1061,13 @@ const StudentManagement = () => {
           previousSchoolTcNumber: student.previousSchoolTcNumber || "",
           classId: student.classId?._id || student.classId || "",
           sectionId: student.sectionId?._id || student.sectionId || "",
+          streamId: student.streamId?._id || student.streamId || "",
+          stream: student.stream || "",
+          optionalSubjectIds: Array.isArray(student.optionalSubjectIds)
+            ? student.optionalSubjectIds.map((sid) =>
+                String(sid?._id || sid),
+              )
+            : [],
           rollNo: student.rollNo || "",
           studentType: student.studentType || "",
           feeBatch: student.feeBatch === "Old" ? "Old" : "New",
@@ -1230,6 +1238,7 @@ const StudentManagement = () => {
           });
           return linkedOk ? prev.stream : "";
         })(),
+        optionalSubjectIds: [],
         transport: "",
         useTransport: false,
         selectedOptionalFees: [],
@@ -1249,6 +1258,10 @@ const StudentManagement = () => {
         stream:
           (streams || []).find((s) => String(s._id) === String(nextValue))
             ?.name || "",
+        optionalSubjectIds: [],
+      }),
+      ...(name === "sectionId" && {
+        optionalSubjectIds: [],
       }),
     }));
 
@@ -1259,6 +1272,68 @@ const StudentManagement = () => {
         return updatedErrors;
       });
     }
+  };
+
+  const selectedStream = (streams || []).find(
+    (s) => String(s._id) === String(form.streamId),
+  );
+  const streamCompulsoryIds = new Set(
+    (selectedStream?.compulsorySubjectIds || []).map(String),
+  );
+  const streamCompulsorySubjects = (
+    selectedStream?.compulsorySubjects ||
+    selectedStream?.compulsorySubjectNames?.map((name, i) => ({
+      _id: selectedStream.compulsorySubjectIds?.[i],
+      name,
+    })) ||
+    []
+  ).filter((sub) => sub?._id || sub?.name);
+
+  const classSubjectsForStudent = (() => {
+    const selectedClass = (classes || []).find(
+      (c) => String(c._id) === String(form.classId),
+    );
+    if (!selectedClass) return [];
+    const details = Array.isArray(selectedClass.details)
+      ? selectedClass.details
+      : [];
+    const relevant = form.sectionId
+      ? details.filter(
+          (d) =>
+            String(d.sectionId?._id || d.sectionId) === String(form.sectionId),
+        )
+      : details;
+    const byId = new Map();
+    for (const detail of relevant.length ? relevant : details) {
+      for (const st of detail.subjectTeachers || []) {
+        const sid = String(st.subjectId?._id || st.subjectId || "");
+        if (!sid) continue;
+        if (!byId.has(sid)) {
+          byId.set(sid, {
+            _id: sid,
+            name: st.subjectId?.name || st.name || "Subject",
+          });
+        }
+      }
+    }
+    return [...byId.values()];
+  })();
+
+  const optionalSubjectsForStudent = classSubjectsForStudent.filter(
+    (sub) => !streamCompulsoryIds.has(String(sub._id)),
+  );
+
+  const toggleOptionalSubject = (subjectId) => {
+    const sid = String(subjectId);
+    setForm((prev) => {
+      const has = (prev.optionalSubjectIds || []).includes(sid);
+      return {
+        ...prev,
+        optionalSubjectIds: has
+          ? prev.optionalSubjectIds.filter((id) => id !== sid)
+          : [...(prev.optionalSubjectIds || []), sid],
+      };
+    });
   };
 
   /* FILE */
@@ -2757,6 +2832,100 @@ const StudentManagement = () => {
                   onChange={handleChange}
                   error={errors.streamId}
                 />
+
+                {form.streamId ? (
+                  <div className="space-y-3 sm:col-span-2">
+                    <div>
+                      <p className="mb-1.5 text-xs font-semibold text-[rgb(var(--text))]">
+                        Compulsory subjects
+                      </p>
+                      <p className="mb-2 text-[11px] text-[rgb(var(--text-muted))]">
+                        Applied automatically from the selected stream.
+                      </p>
+                      {streamCompulsorySubjects.length === 0 &&
+                      streamCompulsoryIds.size === 0 ? (
+                        <p className="rounded-xl border border-dashed border-[rgb(var(--border))] px-3 py-3 text-xs text-[rgb(var(--text-muted))]">
+                          No compulsory subjects configured for this stream.
+                        </p>
+                      ) : (
+                        <div className="grid grid-cols-2 gap-2 rounded-xl border border-[rgba(var(--primary),0.25)] bg-[rgba(var(--primary),0.04)] p-3 sm:grid-cols-3">
+                          {(streamCompulsorySubjects.length
+                            ? streamCompulsorySubjects
+                            : [...streamCompulsoryIds].map((id) => ({
+                                _id: id,
+                                name:
+                                  classSubjectsForStudent.find(
+                                    (s) => String(s._id) === id,
+                                  )?.name || id,
+                              }))
+                          ).map((sub) => (
+                            <label
+                              key={String(sub._id || sub.name)}
+                              className="flex cursor-default items-center gap-2 text-xs opacity-90"
+                            >
+                              <input
+                                type="checkbox"
+                                checked
+                                disabled
+                                className="accent-[rgb(var(--primary))]"
+                              />
+                              <span className="font-medium">
+                                {sub.name || "Subject"}
+                              </span>
+                            </label>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+
+                    <div>
+                      <p className="mb-1.5 text-xs font-semibold text-[rgb(var(--text))]">
+                        Optional subjects
+                      </p>
+                      <p className="mb-2 text-[11px] text-[rgb(var(--text-muted))]">
+                        Select the optional subjects this student will take.
+                      </p>
+                      {!form.classId ? (
+                        <p className="rounded-xl border border-dashed border-[rgb(var(--border))] px-3 py-3 text-xs text-[rgb(var(--text-muted))]">
+                          Select a class to see optional subjects.
+                        </p>
+                      ) : optionalSubjectsForStudent.length === 0 ? (
+                        <p className="rounded-xl border border-dashed border-[rgb(var(--border))] px-3 py-3 text-xs text-[rgb(var(--text-muted))]">
+                          No optional subjects on this class. Add optional
+                          subjects when creating the class.
+                        </p>
+                      ) : (
+                        <div className="grid max-h-40 grid-cols-2 gap-2 overflow-y-auto rounded-xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))] p-3 sm:grid-cols-3">
+                          {optionalSubjectsForStudent.map((sub) => {
+                            const sid = String(sub._id);
+                            const checked = (
+                              form.optionalSubjectIds || []
+                            ).includes(sid);
+                            return (
+                              <label
+                                key={sid}
+                                className="flex cursor-pointer items-center gap-2 text-xs text-[rgb(var(--text))]"
+                              >
+                                <input
+                                  type="checkbox"
+                                  checked={checked}
+                                  onChange={() => toggleOptionalSubject(sid)}
+                                  className="accent-[rgb(var(--primary))]"
+                                />
+                                <span>{sub.name}</span>
+                              </label>
+                            );
+                          })}
+                        </div>
+                      )}
+                      {errors.optionalSubjectIds ? (
+                        <p className="mt-1 text-xs text-red-500">
+                          {errors.optionalSubjectIds}
+                        </p>
+                      ) : null}
+                    </div>
+                  </div>
+                ) : null}
 
                 <Input
                   label="Roll Number *"

@@ -1,15 +1,12 @@
 import mongoose from "mongoose";
 import Stream from "../models/stream.js";
 import Class from "../models/class.js";
+import Subject from "../models/subject.js";
 
 const schoolIdOf = (req) => req.user?.school_id;
 
 const normalizeClassIds = async (schoolId, raw) => {
-  const list = Array.isArray(raw)
-    ? raw
-    : raw
-      ? [raw]
-      : [];
+  const list = Array.isArray(raw) ? raw : raw ? [raw] : [];
   const unique = [
     ...new Set(
       list
@@ -31,42 +28,81 @@ const normalizeClassIds = async (schoolId, raw) => {
     .map((id) => new mongoose.Types.ObjectId(id));
 };
 
+const normalizeSubjectIds = async (schoolId, raw) => {
+  const list = Array.isArray(raw) ? raw : raw ? [raw] : [];
+  const unique = [
+    ...new Set(
+      list
+        .map((id) => String(id || "").trim())
+        .filter((id) => mongoose.Types.ObjectId.isValid(id)),
+    ),
+  ];
+  if (!unique.length) return [];
+
+  const subjects = await Subject.find({
+    schoolId,
+    _id: { $in: unique },
+  })
+    .select("_id")
+    .lean();
+  const allowed = new Set(subjects.map((s) => String(s._id)));
+  return unique
+    .filter((id) => allowed.has(id))
+    .map((id) => new mongoose.Types.ObjectId(id));
+};
+
 const decorateStreams = async (schoolId, streams) => {
   const classIdSet = new Set();
+  const subjectIdSet = new Set();
   for (const stream of streams) {
-    for (const id of stream.classIds || []) {
-      classIdSet.add(String(id));
+    for (const id of stream.classIds || []) classIdSet.add(String(id));
+    for (const id of stream.compulsorySubjectIds || []) {
+      subjectIdSet.add(String(id));
     }
   }
-  if (!classIdSet.size) {
-    return streams.map((stream) => ({
-      ...stream,
-      classIds: (stream.classIds || []).map(String),
-      classNames: [],
-      classes: [],
-    }));
-  }
 
-  const classes = await Class.find({
-    schoolId,
-    _id: { $in: [...classIdSet] },
-  })
-    .select("name")
-    .lean();
-  const byId = Object.fromEntries(
+  const [classes, subjects] = await Promise.all([
+    classIdSet.size
+      ? Class.find({ schoolId, _id: { $in: [...classIdSet] } })
+          .select("name")
+          .lean()
+      : Promise.resolve([]),
+    subjectIdSet.size
+      ? Subject.find({ schoolId, _id: { $in: [...subjectIdSet] } })
+          .select("name")
+          .lean()
+      : Promise.resolve([]),
+  ]);
+
+  const classById = Object.fromEntries(
     classes.map((cls) => [String(cls._id), cls.name || ""]),
+  );
+  const subjectById = Object.fromEntries(
+    subjects.map((sub) => [String(sub._id), sub.name || ""]),
   );
 
   return streams.map((stream) => {
     const classIds = (stream.classIds || []).map((id) => String(id));
-    const classNames = classIds.map((id) => byId[id]).filter(Boolean);
+    const classNames = classIds.map((id) => classById[id]).filter(Boolean);
+    const compulsorySubjectIds = (stream.compulsorySubjectIds || []).map((id) =>
+      String(id),
+    );
+    const compulsorySubjectNames = compulsorySubjectIds
+      .map((id) => subjectById[id])
+      .filter(Boolean);
     return {
       ...stream,
       classIds,
       classNames,
       classes: classIds.map((id) => ({
         _id: id,
-        name: byId[id] || "",
+        name: classById[id] || "",
+      })),
+      compulsorySubjectIds,
+      compulsorySubjectNames,
+      compulsorySubjects: compulsorySubjectIds.map((id) => ({
+        _id: id,
+        name: subjectById[id] || "",
       })),
     };
   });
@@ -136,6 +172,16 @@ export const createStream = async (req, res) => {
     }
 
     const classIds = await normalizeClassIds(schoolId, req.body?.classIds);
+    const compulsorySubjectIds = await normalizeSubjectIds(
+      schoolId,
+      req.body?.compulsorySubjectIds,
+    );
+    if (!compulsorySubjectIds.length) {
+      return res.status(400).json({
+        success: false,
+        message: "Select at least one compulsory subject for this stream.",
+      });
+    }
 
     const exists = await Stream.findOne({ schoolId, name }).select("_id").lean();
     if (exists) {
@@ -151,6 +197,7 @@ export const createStream = async (req, res) => {
       code: String(req.body?.code || "").trim().toUpperCase(),
       description: String(req.body?.description || "").trim(),
       classIds,
+      compulsorySubjectIds,
       status: req.body?.status === "Inactive" ? "Inactive" : "Active",
     });
 
@@ -219,6 +266,19 @@ export const updateStream = async (req, res) => {
     }
     if (req.body?.classIds !== undefined) {
       stream.classIds = await normalizeClassIds(schoolId, req.body.classIds);
+    }
+    if (req.body?.compulsorySubjectIds !== undefined) {
+      const compulsorySubjectIds = await normalizeSubjectIds(
+        schoolId,
+        req.body.compulsorySubjectIds,
+      );
+      if (!compulsorySubjectIds.length) {
+        return res.status(400).json({
+          success: false,
+          message: "Select at least one compulsory subject for this stream.",
+        });
+      }
+      stream.compulsorySubjectIds = compulsorySubjectIds;
     }
 
     await stream.save();

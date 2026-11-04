@@ -12,7 +12,7 @@ const emptyForm = () => ({
   code: "",
   description: "",
   status: "Active",
-  classIds: [],
+  compulsorySubjectIds: [],
 });
 
 export default function StreamManagement() {
@@ -23,7 +23,7 @@ export default function StreamManagement() {
     user?.role === "school_admin" || user?.role === "super_admin";
 
   const [streams, setStreams] = useState([]);
-  const [classes, setClasses] = useState([]);
+  const [subjects, setSubjects] = useState([]);
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [showModal, setShowModal] = useState(false);
@@ -44,20 +44,20 @@ export default function StreamManagement() {
     }
   };
 
-  const fetchClasses = async () => {
+  const fetchSubjects = async () => {
     try {
-      const { data } = await axios.get(`${API}/classes/all`, {
+      const { data } = await axios.get(`${API}/subjects/all`, {
         withCredentials: true,
       });
-      setClasses(data?.classes || []);
+      setSubjects(data?.subjects || data?.data || []);
     } catch {
-      setClasses([]);
+      setSubjects([]);
     }
   };
 
   useEffect(() => {
     fetchStreams();
-    fetchClasses();
+    fetchSubjects();
   }, []);
 
   const openCreate = () => {
@@ -73,7 +73,7 @@ export default function StreamManagement() {
       code: stream.code || "",
       description: stream.description || "",
       status: stream.status || "Active",
-      classIds: (stream.classIds || []).map(String),
+      compulsorySubjectIds: (stream.compulsorySubjectIds || []).map(String),
     });
     setShowModal(true);
   };
@@ -84,15 +84,15 @@ export default function StreamManagement() {
     setForm(emptyForm());
   };
 
-  const toggleClass = (classId) => {
-    const id = String(classId);
+  const toggleSubject = (subjectId) => {
+    const id = String(subjectId);
     setForm((prev) => {
-      const has = prev.classIds.includes(id);
+      const has = prev.compulsorySubjectIds.includes(id);
       return {
         ...prev,
-        classIds: has
-          ? prev.classIds.filter((item) => item !== id)
-          : [...prev.classIds, id],
+        compulsorySubjectIds: has
+          ? prev.compulsorySubjectIds.filter((item) => item !== id)
+          : [...prev.compulsorySubjectIds, id],
       };
     });
   };
@@ -102,6 +102,10 @@ export default function StreamManagement() {
       toast.error("Stream name is required");
       return;
     }
+    if (!form.compulsorySubjectIds.length) {
+      toast.error("Select at least one compulsory subject");
+      return;
+    }
     try {
       setSaving(true);
       const payload = {
@@ -109,7 +113,7 @@ export default function StreamManagement() {
         code: form.code.trim(),
         description: form.description.trim(),
         status: form.status,
-        classIds: form.classIds,
+        compulsorySubjectIds: form.compulsorySubjectIds,
       };
       if (editing?._id) {
         await axios.put(`${API}/streams/update/${editing._id}`, payload, {
@@ -144,11 +148,13 @@ export default function StreamManagement() {
     }
   };
 
-  const classLabel = (stream) => {
-    const names = stream.classNames || stream.classes?.map((c) => c.name) || [];
+  const subjectLabel = (stream) => {
+    const names =
+      stream.compulsorySubjectNames ||
+      stream.compulsorySubjects?.map((s) => s.name) ||
+      [];
     if (names.length) return names.join(", ");
-    if (!(stream.classIds || []).length) return "All classes";
-    return "Linked classes";
+    return "None";
   };
 
   return (
@@ -179,8 +185,8 @@ export default function StreamManagement() {
             Streams
           </h1>
           <p className="mt-0.5 text-sm text-[rgb(var(--text-muted))]">
-            Optionally link streams to classes for leads, registration and
-            admission. Leave classes empty to allow the stream on all classes.
+            Set compulsory subjects for each stream. Assign streams from Add
+            Class.
           </p>
         </div>
         {canManage && (
@@ -201,8 +207,8 @@ export default function StreamManagement() {
           </p>
         ) : streams.length === 0 ? (
           <p className="px-5 py-10 text-center text-[rgb(var(--text-muted))]">
-            No streams yet. Add Science, Commerce, Arts and assign them to
-            classes.
+            No streams yet. Add Science, Commerce or Arts and pick compulsory
+            subjects.
           </p>
         ) : (
           <div className="divide-y divide-[rgb(var(--border))]">
@@ -230,7 +236,7 @@ export default function StreamManagement() {
                     </span>
                   </div>
                   <p className="mt-1 text-sm text-[rgb(var(--text-muted))]">
-                    Classes: {classLabel(stream)}
+                    Compulsory subjects: {subjectLabel(stream)}
                   </p>
                   {stream.description ? (
                     <p className="mt-1 text-sm text-[rgb(var(--text-muted))]">
@@ -306,21 +312,21 @@ export default function StreamManagement() {
                   <option value="Inactive">Inactive</option>
                 </select>
               </label>
+
               <div className="sm:col-span-2">
                 <div className="mb-2 flex items-center justify-between gap-2">
-                  <p className="text-sm font-medium">
-                    Classes{" "}
-                    <span className="font-normal text-[rgb(var(--text-muted))]">
-                      (optional)
-                    </span>
-                  </p>
+                  <p className="text-sm font-medium">Compulsory Subjects *</p>
                   <div className="flex gap-2">
                     <button
                       type="button"
                       onClick={() =>
                         setForm((prev) => ({
                           ...prev,
-                          classIds: classes.map((cls) => String(cls._id)),
+                          compulsorySubjectIds: subjects
+                            .filter(
+                              (sub) => (sub.status || "Active") === "Active",
+                            )
+                            .map((sub) => String(sub._id)),
                         }))
                       }
                       className="text-[11px] font-semibold text-[rgb(var(--primary))]"
@@ -330,7 +336,10 @@ export default function StreamManagement() {
                     <button
                       type="button"
                       onClick={() =>
-                        setForm((prev) => ({ ...prev, classIds: [] }))
+                        setForm((prev) => ({
+                          ...prev,
+                          compulsorySubjectIds: [],
+                        }))
                       }
                       className="text-[11px] font-semibold text-[rgb(var(--text-muted))]"
                     >
@@ -339,40 +348,52 @@ export default function StreamManagement() {
                   </div>
                 </div>
                 <p className="mb-2 text-xs text-[rgb(var(--text-muted))]">
-                  Leave empty to make this stream available for every class.
+                  Choose from subjects already added for this school.
                 </p>
-                {classes.length === 0 ? (
+                {subjects.length === 0 ? (
                   <p className="rounded-xl border border-dashed border-[rgb(var(--border))] px-3 py-4 text-sm text-[rgb(var(--text-muted))]">
-                    No classes found. You can still save the stream without
-                    linking classes.
+                    No subjects found. Add subjects first, then create the
+                    stream.
                   </p>
                 ) : (
                   <div className="max-h-48 space-y-2 overflow-y-auto rounded-xl border border-[rgb(var(--border))] p-3">
-                    {classes.map((cls) => {
-                      const id = String(cls._id);
-                      const checked = form.classIds.includes(id);
-                      return (
-                        <label
-                          key={id}
-                          className={`flex cursor-pointer items-center gap-3 rounded-lg border px-3 py-2 text-sm ${
-                            checked
-                              ? "border-[rgb(var(--primary))] bg-[rgba(var(--primary),0.06)]"
-                              : "border-[rgb(var(--border))]"
-                          }`}
-                        >
-                          <input
-                            type="checkbox"
-                            checked={checked}
-                            onChange={() => toggleClass(id)}
-                            className="h-4 w-4 accent-[rgb(var(--primary))]"
-                          />
-                          <span className="font-medium">{cls.name}</span>
-                        </label>
-                      );
-                    })}
+                    {subjects
+                      .filter(
+                        (sub) =>
+                          (sub.status || "Active") === "Active" ||
+                          form.compulsorySubjectIds.includes(String(sub._id)),
+                      )
+                      .map((sub) => {
+                        const id = String(sub._id);
+                        const checked = form.compulsorySubjectIds.includes(id);
+                        return (
+                          <label
+                            key={id}
+                            className={`flex cursor-pointer items-center gap-3 rounded-lg border px-3 py-2 text-sm ${
+                              checked
+                                ? "border-[rgb(var(--primary))] bg-[rgba(var(--primary),0.06)]"
+                                : "border-[rgb(var(--border))]"
+                            }`}
+                          >
+                            <input
+                              type="checkbox"
+                              checked={checked}
+                              onChange={() => toggleSubject(id)}
+                              className="h-4 w-4 accent-[rgb(var(--primary))]"
+                            />
+                            <span className="font-medium">{sub.name}</span>
+                            {sub.status === "Inactive" ? (
+                              <span className="text-[10px] text-[rgb(var(--text-muted))]">
+                                Inactive
+                              </span>
+                            ) : null}
+                          </label>
+                        );
+                      })}
                   </div>
                 )}
               </div>
+
               <label className="flex flex-col gap-2 text-sm font-medium sm:col-span-2">
                 Description
                 <textarea

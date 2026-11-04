@@ -5,6 +5,8 @@ import Registration from "../models/registration.js";
 import Group from "../models/group.js";
 import Teacher from "../models/teacher.js";
 import Class from "../models/class.js";
+import Subject from "../models/subject.js";
+import Stream from "../models/stream.js";
 import School from "../models/school.js";
 import House from "../models/house.js";
 import { uploadToCloudinary } from "../utils/uploadToCloudinary.js";
@@ -117,12 +119,64 @@ const normalizeStudentFeeFields = (safeBody) => {
     safeBody.selectedOptionalFees = [];
   }
 
+  if (typeof safeBody.optionalSubjectIds === "string") {
+    try {
+      safeBody.optionalSubjectIds = JSON.parse(safeBody.optionalSubjectIds);
+    } catch {
+      safeBody.optionalSubjectIds = [];
+    }
+  }
+
+  if (safeBody.optionalSubjectIds !== undefined) {
+    const list = Array.isArray(safeBody.optionalSubjectIds)
+      ? safeBody.optionalSubjectIds
+      : [];
+    safeBody.optionalSubjectIds = [
+      ...new Set(
+        list
+          .map((id) => String(id || "").trim())
+          .filter((id) => isValidObjectId(id)),
+      ),
+    ];
+  }
+
   safeBody.busFeeFrequency =
     safeBody.busFeeFrequency === "quarterly" ? "quarterly" : "annually";
   safeBody.busFeeQuarter =
     safeBody.busFeeFrequency === "quarterly"
       ? safeBody.busFeeQuarter || ""
       : "";
+};
+
+/** Keep optional subjects that belong to the school and are not stream-compulsory. */
+const resolveOptionalSubjectIds = async (schoolId, safeBody) => {
+  if (safeBody.optionalSubjectIds === undefined) return undefined;
+
+  const unique = (safeBody.optionalSubjectIds || []).map(String);
+  if (!unique.length) return [];
+
+  const subjects = await Subject.find({
+    schoolId,
+    _id: { $in: unique },
+  })
+    .select("_id")
+    .lean();
+  const allowed = new Set(subjects.map((s) => String(s._id)));
+
+  let compulsory = new Set();
+  const streamId = safeBody.streamId;
+  if (streamId && isValidObjectId(streamId)) {
+    const stream = await Stream.findOne({ _id: streamId, schoolId })
+      .select("compulsorySubjectIds")
+      .lean();
+    compulsory = new Set(
+      (stream?.compulsorySubjectIds || []).map((id) => String(id)),
+    );
+  }
+
+  return unique
+    .filter((id) => allowed.has(id) && !compulsory.has(id))
+    .map((id) => new mongoose.Types.ObjectId(id));
 };
 
 /* ============ ADMIN-DEFINED (CUSTOM) ADMISSION FIELDS ============ */
@@ -731,6 +785,11 @@ export const createStudent = async (req, res) => {
       resolvedStreamOnAdmit.stream = String(safeBody.stream).trim();
     }
 
+    const optionalSubjectIds = await resolveOptionalSubjectIds(schoolId, {
+      ...safeBody,
+      streamId: resolvedStreamOnAdmit.streamId,
+    });
+
     // Auto-assign a random active house when school uses House Allocation
     let houseId = safeBody.houseId || null;
     if (!houseId) {
@@ -786,6 +845,7 @@ export const createStudent = async (req, res) => {
       houseId,
       streamId: resolvedStreamOnAdmit.streamId,
       stream: resolvedStreamOnAdmit.stream,
+      optionalSubjectIds: optionalSubjectIds || [],
       idCardIssuedAt: new Date(),
       confirmationStatus,
       isActive: true,
@@ -1454,6 +1514,32 @@ export const updateStudent = async (req, res) => {
       safeBody.sectionId !== undefined ? safeBody.sectionId : student.sectionId,
       req.params.id,
     );
+
+    if (safeBody.streamId !== undefined || safeBody.stream !== undefined) {
+      try {
+        const resolved = await resolveStream(
+          schoolId,
+          safeBody.streamId || null,
+          safeBody.classId || student.classId || null,
+        );
+        safeBody.streamId = resolved.streamId;
+        safeBody.stream =
+          resolved.stream ||
+          (safeBody.stream ? String(safeBody.stream).trim() : "");
+      } catch (streamErr) {
+        return res.status(streamErr.statusCode || 400).json({
+          success: false,
+          message: streamErr.message || "Invalid stream selected.",
+        });
+      }
+    }
+
+    if (safeBody.optionalSubjectIds !== undefined) {
+      safeBody.optionalSubjectIds = await resolveOptionalSubjectIds(schoolId, {
+        ...safeBody,
+        streamId: safeBody.streamId || student.streamId,
+      });
+    }
 
     const updatedStudent = await Student.findOneAndUpdate(
       { _id: req.params.id, schoolId },

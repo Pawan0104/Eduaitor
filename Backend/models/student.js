@@ -104,6 +104,16 @@ const studentSchema = new mongoose.Schema(
       type: String,
       default: "",
     },
+    /** Elective / optional subjects chosen at admission (stream compulsory are implied). */
+    optionalSubjectIds: {
+      type: [
+        {
+          type: mongoose.Schema.Types.ObjectId,
+          ref: "Subject",
+        },
+      ],
+      default: [],
+    },
     rollNo: String,
     studentType: String,
 

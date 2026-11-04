@@ -604,9 +604,30 @@ export const addLeadFollowUp = async (req, res) => {
       createdAt: new Date(),
     };
 
+    const existing = await Lead.findOne({ _id: req.params.id, schoolId })
+      .select("status studentId")
+      .lean();
+    if (!existing) {
+      return res.status(404).json({ success: false, message: "Lead not found" });
+    }
+
+    const currentStatus = String(existing.status || "active").toLowerCase();
+    // Any real feedback moves an open lead into Processing.
+    // Admitted / cancelled stay untouched.
+    const shouldMoveToProcessing =
+      !existing.studentId &&
+      currentStatus !== "admitted" &&
+      currentStatus !== "cancelled" &&
+      currentStatus !== "processing";
+
+    const update = {
+      $push: { followUps: followUp },
+      ...(shouldMoveToProcessing ? { $set: { status: "processing" } } : {}),
+    };
+
     const lead = await Lead.findOneAndUpdate(
       { _id: req.params.id, schoolId },
-      { $push: { followUps: followUp } },
+      update,
       { new: true },
     );
 
@@ -616,7 +637,9 @@ export const addLeadFollowUp = async (req, res) => {
 
     return res.json({
       success: true,
-      message: "Feedback added successfully",
+      message: shouldMoveToProcessing
+        ? "Feedback added. Lead moved to Processing."
+        : "Feedback added successfully",
       data: lead,
     });
   } catch (error) {

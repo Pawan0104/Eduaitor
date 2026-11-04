@@ -6,18 +6,17 @@ import { useAuth } from "../context/AuthContext";
 import {
   FaArrowLeft,
   FaBan,
-  FaClipboardList,
+  FaCheck,
   FaCommentDots,
   FaEdit,
   FaEnvelope,
   FaEye,
   FaPhone,
   FaPlus,
-  FaSchool,
   FaSlidersH,
   FaTimes,
   FaUserGraduate,
-  FaUserTie,
+  FaUserPlus,
 } from "react-icons/fa";
 import AdmissionFormBuilder from "../components/AdmissionFormBuilder";
 import ConfigurableFormFields, {
@@ -37,6 +36,60 @@ const leadStatusOptions = ["active", "processing", "admitted", "cancelled"];
 
 const formatLeadStatus = (status = "") =>
   status ? status.charAt(0).toUpperCase() + status.slice(1) : "Active";
+
+const leadStatusMeta = {
+  active: {
+    label: "Active",
+    className: "bg-sky-100 text-sky-800 border-sky-200",
+    hint: "New enquiry",
+  },
+  processing: {
+    label: "Processing",
+    className: "bg-amber-100 text-amber-800 border-amber-200",
+    hint: "Follow-up or registration started",
+  },
+  admitted: {
+    label: "Admitted",
+    className: "bg-emerald-100 text-emerald-800 border-emerald-200",
+    hint: "Student created",
+  },
+  cancelled: {
+    label: "Cancelled",
+    className: "bg-slate-200 text-slate-700 border-slate-300",
+    hint: "Closed without admission",
+  },
+};
+
+const statusOf = (lead) => String(lead?.status || "active").toLowerCase();
+
+const getInitials = (name = "", fallback = "?") => {
+  const parts = String(name || "")
+    .trim()
+    .split(/\s+/)
+    .filter(Boolean);
+  if (!parts.length) return fallback;
+  if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase();
+  return `${parts[0][0] || ""}${parts[1][0] || ""}`.toUpperCase();
+};
+
+const IconAction = ({
+  title,
+  onClick,
+  disabled,
+  className = "",
+  children,
+}) => (
+  <button
+    type="button"
+    title={title}
+    aria-label={title}
+    onClick={onClick}
+    disabled={disabled}
+    className={`inline-flex h-9 w-9 items-center justify-center rounded-xl border text-sm transition disabled:opacity-50 ${className}`}
+  >
+    {children}
+  </button>
+);
 
 const emptyForm = {
   studentName: "",
@@ -86,6 +139,11 @@ const LeadManagement = () => {
   const [viewModal, setViewModal] = useState({
     open: false,
     lead: null,
+  });
+  const [filters, setFilters] = useState({
+    name: "",
+    status: "",
+    assigneeKey: "",
   });
 
   const fetchPageData = async () => {
@@ -156,6 +214,65 @@ const LeadManagement = () => {
       })),
     [assignees],
   );
+
+  const filteredLeads = useMemo(() => {
+    const nameQuery = String(filters.name || "").trim().toLowerCase();
+    const statusQuery = String(filters.status || "").trim().toLowerCase();
+    const assigneeQuery = String(filters.assigneeKey || "").trim();
+
+    return (leads || []).filter((lead) => {
+      if (nameQuery) {
+        const haystack = [
+          lead.studentName,
+          lead.parentName,
+          lead.parentMobile,
+          lead.parentEmail,
+        ]
+          .map((value) => String(value || "").toLowerCase())
+          .join(" ");
+        if (!haystack.includes(nameQuery)) return false;
+      }
+
+      if (statusQuery) {
+        const leadStatus = String(lead.status || "active").toLowerCase();
+        if (leadStatus !== statusQuery) return false;
+      }
+
+      if (assigneeQuery) {
+        const leadAssignee =
+          lead.assignedTo?.userType && lead.assignedTo?.userId
+            ? `${lead.assignedTo.userType}:${lead.assignedTo.userId}`
+            : "";
+        if (leadAssignee !== assigneeQuery) return false;
+      }
+
+      return true;
+    });
+  }, [leads, filters]);
+
+  const hasActiveFilters = Boolean(
+    String(filters.name || "").trim() ||
+      filters.status ||
+      filters.assigneeKey,
+  );
+
+  const clearFilters = () =>
+    setFilters({ name: "", status: "", assigneeKey: "" });
+
+  const statusCounts = useMemo(() => {
+    const counts = {
+      active: 0,
+      processing: 0,
+      admitted: 0,
+      cancelled: 0,
+    };
+    for (const lead of leads || []) {
+      const key = statusOf(lead);
+      if (counts[key] !== undefined) counts[key] += 1;
+      else counts.active += 1;
+    }
+    return counts;
+  }, [leads]);
 
   const streamsForClass = (classId) => {
     const selected = String(classId || "");
@@ -376,49 +493,6 @@ const LeadManagement = () => {
     navigate(`${basePath}/registrations?leadId=${lead._id}`);
   };
 
-  const handleStatusChange = async (leadId, nextStatus) => {
-    const normalized = String(nextStatus || "").toLowerCase();
-    if (!leadStatusOptions.includes(normalized)) return;
-
-    if (normalized === "admitted") {
-      const lead = leads.find((item) => item._id === leadId);
-      if (!lead?.studentId) {
-        toast.info(
-          lead?.registrationId
-            ? "Open Registration and use Admit after the candidate passes"
-            : "Register this lead first, then Admit from Registration",
-        );
-        handleStartRegistration(lead || { _id: leadId });
-        return;
-      }
-    }
-
-    try {
-      setStatusUpdatingId(leadId);
-      await axios.patch(
-        `${API}/leads/${leadId}/status`,
-        { status: normalized },
-        { withCredentials: true },
-      );
-
-      setLeads((prev) =>
-        prev.map((lead) =>
-          lead._id === leadId
-            ? {
-                ...lead,
-                status: normalized,
-              }
-            : lead,
-        ),
-      );
-      toast.success("Lead status updated");
-    } catch (error) {
-      toast.error(error.response?.data?.message || "Failed to update lead status");
-    } finally {
-      setStatusUpdatingId("");
-    }
-  };
-
   const handleFeedbackInputChange = (leadId, value) => {
     setFeedbackDrafts((prev) => ({ ...prev, [leadId]: value }));
   };
@@ -488,7 +562,12 @@ const LeadManagement = () => {
       );
 
       setFeedbackDrafts((prev) => ({ ...prev, [leadId]: "" }));
-      toast.success("Feedback added");
+      toast.success(
+        data?.message ||
+          (String(data?.data?.status || "").toLowerCase() === "processing"
+            ? "Feedback added. Lead moved to Processing."
+            : "Feedback added"),
+      );
     } catch (error) {
       toast.error(error.response?.data?.message || "Failed to add feedback");
     } finally {
@@ -539,8 +618,12 @@ const LeadManagement = () => {
           </h1>
           <p className="text-sm text-[rgb(var(--text-muted))] mt-0.5">
             {isStaffLogin
-              ? "View your assigned leads and log follow-up feedback."
-              : "Track admission enquiries and assign them to your admin group."}
+              ? "View assigned leads, add comments, and move them toward registration."
+              : "Capture enquiries, assign owners, follow up, then register and admit."}
+          </p>
+          <p className="mt-2 text-[11px] text-[rgb(var(--text-muted))]">
+            Status flow: Active → comment moves to Processing → Admit sets
+            Admitted. Cancel closes the lead.
           </p>
         </div>
 
@@ -568,55 +651,131 @@ const LeadManagement = () => {
         </div>
       </div>
 
-      <div className="grid grid-cols-1 xl:grid-cols-3 gap-4 mb-6">
-        <div className="bg-[rgb(var(--surface))] border border-[rgb(var(--border))] rounded-2xl p-5">
-          <div className="flex items-center gap-3 mb-2">
-            <div className="w-11 h-11 rounded-2xl bg-[rgba(var(--primary),0.1)] text-[rgb(var(--primary))] flex items-center justify-center">
-              <FaClipboardList size={18} />
-            </div>
-            <div>
-              <p className="text-xs uppercase tracking-wide text-[rgb(var(--text-muted))]">
-                Total Leads
+      <div className="mb-6 grid grid-cols-2 gap-3 lg:grid-cols-5">
+        <button
+          type="button"
+          onClick={() => setFilters((prev) => ({ ...prev, status: "" }))}
+          className={`rounded-2xl border p-4 text-left transition ${
+            !filters.status
+              ? "border-[rgb(var(--primary))] bg-[rgba(var(--primary),0.06)]"
+              : "border-[rgb(var(--border))] bg-[rgb(var(--surface))]"
+          }`}
+        >
+          <p className="text-[11px] uppercase tracking-wide text-[rgb(var(--text-muted))]">
+            Total
+          </p>
+          <p className="mt-1 text-2xl font-bold text-[rgb(var(--text))]">
+            {leads.length}
+          </p>
+        </button>
+        {leadStatusOptions.map((status) => {
+          const meta = leadStatusMeta[status];
+          const active = filters.status === status;
+          return (
+            <button
+              key={status}
+              type="button"
+              onClick={() =>
+                setFilters((prev) => ({
+                  ...prev,
+                  status: prev.status === status ? "" : status,
+                }))
+              }
+              className={`rounded-2xl border p-4 text-left transition ${
+                active
+                  ? "border-[rgb(var(--primary))] bg-[rgba(var(--primary),0.06)]"
+                  : "border-[rgb(var(--border))] bg-[rgb(var(--surface))]"
+              }`}
+              title={meta.hint}
+            >
+              <p className="text-[11px] uppercase tracking-wide text-[rgb(var(--text-muted))]">
+                {meta.label}
               </p>
-              <p className="text-2xl font-bold text-[rgb(var(--text))]">{leads.length}</p>
-            </div>
-          </div>
-        </div>
+              <p className="mt-1 text-2xl font-bold text-[rgb(var(--text))]">
+                {statusCounts[status] || 0}
+              </p>
+            </button>
+          );
+        })}
+      </div>
 
-        <div className="bg-[rgb(var(--surface))] border border-[rgb(var(--border))] rounded-2xl p-5">
-          <div className="flex items-center gap-3 mb-2">
-            <div className="w-11 h-11 rounded-2xl bg-[rgba(var(--primary),0.1)] text-[rgb(var(--primary))] flex items-center justify-center">
-              <FaUserTie size={18} />
-            </div>
-            <div>
-              <p className="text-xs uppercase tracking-wide text-[rgb(var(--text-muted))]">
-                Assignable Admins
-              </p>
-              <p className="text-2xl font-bold text-[rgb(var(--text))]">{assignees.length}</p>
-            </div>
-          </div>
+      <div className="mb-4 rounded-2xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))] p-4">
+        <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+          <h2 className="text-sm font-semibold text-[rgb(var(--text))]">
+            Filter leads
+          </h2>
+          {hasActiveFilters ? (
+            <button
+              type="button"
+              onClick={clearFilters}
+              className="text-xs font-semibold text-[rgb(var(--primary))]"
+            >
+              Clear filters
+            </button>
+          ) : null}
         </div>
-
-        <div className="bg-[rgb(var(--surface))] border border-[rgb(var(--border))] rounded-2xl p-5">
-          <div className="flex items-center gap-3 mb-2">
-            <div className="w-11 h-11 rounded-2xl bg-[rgba(var(--primary),0.1)] text-[rgb(var(--primary))] flex items-center justify-center">
-              <FaSchool size={18} />
-            </div>
-            <div>
-              <p className="text-xs uppercase tracking-wide text-[rgb(var(--text-muted))]">
-                Recent Enquiries
-              </p>
-              <p className="text-sm font-semibold text-[rgb(var(--text))]">
-                {leads[0]?.studentName || "No leads yet"}
-              </p>
-            </div>
-          </div>
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
+          <label className="flex flex-col gap-1.5 text-xs font-medium text-[rgb(var(--text-muted))]">
+            Name
+            <input
+              type="search"
+              value={filters.name}
+              onChange={(event) =>
+                setFilters((prev) => ({ ...prev, name: event.target.value }))
+              }
+              placeholder="Student or parent name"
+              className="rounded-xl border border-[rgb(var(--border))] bg-[rgb(var(--bg))] px-3 py-2.5 text-sm text-[rgb(var(--text))]"
+            />
+          </label>
+          <label className="flex flex-col gap-1.5 text-xs font-medium text-[rgb(var(--text-muted))]">
+            Status
+            <select
+              value={filters.status}
+              onChange={(event) =>
+                setFilters((prev) => ({ ...prev, status: event.target.value }))
+              }
+              className="rounded-xl border border-[rgb(var(--border))] bg-[rgb(var(--bg))] px-3 py-2.5 text-sm text-[rgb(var(--text))]"
+            >
+              <option value="">All statuses</option>
+              {leadStatusOptions.map((status) => (
+                <option key={status} value={status}>
+                  {formatLeadStatus(status)}
+                </option>
+              ))}
+            </select>
+          </label>
+          {!isStaffLogin ? (
+            <label className="flex flex-col gap-1.5 text-xs font-medium text-[rgb(var(--text-muted))]">
+              Assign to
+              <select
+                value={filters.assigneeKey}
+                onChange={(event) =>
+                  setFilters((prev) => ({
+                    ...prev,
+                    assigneeKey: event.target.value,
+                  }))
+                }
+                className="rounded-xl border border-[rgb(var(--border))] bg-[rgb(var(--bg))] px-3 py-2.5 text-sm text-[rgb(var(--text))]"
+              >
+                <option value="">All assignees</option>
+                {assigneeOptions.map((option) => (
+                  <option key={option.value} value={option.value}>
+                    {option.label}
+                  </option>
+                ))}
+              </select>
+            </label>
+          ) : null}
         </div>
       </div>
 
       <div className="bg-[rgb(var(--surface))] border border-[rgb(var(--border))] rounded-2xl shadow-sm overflow-hidden">
-        <div className="px-5 py-4 border-b border-[rgb(var(--border))]">
-          <h2 className="text-lg font-semibold text-[rgb(var(--text))]">Previous Leads</h2>
+        <div className="px-5 py-4 border-b border-[rgb(var(--border))] flex flex-wrap items-center justify-between gap-2">
+          <h2 className="text-lg font-semibold text-[rgb(var(--text))]">Leads</h2>
+          <p className="text-xs text-[rgb(var(--text-muted))]">
+            Showing {filteredLeads.length}
+            {hasActiveFilters ? ` of ${leads.length}` : ""}
+          </p>
         </div>
 
         {loading ? (
@@ -627,200 +786,289 @@ const LeadManagement = () => {
               ? "No leads are assigned to your account yet."
               : "No admission leads have been added yet."}
           </p>
+        ) : filteredLeads.length === 0 ? (
+          <p className="px-5 py-10 text-center text-[rgb(var(--text-muted))]">
+            No leads match the selected filters.
+          </p>
         ) : (
           <div className="divide-y divide-[rgb(var(--border))]">
-            {leads.map((lead) => (
-              <div
-                key={lead._id}
-                className="px-5 py-4 flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4"
-              >
-                <div className="space-y-2">
-                  <div>
-                    <div className="flex flex-wrap items-center gap-2">
-                      <p className="text-lg font-semibold text-[rgb(var(--text))]">{lead.studentName}</p>
-                      {(lead.studentId || String(lead.status || "").toLowerCase() === "admitted") && (
-                        <span className="text-[10px] font-semibold uppercase tracking-wide px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-700">
-                          Converted
-                        </span>
-                      )}
-                    </div>
-                    <p className="text-sm text-[rgb(var(--text-muted))]">Parent: {lead.parentName}</p>
-                    <p className="text-sm text-[rgb(var(--text-muted))]">
-                      Source:{" "}
-                      <span className="font-medium text-[rgb(var(--text))]">
-                        {lead.source === "website"
-                          ? "Website"
-                          : lead.createdByName || "Office"}
-                      </span>
-                    </p>
-                  </div>
+            {filteredLeads.map((lead) => {
+              const currentStatus = statusOf(lead);
+              const meta = leadStatusMeta[currentStatus] || leadStatusMeta.active;
+              const isAdmitted =
+                Boolean(lead.studentId) || currentStatus === "admitted";
+              const isCancelled = currentStatus === "cancelled";
+              const canComment = !isAdmitted && !isCancelled;
+              const canCancel =
+                !isStaffLogin &&
+                !isAdmitted &&
+                !isCancelled &&
+                !lead.registrationId &&
+                currentStatus === "active";
 
-                  <div className="flex flex-wrap gap-3 text-xs text-[rgb(var(--text-muted))]">
-                    <span className="flex items-center gap-1"><FaPhone size={11} /> {lead.parentMobile}</span>
-                    {lead.parentEmail && (
-                      <span className="flex items-center gap-1"><FaEnvelope size={11} /> {lead.parentEmail}</span>
-                    )}
-                    {lead.previousSchoolName && (
-                      <span className="flex items-center gap-1"><FaSchool size={11} /> {lead.previousSchoolName}</span>
-                    )}
-                    {(lead.className || lead.stream) && (
-                      <span className="flex items-center gap-1">
-                        <FaUserGraduate size={11} />
-                        {[lead.className, lead.stream].filter(Boolean).join(" · ")}
-                      </span>
-                    )}
-                  </div>
-                </div>
+              const sourceFull =
+                lead.source === "website"
+                  ? "Website"
+                  : lead.createdByName || "Office";
+              const sourceInitials = getInitials(
+                sourceFull,
+                lead.source === "website" ? "WW" : "OF",
+              );
+              const assigneeFull = lead.assignedTo?.name
+                ? `${lead.assignedTo.name}${
+                    lead.assignedTo.roleLabel
+                      ? ` (${lead.assignedTo.roleLabel})`
+                      : ""
+                  }`
+                : "Unassigned";
+              const assigneeInitials = getInitials(
+                lead.assignedTo?.name || "",
+                "NA",
+              );
 
-                <div className="flex flex-col sm:flex-row sm:items-start gap-3 sm:gap-5">
-                  <div>
-                    <p className="text-xs uppercase tracking-wide text-[rgb(var(--text-muted))]">Status</p>
-                    <select
-                      value={String(lead.status || "active").toLowerCase()}
-                      onChange={(event) => handleStatusChange(lead._id, event.target.value)}
-                      disabled={statusUpdatingId === lead._id}
-                      className="mt-1 px-2.5 py-1.5 rounded-lg border border-[rgb(var(--border))] bg-[rgb(var(--bg))] text-sm"
-                    >
-                      {leadStatusOptions.map((status) => (
-                        <option key={status} value={status}>
-                          {formatLeadStatus(status)}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-
-                  <div>
-                    <p className="text-xs uppercase tracking-wide text-[rgb(var(--text-muted))]">Assigned To</p>
-                    {!isStaffLogin && editingAssigneeLeadId === lead._id ? (
-                      <div className="mt-1 space-y-2">
-                        <select
-                          value={assigneeDrafts[lead._id] || ""}
-                          onChange={(event) => handleAssigneeDraftChange(lead._id, event.target.value)}
-                          className="px-2.5 py-1.5 rounded-lg border border-[rgb(var(--border))] bg-[rgb(var(--bg))] text-sm"
+              return (
+                <div key={lead._id} className="px-5 py-4">
+                  <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+                    <div className="min-w-0 flex-1 space-y-2">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <p className="truncate text-base font-semibold text-[rgb(var(--text))] sm:text-lg">
+                          {lead.studentName}
+                        </p>
+                        <span
+                          className={`inline-flex items-center rounded-full border px-2.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide ${meta.className}`}
+                          title={meta.hint}
                         >
-                          <option value="">Select assignee</option>
-                          {assigneeOptions.map((option) => (
-                            <option key={option.value} value={option.value}>
-                              {option.label}
-                            </option>
-                          ))}
-                        </select>
-                        <div className="flex gap-2">
-                          <button
-                            onClick={() => handleSaveAssignee(lead._id)}
-                            disabled={assigneeUpdatingId === lead._id}
-                            className="px-2.5 py-1 text-xs rounded-lg bg-[rgb(var(--primary))] text-white"
-                          >
-                            Save
-                          </button>
-                          <button
-                            onClick={() => setEditingAssigneeLeadId("")}
-                            className="px-2.5 py-1 text-xs rounded-lg border border-[rgb(var(--border))]"
-                          >
-                            Cancel
-                          </button>
-                        </div>
+                          {meta.label}
+                        </span>
+                        {isAdmitted ? (
+                          <span className="rounded-full bg-emerald-50 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-emerald-700">
+                            Student linked
+                          </span>
+                        ) : null}
                       </div>
-                    ) : (
-                      <>
-                        {isStaffLogin ? (
-                          <p className="text-sm font-semibold text-[rgb(var(--text))]">
-                            {lead.assignedTo?.name || "Unassigned"}
-                          </p>
-                        ) : (
-                          <button
-                            onClick={() => handleStartAssigneeEdit(lead)}
-                            className="text-sm font-semibold text-[rgb(var(--text))] underline underline-offset-2 decoration-dotted"
+
+                      <div className="flex flex-wrap items-center gap-x-4 gap-y-2 text-sm text-[rgb(var(--text-muted))]">
+                        <span>
+                          <span className="font-medium text-[rgb(var(--text))]">
+                            Parent:
+                          </span>{" "}
+                          {lead.parentName || "—"}
+                        </span>
+                        <span className="inline-flex items-center gap-1.5">
+                          <span className="font-medium text-[rgb(var(--text))]">
+                            Source:
+                          </span>
+                          <span
+                            title={sourceFull}
+                            className="inline-flex h-7 min-w-7 items-center justify-center rounded-full bg-[rgb(var(--surface))] border border-[rgb(var(--border))] px-1.5 text-[10px] font-bold tracking-wide text-[rgb(var(--text))]"
                           >
-                            {lead.assignedTo?.name || "Unassigned"}
-                          </button>
-                        )}
-                        <p className="text-xs text-[rgb(var(--text-muted))]">{lead.assignedTo?.roleLabel || ""}</p>
-                      </>
-                    )}
-                  </div>
-
-                  <div className="min-w-[270px]">
-                    <p className="text-xs uppercase tracking-wide text-[rgb(var(--text-muted))] mb-1">Feedback</p>
-                    <div className="flex gap-2">
-                      <textarea
-                        value={feedbackDrafts[lead._id] || ""}
-                        onChange={(event) => handleFeedbackInputChange(lead._id, event.target.value)}
-                        placeholder="Add follow-up comment"
-                        rows={2}
-                        className="w-full px-3 py-2 rounded-xl border border-[rgb(var(--border))] bg-[rgb(var(--bg))] text-sm resize-none"
-                      />
-                      <button
-                        onClick={() => handleAddFeedback(lead._id)}
-                        disabled={feedbackSavingId === lead._id}
-                        className="inline-flex items-center justify-center gap-2 px-3 py-2 rounded-xl border border-[rgb(var(--border))] text-sm font-medium hover:bg-[rgb(var(--bg))]"
-                      >
-                        <FaCommentDots size={12} /> Add
-                      </button>
+                            {sourceInitials}
+                          </span>
+                        </span>
+                        <span className="inline-flex items-center gap-1.5">
+                          <span className="font-medium text-[rgb(var(--text))]">
+                            Assign:
+                          </span>
+                          {!isStaffLogin &&
+                          editingAssigneeLeadId === lead._id ? (
+                            <span className="inline-flex flex-wrap items-center gap-1.5">
+                              <select
+                                value={assigneeDrafts[lead._id] || ""}
+                                onChange={(event) =>
+                                  handleAssigneeDraftChange(
+                                    lead._id,
+                                    event.target.value,
+                                  )
+                                }
+                                className="max-w-[160px] rounded-lg border border-[rgb(var(--border))] bg-[rgb(var(--bg))] px-2 py-1 text-xs text-[rgb(var(--text))]"
+                              >
+                                <option value="">Select</option>
+                                {assigneeOptions.map((option) => (
+                                  <option
+                                    key={option.value}
+                                    value={option.value}
+                                  >
+                                    {option.label}
+                                  </option>
+                                ))}
+                              </select>
+                              <IconAction
+                                title="Save assignee"
+                                onClick={() => handleSaveAssignee(lead._id)}
+                                disabled={assigneeUpdatingId === lead._id}
+                                className="border-transparent bg-[rgb(var(--primary))] text-white"
+                              >
+                                <FaCheck size={11} />
+                              </IconAction>
+                              <IconAction
+                                title="Cancel"
+                                onClick={() => setEditingAssigneeLeadId("")}
+                                className="border-[rgb(var(--border))] bg-[rgb(var(--surface))] text-[rgb(var(--text-muted))]"
+                              >
+                                <FaTimes size={11} />
+                              </IconAction>
+                            </span>
+                          ) : (
+                            <button
+                              type="button"
+                              title={assigneeFull}
+                              aria-label={assigneeFull}
+                              onClick={
+                                isStaffLogin
+                                  ? undefined
+                                  : () => handleStartAssigneeEdit(lead)
+                              }
+                              className={`inline-flex h-7 min-w-7 items-center justify-center rounded-full border px-1.5 text-[10px] font-bold tracking-wide ${
+                                lead.assignedTo?.name
+                                  ? "border-[rgba(var(--primary),0.35)] bg-[rgba(var(--primary),0.08)] text-[rgb(var(--primary))]"
+                                  : "border-[rgb(var(--border))] bg-[rgb(var(--surface))] text-[rgb(var(--text-muted))]"
+                              } ${isStaffLogin ? "cursor-default" : "hover:opacity-90"}`}
+                            >
+                              {assigneeInitials}
+                            </button>
+                          )}
+                        </span>
+                        <span>
+                          <span className="font-medium text-[rgb(var(--text))]">
+                            Class:
+                          </span>{" "}
+                          {[lead.className, lead.stream]
+                            .filter(Boolean)
+                            .join(" · ") || "—"}
+                        </span>
+                        <span className="inline-flex items-center gap-1">
+                          <FaPhone size={11} /> {lead.parentMobile || "—"}
+                        </span>
+                        {lead.parentEmail ? (
+                          <span
+                            className="inline-flex items-center gap-1"
+                            title={lead.parentEmail}
+                          >
+                            <FaEnvelope size={11} />
+                          </span>
+                        ) : null}
+                      </div>
                     </div>
-                    <div className="mt-2 flex items-center justify-between">
-                      <p className="text-xs text-[rgb(var(--text-muted))]">
-                        Follow-ups: {lead.followUps?.length || 0}
-                      </p>
-                      <button
+
+                    <div className="flex shrink-0 flex-wrap items-center gap-1.5">
+                      {isAdmitted ? (
+                        <IconAction
+                          title="View student"
+                          onClick={() =>
+                            lead.studentId
+                              ? navigate(
+                                  `${basePath}/student-view/${lead.studentId}`,
+                                )
+                              : toast.info(
+                                  "Student linked — open from Students list",
+                                )
+                          }
+                          className="border-emerald-200 bg-emerald-50 text-emerald-700 hover:bg-emerald-100"
+                        >
+                          <FaUserGraduate size={13} />
+                        </IconAction>
+                      ) : !isCancelled ? (
+                        <IconAction
+                          title={
+                            lead.registrationId
+                              ? "Open registration"
+                              : "Register / Admit"
+                          }
+                          onClick={() => handleStartRegistration(lead)}
+                          className="border-transparent bg-[rgb(var(--primary))] text-white hover:opacity-90"
+                        >
+                          <FaUserPlus size={13} />
+                        </IconAction>
+                      ) : null}
+
+                      <IconAction
+                        title="View lead"
+                        onClick={() => openViewModal(lead)}
+                        className="border-[rgb(var(--border))] bg-[rgb(var(--surface))] text-[rgb(var(--text))] hover:bg-[rgb(var(--bg))]"
+                      >
+                        <FaEye size={13} />
+                      </IconAction>
+
+                      <IconAction
+                        title="Comment history"
                         onClick={() => handleOpenHistory(lead)}
-                        className="inline-flex items-center gap-1 text-xs font-semibold text-[rgb(var(--primary))]"
+                        className="border-[rgb(var(--border))] bg-[rgb(var(--surface))] text-[rgb(var(--text))] hover:bg-[rgb(var(--bg))]"
                       >
-                        <FaEye size={11} /> History
-                      </button>
-                    </div>
-                  </div>
+                        <FaCommentDots size={13} />
+                      </IconAction>
 
-                  <div className="flex flex-col gap-2">
-                    <button
-                      type="button"
-                      onClick={() => openViewModal(lead)}
-                      className="inline-flex items-center justify-center gap-2 px-3 py-2 rounded-xl border border-[rgb(var(--border))] text-[rgb(var(--text))] hover:bg-[rgb(var(--bg))] transition text-sm font-medium"
-                    >
-                      <FaEye size={12} /> View
-                    </button>
-                    {lead.studentId || String(lead.status || "").toLowerCase() === "admitted" ? (
-                      <button
-                        type="button"
-                        onClick={() =>
-                          lead.studentId
-                            ? navigate(`${basePath}/student-view/${lead.studentId}`)
-                            : toast.info("Student linked — open from Students list")
-                        }
-                        className="inline-flex items-center justify-center gap-2 px-3 py-2 rounded-xl border border-emerald-200 text-emerald-700 bg-emerald-50 hover:bg-emerald-100 transition text-sm font-medium"
-                      >
-                        <FaUserGraduate size={12} /> View Student
-                      </button>
-                    ) : String(lead.status || "").toLowerCase() !== "cancelled" ? (
-                      <button
-                        type="button"
-                        onClick={() => handleStartRegistration(lead)}
-                        className="inline-flex items-center justify-center gap-2 px-3 py-2 rounded-xl bg-[rgb(var(--primary))] text-white hover:opacity-90 transition text-sm font-medium"
-                      >
-                        <FaUserGraduate size={12} />{" "}
-                        {lead.registrationId ? "Open Registration" : "Register"}
-                      </button>
-                    ) : null}
+                      {!isStaffLogin &&
+                      !isAdmitted &&
+                      !isCancelled &&
+                      currentStatus !== "processing" ? (
+                        <IconAction
+                          title="Edit lead"
+                          onClick={() => openEditModal(lead)}
+                          className="border-[rgb(var(--border))] bg-[rgb(var(--surface))] text-[rgb(var(--text))] hover:bg-[rgb(var(--bg))]"
+                        >
+                          <FaEdit size={13} />
+                        </IconAction>
+                      ) : null}
 
-                    {!isStaffLogin &&
-                      !lead.studentId &&
-                      !lead.registrationId &&
-                      String(lead.status || "").toLowerCase() !== "admitted" &&
-                      String(lead.status || "").toLowerCase() !== "processing" &&
-                      String(lead.status || "").toLowerCase() !== "cancelled" && (
-                        <button
-                          type="button"
+                      {canCancel ? (
+                        <IconAction
+                          title="Cancel lead"
                           onClick={() => handleCancelLead(lead)}
                           disabled={statusUpdatingId === lead._id}
-                          className="inline-flex items-center justify-center gap-2 px-3 py-2 rounded-xl border border-amber-200 text-amber-700 bg-amber-50 hover:bg-amber-100 transition text-sm font-medium disabled:opacity-60"
+                          className="border-amber-200 bg-amber-50 text-amber-700 hover:bg-amber-100"
                         >
-                          <FaBan size={12} /> Cancel
-                        </button>
-                      )}
+                          <FaBan size={13} />
+                        </IconAction>
+                      ) : null}
+                    </div>
                   </div>
+
+                  {canComment ? (
+                    <div className="mt-4 rounded-xl border border-[rgb(var(--border))] bg-[rgb(var(--bg))] p-3">
+                      <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
+                        <div>
+                          <p className="text-xs font-semibold uppercase tracking-wide text-[rgb(var(--text-muted))]">
+                            Add comment
+                          </p>
+                          <p className="text-[11px] text-[rgb(var(--text-muted))]">
+                            {currentStatus === "active"
+                              ? "Saving a comment moves this lead to Processing."
+                              : "Log follow-up notes for this lead."}
+                          </p>
+                        </div>
+                        <p className="text-[11px] text-[rgb(var(--text-muted))]">
+                          {lead.followUps?.length || 0} follow-up
+                          {(lead.followUps?.length || 0) === 1 ? "" : "s"}
+                        </p>
+                      </div>
+                      <div className="flex flex-col gap-2 sm:flex-row">
+                        <textarea
+                          value={feedbackDrafts[lead._id] || ""}
+                          onChange={(event) =>
+                            handleFeedbackInputChange(
+                              lead._id,
+                              event.target.value,
+                            )
+                          }
+                          placeholder="Write follow-up comment…"
+                          rows={2}
+                          className="w-full resize-none rounded-xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))] px-3 py-2 text-sm"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => handleAddFeedback(lead._id)}
+                          disabled={feedbackSavingId === lead._id}
+                          className="inline-flex shrink-0 items-center justify-center gap-2 rounded-xl bg-[rgb(var(--primary))] px-4 py-2 text-sm font-medium text-white disabled:opacity-60"
+                        >
+                          <FaCommentDots size={12} />
+                          {feedbackSavingId === lead._id ? "Saving…" : "Save"}
+                        </button>
+                      </div>
+                    </div>
+                  ) : null}
                 </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         )}
       </div>

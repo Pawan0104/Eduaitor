@@ -34,6 +34,16 @@ const streamSchema = new mongoose.Schema(
       ],
       default: [],
     },
+    /** Compulsory subjects for this stream (from school subject master). */
+    compulsorySubjectIds: {
+      type: [
+        {
+          type: mongoose.Schema.Types.ObjectId,
+          ref: "Subject",
+        },
+      ],
+      default: [],
+    },
     status: {
       type: String,
       enum: ["Active", "Inactive"],
@@ -52,5 +62,6 @@ streamSchema.index(
   },
 );
 streamSchema.index({ schoolId: 1, classIds: 1 });
+streamSchema.index({ schoolId: 1, compulsorySubjectIds: 1 });
 
 export default mongoose.models.Stream || mongoose.model("Stream", streamSchema);
