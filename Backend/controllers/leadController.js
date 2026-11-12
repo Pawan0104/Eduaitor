@@ -1,5 +1,6 @@
 import mongoose from "mongoose";
 import Lead from "../models/lead.js";
+import Registration from "../models/registration.js";
 import Class from "../models/class.js";
 import { resolveStream } from "../utils/resolveStream.js";
 import School from "../models/school.js";
@@ -473,7 +474,9 @@ export const updateLeadStatus = async (req, res) => {
       query["assignedTo.userId"] = req.user.staff_id;
     }
 
-    const existing = await Lead.findOne(query).select("status studentId").lean();
+    const existing = await Lead.findOne(query)
+      .select("status studentId registrationId")
+      .lean();
     if (!existing) {
       return res.status(404).json({ success: false, message: "Lead not found" });
     }
@@ -515,6 +518,19 @@ export const updateLeadStatus = async (req, res) => {
 
     if (!lead) {
       return res.status(404).json({ success: false, message: "Lead not found" });
+    }
+
+    // Cancelling a lead in Processing closes its linked registration too, so a
+    // cancelled enquiry cannot still be admitted from the Registration screen.
+    if (nextStatus === "cancelled" && existing.registrationId) {
+      await Registration.updateOne(
+        {
+          _id: existing.registrationId,
+          schoolId,
+          status: { $ne: "admitted" },
+        },
+        { $set: { status: "cancelled" } },
+      );
     }
 
     return res.json({

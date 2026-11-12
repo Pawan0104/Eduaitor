@@ -23,6 +23,7 @@ import ConfigurableFormFields, {
   buildCustomFieldsPayload,
   emptyCustomValues,
   hydrateCustomValues,
+  isCustomFieldKey,
   validateConfigurableFields,
 } from "../components/ConfigurableFormFields";
 import {
@@ -284,6 +285,53 @@ const LeadManagement = () => {
     });
   };
 
+  const viewCustomValues = useMemo(
+    () =>
+      hydrateCustomValues(formSteps, viewModal.lead?.customFields || []),
+    [formSteps, viewModal.lead],
+  );
+
+  // Read-only value for a form field, using the same labels as the Add form.
+  const viewFieldValue = (field) => {
+    if (!field?.key) return "";
+    const lead = viewModal.lead || {};
+
+    if (isCustomFieldKey(field.key)) {
+      const raw = viewCustomValues?.[field.key];
+      if (field.type === "checkbox") return raw ? "Yes" : "No";
+      if (raw === null || raw === undefined) return "";
+      return String(raw).trim();
+    }
+
+    if (field.key === "classId") {
+      if (lead.className) return lead.className;
+      const found = (classes || []).find(
+        (item) => String(item._id) === String(lead.classId),
+      );
+      return found?.name || "";
+    }
+
+    if (field.key === "streamId") {
+      if (lead.stream) return lead.stream;
+      const found = (streams || []).find(
+        (item) => String(item._id) === String(lead.streamId),
+      );
+      return found?.name || "";
+    }
+
+    if (field.key === "assigneeKey") {
+      const assigned = lead.assignedTo;
+      if (!assigned?.name) return "";
+      return assigned.roleLabel
+        ? `${assigned.name} (${assigned.roleLabel})`
+        : assigned.name;
+    }
+
+    const raw = lead[field.key];
+    if (raw === null || raw === undefined) return "";
+    return String(raw).trim();
+  };
+
   const handleChange = (event) => {
     const { name, value } = event.target;
     setForm((prev) => {
@@ -417,20 +465,15 @@ const LeadManagement = () => {
       toast.error("Admitted leads cannot be cancelled");
       return;
     }
-    if (
-      lead.registrationId ||
-      String(lead.status || "").toLowerCase() === "processing"
-    ) {
-      toast.error("Cancel from Registration instead — this lead is already registered");
-      return;
-    }
     if (String(lead.status || "").toLowerCase() === "cancelled") {
       toast.info("Lead is already cancelled");
       return;
     }
     if (
       !window.confirm(
-        `Cancel lead for “${lead.studentName || "this student"}”? They will no longer be available for registration.`,
+        lead.registrationId
+          ? `Cancel lead for “${lead.studentName || "this student"}”? The linked registration will also be cancelled.`
+          : `Cancel lead for “${lead.studentName || "this student"}”? They will no longer be available for registration.`,
       )
     ) {
       return;
@@ -448,7 +491,11 @@ const LeadManagement = () => {
           item._id === lead._id ? { ...item, status: "cancelled" } : item,
         ),
       );
-      toast.success("Lead cancelled");
+      toast.success(
+        lead.registrationId
+          ? "Lead and linked registration cancelled"
+          : "Lead cancelled",
+      );
     } catch (error) {
       toast.error(error.response?.data?.message || "Failed to cancel lead");
     } finally {
@@ -802,9 +849,7 @@ const LeadManagement = () => {
               const canCancel =
                 !isStaffLogin &&
                 !isAdmitted &&
-                !isCancelled &&
-                !lead.registrationId &&
-                currentStatus === "active";
+                !isCancelled;
 
               const sourceFull =
                 lead.source === "website"
@@ -1074,7 +1119,7 @@ const LeadManagement = () => {
       </div>
 
       {!isStaffLogin && showModal && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4 overflow-y-auto">
           <div className="bg-[rgb(var(--surface))] text-[rgb(var(--text))] rounded-2xl shadow-2xl w-full max-w-2xl max-h-[94vh] flex flex-col overflow-hidden">
             <div className="flex items-center justify-between px-6 py-4 border-b border-[rgb(var(--border))] shrink-0">
               <div>
@@ -1202,7 +1247,7 @@ const LeadManagement = () => {
       )}
 
       {viewModal.open && viewModal.lead && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4 overflow-y-auto">
           <div className="bg-[rgb(var(--surface))] text-[rgb(var(--text))] rounded-2xl shadow-2xl w-full max-w-2xl max-h-[90vh] overflow-hidden flex flex-col">
             <div className="flex items-center justify-between px-6 py-4 border-b border-[rgb(var(--border))]">
               <div>
@@ -1222,26 +1267,14 @@ const LeadManagement = () => {
               </button>
             </div>
 
-            <div className="p-6 overflow-y-auto space-y-4 text-sm">
-              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+            <div className="p-6 overflow-y-auto space-y-5 text-sm">
+              <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
                 {[
-                  ["Student Name", viewModal.lead.studentName],
-                  ["Parent Name", viewModal.lead.parentName],
-                  ["Parent Mobile", viewModal.lead.parentMobile],
-                  ["Parent Email", viewModal.lead.parentEmail],
-                  ["Previous School", viewModal.lead.previousSchoolName],
-                  ["Class", viewModal.lead.className],
-                  ["Stream", viewModal.lead.stream],
                   [
                     "Status",
                     formatLeadStatus(
                       String(viewModal.lead.status || "active").toLowerCase(),
                     ),
-                  ],
-                  ["Assigned To", viewModal.lead.assignedTo?.name],
-                  [
-                    "Assignee Role",
-                    viewModal.lead.assignedTo?.roleLabel,
                   ],
                   [
                     "Source",
@@ -1252,7 +1285,7 @@ const LeadManagement = () => {
                   [
                     "Created",
                     viewModal.lead.createdAt
-                      ? new Date(viewModal.lead.createdAt).toLocaleString()
+                      ? new Date(viewModal.lead.createdAt).toLocaleDateString()
                       : "",
                   ],
                   [
@@ -1274,29 +1307,46 @@ const LeadManagement = () => {
                 ))}
               </div>
 
-              {Array.isArray(viewModal.lead.customFields) &&
-              viewModal.lead.customFields.length > 0 ? (
-                <div>
-                  <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-[rgb(var(--text-muted))]">
-                    Additional fields
-                  </p>
-                  <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                    {viewModal.lead.customFields.map((field) => (
-                      <div
-                        key={field.key}
-                        className="rounded-lg border border-[rgb(var(--border))] px-3 py-2"
-                      >
-                        <p className="text-[11px] font-semibold uppercase tracking-wide text-[rgb(var(--text-muted))]">
-                          {field.label || field.key}
-                        </p>
-                        <p className="mt-0.5 font-medium text-[rgb(var(--text))]">
-                          {field.value || "—"}
-                        </p>
-                      </div>
-                    ))}
+              {formSteps.map((step) => {
+                const fields = (step.fields || []).filter(
+                  (field) => field && field.visible !== false,
+                );
+                if (!fields.length) return null;
+                return (
+                  <div key={step.key}>
+                    <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-[rgb(var(--text-muted))]">
+                      {step.title || "Details"}
+                    </p>
+                    <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                      {fields.map((field) => {
+                        const value = viewFieldValue(field);
+                        const wide = ["textarea", "radio", "checkbox"].includes(
+                          field.type,
+                        );
+                        return (
+                          <div
+                            key={field.key}
+                            className={`rounded-lg border border-[rgb(var(--border))] px-3 py-2 ${
+                              wide ? "sm:col-span-2" : ""
+                            }`}
+                          >
+                            <p className="text-[11px] font-semibold uppercase tracking-wide text-[rgb(var(--text-muted))]">
+                              {field.label || field.key}
+                            </p>
+                            <p
+                              className={`mt-0.5 font-medium text-[rgb(var(--text))] ${
+                                wide ? "whitespace-pre-wrap" : ""
+                              }`}
+                            >
+                              {value === "" ? "—" : value}
+                            </p>
+                          </div>
+                        );
+                      })}
+                    </div>
                   </div>
-                </div>
-              ) : null}
+                );
+              })}
             </div>
 
             <div className="flex flex-wrap justify-end gap-2 border-t border-[rgb(var(--border))] px-6 py-4">
@@ -1331,7 +1381,7 @@ const LeadManagement = () => {
       )}
 
       {historyModal.open && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4 overflow-y-auto">
           <div className="bg-[rgb(var(--surface))] text-[rgb(var(--text))] rounded-2xl shadow-2xl w-full max-w-2xl max-h-[90vh] overflow-hidden flex flex-col">
             <div className="flex items-center justify-between px-6 py-4 border-b border-[rgb(var(--border))]">
               <div>
