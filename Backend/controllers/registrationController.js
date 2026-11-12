@@ -89,7 +89,7 @@ const resolveActor = (user = {}) => ({
   role: user.role || "",
 });
 
-const makeFollowUp = (actor, comment) => ({
+const makeFollowUp = (actor, comment, extra = {}) => ({
   comment: String(comment || "")
     .trim()
     .slice(0, 1000),
@@ -98,6 +98,8 @@ const makeFollowUp = (actor, comment) => ({
     name: actor?.name || "System",
     role: actor?.role || "system",
   },
+  nextFollowUpDate: parseDate(extra.nextFollowUpDate),
+  assignedTo: String(extra.assignedTo || "").trim().slice(0, 120),
   createdAt: new Date(),
 });
 
@@ -114,6 +116,53 @@ const normalizeCustomFieldList = (list = []) =>
           : String(field.value).slice(0, 4000),
     }));
 
+const fieldLabelKey = (value) =>
+  String(value || "")
+    .toLowerCase()
+    .replace(/['’]/g, "")
+    .replace(/[^a-z0-9]+/g, "");
+
+/** Keep every lead custom value, then let non-empty registration values override. */
+const mergeLeadCustomFields = (leadFields = [], submittedFields = []) => {
+  const merged = new Map();
+  for (const field of leadFields) {
+    if (!field?.key) continue;
+    merged.set(field.key, field);
+    const labelKey = fieldLabelKey(field.label || field.key);
+    if (labelKey) merged.set(`label:${labelKey}`, field);
+  }
+
+  const result = [];
+  const usedLeadKeys = new Set();
+  for (const field of submittedFields) {
+    if (!field?.key) continue;
+    const labelKey = fieldLabelKey(field.label || field.key);
+    const fromLead =
+      merged.get(field.key) ||
+      (labelKey ? merged.get(`label:${labelKey}`) : null);
+    const submittedEmpty = !String(field.value || "").trim();
+    const leadValue = String(fromLead?.value || "").trim();
+    const next = {
+      ...field,
+      value:
+        submittedEmpty && leadValue ? fromLead.value : field.value,
+      label: field.label || fromLead?.label || field.key,
+    };
+    result.push(next);
+    if (fromLead?.key) usedLeadKeys.add(fromLead.key);
+    usedLeadKeys.add(field.key);
+  }
+
+  for (const field of leadFields) {
+    if (!field?.key || usedLeadKeys.has(field.key)) continue;
+    if (!String(field.value || "").trim()) continue;
+    result.push(field);
+    usedLeadKeys.add(field.key);
+  }
+
+  return result;
+};
+
 const cloneFollowUps = (list = []) =>
   (Array.isArray(list) ? list : [])
     .filter((entry) => entry && String(entry.comment || "").trim())
@@ -124,6 +173,10 @@ const cloneFollowUps = (list = []) =>
         name: String(entry.addedBy?.name || "System").slice(0, 120),
         role: String(entry.addedBy?.role || "").slice(0, 60),
       },
+      nextFollowUpDate: entry.nextFollowUpDate
+        ? new Date(entry.nextFollowUpDate)
+        : null,
+      assignedTo: String(entry.assignedTo || "").slice(0, 120),
       createdAt: entry.createdAt ? new Date(entry.createdAt) : new Date(),
     }));
 
@@ -349,11 +402,11 @@ export const createRegistration = async (req, res) => {
       }
     }
 
-    let normalizedCustomFields = normalizeCustomFieldList(body.customFields);
-    // Carry custom fields from the lead when the registration form did not send any.
-    if (!normalizedCustomFields.length && lead?.customFields?.length) {
-      normalizedCustomFields = normalizeCustomFieldList(lead.customFields);
-    }
+    const submittedCustomFields = normalizeCustomFieldList(body.customFields);
+    const leadCustomFields = normalizeCustomFieldList(lead?.customFields);
+    const normalizedCustomFields = lead
+      ? mergeLeadCustomFields(leadCustomFields, submittedCustomFields)
+      : submittedCustomFields;
 
     const actor = resolveActor(req.user);
     const registrationNumber = await nextRegistrationNumber(schoolId);
@@ -410,6 +463,7 @@ export const createRegistration = async (req, res) => {
         160,
       ),
       notes,
+      nextFollowUpDate: parseDate(body.nextFollowUpDate),
       customFields: normalizedCustomFields,
       followUps,
       source,
@@ -551,6 +605,9 @@ export const updateRegistration = async (req, res) => {
       registration.previousSchoolName = sanitize(body.previousSchoolName, 160);
     }
     if (body.notes !== undefined) registration.notes = sanitize(body.notes, 600);
+    if (body.nextFollowUpDate !== undefined) {
+      registration.nextFollowUpDate = parseDate(body.nextFollowUpDate);
+    }
     if (body.customFields !== undefined) {
       registration.customFields = Array.isArray(body.customFields)
         ? body.customFields
@@ -947,16 +1004,25 @@ export const addRegistrationFollowUp = async (req, res) => {
         .json({ success: false, message: "Feedback comment is required" });
     }
 
-    const followUp = makeFollowUp(resolveActor(req.user), comment);
+    const hasNextDate = req.body?.nextFollowUpDate !== undefined;
+    const followUp = makeFollowUp(resolveActor(req.user), comment, {
+      nextFollowUpDate: req.body?.nextFollowUpDate,
+      assignedTo: req.body?.assignedTo,
+    });
     if (!followUp.comment) {
       return res
         .status(400)
         .json({ success: false, message: "Feedback comment is required" });
     }
 
+    const update = { $push: { followUps: followUp } };
+    if (hasNextDate) {
+      update.$set = { nextFollowUpDate: followUp.nextFollowUpDate };
+    }
+
     const registration = await Registration.findOneAndUpdate(
       { _id: req.params.id, schoolId },
-      { $push: { followUps: followUp } },
+      update,
       { new: true },
     );
 

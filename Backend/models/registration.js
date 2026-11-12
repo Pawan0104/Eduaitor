@@ -80,6 +80,8 @@ const registrationSchema = new mongoose.Schema(
     pincode: { type: String, default: "" },
     previousSchoolName: { type: String, default: "" },
     notes: { type: String, default: "" },
+    /** Next scheduled follow-up for this enquiry (drives the due queue). */
+    nextFollowUpDate: { type: Date, default: null },
 
     source: {
       type: String,
@@ -139,6 +141,8 @@ const registrationSchema = new mongoose.Schema(
               name: { type: String, default: "" },
               role: { type: String, default: "" },
             },
+            nextFollowUpDate: { type: Date, default: null },
+            assignedTo: { type: String, default: "", trim: true },
             createdAt: { type: Date, default: Date.now },
           },
           { _id: false },
