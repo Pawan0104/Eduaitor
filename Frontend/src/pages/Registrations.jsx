@@ -2949,113 +2949,115 @@ const Registrations = () => {
         }
       >
         <div className="space-y-4 text-xs">
-          <ConfigurableFormFields
-            steps={activeFormSteps}
-            values={regForm}
-            customValues={customValues}
-            inputClass={inputClass}
-            onChangeBuiltin={(key, value) =>
-              setRegForm((prev) => ({
-                ...prev,
-                [key]: value,
-                ...(key === "classId" ? { sectionId: "" } : {}),
-              }))
-            }
-            onChangeCustom={(key, value) =>
-              setCustomValues((prev) => ({ ...prev, [key]: value }))
-            }
-            renderBuiltin={{
-              classId: (field) => (
-                <Field
-                  label={`${field.label}${field.required ? " *" : ""}`}
-                  className="text-slate-600"
-                >
-                  <select
-                    value={regForm.classId}
-                    onChange={(event) => {
-                      const nextClassId = event.target.value;
-                      const available = streamsForClass(nextClassId);
-                      setRegForm((prev) => ({
-                        ...prev,
-                        classId: nextClassId,
-                        sectionId: "",
-                        streamId: available.some(
-                          (item) => String(item._id) === String(prev.streamId),
-                        )
-                          ? prev.streamId
-                          : "",
-                      }));
-                    }}
-                    className={inputClass}
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+            <ConfigurableFormFields
+              steps={activeFormSteps}
+              values={regForm}
+              customValues={customValues}
+              inputClass={inputClass}
+              onChangeBuiltin={(key, value) =>
+                setRegForm((prev) => ({
+                  ...prev,
+                  [key]: value,
+                  ...(key === "classId" ? { sectionId: "" } : {}),
+                }))
+              }
+              onChangeCustom={(key, value) =>
+                setCustomValues((prev) => ({ ...prev, [key]: value }))
+              }
+              renderBuiltin={{
+                classId: (field) => (
+                  <Field
+                    label={`${field.label}${field.required ? " *" : ""}`}
+                    className="text-slate-600"
                   >
-                    <option value="">Select class</option>
-                    {classes.map((cls) => (
-                      <option key={cls._id} value={cls._id}>
-                        {cls.name}
-                      </option>
-                    ))}
-                  </select>
-                </Field>
-              ),
-              streamId: (field) => (
-                <Field
-                  label={`${field.label}${field.required ? " *" : ""}`}
-                  className="text-slate-600"
-                >
-                  <select
-                    value={regForm.streamId}
-                    onChange={(event) =>
-                      setRegForm((prev) => ({
-                        ...prev,
-                        streamId: event.target.value,
-                      }))
-                    }
-                    className={inputClass}
+                    <select
+                      value={regForm.classId}
+                      onChange={(event) => {
+                        const nextClassId = event.target.value;
+                        const available = streamsForClass(nextClassId);
+                        setRegForm((prev) => ({
+                          ...prev,
+                          classId: nextClassId,
+                          sectionId: "",
+                          streamId: available.some(
+                            (item) => String(item._id) === String(prev.streamId),
+                          )
+                            ? prev.streamId
+                            : "",
+                        }));
+                      }}
+                      className={inputClass}
+                    >
+                      <option value="">Select class</option>
+                      {classes.map((cls) => (
+                        <option key={cls._id} value={cls._id}>
+                          {cls.name}
+                        </option>
+                      ))}
+                    </select>
+                  </Field>
+                ),
+                streamId: (field) => (
+                  <Field
+                    label={`${field.label}${field.required ? " *" : ""}`}
+                    className="text-slate-600"
                   >
-                    <option value="">
-                      {regForm.classId
-                        ? "Select stream (optional)"
-                        : "Select class first"}
-                    </option>
-                    {streamsForClass(regForm.classId).map((item) => (
-                      <option key={item._id} value={item._id}>
-                        {item.name}
+                    <select
+                      value={regForm.streamId}
+                      onChange={(event) =>
+                        setRegForm((prev) => ({
+                          ...prev,
+                          streamId: event.target.value,
+                        }))
+                      }
+                      className={inputClass}
+                    >
+                      <option value="">
+                        {regForm.classId
+                          ? "Select stream (optional)"
+                          : "Select class first"}
                       </option>
-                    ))}
-                  </select>
-                </Field>
-              ),
-              sectionId: (field) => (
-                <Field
-                  label={`${field.label}${field.required ? " *" : ""}`}
-                  className="text-slate-600"
-                >
-                  <select
-                    value={regForm.sectionId}
-                    onChange={(event) =>
-                      setRegForm((prev) => ({
-                        ...prev,
-                        sectionId: event.target.value,
-                      }))
-                    }
-                    disabled={!selectedSections.length}
-                    className={inputClass}
+                      {streamsForClass(regForm.classId).map((item) => (
+                        <option key={item._id} value={item._id}>
+                          {item.name}
+                        </option>
+                      ))}
+                    </select>
+                  </Field>
+                ),
+                sectionId: (field) => (
+                  <Field
+                    label={`${field.label}${field.required ? " *" : ""}`}
+                    className="text-slate-600"
                   >
-                    <option value="">
-                      {selectedSections.length
-                        ? "Select section"
-                        : "No sections"}
-                    </option>
-                    {selectedSections.map((section) => (
-                      <option key={section._id} value={section._id}>
-                        {section.name}
+                    <select
+                      value={regForm.sectionId}
+                      onChange={(event) =>
+                        setRegForm((prev) => ({
+                          ...prev,
+                          sectionId: event.target.value,
+                        }))
+                      }
+                      disabled={!selectedSections.length}
+                      className={inputClass}
+                    >
+                      <option value="">
+                        {selectedSections.length
+                          ? "Select section"
+                          : "No sections"}
                       </option>
-                    ))}
-                  </select>
-                </Field>
-              ),
-            }}
-          />
+                      {selectedSections.map((section) => (
+                        <option key={section._id} value={section._id}>
+                          {section.name}
+                        </option>
+                      ))}
+                    </select>
+                  </Field>
+                ),
+              }}
+            />
+          </div>
 
           <div className="rounded-xl border border-slate-200 bg-slate-50/30 p-4">
             <h4 className="mb-3 flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-slate-700">
