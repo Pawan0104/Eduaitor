@@ -220,8 +220,232 @@ const emptyForm = {
   username: "",
   password: "",
   extraDocuments: [],
-  // Values for admin-defined fields (Admission Form Builder).
   custom: {},
+};
+
+const normFieldLabel = (value) =>
+  String(value || "")
+    .toLowerCase()
+    .replace(/['’]/g, "")
+    .replace(/[^a-z0-9]+/g, "");
+
+const ADMISSION_LABEL_ALIASES = {
+  mothername: "motherName",
+  mothersname: "motherName",
+  mother: "motherName",
+  mothermobile: "motherMobile",
+  mothersmobile: "motherMobile",
+  motherphone: "motherMobile",
+  motheremail: "motherEmail",
+  fathername: "fatherName",
+  fathersname: "fatherName",
+  parentname: "fatherName",
+  parentguardianname: "fatherName",
+  fathermobile: "fatherMobile",
+  parentmobile: "fatherMobile",
+  fatheremail: "fatherEmail",
+  parentemail: "fatherEmail",
+  previousschool: "previousSchoolName",
+  previousschoolname: "previousSchoolName",
+  lastclassattended: "previousSchoolClass",
+  previousschoolclass: "previousSchoolClass",
+  lastclass: "previousSchoolClass",
+  lastresult: "previousSchoolResult",
+  previousschoolresult: "previousSchoolResult",
+  tcnumber: "previousSchoolTcNumber",
+  address: "address",
+  dateofbirth: "dob",
+  dob: "dob",
+  gender: "gender",
+  bloodgroup: "bloodGroup",
+  aadhaarnumber: "aadhaarNumber",
+  aadhaar: "aadhaarNumber",
+  aadhaarid: "aadhaarNumber",
+  pennumber: "penNumber",
+  nationality: "nationality",
+  placeofbirth: "placeOfBirth",
+  caste: "caste",
+  category: "category",
+  community: "community",
+  stream: "stream",
+};
+
+const pushSourceField = (items, key, label, value, type = "text") => {
+  if (value === undefined || value === null) return;
+  const text = String(value).trim();
+  if (!text) return;
+  items.push({
+    key: String(key),
+    label: label || key,
+    value: text,
+    type: type || "text",
+  });
+};
+
+const collectFunnelFields = (lead, registration) => {
+  const items = [];
+  if (lead) {
+    pushSourceField(items, "parentName", "Parent Name", lead.parentName);
+    pushSourceField(items, "parentMobile", "Parent Mobile", lead.parentMobile, "tel");
+    pushSourceField(items, "parentEmail", "Parent Email", lead.parentEmail, "email");
+    pushSourceField(
+      items,
+      "previousSchoolName",
+      "Previous School Name",
+      lead.previousSchoolName,
+    );
+    pushSourceField(items, "stream", "Stream", lead.stream);
+    for (const field of lead.customFields || []) {
+      pushSourceField(
+        items,
+        field.key,
+        field.label || field.key,
+        field.value,
+        field.type || "text",
+      );
+    }
+  }
+  if (registration) {
+    pushSourceField(
+      items,
+      "dob",
+      "Date of Birth",
+      registration.dob ? String(registration.dob).slice(0, 10) : "",
+      "date",
+    );
+    pushSourceField(items, "gender", "Gender", registration.gender, "select");
+    pushSourceField(items, "bloodGroup", "Blood Group", registration.bloodGroup);
+    pushSourceField(
+      items,
+      "parentName",
+      "Parent / Guardian Name",
+      registration.parentName,
+    );
+    pushSourceField(
+      items,
+      "parentMobile",
+      "Parent Mobile",
+      registration.parentMobile,
+      "tel",
+    );
+    pushSourceField(
+      items,
+      "parentEmail",
+      "Parent Email",
+      registration.parentEmail,
+      "email",
+    );
+    pushSourceField(items, "address", "Address", registration.address, "textarea");
+    pushSourceField(items, "city", "City", registration.city);
+    pushSourceField(items, "pincode", "Pincode", registration.pincode);
+    pushSourceField(
+      items,
+      "previousSchoolName",
+      "Previous School",
+      registration.previousSchoolName,
+    );
+    pushSourceField(items, "notes", "Notes", registration.notes, "textarea");
+    pushSourceField(items, "stream", "Stream", registration.stream);
+    for (const field of registration.customFields || []) {
+      pushSourceField(
+        items,
+        field.key,
+        field.label || field.key,
+        field.value,
+        field.type || "text",
+      );
+    }
+  }
+
+  const byIdentity = new Map();
+  for (const item of items) {
+    byIdentity.set(normFieldLabel(item.label) || item.key, item);
+  }
+  return [...byIdentity.values()];
+};
+
+const applyFunnelToAdmission = (lead, registration, steps) => {
+  const formPatch = {};
+  const customPatch = {};
+  const admissionFields = (steps || []).flatMap((step) => step.fields || []);
+  const builtinByLabel = new Map();
+  const customByKey = new Map();
+  const customByLabel = new Map();
+
+  for (const field of admissionFields) {
+    if (!field?.key || field.key === "carried_from_funnel") continue;
+    const labelKey = normFieldLabel(field.label || field.key);
+    if (field.builtin && Object.prototype.hasOwnProperty.call(emptyForm, field.key)) {
+      if (labelKey) builtinByLabel.set(labelKey, field.key);
+    } else if (!field.builtin) {
+      customByKey.set(field.key, field);
+      if (labelKey && !customByLabel.has(labelKey)) customByLabel.set(labelKey, field);
+    }
+  }
+
+  const carried = [];
+  const seen = new Set();
+  const allowedTypes = new Set([
+    "text",
+    "textarea",
+    "number",
+    "date",
+    "email",
+    "tel",
+    "select",
+    "checkbox",
+  ]);
+
+  for (const item of collectFunnelFields(lead, registration)) {
+    const labelKey = normFieldLabel(item.label || item.key);
+    const alias =
+      ADMISSION_LABEL_ALIASES[labelKey] ||
+      ADMISSION_LABEL_ALIASES[normFieldLabel(item.key)];
+    if (alias && Object.prototype.hasOwnProperty.call(emptyForm, alias)) {
+      formPatch[alias] = alias === "dob" ? String(item.value).slice(0, 10) : item.value;
+      continue;
+    }
+
+    const direct = customByKey.get(item.key);
+    if (direct) {
+      customPatch[direct.key] = item.value;
+      continue;
+    }
+    const byLabel = labelKey ? customByLabel.get(labelKey) : null;
+    if (byLabel) {
+      customPatch[byLabel.key] = item.value;
+      continue;
+    }
+    const builtinKey = labelKey ? builtinByLabel.get(labelKey) : "";
+    if (builtinKey) {
+      formPatch[builtinKey] = item.value;
+      continue;
+    }
+
+    const rawKey = String(item.key).startsWith("cf_")
+      ? item.key
+      : `cf_${labelKey || item.key}`;
+    const carryKey = rawKey.slice(0, 60);
+    if (seen.has(carryKey)) {
+      customPatch[carryKey] = item.value;
+      continue;
+    }
+    seen.add(carryKey);
+    carried.push({
+      key: carryKey,
+      label: item.label || item.key,
+      type: allowedTypes.has(item.type) ? item.type : "text",
+      required: false,
+      visible: true,
+      placeholder: "",
+      help: "",
+      options: [],
+      builtin: false,
+    });
+    customPatch[carryKey] = item.value;
+  }
+
+  return { formPatch, customPatch, carried };
 };
 
 const toDateInputValue = (date) => date.toISOString().slice(0, 10);
@@ -402,6 +626,8 @@ const StudentManagement = () => {
   const [formStepDefs, setFormStepDefs] = useState(() =>
     mergeAdmissionSteps(null)
   );
+  const [funnelSource, setFunnelSource] = useState(null);
+  const [carriedFields, setCarriedFields] = useState([]);
   const [builderOpen, setBuilderOpen] = useState(false);
   const [layoutMode, setLayoutMode] = useState("steps"); // steps | single
   const [layoutSaving, setLayoutSaving] = useState(false);
@@ -409,14 +635,33 @@ const StudentManagement = () => {
   const isSinglePage = layoutMode === "single";
   const canChangeLayout = ["school_admin", "super_admin"].includes(user?.role);
 
-  const customStepDefs = formStepDefs.filter((s) => !s.builtin);
+  const activeStepDefs = useMemo(() => {
+    const base = (formStepDefs || []).filter(
+      (step) => step?.key !== "carried_from_funnel",
+    );
+    if (!carriedFields.length) return base;
+    return [
+      ...base,
+      {
+        key: "carried_from_funnel",
+        title: "From Lead / Registration",
+        builtin: false,
+        fields: carriedFields,
+      },
+    ];
+  }, [formStepDefs, carriedFields]);
+
+  const customStepDefs = activeStepDefs.filter((s) => !s.builtin);
   // First seven steps are the built-in wizard steps; custom steps follow them
   // and Review is always last.
   const reviewStep = 8 + customStepDefs.length;
-  const wizardSteps = formStepDefs.map((s) => s.title);
-  const fieldIndex = useMemo(() => buildFieldIndex(formStepDefs), [formStepDefs]);
+  const wizardSteps = activeStepDefs.map((s) => s.title);
+  const fieldIndex = useMemo(
+    () => buildFieldIndex(activeStepDefs),
+    [activeStepDefs],
+  );
 
-  const customFieldsForStep = (stepNumber, stepDefs = formStepDefs) => {
+  const customFieldsForStep = (stepNumber, stepDefs = activeStepDefs) => {
     const def = stepDefs[stepNumber - 1];
     return (def?.fields || []).filter((field) => !field.builtin);
   };
@@ -811,48 +1056,23 @@ const StudentManagement = () => {
           return;
         }
 
-        const { firstName, lastName } = splitStudentName(
-          registration.studentName,
-        );
-        const carriedCustom = Object.fromEntries(
-          (registration.customFields || [])
-            .filter((field) => field?.key)
-            .map((field) => [field.key, field.value || ""]),
-        );
+        let linkedLead = null;
+        if (registration.leadId) {
+          try {
+            const leadRes = await axios.get(
+              `${API}/leads/${registration.leadId}`,
+              { withCredentials: true },
+            );
+            linkedLead = leadRes.data?.data || null;
+          } catch {
+            linkedLead = null;
+          }
+        }
         setSourceRegistration(registration);
         setRegistrationId(registration._id);
         if (registration.leadId) setLeadId(String(registration.leadId));
-        setForm((prev) => ({
-          ...prev,
-          firstName: firstName || prev.firstName,
-          lastName: lastName || prev.lastName,
-          dob: registration.dob
-            ? String(registration.dob).slice(0, 10)
-            : prev.dob,
-          gender: registration.gender || prev.gender,
-          bloodGroup: registration.bloodGroup || prev.bloodGroup,
-          fatherName: registration.parentName || prev.fatherName,
-          fatherMobile: registration.parentMobile || prev.fatherMobile,
-          fatherEmail: registration.parentEmail || prev.fatherEmail,
-          address: registration.address || prev.address,
-          previousSchoolName:
-            registration.previousSchoolName || prev.previousSchoolName,
-          medicalConditionRemarks:
-            registration.notes || prev.medicalConditionRemarks,
-          classId: registration.classId
-            ? String(registration.classId)
-            : prev.classId,
-          sectionId: registration.sectionId
-            ? String(registration.sectionId)
-            : prev.sectionId,
-          streamId: registration.streamId
-            ? String(registration.streamId)
-            : prev.streamId,
-          stream: registration.stream || prev.stream,
-          username: registration.parentMobile || prev.username,
-          confirmationStatus: prev.confirmationStatus || "Non-Confirmed",
-          custom: { ...prev.custom, ...carriedCustom },
-        }));
+        if (linkedLead) setSourceLead(linkedLead);
+        setFunnelSource({ lead: linkedLead, registration });
       } catch (err) {
         toast.error(
           err?.response?.data?.message || "Failed to load registration",
@@ -920,33 +1140,9 @@ const StudentManagement = () => {
           return;
         }
 
-        const { firstName, lastName } = splitStudentName(lead.studentName);
-        const carriedCustom = Object.fromEntries(
-          (lead.customFields || [])
-            .filter((field) => field?.key)
-            .map((field) => [field.key, field.value || ""]),
-        );
-        const latestRemark = [...(lead.followUps || [])]
-          .reverse()
-          .find((entry) => String(entry?.comment || "").trim())?.comment;
         setSourceLead(lead);
         setLeadId(lead._id);
-        setForm((prev) => ({
-          ...prev,
-          firstName: firstName || prev.firstName,
-          lastName: lastName || prev.lastName,
-          fatherName: lead.parentName || prev.fatherName,
-          fatherMobile: lead.parentMobile || prev.fatherMobile,
-          fatherEmail: lead.parentEmail || prev.fatherEmail,
-          previousSchoolName: lead.previousSchoolName || prev.previousSchoolName,
-          medicalConditionRemarks:
-            latestRemark || prev.medicalConditionRemarks,
-          classId: lead.classId ? String(lead.classId) : prev.classId,
-          streamId: lead.streamId ? String(lead.streamId) : prev.streamId,
-          stream: lead.stream || prev.stream,
-          username: lead.parentMobile || prev.username,
-          custom: { ...prev.custom, ...carriedCustom },
-        }));
+        setFunnelSource({ lead, registration: null });
       } catch (err) {
         toast.error(err?.response?.data?.message || "Failed to load lead");
         navigate(`${basePath}/leads`, { replace: true });
@@ -955,6 +1151,77 @@ const StudentManagement = () => {
 
     fetchLead();
   }, [isEdit, leadIdParam, registrationIdParam, basePath, navigate]);
+
+  useEffect(() => {
+    if (isEdit || !funnelSource) return;
+    const { lead, registration } = funnelSource;
+    const mapped = applyFunnelToAdmission(lead, registration, formStepDefs);
+    const studentName = registration?.studentName || lead?.studentName || "";
+    const { firstName, lastName } = splitStudentName(studentName);
+    const latestRemark = [...(lead?.followUps || [])]
+      .reverse()
+      .find((entry) => String(entry?.comment || "").trim())?.comment;
+
+    setCarriedFields(mapped.carried);
+    setForm((prev) => ({
+      ...prev,
+      ...mapped.formPatch,
+      firstName: firstName || prev.firstName,
+      lastName: lastName || prev.lastName,
+      dob: registration?.dob
+        ? String(registration.dob).slice(0, 10)
+        : mapped.formPatch.dob || prev.dob,
+      gender: registration?.gender || mapped.formPatch.gender || prev.gender,
+      bloodGroup:
+        registration?.bloodGroup || mapped.formPatch.bloodGroup || prev.bloodGroup,
+      fatherName:
+        registration?.parentName ||
+        lead?.parentName ||
+        mapped.formPatch.fatherName ||
+        prev.fatherName,
+      motherName: mapped.formPatch.motherName || prev.motherName,
+      fatherMobile:
+        registration?.parentMobile ||
+        lead?.parentMobile ||
+        mapped.formPatch.fatherMobile ||
+        prev.fatherMobile,
+      fatherEmail:
+        registration?.parentEmail ||
+        lead?.parentEmail ||
+        mapped.formPatch.fatherEmail ||
+        prev.fatherEmail,
+      address: registration?.address || mapped.formPatch.address || prev.address,
+      previousSchoolName:
+        registration?.previousSchoolName ||
+        lead?.previousSchoolName ||
+        mapped.formPatch.previousSchoolName ||
+        prev.previousSchoolName,
+      medicalConditionRemarks:
+        prev.medicalConditionRemarks || latestRemark || "",
+      classId: registration?.classId
+        ? String(registration.classId)
+        : lead?.classId
+          ? String(lead.classId)
+          : prev.classId,
+      sectionId: registration?.sectionId
+        ? String(registration.sectionId)
+        : prev.sectionId,
+      streamId: registration?.streamId
+        ? String(registration.streamId)
+        : lead?.streamId
+          ? String(lead.streamId)
+          : prev.streamId,
+      stream:
+        registration?.stream ||
+        lead?.stream ||
+        mapped.formPatch.stream ||
+        prev.stream,
+      username:
+        registration?.parentMobile || lead?.parentMobile || prev.username,
+      confirmationStatus: prev.confirmationStatus || "Non-Confirmed",
+      custom: { ...prev.custom, ...mapped.customPatch },
+    }));
+  }, [isEdit, funnelSource, formStepDefs]);
 
   /* FETCH STUDENT */
   useEffect(() => {
@@ -1745,7 +2012,15 @@ const StudentManagement = () => {
         fatherName: sourceRegistration.parentName || "",
         fatherMobile: sourceRegistration.parentMobile || "",
         fatherEmail: sourceRegistration.parentEmail || "",
-        address: sourceRegistration.address || "",
+        address: [
+          sourceRegistration.address,
+          sourceRegistration.city,
+          sourceRegistration.district,
+          sourceRegistration.state,
+          sourceRegistration.pincode,
+        ]
+          .filter(Boolean)
+          .join(", "),
         previousSchoolName: sourceRegistration.previousSchoolName || "",
         medicalConditionRemarks: sourceRegistration.notes || "",
         classId: sourceRegistration.classId
@@ -1938,7 +2213,7 @@ const StudentManagement = () => {
       }
 
       // Admin-defined fields → JSON metadata (+ files with a customField_ prefix).
-      const customFieldDefs = formStepDefs
+      const customFieldDefs = activeStepDefs
         .flatMap((stepDef) => stepDef.fields || [])
         .filter((field) => !field.builtin);
       const customMeta = [];
@@ -3293,7 +3568,7 @@ const StudentManagement = () => {
                   transportRoutes={transportRoutes}
                   feeStructure={feeStructure}
                   freqFilter={freqFilter}
-                  customFields={formStepDefs.flatMap((stepDef) =>
+                  customFields={activeStepDefs.flatMap((stepDef) =>
                     (stepDef.fields || []).filter((field) => !field.builtin)
                   )}
                 />
