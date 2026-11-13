@@ -197,17 +197,6 @@ const renderField = (field, { values, customValues, onChangeBuiltin, onChangeCus
   );
 };
 
-/**
- * @param {object} props
- * @param {Array} props.steps
- * @param {object} props.values
- * @param {object} props.customValues
- * @param {(key:string, value:any)=>void} props.onChangeBuiltin
- * @param {(key:string, value:any)=>void} props.onChangeCustom
- * @param {Record<string, function>} [props.renderBuiltin]
- * @param {string[]} [props.excludeKeys]
- * @param {string} [props.inputClass]
- */
 const ConfigurableFormFields = ({
   steps = [],
   values = {},
@@ -222,6 +211,7 @@ const ConfigurableFormFields = ({
   const ctx = { values, customValues, onChangeBuiltin, onChangeCustom, renderBuiltin, inputClass };
 
   const elements = [];
+  const sectioned = (steps || []).length > 1;
 
   (steps || []).forEach((step, stepIndex) => {
     const stepFields = (step?.fields || []).filter(
@@ -230,6 +220,12 @@ const ConfigurableFormFields = ({
     if (stepFields.length === 0 && !step?.title) return;
 
     const title = String(step?.title || "").replace(/^\d+\.\s*/, "").trim();
+    const fieldElements = stepFields.map((field) => renderField(field, ctx));
+
+    if (!sectioned) {
+      elements.push(...fieldElements);
+      return;
+    }
 
     elements.push(
       <div
@@ -245,7 +241,7 @@ const ConfigurableFormFields = ({
           </h4>
         ) : null}
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-          {stepFields.map((field) => renderField(field, ctx))}
+          {fieldElements}
         </div>
       </div>,
     );
