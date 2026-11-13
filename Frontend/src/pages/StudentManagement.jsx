@@ -168,6 +168,7 @@ const emptyForm = {
   isEws: false,
   isPhysicallyDisabled: false,
   medicalConditionRemarks: "",
+  admissionNotes: "",
   admissionDate: "",
   studentId: "",
 

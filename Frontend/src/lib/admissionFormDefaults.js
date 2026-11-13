@@ -80,7 +80,7 @@ const f = (key, label, type, required, extra = {}) => ({
 export const ADMISSION_STEPS = [
   {
     key: "builtin_1",
-    title: "Student Details",
+    title: "01. Student Identity",
     builtin: true,
     fields: [
       f("studentId", "Admission Number", "text", false, {
@@ -130,16 +130,12 @@ export const ADMISSION_STEPS = [
         "checkbox",
         false,
       ),
-      f("medicalConditionRemarks", "Medical Condition / History", "textarea", false, {
-        placeholder: "Any medical history or remarks",
-        help: "Optional notes about medical conditions.",
-      }),
       f("admissionDate", "Admission Date", "date", true),
     ],
   },
   {
     key: "builtin_2",
-    title: "Parent / Guardian",
+    title: "02. Parent & Contact Details",
     builtin: true,
     fields: [
       f("fatherName", "Father Name", "text", true),
@@ -158,7 +154,7 @@ export const ADMISSION_STEPS = [
   },
   {
     key: "builtin_address",
-    title: "Residential Address",
+    title: "03. Residential Address",
     builtin: true,
     fields: [
       f("address", "Address Line", "textarea", true),
@@ -172,7 +168,7 @@ export const ADMISSION_STEPS = [
   },
   {
     key: "builtin_3",
-    title: "Previous School",
+    title: "05. Previous School Details",
     builtin: true,
     fields: [
       f("previousSchoolName", "Previous School Name", "text", false),
@@ -188,7 +184,7 @@ export const ADMISSION_STEPS = [
   },
   {
     key: "builtin_4",
-    title: "Documents",
+    title: "06. Original Student Documents",
     builtin: true,
     fields: [
       f("studentPhoto", "Student Photo", "file", true),
@@ -204,7 +200,7 @@ export const ADMISSION_STEPS = [
   },
   {
     key: "builtin_5",
-    title: "Class Details",
+    title: "04. Class Placement, Hostel & Transport Assignment",
     builtin: true,
     fields: [
       f("classId", "Class", "select", true),
@@ -219,7 +215,7 @@ export const ADMISSION_STEPS = [
   },
   {
     key: "builtin_6",
-    title: "Fee Structure",
+    title: "07. Fee Breakdown",
     builtin: true,
     fields: [
       f("totalFee", "Total Annual Fee", "number", true),
@@ -236,12 +232,32 @@ export const ADMISSION_STEPS = [
     ],
   },
   {
+    key: "builtin_medical",
+    title: "Medical Condition / History",
+    builtin: true,
+    fields: [
+      f("medicalConditionRemarks", "Medical Condition / Health History", "textarea", false, {
+        placeholder: "Enter any medical condition, allergies, or health history",
+      }),
+    ],
+  },
+  {
     key: "builtin_7",
-    title: "Parent Login",
+    title: "Parent & Student Portal Credentials",
     builtin: true,
     fields: [
       f("username", "Parent Username", "text", true),
       f("password", "Password", "text", true),
+    ],
+  },
+  {
+    key: "builtin_notes",
+    title: "Notes / Remarks",
+    builtin: true,
+    fields: [
+      f("admissionNotes", "Admission Notes / Office Remarks", "textarea", false, {
+        placeholder: "Enter any special admission notes, scholarship reference, or office remarks",
+      }),
     ],
   },
   {
