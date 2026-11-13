@@ -142,6 +142,9 @@ const getNavItems = (role, loginAs, openProfile, tn) => {
 
 const AdminLayout = () => {
   const [showProfile, setShowProfile] = useState(false);
+  const [sidebarOpen, setSidebarOpen] = useState(() =>
+    typeof window !== "undefined" ? window.innerWidth >= 1024 : true,
+  );
   const [unreadMessages, setUnreadMessages] = useState(0);
   const { user } = useAuth();
   const { tn } = useLanguage();
@@ -191,15 +194,34 @@ const AdminLayout = () => {
     };
   }, []);
 
+  const closeSidebar = () => setSidebarOpen(false);
+
   return (
     <div className="app-shell h-screen bg-[rgb(var(--bg))] overflow-hidden flex flex-col">
-      <Topbar menuPath={menuPath} />
+      <Topbar
+        menuPath={menuPath}
+        onMenuClick={() => setSidebarOpen(true)}
+      />
 
-      <div className="flex flex-1 overflow-hidden min-h-0">
-        {/* Desktop Sidebar only — mobile uses Menu hub + bottom nav */}
-        <aside className="hidden lg:flex w-70 shrink-0">
-          <Sidebar unreadMessages={unreadMessages} />
-        </aside>
+      <div className="flex flex-1 overflow-hidden min-h-0 relative">
+        {/* Slide-in sidebar drawer (all breakpoints) */}
+        <div
+          className={`fixed inset-0 z-40 transition-opacity duration-300 ${
+            sidebarOpen ? "opacity-100" : "pointer-events-none opacity-0"
+          }`}
+        >
+          <div
+            className="absolute inset-0 bg-black/45"
+            onClick={closeSidebar}
+          />
+          <aside
+            className={`absolute left-0 top-0 h-full w-72 max-w-[85vw] bg-[rgb(var(--surface))] shadow-2xl transform transition-transform duration-300 ease-out ${
+              sidebarOpen ? "translate-x-0" : "-translate-x-full"
+            }`}
+          >
+            <Sidebar closeSidebar={closeSidebar} unreadMessages={unreadMessages} />
+          </aside>
+        </div>
 
         <main className="app-main flex-1 overflow-y-auto overscroll-y-contain">
           <div className="app-main-pad px-3 sm:px-4 md:px-6 lg:px-8 py-3 lg:py-6 pb-[calc(5.75rem+env(safe-area-inset-bottom))] lg:pb-8">

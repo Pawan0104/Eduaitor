@@ -1,4 +1,4 @@
-import { FaBell, FaChevronLeft } from "react-icons/fa";
+import { FaBars, FaBell, FaChevronLeft } from "react-icons/fa";
 import { AiOutlineLogout } from "react-icons/ai";
 import { useEffect, useState } from "react";
 import { useAuth } from "../context/AuthContext";
@@ -45,7 +45,7 @@ const timeAgo = (dateStr) => {
   return `${Math.floor(h / 24)}d ago`;
 };
 
-const Topbar = ({ menuPath = "/" }) => {
+const Topbar = ({ menuPath = "/", onMenuClick }) => {
   const [time, setTime] = useState({});
   const [openDropdown, setOpenDropdown] = useState(false);
   const [notifications, setNotifications] = useState([]);
@@ -226,6 +226,19 @@ const Topbar = ({ menuPath = "/" }) => {
     <header className="app-topbar box-border sticky top-0 z-30 flex items-center justify-between border-b border-[rgb(var(--border))] bg-[rgb(var(--surface))] px-2.5 text-[rgb(var(--text))] sm:px-5">
       {/* LEFT: back + (mobile) child switcher | (desktop) home + school */}
       <div className="flex min-w-0 items-center gap-1.5 sm:gap-3">
+        {onMenuClick && (
+          <button
+            type="button"
+            onClick={onMenuClick}
+            className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl
+              border border-[rgb(var(--border))] bg-[rgb(var(--bg))]
+              text-[rgb(var(--text))] transition active:scale-95"
+            aria-label="Open menu"
+            title="Menu"
+          >
+            <FaBars size={15} />
+          </button>
+        )}
         {canGoBack && (
           <button
             type="button"
