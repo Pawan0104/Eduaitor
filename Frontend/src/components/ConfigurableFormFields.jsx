@@ -91,6 +91,112 @@ const FieldShell = ({ field, children, className = "" }) => (
   </label>
 );
 
+const renderField = (field, { values, customValues, onChangeBuiltin, onChangeCustom, renderBuiltin, inputClass }) => {
+  if (typeof renderBuiltin[field.key] === "function") {
+    return (
+      <div key={field.key} className="contents">
+        {renderBuiltin[field.key](field)}
+      </div>
+    );
+  }
+
+  const isCustom = isCustomFieldKey(field.key);
+  const value = isCustom ? customValues?.[field.key] : values?.[field.key];
+  const setValue = (next) =>
+    isCustom
+      ? onChangeCustom?.(field.key, next)
+      : onChangeBuiltin?.(field.key, next);
+
+  if (field.type === "textarea") {
+    return (
+      <FieldShell key={field.key} field={field} className="md:col-span-2">
+        <textarea
+          rows={3}
+          value={value ?? ""}
+          placeholder={field.placeholder || ""}
+          onChange={(e) => setValue(e.target.value)}
+          className={inputClass}
+        />
+      </FieldShell>
+    );
+  }
+
+  if (field.type === "select") {
+    return (
+      <FieldShell key={field.key} field={field}>
+        <select
+          value={value ?? ""}
+          onChange={(e) => setValue(e.target.value)}
+          className={inputClass}
+        >
+          <option value="">Select</option>
+          {(field.options || []).map((option) => (
+            <option key={option} value={option}>
+              {option}
+            </option>
+          ))}
+        </select>
+      </FieldShell>
+    );
+  }
+
+  if (field.type === "radio") {
+    return (
+      <FieldShell key={field.key} field={field} className="md:col-span-2">
+        <div className="flex flex-wrap gap-4">
+          {(field.options || []).map((option) => (
+            <label
+              key={option}
+              className="flex items-center gap-2 text-sm font-normal"
+            >
+              <input
+                type="radio"
+                name={`cfg-${field.key}`}
+                checked={value === option}
+                onChange={() => setValue(option)}
+              />
+              {option}
+            </label>
+          ))}
+        </div>
+      </FieldShell>
+    );
+  }
+
+  if (field.type === "checkbox") {
+    return (
+      <label
+        key={field.key}
+        className="flex items-center gap-2 rounded-xl border border-[rgb(var(--border))] px-3 py-2.5 text-sm font-medium md:col-span-2"
+      >
+        <input
+          type="checkbox"
+          checked={Boolean(value)}
+          onChange={(e) => setValue(e.target.checked)}
+        />
+        {field.label}
+        {field.required ? " *" : ""}
+      </label>
+    );
+  }
+
+  return (
+    <FieldShell key={field.key} field={field}>
+      <input
+        type={
+          ["number", "date", "email", "tel"].includes(field.type)
+            ? field.type
+            : "text"
+        }
+        value={value ?? ""}
+        placeholder={field.placeholder || ""}
+        onChange={(e) => setValue(e.target.value)}
+        className={inputClass}
+      />
+    </FieldShell>
+  );
+};
+
 /**
  * @param {object} props
  * @param {Array} props.steps
@@ -113,132 +219,36 @@ const ConfigurableFormFields = ({
   inputClass = DEFAULT_INPUT,
 }) => {
   const excluded = new Set(excludeKeys);
+  const ctx = { values, customValues, onChangeBuiltin, onChangeCustom, renderBuiltin, inputClass };
+
   const elements = [];
 
   (steps || []).forEach((step, stepIndex) => {
-    if (step?.title) {
-      elements.push(
-        <div
-          key={`step-title-${step.key || stepIndex}`}
-          className="col-span-full mt-3 first:mt-0 rounded-xl border border-slate-200 bg-slate-50/60 px-3 py-2 text-xs font-bold uppercase tracking-wider text-slate-700"
-        >
-          {step.title}
-        </div>,
-      );
-    }
+    const stepFields = (step?.fields || []).filter(
+      (field) => field && field.visible !== false && !excluded.has(field.key),
+    );
+    if (stepFields.length === 0 && !step?.title) return;
 
-    (step?.fields || [])
-      .filter((field) => field && field.visible !== false && !excluded.has(field.key))
-      .forEach((field) => {
-        if (typeof renderBuiltin[field.key] === "function") {
-          elements.push(
-            <div key={field.key} className="contents">
-              {renderBuiltin[field.key](field)}
-            </div>,
-          );
-          return;
-        }
+    const title = String(step?.title || "").replace(/^\d+\.\s*/, "").trim();
 
-        const isCustom = isCustomFieldKey(field.key);
-        const value = isCustom ? customValues?.[field.key] : values?.[field.key];
-        const setValue = (next) =>
-          isCustom
-            ? onChangeCustom?.(field.key, next)
-            : onChangeBuiltin?.(field.key, next);
-
-        if (field.type === "textarea") {
-          elements.push(
-            <FieldShell key={field.key} field={field} className="md:col-span-2">
-              <textarea
-                rows={3}
-                value={value ?? ""}
-                placeholder={field.placeholder || ""}
-                onChange={(e) => setValue(e.target.value)}
-                className={inputClass}
-              />
-            </FieldShell>,
-          );
-          return;
-        }
-
-        if (field.type === "select") {
-          elements.push(
-            <FieldShell key={field.key} field={field}>
-              <select
-                value={value ?? ""}
-                onChange={(e) => setValue(e.target.value)}
-                className={inputClass}
-              >
-                <option value="">Select</option>
-                {(field.options || []).map((option) => (
-                  <option key={option} value={option}>
-                    {option}
-                  </option>
-                ))}
-              </select>
-            </FieldShell>,
-          );
-          return;
-        }
-
-        if (field.type === "radio") {
-          elements.push(
-            <FieldShell key={field.key} field={field} className="md:col-span-2">
-              <div className="flex flex-wrap gap-4">
-                {(field.options || []).map((option) => (
-                  <label
-                    key={option}
-                    className="flex items-center gap-2 text-sm font-normal"
-                  >
-                    <input
-                      type="radio"
-                      name={`cfg-${field.key}`}
-                      checked={value === option}
-                      onChange={() => setValue(option)}
-                    />
-                    {option}
-                  </label>
-                ))}
-              </div>
-            </FieldShell>,
-          );
-          return;
-        }
-
-        if (field.type === "checkbox") {
-          elements.push(
-            <label
-              key={field.key}
-              className="flex items-center gap-2 rounded-xl border border-[rgb(var(--border))] px-3 py-2.5 text-sm font-medium md:col-span-2"
-            >
-              <input
-                type="checkbox"
-                checked={Boolean(value)}
-                onChange={(e) => setValue(e.target.checked)}
-              />
-              {field.label}
-              {field.required ? " *" : ""}
-            </label>,
-          );
-          return;
-        }
-
-        elements.push(
-          <FieldShell key={field.key} field={field}>
-            <input
-              type={
-                ["number", "date", "email", "tel"].includes(field.type)
-                  ? field.type
-                  : "text"
-              }
-              value={value ?? ""}
-              placeholder={field.placeholder || ""}
-              onChange={(e) => setValue(e.target.value)}
-              className={inputClass}
-            />
-          </FieldShell>,
-        );
-      });
+    elements.push(
+      <div
+        key={`section-${step.key || stepIndex}`}
+        className="col-span-full rounded-xl border border-slate-200 bg-slate-50/30 p-4"
+      >
+        {title ? (
+          <h4 className="mb-3 flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-slate-700">
+            <span className="flex h-5 w-5 items-center justify-center rounded-full bg-blue-100 text-[11px] text-blue-700">
+              {stepIndex + 1}
+            </span>
+            {title}
+          </h4>
+        ) : null}
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+          {stepFields.map((field) => renderField(field, ctx))}
+        </div>
+      </div>,
+    );
   });
 
   return elements;
