@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { Fragment, useEffect, useMemo, useState } from "react";
 import axios from "axios";
 import { toast } from "react-toastify";
 import { useNavigate } from "react-router-dom";
@@ -9,6 +9,7 @@ import {
   FaCheck,
   FaCommentDots,
   FaEdit,
+  FaEllipsisV,
   FaEnvelope,
   FaEye,
   FaPhone,
@@ -42,26 +43,49 @@ const leadStatusMeta = {
   active: {
     label: "Active",
     className: "bg-sky-100 text-sky-800 border-sky-200",
+    dot: "bg-sky-500",
     hint: "New enquiry",
   },
   processing: {
     label: "Processing",
     className: "bg-amber-100 text-amber-800 border-amber-200",
+    dot: "bg-amber-500",
     hint: "Follow-up or registration started",
   },
   admitted: {
     label: "Admitted",
     className: "bg-emerald-100 text-emerald-800 border-emerald-200",
+    dot: "bg-emerald-500",
     hint: "Student created",
   },
   cancelled: {
     label: "Cancelled",
     className: "bg-slate-200 text-slate-700 border-slate-300",
+    dot: "bg-slate-500",
     hint: "Closed without admission",
   },
 };
 
 const statusOf = (lead) => String(lead?.status || "active").toLowerCase();
+
+const formatLeadDate = (value) => {
+  if (!value) return "—";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "—";
+  return date.toLocaleDateString("en-IN", {
+    day: "2-digit",
+    month: "short",
+    year: "numeric",
+  });
+};
+
+const latestFollowUpOf = (lead) => {
+  const list = Array.isArray(lead?.followUps) ? lead.followUps : [];
+  if (!list.length) return null;
+  return [...list].sort(
+    (a, b) => new Date(b?.createdAt || 0) - new Date(a?.createdAt || 0),
+  )[0];
+};
 
 const getInitials = (name = "", fallback = "?") => {
   const parts = String(name || "")
@@ -130,6 +154,8 @@ const LeadManagement = () => {
   const [assigneeDrafts, setAssigneeDrafts] = useState({});
   const [feedbackSavingId, setFeedbackSavingId] = useState("");
   const [feedbackDrafts, setFeedbackDrafts] = useState({});
+  const [rowMenuId, setRowMenuId] = useState("");
+  const [commentLeadId, setCommentLeadId] = useState("");
   const [historyModal, setHistoryModal] = useState({
     open: false,
     leadId: "",
@@ -816,104 +842,158 @@ const LeadManagement = () => {
         </div>
       </div>
 
-      <div className="bg-[rgb(var(--surface))] border border-[rgb(var(--border))] rounded-2xl shadow-sm overflow-hidden">
-        <div className="px-5 py-4 border-b border-[rgb(var(--border))] flex flex-wrap items-center justify-between gap-2">
-          <h2 className="text-lg font-semibold text-[rgb(var(--text))]">Leads</h2>
-          <p className="text-xs text-[rgb(var(--text-muted))]">
-            Showing {filteredLeads.length}
-            {hasActiveFilters ? ` of ${leads.length}` : ""}
-          </p>
+      <div className="overflow-hidden rounded-2xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))] shadow-sm">
+        <div className="flex flex-wrap items-center justify-between gap-2 border-b border-[rgb(var(--border))] px-5 py-4">
+          <div>
+            <h2 className="text-lg font-semibold text-[rgb(var(--text))]">
+              Leads
+            </h2>
+            <p className="mt-0.5 text-xs text-[rgb(var(--text-muted))]">
+              Showing {filteredLeads.length}
+              {hasActiveFilters ? ` of ${leads.length}` : ""} · click a row to
+              view the full profile
+            </p>
+          </div>
+          <span className="rounded-full border border-[rgb(var(--border))] bg-[rgba(var(--bg),0.6)] px-2.5 py-0.5 text-[11px] font-semibold text-[rgb(var(--text-muted))]">
+            {filteredLeads.length} lead{filteredLeads.length === 1 ? "" : "s"}
+          </span>
         </div>
 
-        {loading ? (
-          <p className="px-5 py-10 text-center text-[rgb(var(--text-muted))]">Loading leads...</p>
-        ) : leads.length === 0 ? (
-          <p className="px-5 py-10 text-center text-[rgb(var(--text-muted))]">
-            {isStaffLogin
-              ? "No leads are assigned to your account yet."
-              : "No admission leads have been added yet."}
-          </p>
-        ) : filteredLeads.length === 0 ? (
-          <p className="px-5 py-10 text-center text-[rgb(var(--text-muted))]">
-            No leads match the selected filters.
-          </p>
-        ) : (
-          <div className="divide-y divide-[rgb(var(--border))]">
-            {filteredLeads.map((lead) => {
-              const currentStatus = statusOf(lead);
-              const meta = leadStatusMeta[currentStatus] || leadStatusMeta.active;
-              const isAdmitted =
-                Boolean(lead.studentId) || currentStatus === "admitted";
-              const isCancelled = currentStatus === "cancelled";
-              const canComment = !isAdmitted && !isCancelled;
-              const canCancel =
-                !isStaffLogin &&
-                !isAdmitted &&
-                !isCancelled;
-
-              const sourceFull =
-                lead.source === "website"
-                  ? "Website"
-                  : lead.createdByName || "Office";
-              const sourceInitials = getInitials(
-                sourceFull,
-                lead.source === "website" ? "WW" : "OF",
-              );
-              const assigneeFull = lead.assignedTo?.name
-                ? `${lead.assignedTo.name}${
-                    lead.assignedTo.roleLabel
-                      ? ` (${lead.assignedTo.roleLabel})`
-                      : ""
-                  }`
-                : "Unassigned";
-              const assigneeInitials = getInitials(
-                lead.assignedTo?.name || "",
-                "NA",
-              );
-
-              return (
-                <div key={lead._id} className="px-5 py-4">
-                  <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
-                    <div className="min-w-0 flex-1 space-y-2">
-                      <div className="flex flex-wrap items-center gap-2">
-                        <p className="truncate text-base font-semibold text-[rgb(var(--text))] sm:text-lg">
-                          {lead.studentName}
-                        </p>
-                        <span
-                          className={`inline-flex items-center rounded-full border px-2.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide ${meta.className}`}
-                          title={meta.hint}
-                        >
-                          {meta.label}
-                        </span>
-                        {isAdmitted ? (
-                          <span className="rounded-full bg-emerald-50 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-emerald-700">
-                            Student linked
-                          </span>
-                        ) : null}
+        <div className="overflow-x-auto">
+          <table className="w-full border-collapse text-left">
+            <thead className="border-b border-[rgb(var(--border))] bg-[rgba(var(--bg),0.6)] text-[11px] font-semibold uppercase tracking-wider text-[rgb(var(--text-muted))]">
+              <tr>
+                <th className="px-4 py-2.5">Student</th>
+                <th className="px-3 py-2.5">Parent / Contact</th>
+                <th className="px-3 py-2.5">Class</th>
+                <th className="px-3 py-2.5">Source</th>
+                <th className="px-3 py-2.5">Assignee</th>
+                <th className="px-3 py-2.5">Status</th>
+                <th className="px-3 py-2.5">Last follow-up</th>
+                <th className="py-2.5 pl-3 pr-4 text-right">Action</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-[rgb(var(--border))] text-[13px]">
+              {loading ? (
+                <tr>
+                  <td
+                    colSpan={8}
+                    className="px-4 py-12 text-center text-sm text-[rgb(var(--text-muted))]"
+                  >
+                    Loading leads...
+                  </td>
+                </tr>
+              ) : leads.length === 0 ? (
+                <tr>
+                  <td
+                    colSpan={8}
+                    className="px-4 py-12 text-center text-sm text-[rgb(var(--text-muted))]"
+                  >
+                    {isStaffLogin
+                      ? "No leads are assigned to your account yet."
+                      : "No admission leads have been added yet."}
+                  </td>
+                </tr>
+              ) : filteredLeads.length === 0 ? (
+                <tr>
+                  <td
+                    colSpan={8}
+                    className="px-4 py-12 text-center"
+                  >
+                    <div className="mx-auto max-w-xs">
+                      <div className="mx-auto mb-2.5 flex h-10 w-10 items-center justify-center rounded-full bg-[rgba(var(--bg),0.7)] text-[rgb(var(--text-muted))]">
+                        <FaEye size={16} />
                       </div>
+                      <p className="text-sm font-semibold text-[rgb(var(--text))]">
+                        No matching leads
+                      </p>
+                      <p className="mt-1 text-xs text-[rgb(var(--text-muted))]">
+                        Try adjusting your search or filter criteria.
+                      </p>
+                    </div>
+                  </td>
+                </tr>
+              ) : (
+                filteredLeads.map((lead) => {
+                  const currentStatus = statusOf(lead);
+                  const meta =
+                    leadStatusMeta[currentStatus] || leadStatusMeta.active;
+                  const isAdmitted =
+                    Boolean(lead.studentId) || currentStatus === "admitted";
+                  const isCancelled = currentStatus === "cancelled";
+                  const canComment = !isAdmitted && !isCancelled;
+                  const canCancel =
+                    !isStaffLogin && !isAdmitted && !isCancelled;
+                  const latest = latestFollowUpOf(lead);
+                  const followUpCount = lead.followUps?.length || 0;
 
-                      <div className="flex flex-wrap items-center gap-x-4 gap-y-2 text-sm text-[rgb(var(--text-muted))]">
-                        <span>
-                          <span className="font-medium text-[rgb(var(--text))]">
-                            Parent:
-                          </span>{" "}
-                          {lead.parentName || "—"}
-                        </span>
-                        <span className="inline-flex items-center gap-1.5">
-                          <span className="font-medium text-[rgb(var(--text))]">
-                            Source:
-                          </span>
-                          <span
-                            title={sourceFull}
-                            className="inline-flex h-7 min-w-7 items-center justify-center rounded-full bg-[rgb(var(--surface))] border border-[rgb(var(--border))] px-1.5 text-[10px] font-bold tracking-wide text-[rgb(var(--text))]"
-                          >
-                            {sourceInitials}
-                          </span>
-                        </span>
-                        <span className="inline-flex items-center gap-1.5">
-                          <span className="font-medium text-[rgb(var(--text))]">
-                            Assign:
-                          </span>
+                  const sourceFull =
+                    lead.source === "website"
+                      ? "Website"
+                      : lead.createdByName || "Office";
+                  const sourceInitials = getInitials(
+                    sourceFull,
+                    lead.source === "website" ? "WW" : "OF",
+                  );
+                  const assigneeFull = lead.assignedTo?.name
+                    ? `${lead.assignedTo.name}${
+                        lead.assignedTo.roleLabel
+                          ? ` (${lead.assignedTo.roleLabel})`
+                          : ""
+                      }`
+                    : "Unassigned";
+                  const assigneeInitials = getInitials(
+                    lead.assignedTo?.name || "",
+                    "NA",
+                  );
+
+                  return (
+                    <Fragment key={lead._id}>
+                      <tr
+                        onClick={() => openViewModal(lead)}
+                        className="cursor-pointer transition hover:bg-[rgba(var(--primary),0.04)]"
+                      >
+                        <td className="px-4 py-3 align-middle">
+                          <div className="font-semibold leading-snug text-[rgb(var(--text))]">
+                            {lead.studentName}
+                          </div>
+                          <div className="mt-0.5 text-[11px] text-[rgb(var(--text-muted))]">
+                            {formatLeadDate(lead.createdAt)}
+                          </div>
+                        </td>
+                        <td className="px-3 py-3 align-middle">
+                          <div className="font-medium text-[rgb(var(--text))]">
+                            {lead.parentName || "—"}
+                          </div>
+                          <div className="mt-0.5 inline-flex items-center gap-1 text-[11px] text-[rgb(var(--text-muted))]">
+                            <FaPhone size={9} />
+                            {lead.parentMobile || "—"}
+                          </div>
+                        </td>
+                        <td className="px-3 py-3 align-middle">
+                          <div className="font-medium text-[rgb(var(--text))]">
+                            {[lead.className, lead.stream]
+                              .filter(Boolean)
+                              .join(" · ") || "—"}
+                          </div>
+                        </td>
+                        <td className="px-3 py-3 align-middle">
+                          <div className="inline-flex items-center gap-1.5">
+                            <span
+                              title={sourceFull}
+                              className="inline-flex h-6 min-w-6 items-center justify-center rounded-full border border-[rgb(var(--border))] bg-[rgba(var(--bg),0.7)] px-1.5 text-[10px] font-bold tracking-wide text-[rgb(var(--text))]"
+                            >
+                              {sourceInitials}
+                            </span>
+                            <span className="max-w-[110px] truncate text-xs text-[rgb(var(--text-muted))]">
+                              {sourceFull}
+                            </span>
+                          </div>
+                        </td>
+                        <td
+                          className="px-3 py-3 align-middle"
+                          onClick={(event) => event.stopPropagation()}
+                        >
                           {!isStaffLogin &&
                           editingAssigneeLeadId === lead._id ? (
                             <span className="inline-flex flex-wrap items-center gap-1.5">
@@ -925,7 +1005,7 @@ const LeadManagement = () => {
                                     event.target.value,
                                   )
                                 }
-                                className="max-w-[160px] rounded-lg border border-[rgb(var(--border))] bg-[rgb(var(--bg))] px-2 py-1 text-xs text-[rgb(var(--text))]"
+                                className="max-w-[150px] rounded-lg border border-[rgb(var(--border))] bg-[rgb(var(--bg))] px-2 py-1 text-xs text-[rgb(var(--text))]"
                               >
                                 <option value="">Select</option>
                                 {assigneeOptions.map((option) => (
@@ -937,21 +1017,23 @@ const LeadManagement = () => {
                                   </option>
                                 ))}
                               </select>
-                              <IconAction
+                              <button
+                                type="button"
                                 title="Save assignee"
                                 onClick={() => handleSaveAssignee(lead._id)}
                                 disabled={assigneeUpdatingId === lead._id}
-                                className="border-transparent bg-[rgb(var(--primary))] text-white"
+                                className="rounded-md border border-transparent bg-[rgb(var(--primary))] p-1 text-white transition hover:opacity-90 disabled:opacity-50"
                               >
-                                <FaCheck size={11} />
-                              </IconAction>
-                              <IconAction
+                                <FaCheck size={10} />
+                              </button>
+                              <button
+                                type="button"
                                 title="Cancel"
                                 onClick={() => setEditingAssigneeLeadId("")}
-                                className="border-[rgb(var(--border))] bg-[rgb(var(--surface))] text-[rgb(var(--text-muted))]"
+                                className="rounded-md border border-[rgb(var(--border))] bg-[rgb(var(--surface))] p-1 text-[rgb(var(--text-muted))] transition hover:bg-[rgb(var(--bg))]"
                               >
-                                <FaTimes size={11} />
-                              </IconAction>
+                                <FaTimes size={10} />
+                              </button>
                             </span>
                           ) : (
                             <button
@@ -963,159 +1045,272 @@ const LeadManagement = () => {
                                   ? undefined
                                   : () => handleStartAssigneeEdit(lead)
                               }
-                              className={`inline-flex h-7 min-w-7 items-center justify-center rounded-full border px-1.5 text-[10px] font-bold tracking-wide ${
+                              className={`inline-flex max-w-full items-center gap-1.5 rounded-full border px-1.5 py-0.5 text-left transition ${
                                 lead.assignedTo?.name
                                   ? "border-[rgba(var(--primary),0.35)] bg-[rgba(var(--primary),0.08)] text-[rgb(var(--primary))]"
                                   : "border-[rgb(var(--border))] bg-[rgb(var(--surface))] text-[rgb(var(--text-muted))]"
-                              } ${isStaffLogin ? "cursor-default" : "hover:opacity-90"}`}
+                              } ${
+                                isStaffLogin
+                                  ? "cursor-default"
+                                  : "hover:opacity-90"
+                              }`}
                             >
-                              {assigneeInitials}
+                              <span className="inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-[rgba(var(--primary),0.12)] px-0.5 text-[9px] font-bold">
+                                {assigneeInitials}
+                              </span>
+                              <span className="max-w-[110px] truncate text-[11px] font-medium">
+                                {lead.assignedTo?.name || "Unassigned"}
+                              </span>
                             </button>
                           )}
-                        </span>
-                        <span>
-                          <span className="font-medium text-[rgb(var(--text))]">
-                            Class:
-                          </span>{" "}
-                          {[lead.className, lead.stream]
-                            .filter(Boolean)
-                            .join(" · ") || "—"}
-                        </span>
-                        <span className="inline-flex items-center gap-1">
-                          <FaPhone size={11} /> {lead.parentMobile || "—"}
-                        </span>
-                        {lead.parentEmail ? (
+                        </td>
+                        <td className="px-3 py-3 align-middle">
                           <span
-                            className="inline-flex items-center gap-1"
-                            title={lead.parentEmail}
+                            className={`inline-flex items-center gap-1.5 whitespace-nowrap rounded-full border px-2 py-0.5 text-[11px] font-semibold ${meta.className}`}
+                            title={meta.hint}
                           >
-                            <FaEnvelope size={11} />
+                            <span
+                              className={`h-1.5 w-1.5 rounded-full ${meta.dot}`}
+                            />
+                            {meta.label}
                           </span>
-                        ) : null}
-                      </div>
-                    </div>
-
-                    <div className="flex shrink-0 flex-wrap items-center gap-1.5">
-                      {isAdmitted ? (
-                        <IconAction
-                          title="View student"
-                          onClick={() =>
-                            lead.studentId
-                              ? navigate(
-                                  `${basePath}/student-view/${lead.studentId}`,
+                        </td>
+                        <td className="px-3 py-3 align-middle">
+                          {latest ? (
+                            <>
+                              <div className="text-xs font-medium text-[rgb(var(--text))]">
+                                {formatLeadDate(latest.createdAt)}
+                              </div>
+                              <div className="mt-0.5 max-w-[180px] truncate text-[11px] text-[rgb(var(--text-muted))]">
+                                {latest.comment || "—"}
+                              </div>
+                            </>
+                          ) : (
+                            <span className="text-xs text-[rgb(var(--text-muted))]">
+                              No follow-up yet
+                            </span>
+                          )}
+                        </td>
+                        <td
+                          className="relative py-3 pl-3 pr-4 text-right align-middle"
+                          onClick={(event) => event.stopPropagation()}
+                        >
+                          <div className="inline-flex items-center justify-end gap-1.5">
+                            {isAdmitted ? (
+                              <button
+                                type="button"
+                                onClick={() =>
+                                  lead.studentId
+                                    ? navigate(
+                                        `${basePath}/student-view/${lead.studentId}`,
+                                      )
+                                    : toast.info(
+                                        "Student linked — open from Students list",
+                                      )
+                                }
+                                className="rounded-md bg-emerald-50 px-2.5 py-1 text-xs font-semibold text-emerald-700 transition hover:bg-emerald-100"
+                              >
+                                View
+                              </button>
+                            ) : isCancelled ? (
+                              <button
+                                type="button"
+                                onClick={() => openViewModal(lead)}
+                                className="rounded-md bg-[rgba(var(--bg),0.8)] px-2.5 py-1 text-xs font-semibold text-[rgb(var(--text-muted))] transition hover:bg-[rgba(var(--bg),1)]"
+                              >
+                                View
+                              </button>
+                            ) : (
+                              <button
+                                type="button"
+                                onClick={() => handleStartRegistration(lead)}
+                                className="rounded-md bg-[rgb(var(--primary))] px-2.5 py-1 text-xs font-semibold text-white transition hover:opacity-90"
+                              >
+                                {lead.registrationId ? "Registration" : "Register"}
+                              </button>
+                            )}
+                            <button
+                              type="button"
+                              onClick={() =>
+                                setRowMenuId((prev) =>
+                                  prev === lead._id ? "" : lead._id,
                                 )
-                              : toast.info(
-                                  "Student linked — open from Students list",
-                                )
-                          }
-                          className="border-emerald-200 bg-emerald-50 text-emerald-700 hover:bg-emerald-100"
-                        >
-                          <FaUserGraduate size={13} />
-                        </IconAction>
-                      ) : !isCancelled ? (
-                        <IconAction
-                          title={
-                            lead.registrationId
-                              ? "Open registration"
-                              : "Register / Admit"
-                          }
-                          onClick={() => handleStartRegistration(lead)}
-                          className="border-transparent bg-[rgb(var(--primary))] text-white hover:opacity-90"
-                        >
-                          <FaUserPlus size={13} />
-                        </IconAction>
+                              }
+                              className="rounded-md p-1 text-[rgb(var(--text-muted))] transition hover:bg-[rgba(var(--bg),0.8)] hover:text-[rgb(var(--text))]"
+                              title="Row actions"
+                              aria-label={`More actions for ${lead.studentName}`}
+                            >
+                              <FaEllipsisV size={13} />
+                            </button>
+                          </div>
+
+                          {rowMenuId === lead._id ? (
+                            <div className="absolute right-4 top-11 z-40 w-48 rounded-xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))] py-1 text-left text-xs shadow-xl">
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setRowMenuId("");
+                                  openViewModal(lead);
+                                }}
+                                className="flex w-full items-center gap-2 px-3 py-2 font-medium text-[rgb(var(--text))] hover:bg-[rgba(var(--bg),0.7)]"
+                              >
+                                <FaEye
+                                  size={12}
+                                  className="text-[rgb(var(--text-muted))]"
+                                />
+                                View lead
+                              </button>
+                              {canComment ? (
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    setRowMenuId("");
+                                    setCommentLeadId((prev) =>
+                                      prev === lead._id ? "" : lead._id,
+                                    );
+                                  }}
+                                  className="flex w-full items-center gap-2 px-3 py-2 font-medium text-[rgb(var(--text))] hover:bg-[rgba(var(--bg),0.7)]"
+                                >
+                                  <FaCommentDots
+                                    size={12}
+                                    className="text-[rgb(var(--text-muted))]"
+                                  />
+                                  {followUpCount
+                                    ? `Add comment (${followUpCount})`
+                                    : "Add comment"}
+                                </button>
+                              ) : null}
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setRowMenuId("");
+                                  handleOpenHistory(lead);
+                                }}
+                                className="flex w-full items-center gap-2 px-3 py-2 font-medium text-[rgb(var(--text))] hover:bg-[rgba(var(--bg),0.7)]"
+                              >
+                                <FaCommentDots
+                                  size={12}
+                                  className="text-[rgb(var(--text-muted))]"
+                                />
+                                Comment history
+                              </button>
+                              {!isStaffLogin &&
+                              !isAdmitted &&
+                              !isCancelled &&
+                              currentStatus !== "processing" ? (
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    setRowMenuId("");
+                                    openEditModal(lead);
+                                  }}
+                                  className="flex w-full items-center gap-2 px-3 py-2 font-medium text-[rgb(var(--text))] hover:bg-[rgba(var(--bg),0.7)]"
+                                >
+                                  <FaEdit
+                                    size={12}
+                                    className="text-[rgb(var(--text-muted))]"
+                                  />
+                                  Edit lead
+                                </button>
+                              ) : null}
+                              {canCancel ? (
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    setRowMenuId("");
+                                    handleCancelLead(lead);
+                                  }}
+                                  disabled={statusUpdatingId === lead._id}
+                                  className="flex w-full items-center gap-2 px-3 py-2 font-medium text-amber-700 hover:bg-amber-50 disabled:opacity-60"
+                                >
+                                  <FaBan size={12} />
+                                  Cancel lead
+                                </button>
+                              ) : null}
+                            </div>
+                          ) : null}
+                        </td>
+                      </tr>
+
+                      {commentLeadId === lead._id && canComment ? (
+                        <tr className="bg-[rgba(var(--bg),0.55)]">
+                          <td colSpan={8} className="px-4 py-3">
+                            <div className="rounded-xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))] p-3">
+                              <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
+                                <div>
+                                  <p className="text-xs font-semibold uppercase tracking-wide text-[rgb(var(--text-muted))]">
+                                    Add comment
+                                  </p>
+                                  <p className="text-[11px] text-[rgb(var(--text-muted))]">
+                                    {currentStatus === "active"
+                                      ? "Saving a comment moves this lead to Processing."
+                                      : "Log follow-up notes for this lead."}
+                                  </p>
+                                </div>
+                                <div className="flex items-center gap-2">
+                                  <p className="text-[11px] text-[rgb(var(--text-muted))]">
+                                    {followUpCount} follow-up
+                                    {followUpCount === 1 ? "" : "s"}
+                                  </p>
+                                  <button
+                                    type="button"
+                                    onClick={() => setCommentLeadId("")}
+                                    className="rounded p-1 text-[rgb(var(--text-muted))] transition hover:bg-[rgba(var(--bg),0.8)]"
+                                    aria-label="Close comment box"
+                                  >
+                                    <FaTimes size={11} />
+                                  </button>
+                                </div>
+                              </div>
+                              <div className="flex flex-col gap-2 sm:flex-row">
+                                <textarea
+                                  value={feedbackDrafts[lead._id] || ""}
+                                  onChange={(event) =>
+                                    handleFeedbackInputChange(
+                                      lead._id,
+                                      event.target.value,
+                                    )
+                                  }
+                                  placeholder="Write follow-up comment…"
+                                  rows={2}
+                                  className="w-full resize-none rounded-xl border border-[rgb(var(--border))] bg-[rgb(var(--bg))] px-3 py-2 text-sm text-[rgb(var(--text))]"
+                                />
+                                <button
+                                  type="button"
+                                  onClick={() => handleAddFeedback(lead._id)}
+                                  disabled={feedbackSavingId === lead._id}
+                                  className="inline-flex shrink-0 items-center justify-center gap-2 rounded-xl bg-[rgb(var(--primary))] px-4 py-2 text-sm font-medium text-white disabled:opacity-60"
+                                >
+                                  <FaCommentDots size={12} />
+                                  {feedbackSavingId === lead._id
+                                    ? "Saving…"
+                                    : "Save"}
+                                </button>
+                              </div>
+                            </div>
+                          </td>
+                        </tr>
                       ) : null}
+                    </Fragment>
+                  );
+                })
+              )}
+            </tbody>
+          </table>
+        </div>
 
-                      <IconAction
-                        title="View lead"
-                        onClick={() => openViewModal(lead)}
-                        className="border-[rgb(var(--border))] bg-[rgb(var(--surface))] text-[rgb(var(--text))] hover:bg-[rgb(var(--bg))]"
-                      >
-                        <FaEye size={13} />
-                      </IconAction>
-
-                      <IconAction
-                        title="Comment history"
-                        onClick={() => handleOpenHistory(lead)}
-                        className="border-[rgb(var(--border))] bg-[rgb(var(--surface))] text-[rgb(var(--text))] hover:bg-[rgb(var(--bg))]"
-                      >
-                        <FaCommentDots size={13} />
-                      </IconAction>
-
-                      {!isStaffLogin &&
-                      !isAdmitted &&
-                      !isCancelled &&
-                      currentStatus !== "processing" ? (
-                        <IconAction
-                          title="Edit lead"
-                          onClick={() => openEditModal(lead)}
-                          className="border-[rgb(var(--border))] bg-[rgb(var(--surface))] text-[rgb(var(--text))] hover:bg-[rgb(var(--bg))]"
-                        >
-                          <FaEdit size={13} />
-                        </IconAction>
-                      ) : null}
-
-                      {canCancel ? (
-                        <IconAction
-                          title="Cancel lead"
-                          onClick={() => handleCancelLead(lead)}
-                          disabled={statusUpdatingId === lead._id}
-                          className="border-amber-200 bg-amber-50 text-amber-700 hover:bg-amber-100"
-                        >
-                          <FaBan size={13} />
-                        </IconAction>
-                      ) : null}
-                    </div>
-                  </div>
-
-                  {canComment ? (
-                    <div className="mt-4 rounded-xl border border-[rgb(var(--border))] bg-[rgb(var(--bg))] p-3">
-                      <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
-                        <div>
-                          <p className="text-xs font-semibold uppercase tracking-wide text-[rgb(var(--text-muted))]">
-                            Add comment
-                          </p>
-                          <p className="text-[11px] text-[rgb(var(--text-muted))]">
-                            {currentStatus === "active"
-                              ? "Saving a comment moves this lead to Processing."
-                              : "Log follow-up notes for this lead."}
-                          </p>
-                        </div>
-                        <p className="text-[11px] text-[rgb(var(--text-muted))]">
-                          {lead.followUps?.length || 0} follow-up
-                          {(lead.followUps?.length || 0) === 1 ? "" : "s"}
-                        </p>
-                      </div>
-                      <div className="flex flex-col gap-2 sm:flex-row">
-                        <textarea
-                          value={feedbackDrafts[lead._id] || ""}
-                          onChange={(event) =>
-                            handleFeedbackInputChange(
-                              lead._id,
-                              event.target.value,
-                            )
-                          }
-                          placeholder="Write follow-up comment…"
-                          rows={2}
-                          className="w-full resize-none rounded-xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))] px-3 py-2 text-sm"
-                        />
-                        <button
-                          type="button"
-                          onClick={() => handleAddFeedback(lead._id)}
-                          disabled={feedbackSavingId === lead._id}
-                          className="inline-flex shrink-0 items-center justify-center gap-2 rounded-xl bg-[rgb(var(--primary))] px-4 py-2 text-sm font-medium text-white disabled:opacity-60"
-                        >
-                          <FaCommentDots size={12} />
-                          {feedbackSavingId === lead._id ? "Saving…" : "Save"}
-                        </button>
-                      </div>
-                    </div>
-                  ) : null}
-                </div>
-              );
-            })}
-          </div>
-        )}
+        <div className="flex flex-wrap items-center justify-between gap-2 border-t border-[rgb(var(--border))] bg-[rgba(var(--bg),0.5)] px-4 py-2.5 text-xs text-[rgb(var(--text-muted))]">
+          <span>
+            Showing{" "}
+            <span className="font-semibold text-[rgb(var(--text))]">
+              {filteredLeads.length}
+            </span>
+            {hasActiveFilters ? ` of ${leads.length}` : ""} leads
+          </span>
+          <span className="hidden sm:inline">
+            Click any row to open the full lead profile
+          </span>
+        </div>
       </div>
 
       {!isStaffLogin && showModal && (
