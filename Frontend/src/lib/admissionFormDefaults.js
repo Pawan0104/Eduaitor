@@ -1,3 +1,5 @@
+import { INDIA_STATES } from "./indiaLocations";
+
 /**
  * Built-in admission wizard layout.
  *
@@ -88,7 +90,7 @@ export const ADMISSION_STEPS = [
       f("lastName", "Last Name", "text", true),
       f("dob", "Date of Birth", "date", true),
       f("gender", "Gender", "select", true, {
-        options: ["Male", "Female"],
+        options: ["Male", "Female", "Other"],
       }),
       f("bloodGroup", "Blood Group", "text", false),
       f("nationality", "Nationality", "text", false, {
@@ -99,6 +101,12 @@ export const ADMISSION_STEPS = [
       f("category", "Category", "select", true, {
         options: CATEGORY_OPTIONS,
       }),
+      f("religion", "Religion", "select", false, {
+        options: ["Hindu", "Jain", "Sikh", "Muslim", "Christian", "Buddhism"],
+      }),
+      f("nicNumber", "NIC Number", "text", false),
+      f("srNo", "SR. No.", "text", false),
+      f("apaarId", "APAAR ID", "text", false),
       f("community", "Community", "select", false, {
         options: COMMUNITY_OPTIONS,
         help: "Only shown when Category is Minority.",
@@ -145,7 +153,21 @@ export const ADMISSION_STEPS = [
       f("guardianRelation", "Guardian Relation", "select", false, {
         options: GUARDIAN_RELATION_OPTIONS,
       }),
-      f("address", "Address", "textarea", true),
+      f("guardianEmail", "Guardian Email", "email", false),
+    ],
+  },
+  {
+    key: "builtin_address",
+    title: "Residential Address",
+    builtin: true,
+    fields: [
+      f("address", "Address Line", "textarea", true),
+      f("city", "City / Town / Tehsil", "text", false),
+      f("district", "District", "text", false),
+      f("state", "State", "select", false, {
+        options: INDIA_STATES,
+      }),
+      f("pincode", "PIN Code", "text", false),
     ],
   },
   {
@@ -154,11 +176,14 @@ export const ADMISSION_STEPS = [
     builtin: true,
     fields: [
       f("previousSchoolName", "Previous School Name", "text", false),
+      f("previousSchoolUdise", "Previous School UDISE Code", "text", false),
       f("previousSchoolClass", "Last Class Attended", "text", false),
       f("previousSchoolResult", "Last Result", "text", false),
       f("previousSchoolTcNumber", "TC Number", "text", false, {
         placeholder: "Transfer Certificate number",
       }),
+      f("schoolLeavingDate", "School Leaving Date", "date", false),
+      f("prevSchoolAddress", "Previous School Address", "text", false),
     ],
   },
   {

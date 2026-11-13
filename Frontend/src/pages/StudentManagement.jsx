@@ -152,6 +152,10 @@ const emptyForm = {
   bloodGroup: "",
   nationality: "",
   placeOfBirth: "",
+  religion: "",
+  nicNumber: "",
+  srNo: "",
+  apaarId: "",
   caste: "",
   category: "",
   community: "",
@@ -178,13 +182,21 @@ const emptyForm = {
   guardianName: "",
   guardianMobile: "",
   guardianRelation: "",
+  guardianEmail: "",
 
   address: "",
+  city: "",
+  district: "",
+  state: "",
+  pincode: "",
 
   previousSchoolName: "",
+  previousSchoolUdise: "",
   previousSchoolClass: "",
   previousSchoolResult: "",
   previousSchoolTcNumber: "",
+  schoolLeavingDate: "",
+  prevSchoolAddress: "",
 
   classId: "",
   sectionId: "",
@@ -342,6 +354,8 @@ const collectFunnelFields = (lead, registration) => {
     );
     pushSourceField(items, "address", "Address", registration.address, "textarea");
     pushSourceField(items, "city", "City", registration.city);
+    pushSourceField(items, "district", "District", registration.district);
+    pushSourceField(items, "state", "State", registration.state);
     pushSourceField(items, "pincode", "Pincode", registration.pincode);
     pushSourceField(
       items,
@@ -1230,6 +1244,10 @@ const StudentManagement = () => {
           .join(", ") ||
         mapped.formPatch.address ||
         prev.address,
+      city: registration?.city || mapped.formPatch.city || prev.city,
+      district: registration?.district || mapped.formPatch.district || prev.district,
+      state: registration?.state || mapped.formPatch.state || prev.state,
+      pincode: registration?.pincode || mapped.formPatch.pincode || prev.pincode,
       previousSchoolName:
         registration?.previousSchoolName ||
         lead?.previousSchoolName ||

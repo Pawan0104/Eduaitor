@@ -79,6 +79,18 @@ const studentSchema = new mongoose.Schema(
     guardianName: String,
     guardianMobile: String,
     guardianRelation: String,
+    guardianEmail: { type: String, default: "" },
+
+    religion: { type: String, default: "" },
+    nicNumber: { type: String, default: "" },
+    srNo: { type: String, default: "" },
+    apaarId: { type: String, default: "" },
+    relative: { type: String, default: "" },
+
+    city: { type: String, default: "" },
+    district: { type: String, default: "" },
+    state: { type: String, default: "" },
+    pincode: { type: String, default: "" },
 
     address: String,
 
@@ -86,6 +98,9 @@ const studentSchema = new mongoose.Schema(
     previousSchoolClass: String,
     previousSchoolResult: String,
     previousSchoolTcNumber: { type: String, default: "" },
+    previousSchoolUdise: { type: String, default: "" },
+    schoolLeavingDate: Date,
+    prevSchoolAddress: { type: String, default: "" },
 
     classId: {
       type: mongoose.Schema.Types.ObjectId,
