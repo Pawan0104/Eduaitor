@@ -77,7 +77,6 @@ const registrationSchema = new mongoose.Schema(
     parentName: { type: String, required: true, trim: true },
     parentMobile: { type: String, required: true, trim: true },
     parentEmail: { type: String, default: "", trim: true },
-    occupation: { type: String, default: "" },
     alternateMobile: { type: String, default: "" },
     address: { type: String, default: "" },
     city: { type: String, default: "" },

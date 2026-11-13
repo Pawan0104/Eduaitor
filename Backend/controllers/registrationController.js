@@ -473,7 +473,6 @@ export const createRegistration = async (req, res) => {
       parentName,
       parentMobile,
       parentEmail: sanitize(body.parentEmail, 160),
-      occupation: sanitize(body.occupation, 120),
       alternateMobile: sanitize(body.alternateMobile, 20),
       address: sanitize(body.address, 400),
       city: sanitize(body.city, 80),
@@ -632,9 +631,6 @@ export const updateRegistration = async (req, res) => {
     }
     if (body.motherName !== undefined) {
       registration.motherName = sanitize(body.motherName, 160);
-    }
-    if (body.occupation !== undefined) {
-      registration.occupation = sanitize(body.occupation, 120);
     }
     if (body.alternateMobile !== undefined) {
       registration.alternateMobile = sanitize(body.alternateMobile, 20);

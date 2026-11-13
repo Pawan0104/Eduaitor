@@ -57,7 +57,6 @@ export const REGISTRATION_STEPS = [
         placeholder: "10-digit mobile number",
       }),
       f("parentEmail", "Parent Email", "email", false),
-      f("occupation", "Occupation", "text", false),
       f("alternateMobile", "Alternate Mobile", "tel", false),
       f("address", "Address", "textarea", false),
       f("city", "City / Town / Tehsil", "text", false),
