@@ -105,6 +105,18 @@ button:disabled,
   focus:border-[rgb(var(--primary))];
 }
 
+/* ---------- ERP-WIDE FORM CONTROL NORMALIZATION ---------- */
+/* Keep every text-like form control on one font size and padding so all
+   ERP forms (Student, Lead, Registration, ...) look identical. */
+input:not([type="checkbox"]):not([type="radio"]):not([type="file"]):not([type="range"]):not([type="color"]):not([type="hidden"]),
+select,
+textarea {
+  font-size: 0.875rem !important;
+  line-height: 1.25rem !important;
+  padding: 0.625rem 0.75rem !important;
+  border-radius: 0.75rem !important;
+}
+
 /* ---------- SCROLLBAR ---------- */
 
 ::-webkit-scrollbar {
