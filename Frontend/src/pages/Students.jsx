@@ -523,25 +523,25 @@ const Students = () => {
 
         {!loading && students.length > 0 && (
           <div className="overflow-x-auto">
-            <table className="w-full min-w-175 text-sm">
-              <thead className="bg-[rgb(var(--surface))] ">
+            <table className="w-full border-collapse text-left">
+              <thead className="border-b border-slate-200 bg-slate-50/90 text-[11px] font-semibold uppercase tracking-wider text-slate-500">
                 <tr>
-                  <th className="p-3 text-left">Admission No</th>
-                  <th className="p-3 text-left">Name</th>
-                  <th className="p-3 text-left">Class</th>
-                  <th className="p-3 text-left">Father</th>
-                  <th className="p-3 text-left">Mobile</th>
-                  <th className="p-3 text-center">Action</th>
+                  <th className="px-4 py-2.5">Admission No</th>
+                  <th className="px-3 py-2.5">Name</th>
+                  <th className="px-3 py-2.5">Class</th>
+                  <th className="px-3 py-2.5">Father</th>
+                  <th className="px-3 py-2.5">Mobile</th>
+                  <th className="py-2.5 pl-3 pr-4 text-right">Action</th>
                 </tr>
               </thead>
 
-              <tbody>
+              <tbody className="divide-y divide-slate-100 text-[13px]">
                 {filteredStudents.map((student) => (
-                  <tr key={student._id} className="border-t hover:bg-[rgb(var(--bg-hover))]">
-                    <td className="p-3 font-mono text-xs font-semibold">
+                  <tr key={student._id} className="transition hover:bg-slate-50/70">
+                    <td className="px-4 py-3 font-mono text-xs font-semibold">
                       {student.studentId || "—"}
                     </td>
-                    <td className="p-3 font-medium">
+                    <td className="px-3 py-3 font-medium">
                       <div className="flex items-center gap-2.5 min-w-0">
                         <UserAvatar
                           name={`${student.firstName || ""} ${student.lastName || ""}`}
@@ -559,13 +559,13 @@ const Students = () => {
                       </div>
                     </td>
 
-                    <td className="p-3">{student.classId?.name || "-"}</td>
+                    <td className="px-3 py-3">{student.classId?.name || "-"}</td>
 
-                    <td className="p-3">{student.fatherName}</td>
+                    <td className="px-3 py-3">{student.fatherName}</td>
 
-                    <td className="p-3">{student.fatherMobile}</td>
+                    <td className="px-3 py-3">{student.fatherMobile}</td>
 
-                    <td className="p-3">
+                    <td className="px-3 py-3">
                       <div className="flex justify-center gap-3">
                   <MessageButton 
                           targetId={student._id} 
@@ -642,8 +642,8 @@ const Students = () => {
         />
       </div>
       {confirmOpen && (
-        <div className="fixed inset-0 flex items-center justify-center p-4 z-50 border-bg-[rgb(var(--border-strong))]">
-          <div className="bg-[rgb(var(--surface))] rounded-xl p-6 w-full max-w-md">
+        <div className="fixed inset-0 flex items-center justify-center p-4 z-50 border-bg-[rgb(var(--border-strong))] overflow-y-auto">
+          <div className="bg-[rgb(var(--surface))] rounded-xl p-6 w-full max-w-md my-auto max-h-[min(92vh,880px)] overflow-y-auto">
             <h3 className="text-lg font-semibold mb-2">Confirmation</h3>
 
             <p className="text-[rgb(var(--text))] mb-6">{confirmMessage}</p>
