@@ -701,7 +701,6 @@ const Registrations = () => {
         category: registration.category || "",
         motherName: registration.motherName || "",
         classId: registration.classId || "",
-        sectionId: registration.sectionId || "",
         streamId: registration.streamId ? String(registration.streamId) : "",
         parentName: registration.parentName || "",
         parentMobile: registration.parentMobile || "",

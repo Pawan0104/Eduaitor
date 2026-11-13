@@ -80,7 +80,6 @@ export const REGISTRATION_STEPS = [
     removedFieldKeys: [],
     fields: [
       f("classId", "Class Applied", "select", true),
-      f("sectionId", "Section", "select", false),
       f("streamId", "Stream", "select", false),
       f("previousSchoolName", "Previous School / Institution", "text", false),
     ],
