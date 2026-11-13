@@ -15,6 +15,7 @@ import ConfigurableFormFields, {
   validateConfigurableFields,
 } from "../components/ConfigurableFormFields";
 import { mergeRegistrationSteps } from "../lib/registrationFormDefaults";
+import { INDIA_STATES, districtsForState } from "../lib/indiaLocations";
 
 const emptyForm = () => ({
   studentName: "",
@@ -29,6 +30,8 @@ const emptyForm = () => ({
   parentEmail: "",
   address: "",
   city: "",
+  state: "",
+  district: "",
   pincode: "",
   previousSchoolName: "",
   notes: "",
@@ -326,6 +329,56 @@ const PublicRegistration = () => {
                           {sections.map((section) => (
                             <option key={section._id} value={section._id}>
                               {section.name}
+                            </option>
+                          ))}
+                        </select>
+                      </Field>
+                    ),
+                    state: (field) => (
+                      <Field label={field.label} required={field.required}>
+                        <select
+                          value={form.state}
+                          onChange={(event) => {
+                            const nextState = event.target.value;
+                            setForm((prev) => ({
+                              ...prev,
+                              state: nextState,
+                              district:
+                                prev.state === nextState ? prev.district : "",
+                            }));
+                          }}
+                          className={inputClass}
+                        >
+                          <option value="">Select state</option>
+                          {INDIA_STATES.map((item) => (
+                            <option key={item} value={item}>
+                              {item}
+                            </option>
+                          ))}
+                        </select>
+                      </Field>
+                    ),
+                    district: (field) => (
+                      <Field label={field.label} required={field.required}>
+                        <select
+                          value={form.district}
+                          onChange={(event) =>
+                            setForm((prev) => ({
+                              ...prev,
+                              district: event.target.value,
+                            }))
+                          }
+                          className={inputClass}
+                          disabled={!form.state}
+                        >
+                          <option value="">
+                            {form.state
+                              ? "Select district"
+                              : "Select state first"}
+                          </option>
+                          {districtsForState(form.state).map((item) => (
+                            <option key={item} value={item}>
+                              {item}
                             </option>
                           ))}
                         </select>

@@ -294,6 +294,8 @@ export const submitPublicRegistration = async (req, res) => {
       parentEmail: sanitize(body.parentEmail, 160),
       address: sanitize(body.address, 400),
       city: sanitize(body.city, 80),
+      state: sanitize(body.state, 80),
+      district: sanitize(body.district, 80),
       pincode: sanitize(body.pincode, 10),
       previousSchoolName: sanitize(body.previousSchoolName, 160),
       notes: sanitize(body.notes, 600),

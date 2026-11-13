@@ -473,6 +473,8 @@ export const createRegistration = async (req, res) => {
       parentEmail: sanitize(body.parentEmail, 160),
       address: sanitize(body.address, 400),
       city: sanitize(body.city, 80),
+      state: sanitize(body.state, 80),
+      district: sanitize(body.district, 80),
       pincode: sanitize(body.pincode, 10),
       previousSchoolName: sanitize(
         body.previousSchoolName || lead?.previousSchoolName,
@@ -623,6 +625,10 @@ export const updateRegistration = async (req, res) => {
     }
     if (body.address !== undefined) registration.address = sanitize(body.address, 400);
     if (body.city !== undefined) registration.city = sanitize(body.city, 80);
+    if (body.state !== undefined) registration.state = sanitize(body.state, 80);
+    if (body.district !== undefined) {
+      registration.district = sanitize(body.district, 80);
+    }
     if (body.pincode !== undefined) registration.pincode = sanitize(body.pincode, 10);
     if (body.previousSchoolName !== undefined) {
       registration.previousSchoolName = sanitize(body.previousSchoolName, 160);

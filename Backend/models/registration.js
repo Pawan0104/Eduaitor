@@ -77,6 +77,8 @@ const registrationSchema = new mongoose.Schema(
     parentEmail: { type: String, default: "", trim: true },
     address: { type: String, default: "" },
     city: { type: String, default: "" },
+    state: { type: String, default: "" },
+    district: { type: String, default: "" },
     pincode: { type: String, default: "" },
     previousSchoolName: { type: String, default: "" },
     notes: { type: String, default: "" },

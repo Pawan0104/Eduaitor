@@ -6,6 +6,7 @@ import {
   ADMISSION_FIELD_TYPES,
   makeCustomFieldKey,
 } from "./admissionFormDefaults";
+import { DEFAULT_STATE, INDIA_STATES, districtsForState } from "./indiaLocations";
 
 export const REGISTRATION_FIELD_TYPES = ADMISSION_FIELD_TYPES.filter(
   (type) => type.value !== "file",
@@ -53,8 +54,14 @@ export const REGISTRATION_STEPS = [
       }),
       f("parentEmail", "Parent Email", "email", false),
       f("address", "Address", "textarea", false),
-      f("city", "City", "text", false),
-      f("pincode", "Pincode", "text", false),
+      f("city", "City / Town / Tehsil", "text", false),
+      f("state", "State", "select", false, {
+        options: INDIA_STATES,
+      }),
+      f("district", "District", "select", false, {
+        options: districtsForState(DEFAULT_STATE),
+      }),
+      f("pincode", "Pin Code", "text", false),
       f("previousSchoolName", "Previous School", "text", false),
       f("notes", "Notes", "textarea", false),
     ],
@@ -65,6 +72,16 @@ const cloneField = (field) => ({
   ...field,
   options: Array.isArray(field.options) ? [...field.options] : [],
 });
+
+/**
+ * Older saved configs kept the default labels from before the address block
+ * was reworked. Rename only exact legacy defaults so genuine custom labels
+ * chosen by a school admin are left untouched.
+ */
+const LEGACY_FIELD_LABELS = {
+  city: "City",
+  pincode: "Pincode",
+};
 
 const normalizeRemovedKeys = (raw) => {
   if (!Array.isArray(raw)) return [];
@@ -103,6 +120,10 @@ const mergeStep = (defaultStep, storedStep) => {
       return cloneField({
         ...defaultField,
         ...field,
+        label:
+          LEGACY_FIELD_LABELS[field.key] === String(field.label || "").trim()
+            ? defaultField.label
+            : field.label,
         type: defaultField.type,
         builtin: true,
         visible: REGISTRATION_LOCKED_FIELD_KEYS.has(field.key)
@@ -115,7 +136,33 @@ const mergeStep = (defaultStep, storedStep) => {
 
   defaultByKey.forEach((field) => {
     if (removedSet.has(field.key)) return;
-    mergedFields.push(cloneField(field));
+
+    // Insert newly added defaults next to their neighbouring default fields
+    // (rather than always appending them) so saved configs keep the intended
+    // layout, e.g. State/District between City and Pin Code.
+    const defaultIndex = defaultStep.fields.findIndex(
+      (item) => item.key === field.key,
+    );
+    let insertAt = mergedFields.length;
+    for (let i = defaultIndex - 1; i >= 0; i -= 1) {
+      const prevKey = defaultStep.fields[i]?.key;
+      const prevIndex = mergedFields.findIndex((item) => item.key === prevKey);
+      if (prevIndex !== -1) {
+        insertAt = prevIndex + 1;
+        break;
+      }
+    }
+    if (insertAt === mergedFields.length) {
+      for (let i = defaultIndex + 1; i < defaultStep.fields.length; i += 1) {
+        const nextKey = defaultStep.fields[i]?.key;
+        const nextIndex = mergedFields.findIndex((item) => item.key === nextKey);
+        if (nextIndex !== -1) {
+          insertAt = nextIndex;
+          break;
+        }
+      }
+    }
+    mergedFields.splice(insertAt, 0, cloneField(field));
   });
 
   return {

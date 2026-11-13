@@ -42,6 +42,7 @@ import {
   REGISTRATION_LOCKED_FIELD_KEYS,
   mergeRegistrationSteps,
 } from "../lib/registrationFormDefaults";
+import { INDIA_STATES, districtsForState } from "../lib/indiaLocations";
 
 const STATUS_META = {
   registered: {
@@ -119,6 +120,8 @@ const emptyRegistration = () => ({
   parentEmail: "",
   address: "",
   city: "",
+  state: "",
+  district: "",
   pincode: "",
   previousSchoolName: "",
   notes: "",
@@ -688,6 +691,8 @@ const Registrations = () => {
         parentEmail: registration.parentEmail || "",
         address: registration.address || "",
         city: registration.city || "",
+        state: registration.state || "",
+        district: registration.district || "",
         pincode: registration.pincode || "",
         previousSchoolName: registration.previousSchoolName || "",
         notes: registration.notes || "",
@@ -3087,6 +3092,62 @@ const Registrations = () => {
                     </select>
                   </Field>
                 ),
+                state: (field) => (
+                  <Field
+                    label={`${field.label}${field.required ? " *" : ""}`}
+                    className="text-slate-600"
+                  >
+                    <select
+                      value={regForm.state}
+                      onChange={(event) => {
+                        const nextState = event.target.value;
+                        setRegForm((prev) => ({
+                          ...prev,
+                          state: nextState,
+                          district:
+                            prev.state === nextState ? prev.district : "",
+                        }));
+                      }}
+                      className={inputClass}
+                    >
+                      <option value="">Select state</option>
+                      {INDIA_STATES.map((item) => (
+                        <option key={item} value={item}>
+                          {item}
+                        </option>
+                      ))}
+                    </select>
+                  </Field>
+                ),
+                district: (field) => (
+                  <Field
+                    label={`${field.label}${field.required ? " *" : ""}`}
+                    className="text-slate-600"
+                  >
+                    <select
+                      value={regForm.district}
+                      onChange={(event) =>
+                        setRegForm((prev) => ({
+                          ...prev,
+                          district: event.target.value,
+                        }))
+                      }
+                      disabled={!regForm.state}
+                      className={inputClass}
+                    >
+                      <option value="">
+                        {regForm.state
+                          ? "Select district"
+                          : "Select state first"}
+                      </option>
+                      {districtsForState(regForm.state).map((item) => (
+                        <option key={item} value={item}>
+                          {item}
+                        </option>
+                      ))}
+                    </select>
+                  </Field>
+                ),
               }}
             />
           </div>
@@ -4010,8 +4071,10 @@ const Registrations = () => {
                 title: "5. Address",
                 fields: [
                   ["Street / Locality", viewModal.data.address],
-                  ["City / District", viewModal.data.city],
-                  ["Pincode", viewModal.data.pincode],
+                  ["City / Town / Tehsil", viewModal.data.city],
+                  ["State", viewModal.data.state],
+                  ["District", viewModal.data.district],
+                  ["Pin Code", viewModal.data.pincode],
                 ],
               },
               {
