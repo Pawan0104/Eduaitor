@@ -4,6 +4,7 @@ import EntranceExam from "../models/entranceExam.js";
 import Registration from "../models/registration.js";
 import Class from "../models/class.js";
 import AcademicYear from "../models/academicYearSchema.js";
+import { schoolAllowsEntranceExam } from "../utils/registration.js";
 import { currentSessionName, SESSION_NAME_RE } from "../utils/academicSession.js";
 
 const ADMIN_ROLES = new Set(["school_admin", "staff_admin", "super_admin"]);
@@ -207,6 +208,14 @@ export const createEntranceExam = async (req, res) => {
     assertAdmin(req);
     const schoolId = schoolIdOf(req);
     const body = req.body || {};
+
+    if (!(await schoolAllowsEntranceExam(schoolId))) {
+      return res.status(400).json({
+        success: false,
+        message:
+          "Entrance exams are turned off for this school. Ask the platform administrator to enable them.",
+      });
+    }
 
     const name = sanitize(body.name, 120);
     if (!name) {

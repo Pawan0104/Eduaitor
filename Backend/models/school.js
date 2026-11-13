@@ -112,6 +112,16 @@ const schoolSchema = new mongoose.Schema(
     },
 
     /**
+     * Set by the super admin. When false, this school does not use entrance
+     * exams: registrations skip exam linking, admissions are not gated on
+     * exam results, and the Registration page stays in follow-up mode.
+     */
+    entranceExamEnabled: {
+      type: Boolean,
+      default: true,
+    },
+
+    /**
      * Public admission registration form. `token` is the unguessable slug used
      * by the shareable link (/register/<token>); it is created lazily when an
      * admin opens the Registration page.

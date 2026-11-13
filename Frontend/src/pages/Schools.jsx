@@ -181,6 +181,19 @@ const Schools = () => {
                 {school.contact_phone}
               </p>
 
+              <p>
+                <span className="text-[rgb(var(--text))]">Entrance exams:</span>{" "}
+                <span
+                  className={
+                    school.entranceExamEnabled === false
+                      ? "font-medium text-amber-600"
+                      : "font-medium text-green-600"
+                  }
+                >
+                  {school.entranceExamEnabled === false ? "Off" : "On"}
+                </span>
+              </p>
+
             </div>
 
             {/* ADDRESS */}

@@ -15,6 +15,13 @@ const isValidRazorpayKeyId = (keyId = "") =>
 const escapeRegex = (value = "") =>
   String(value).replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 
+/** Multipart bodies arrive as strings ("true"/"false"), so parse leniently. */
+const parseBoolean = (value, fallback = false) => {
+  if (value === undefined || value === null || value === "") return fallback;
+  if (typeof value === "boolean") return value;
+  return !["false", "0", "off", "no"].includes(String(value).toLowerCase());
+};
+
 const findSchoolByAdminName = async (adminName, excludeId = null) => {
   const name = String(adminName || "").trim();
   if (!name) return null;
@@ -59,6 +66,7 @@ export const createSchool = async (req, res, next) => {
       subscribed_modules,
       razorpayKeyId,
       razorpayKeySecret,
+      entranceExamEnabled,
     } = req.body;
 
     const adminName = String(admin_name || "").trim();
@@ -137,6 +145,7 @@ export const createSchool = async (req, res, next) => {
       subscribed_modules: modules,
       razorpayKeyId: razorpayKeyId || "",
       razorpayKeySecret: razorpayKeySecret || "",
+      entranceExamEnabled: parseBoolean(entranceExamEnabled, true),
     });
 
     if (modules.includes("house")) {
@@ -238,6 +247,7 @@ export const updateSchool = async (req, res, next) => {
       subscribed_modules,
       razorpayKeyId,
       razorpayKeySecret,
+      entranceExamEnabled,
     } = req.body;
 
     // ── 1. BUILD UPDATE OBJECT ────────────────────────
@@ -255,6 +265,8 @@ export const updateSchool = async (req, res, next) => {
     if (status)           updateData.status           = status;
     if (razorpayKeyId !== undefined)     updateData.razorpayKeyId     = razorpayKeyId;
     if (razorpayKeySecret !== undefined) updateData.razorpayKeySecret = razorpayKeySecret;
+    if (entranceExamEnabled !== undefined)
+      updateData.entranceExamEnabled = parseBoolean(entranceExamEnabled, true);
 
     if (admin_name !== undefined && String(admin_name).trim() !== "") {
       const adminName = String(admin_name).trim();

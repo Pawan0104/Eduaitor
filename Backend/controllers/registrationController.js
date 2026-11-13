@@ -14,6 +14,7 @@ import {
   findExamForClass,
   linkExam,
   nextRegistrationNumber,
+  schoolAllowsEntranceExam,
   unlinkExam,
 } from "../utils/registration.js";
 
@@ -187,15 +188,20 @@ const sourceLabelOf = (plain = {}) => {
   return name || "Office";
 };
 
-const toPayload = (doc) => {
+const toPayload = (doc, options = {}) => {
   const plain = typeof doc.toObject === "function" ? doc.toObject() : doc;
+  const examGatesAdmission =
+    options.entranceExamEnabled !== false &&
+    Boolean(plain.entranceExamId) &&
+    plain.entrance?.result !== "pass";
   return {
     ...plain,
     sourceLabel: sourceLabelOf(plain),
+    entranceExamEnabled: options.entranceExamEnabled !== false,
     canAdmit:
       plain.status !== "cancelled" &&
       plain.status !== "admitted" &&
-      (!plain.entranceExamId || plain.entrance?.result === "pass"),
+      !examGatesAdmission,
   };
 };
 
@@ -229,13 +235,14 @@ export const getRegistrations = async (req, res) => {
       ];
     }
 
-    const [rows, total, statsRows] = await Promise.all([
+    const [rows, total, statsRows, entranceExamEnabled] = await Promise.all([
       Registration.find(query).sort({ createdAt: -1 }).skip(skip).limit(limit).lean(),
       Registration.countDocuments(query),
       Registration.aggregate([
         { $match: { schoolId: new mongoose.Types.ObjectId(schoolId) } },
         { $group: { _id: "$status", count: { $sum: 1 } } },
       ]),
+      schoolAllowsEntranceExam(schoolId),
     ]);
 
     const stats = {
@@ -255,8 +262,11 @@ export const getRegistrations = async (req, res) => {
     return res.json({
       success: true,
       data: {
-        registrations: rows.map(toPayload),
+        registrations: rows.map((row) =>
+          toPayload(row, { entranceExamEnabled }),
+        ),
         stats,
+        entranceExamEnabled,
         pagination: {
           page,
           limit,
@@ -289,7 +299,13 @@ export const getRegistration = async (req, res) => {
         .status(404)
         .json({ success: false, message: "Registration not found." });
     }
-    return res.json({ success: true, data: toPayload(registration) });
+    const entranceExamEnabled = await schoolAllowsEntranceExam(
+      schoolIdOf(req),
+    );
+    return res.json({
+      success: true,
+      data: toPayload(registration, { entranceExamEnabled }),
+    });
   } catch (error) {
     return res.status(error.statusCode || 500).json({
       success: false,
@@ -479,15 +495,22 @@ export const createRegistration = async (req, res) => {
     });
 
     // Link a scheduled entrance exam unless the caller picked a specific one.
+    const entranceExamEnabled = await schoolAllowsEntranceExam(schoolId);
     let exam = null;
-    if (body.entranceExamId && mongoose.Types.ObjectId.isValid(body.entranceExamId)) {
+    if (
+      entranceExamEnabled &&
+      body.entranceExamId &&
+      mongoose.Types.ObjectId.isValid(body.entranceExamId)
+    ) {
       exam = await EntranceExam.findOne({
         _id: body.entranceExamId,
         schoolId,
         status: { $ne: "cancelled" },
       }).lean();
     }
-    if (!exam) exam = await findExamForClass(schoolId, body.classId);
+    if (entranceExamEnabled && !exam) {
+      exam = await findExamForClass(schoolId, body.classId);
+    }
     if (exam) linkExam(registration, exam);
 
     await registration.save();
@@ -517,7 +540,7 @@ export const createRegistration = async (req, res) => {
     return res.status(201).json({
       success: true,
       message: `${registration.studentName} registered as ${registration.registrationNumber}.`,
-      data: toPayload(registration),
+      data: toPayload(registration, { entranceExamEnabled }),
     });
   } catch (error) {
     if (error?.code === 11000) {
@@ -684,7 +707,10 @@ export const updateRegistration = async (req, res) => {
 
     if (body.entranceExamId !== undefined) {
       const raw = body.entranceExamId;
-      if (!raw) {
+      const canUseExams = await schoolAllowsEntranceExam(schoolId);
+      if (!canUseExams) {
+        // Entrance exams are off for this school; leave any existing data alone.
+      } else if (!raw) {
         unlinkExam(registration);
       } else if (mongoose.Types.ObjectId.isValid(raw)) {
         const exam = await EntranceExam.findOne({
@@ -700,7 +726,9 @@ export const updateRegistration = async (req, res) => {
     return res.json({
       success: true,
       message: "Registration updated.",
-      data: toPayload(registration),
+      data: toPayload(registration, {
+        entranceExamEnabled: await schoolAllowsEntranceExam(schoolId),
+      }),
     });
   } catch (error) {
     console.error("updateRegistration failed:", error);
@@ -764,16 +792,22 @@ export const updateRegistrationStatus = async (req, res) => {
         ),
       );
       if (registration.entranceExamId) {
-        const exam = await EntranceExam.findOne({
-          _id: registration.entranceExamId,
-          schoolId,
-        }).lean();
-        if (exam && exam.status !== "cancelled") {
-          linkExam(registration, exam);
-        } else {
-          unlinkExam(registration);
-          const fallback = await findExamForClass(schoolId, registration.classId);
-          if (fallback) linkExam(registration, fallback);
+        const canUseExams = await schoolAllowsEntranceExam(schoolId);
+        if (canUseExams) {
+          const exam = await EntranceExam.findOne({
+            _id: registration.entranceExamId,
+            schoolId,
+          }).lean();
+          if (exam && exam.status !== "cancelled") {
+            linkExam(registration, exam);
+          } else {
+            unlinkExam(registration);
+            const fallback = await findExamForClass(
+              schoolId,
+              registration.classId,
+            );
+            if (fallback) linkExam(registration, fallback);
+          }
         }
       } else {
         const exam = await findExamForClass(schoolId, registration.classId);
@@ -829,7 +863,9 @@ export const updateRegistrationStatus = async (req, res) => {
     return res.json({
       success: true,
       message: `Registration marked ${registration.status}.`,
-      data: toPayload(registration),
+      data: toPayload(registration, {
+        entranceExamEnabled: await schoolAllowsEntranceExam(schoolId),
+      }),
     });
   } catch (error) {
     return res.status(error.statusCode || 500).json({
@@ -890,13 +926,15 @@ export const getRegistrationLink = async (req, res) => {
     assertAdmin(req);
     const schoolId = schoolIdOf(req);
     const school = await School.findById(schoolId)
-      .select("school_name registrationForm")
+      .select("school_name entranceExamEnabled registrationForm")
       .lean();
     if (!school) {
       return res
         .status(404)
         .json({ success: false, message: "School not found." });
     }
+
+    const entranceExamEnabled = school.entranceExamEnabled !== false;
 
     let config = school.registrationForm || {};
     if (!config.token) {
@@ -916,6 +954,7 @@ export const getRegistrationLink = async (req, res) => {
       success: true,
       data: {
         enabled: Boolean(config.publicEnabled),
+        entranceExamEnabled,
         token: config.token,
         path: `/register/${config.token}`,
         instructions: config.instructions || "",
@@ -935,7 +974,7 @@ export const updateRegistrationLink = async (req, res) => {
     assertAdmin(req);
     const schoolId = schoolIdOf(req);
     const school = await School.findById(schoolId)
-      .select("registrationForm")
+      .select("entranceExamEnabled registrationForm")
       .lean();
     if (!school) {
       return res
@@ -976,6 +1015,7 @@ export const updateRegistrationLink = async (req, res) => {
         : "Public registration form is off.",
       data: {
         enabled: next.publicEnabled,
+        entranceExamEnabled: school.entranceExamEnabled !== false,
         token: next.token,
         path: `/register/${next.token}`,
         instructions: next.instructions,
@@ -1035,7 +1075,9 @@ export const addRegistrationFollowUp = async (req, res) => {
     return res.json({
       success: true,
       message: "Feedback added successfully",
-      data: toPayload(registration),
+      data: toPayload(registration, {
+        entranceExamEnabled: await schoolAllowsEntranceExam(schoolId),
+      }),
     });
   } catch (error) {
     console.error("addRegistrationFollowUp failed:", error);

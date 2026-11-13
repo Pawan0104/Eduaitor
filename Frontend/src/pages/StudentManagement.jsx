@@ -795,6 +795,7 @@ const StudentManagement = () => {
           return;
         }
         if (
+          registration.entranceExamEnabled !== false &&
           registration.entranceExamId &&
           registration.entrance?.result !== "pass"
         ) {

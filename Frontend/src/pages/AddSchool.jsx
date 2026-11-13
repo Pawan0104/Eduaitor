@@ -24,6 +24,7 @@ const AddSchool = () => {
     admin_email: "",
     admin_password: "",
     status: "Active",
+    entranceExamEnabled: true,
   });
 
   const [subscriptions, setSubscriptions] = useState([]);
@@ -57,7 +58,8 @@ const AddSchool = () => {
 
   /* HANDLERS */
   const handleChange = (e) => {
-    const { name, value } = e.target;
+    const { name, value, type, checked } = e.target;
+    const nextValue = type === "checkbox" ? checked : value;
 
     if (name === "school_name") {
       const generatedSlug = value
@@ -66,9 +68,13 @@ const AddSchool = () => {
         .replace(/-+/g, "-")
         .replace(/^-|-$/g, "");
 
-      setForm((prev) => ({ ...prev, [name]: value, slug: generatedSlug }));
+      setForm((prev) => ({
+        ...prev,
+        [name]: nextValue,
+        slug: generatedSlug,
+      }));
     } else {
-      setForm((prev) => ({ ...prev, [name]: value }));
+      setForm((prev) => ({ ...prev, [name]: nextValue }));
     }
   };
 
@@ -446,6 +452,28 @@ const AddSchool = () => {
                   <option value="Active">Active</option>
                   <option value="Inactive">Inactive</option>
                 </select>
+              </div>
+
+              <div className="md:col-span-2 rounded-xl border border-[rgb(var(--border))] bg-[rgb(var(--bg))] p-4">
+                <label className="flex items-start gap-3 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    name="entranceExamEnabled"
+                    checked={form.entranceExamEnabled}
+                    onChange={handleChange}
+                    className="mt-0.5 h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                  />
+                  <span>
+                    <span className="block text-sm font-medium text-[rgb(var(--text))]">
+                      Allows entrance exams
+                    </span>
+                    <span className="block text-xs text-[rgb(var(--text-muted))] mt-0.5">
+                      When on, this school can schedule entrance exams and
+                      admissions wait for a passing result. Turn it off for
+                      schools that admit students directly.
+                    </span>
+                  </span>
+                </label>
               </div>
 
             </div>

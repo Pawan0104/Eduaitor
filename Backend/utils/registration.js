@@ -1,6 +1,7 @@
 import Registration from "../models/registration.js";
 import EntranceExam from "../models/entranceExam.js";
 import AcademicYear from "../models/academicYearSchema.js";
+import School from "../models/school.js";
 import { currentSessionName } from "./academicSession.js";
 
 const startOfToday = () => {
@@ -28,9 +29,18 @@ export const activeSessionName = async (schoolId) => {
   return active?.name || currentSessionName();
 };
 
+/** Does this school allow entrance exams as part of admission? */
+export const schoolAllowsEntranceExam = async (schoolId) => {
+  const school = await School.findById(schoolId)
+    .select("entranceExamEnabled")
+    .lean();
+  return school?.entranceExamEnabled !== false;
+};
+
 /** Nearest upcoming entrance exam scheduled for a class. */
-export const findExamForClass = async (schoolId, classId) =>
-  EntranceExam.findOne({
+export const findExamForClass = async (schoolId, classId) => {
+  if (!(await schoolAllowsEntranceExam(schoolId))) return null;
+  return EntranceExam.findOne({
     schoolId,
     classId,
     status: "scheduled",
@@ -38,6 +48,7 @@ export const findExamForClass = async (schoolId, classId) =>
   })
     .sort({ examDate: 1, startTime: 1 })
     .lean();
+};
 
 export const examSnapshot = (exam) => ({
   examName: exam.name || "",

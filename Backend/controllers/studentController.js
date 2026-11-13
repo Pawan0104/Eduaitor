@@ -16,6 +16,7 @@ import {
   removeStudentFromOldGroups,
 } from "../utils/groupSync.js";
 import { ensureDefaultHouses } from "../utils/ensureDefaultHouses.js";
+import { schoolAllowsEntranceExam } from "../utils/registration.js";
 import {
   parsePagination,
   applyPagination,
@@ -707,6 +708,7 @@ export const createStudent = async (req, res) => {
         });
       }
       if (
+        (await schoolAllowsEntranceExam(schoolId)) &&
         registrationDoc.entranceExamId &&
         registrationDoc.entrance?.result !== "pass"
       ) {

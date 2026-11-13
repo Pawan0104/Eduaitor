@@ -89,6 +89,7 @@ export default function SchoolDetail() {
     admin_confirm: "",
   });
   const [adminSaving, setAdminSaving] = useState(false);
+  const [examSaving, setExamSaving] = useState(false);
   const [showImport, setShowImport] = useState(false);
 
   useEffect(() => {
@@ -254,6 +255,33 @@ export default function SchoolDetail() {
       toast.error(err?.response?.data?.message || err?.message || "Update failed");
     } finally {
       setAdminSaving(false);
+    }
+  };
+
+  const handleToggleEntranceExam = async (enabled) => {
+    try {
+      setExamSaving(true);
+      const formData = new FormData();
+      formData.append("entranceExamEnabled", enabled ? "true" : "false");
+      await api.put(`/schools/${selId}`, formData);
+      setWs((prev) =>
+        prev
+          ? { ...prev, school: { ...prev.school, entranceExamEnabled: enabled } }
+          : prev,
+      );
+      toast.success(
+        enabled
+          ? "Entrance exams turned on for this school."
+          : "Entrance exams turned off for this school.",
+      );
+    } catch (err) {
+      toast.error(
+        err?.response?.data?.message ||
+          err?.message ||
+          "Could not update entrance exam setting",
+      );
+    } finally {
+      setExamSaving(false);
     }
   };
 
@@ -864,6 +892,46 @@ export default function SchoolDetail() {
                     <p className="text-sm text-slate-600">
                       {ws.school.address || "—"}
                     </p>
+                  </div>
+
+                  <div className="mt-3 flex flex-col gap-3 rounded-xl border border-slate-200 bg-white p-4 sm:flex-row sm:items-center sm:justify-between">
+                    <div>
+                      <p className="text-sm font-semibold text-slate-700">
+                        Allows entrance exams
+                      </p>
+                      <p className="mt-0.5 text-xs text-slate-500">
+                        {ws.school.entranceExamEnabled === false
+                          ? "Off — this school admits students directly, without an entrance exam."
+                          : "On — this school can schedule entrance exams and admissions wait for a passing result."}
+                      </p>
+                    </div>
+                    <button
+                      type="button"
+                      disabled={examSaving}
+                      onClick={() =>
+                        handleToggleEntranceExam(
+                          ws.school.entranceExamEnabled === false,
+                        )
+                      }
+                      className={`inline-flex min-h-10 shrink-0 items-center gap-2 rounded-full px-4 py-2 text-xs font-semibold transition disabled:opacity-60 ${
+                        ws.school.entranceExamEnabled === false
+                          ? "bg-slate-100 text-slate-600 hover:bg-slate-200"
+                          : "bg-emerald-100 text-emerald-700 hover:bg-emerald-200"
+                      }`}
+                    >
+                      <span
+                        className={`h-2 w-2 rounded-full ${
+                          ws.school.entranceExamEnabled === false
+                            ? "bg-slate-400"
+                            : "bg-emerald-500"
+                        }`}
+                      />
+                      {examSaving
+                        ? "Saving..."
+                        : ws.school.entranceExamEnabled === false
+                          ? "Turn on"
+                          : "Turn off"}
+                    </button>
                   </div>
                 </Panel>
 
