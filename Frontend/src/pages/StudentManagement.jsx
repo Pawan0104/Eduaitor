@@ -254,6 +254,11 @@ const ADMISSION_LABEL_ALIASES = {
   previousschoolresult: "previousSchoolResult",
   tcnumber: "previousSchoolTcNumber",
   address: "address",
+  aadhaarnumber: "aadhaarNumber",
+  aadhaar: "aadhaarNumber",
+  aadhaarid: "aadhaarNumber",
+  aadhar: "aadhaarNumber",
+  aadharnumber: "aadhaarNumber",
   dateofbirth: "dob",
   dob: "dob",
   gender: "gender",
@@ -400,7 +405,10 @@ const applyFunnelToAdmission = (lead, registration, steps) => {
     const labelKey = normFieldLabel(item.label || item.key);
     const alias =
       ADMISSION_LABEL_ALIASES[labelKey] ||
-      ADMISSION_LABEL_ALIASES[normFieldLabel(item.key)];
+      ADMISSION_LABEL_ALIASES[normFieldLabel(item.key)] ||
+      (labelKey.includes("aadhaar") || labelKey.includes("aadhar") || normFieldLabel(item.key).includes("aadhaar") || normFieldLabel(item.key).includes("aadhar")
+        ? "aadhaarNumber"
+        : undefined);
     if (alias && Object.prototype.hasOwnProperty.call(emptyForm, alias)) {
       formPatch[alias] = alias === "dob" ? String(item.value).slice(0, 10) : item.value;
       continue;
@@ -1190,7 +1198,18 @@ const StudentManagement = () => {
         lead?.parentEmail ||
         mapped.formPatch.fatherEmail ||
         prev.fatherEmail,
-      address: registration?.address || mapped.formPatch.address || prev.address,
+      address:
+        [
+          registration?.address,
+          registration?.city,
+          registration?.district,
+          registration?.state,
+          registration?.pincode,
+        ]
+          .filter(Boolean)
+          .join(", ") ||
+        mapped.formPatch.address ||
+        prev.address,
       previousSchoolName:
         registration?.previousSchoolName ||
         lead?.previousSchoolName ||
