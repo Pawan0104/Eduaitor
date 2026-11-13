@@ -56,7 +56,7 @@ export const REGISTRATION_STEPS = [
     builtin: true,
     removedFieldKeys: [],
     fields: [
-      f("parentName", "Father / Guardian Name", "text", true),
+      f("parentName", "Father's Name", "text", true),
       f("motherName", "Mother's Name", "text", false),
     ],
   },
