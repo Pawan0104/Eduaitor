@@ -142,9 +142,7 @@ const getNavItems = (role, loginAs, openProfile, tn) => {
 
 const AdminLayout = () => {
   const [showProfile, setShowProfile] = useState(false);
-  const [sidebarOpen, setSidebarOpen] = useState(() =>
-    typeof window !== "undefined" ? window.innerWidth >= 1024 : true,
-  );
+  const [sidebarOpen, setSidebarOpen] = useState(false);
   const [unreadMessages, setUnreadMessages] = useState(0);
   const { user } = useAuth();
   const { tn } = useLanguage();
