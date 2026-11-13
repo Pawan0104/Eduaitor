@@ -167,6 +167,21 @@ export const ADMISSION_STEPS = [
     ],
   },
   {
+    key: "builtin_5",
+    title: "04. Class Placement, Hostel & Transport Assignment",
+    builtin: true,
+    fields: [
+      f("classId", "Class", "select", true),
+      f("sectionId", "Section", "select", false),
+      f("rollNo", "Roll Number", "text", true),
+      f("studentType", "Student Type", "select", false, {
+        options: ["Day Scholar", "Day Boarder", "Boarder"],
+      }),
+      f("transport", "Transport Route", "select", false),
+      f("relative", "Relative / Sibling", "text", false),
+    ],
+  },
+  {
     key: "builtin_3",
     title: "05. Previous School Details",
     builtin: true,
@@ -196,21 +211,6 @@ export const ADMISSION_STEPS = [
       f("studentAadhar", "Student Aadhar", "file", false),
       f("fatherAadhar", "Father Aadhar", "file", true),
       f("motherAadhar", "Mother Aadhar", "file", true),
-    ],
-  },
-  {
-    key: "builtin_5",
-    title: "04. Class Placement, Hostel & Transport Assignment",
-    builtin: true,
-    fields: [
-      f("classId", "Class", "select", true),
-      f("sectionId", "Section", "select", false),
-      f("rollNo", "Roll Number", "text", true),
-      f("studentType", "Student Type", "select", false, {
-        options: ["Day Scholar", "Day Boarder", "Boarder"],
-      }),
-      f("transport", "Transport Route", "select", false),
-      f("relative", "Relative / Sibling", "text", false),
     ],
   },
   {
