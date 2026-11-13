@@ -45,6 +45,10 @@ export const REGISTRATION_STEPS = [
         options: ["Male", "Female", "Other"],
       }),
       f("bloodGroup", "Blood Group", "text", false),
+      f("category", "Category", "select", false, {
+        options: ["General", "OBC", "SC", "ST", "EWS"],
+      }),
+      f("motherName", "Mother's Name", "text", false),
       f("classId", "Applied Class", "select", true),
       f("sectionId", "Section", "select", false),
       f("streamId", "Stream", "select", false),
@@ -53,6 +57,8 @@ export const REGISTRATION_STEPS = [
         placeholder: "10-digit mobile number",
       }),
       f("parentEmail", "Parent Email", "email", false),
+      f("occupation", "Occupation", "text", false),
+      f("alternateMobile", "Alternate Mobile", "tel", false),
       f("address", "Address", "textarea", false),
       f("city", "City / Town / Tehsil", "text", false),
       f("state", "State", "select", false, {
