@@ -1178,7 +1178,14 @@ const StudentManagement = () => {
       lastName: lastName || prev.lastName,
       dob: registration?.dob
         ? String(registration.dob).slice(0, 10)
-        : mapped.formPatch.dob || prev.dob,
+        : findCustomValue(registration, (label) =>
+            label.includes("dob") || label.includes("date of birth"),
+          ) ||
+          findCustomValue(lead, (label) =>
+            label.includes("dob") || label.includes("date of birth"),
+          ) ||
+          mapped.formPatch.dob ||
+          prev.dob,
       gender: registration?.gender || mapped.formPatch.gender || prev.gender,
       bloodGroup:
         registration?.bloodGroup || mapped.formPatch.bloodGroup || prev.bloodGroup,
@@ -1187,7 +1194,20 @@ const StudentManagement = () => {
         lead?.parentName ||
         mapped.formPatch.fatherName ||
         prev.fatherName,
-      motherName: mapped.formPatch.motherName || prev.motherName,
+      motherName:
+        findCustomValue(registration, (label) => label.includes("mother")) ||
+        findCustomValue(lead, (label) => label.includes("mother")) ||
+        mapped.formPatch.motherName ||
+        prev.motherName,
+      aadhaarNumber:
+        findCustomValue(registration, (label) =>
+          label.includes("aadhaar") || label.includes("aadhar"),
+        ) ||
+        findCustomValue(lead, (label) =>
+          label.includes("aadhaar") || label.includes("aadhar"),
+        ) ||
+        mapped.formPatch.aadhaarNumber ||
+        prev.aadhaarNumber,
       fatherMobile:
         registration?.parentMobile ||
         lead?.parentMobile ||
@@ -2007,6 +2027,19 @@ const StudentManagement = () => {
 
   const prev = () => {
     if (step > 1) setStep((s) => s - 1);
+  };
+
+  const findCustomValue = (source, matcher) => {
+    const fields = Array.isArray(source?.customFields)
+      ? source.customFields
+      : [];
+    for (const field of fields) {
+      const label = String(field?.label || field?.key || "").toLowerCase();
+      if (matcher(label) && String(field?.value || "").trim()) {
+        return String(field.value).trim();
+      }
+    }
+    return "";
   };
 
   const applySourcePrefill = (base = emptyForm) => {
