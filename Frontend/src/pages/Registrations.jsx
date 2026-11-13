@@ -419,6 +419,18 @@ const Field = ({ label, children, hint, className = "" }) => (
   </label>
 );
 
+/** Matches the built-in field shell so custom-rendered selects line up with
+ * the text inputs rendered by ConfigurableFormFields. */
+const ConfigField = ({ field, children }) => (
+  <label className="flex flex-col gap-2 text-sm font-medium">
+    <span>
+      {field.label}
+      {field.required ? " *" : ""}
+    </span>
+    {children}
+  </label>
+);
+
 const inputClass =
   "w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs text-slate-800 outline-none transition placeholder:text-slate-400 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/15";
 
@@ -3004,10 +3016,7 @@ const Registrations = () => {
               }
               renderBuiltin={{
                 classId: (field) => (
-                  <Field
-                    label={`${field.label}${field.required ? " *" : ""}`}
-                    className="text-slate-600"
-                  >
+                  <ConfigField field={field}>
                     <select
                       value={regForm.classId}
                       onChange={(event) => {
@@ -3033,13 +3042,10 @@ const Registrations = () => {
                         </option>
                       ))}
                     </select>
-                  </Field>
+                  </ConfigField>
                 ),
                 streamId: (field) => (
-                  <Field
-                    label={`${field.label}${field.required ? " *" : ""}`}
-                    className="text-slate-600"
-                  >
+                  <ConfigField field={field}>
                     <select
                       value={regForm.streamId}
                       onChange={(event) =>
@@ -3061,13 +3067,10 @@ const Registrations = () => {
                         </option>
                       ))}
                     </select>
-                  </Field>
+                  </ConfigField>
                 ),
                 sectionId: (field) => (
-                  <Field
-                    label={`${field.label}${field.required ? " *" : ""}`}
-                    className="text-slate-600"
-                  >
+                  <ConfigField field={field}>
                     <select
                       value={regForm.sectionId}
                       onChange={(event) =>
@@ -3090,13 +3093,10 @@ const Registrations = () => {
                         </option>
                       ))}
                     </select>
-                  </Field>
+                  </ConfigField>
                 ),
                 state: (field) => (
-                  <Field
-                    label={`${field.label}${field.required ? " *" : ""}`}
-                    className="text-slate-600"
-                  >
+                  <ConfigField field={field}>
                     <select
                       value={regForm.state}
                       onChange={(event) => {
@@ -3117,13 +3117,10 @@ const Registrations = () => {
                         </option>
                       ))}
                     </select>
-                  </Field>
+                  </ConfigField>
                 ),
                 district: (field) => (
-                  <Field
-                    label={`${field.label}${field.required ? " *" : ""}`}
-                    className="text-slate-600"
-                  >
+                  <ConfigField field={field}>
                     <select
                       value={regForm.district}
                       onChange={(event) =>
@@ -3146,7 +3143,7 @@ const Registrations = () => {
                         </option>
                       ))}
                     </select>
-                  </Field>
+                  </ConfigField>
                 ),
               }}
             />
