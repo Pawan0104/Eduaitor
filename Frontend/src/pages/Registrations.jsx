@@ -425,7 +425,7 @@ const Field = ({ label, children, hint, className = "" }) => (
 /** Matches the built-in field shell so custom-rendered selects line up with
  * the text inputs rendered by ConfigurableFormFields. */
 const ConfigField = ({ field, children }) => (
-  <label className="flex flex-col gap-2 text-sm font-medium">
+  <label className="flex flex-col gap-1 text-xs font-medium">
     <span>
       {field.label}
       {field.required ? " *" : ""}

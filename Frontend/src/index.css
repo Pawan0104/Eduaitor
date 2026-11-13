@@ -111,10 +111,10 @@ button:disabled,
 input:not([type="checkbox"]):not([type="radio"]):not([type="file"]):not([type="range"]):not([type="color"]):not([type="hidden"]),
 select,
 textarea {
-  font-size: 0.875rem !important;
-  line-height: 1.25rem !important;
-  padding: 0.625rem 0.75rem !important;
-  border-radius: 0.75rem !important;
+  font-size: 0.75rem !important;
+  line-height: 1rem !important;
+  padding: 0.5rem 0.75rem !important;
+  border-radius: 0.5rem !important;
 }
 
 /* ---------- SCROLLBAR ---------- */

@@ -77,7 +77,7 @@ export const validateConfigurableFields = (
 };
 
 const FieldShell = ({ field, children, className = "" }) => (
-  <label className={`flex flex-col gap-2 text-sm font-medium ${className}`}>
+  <label className={`flex flex-col gap-1 text-xs font-medium ${className}`}>
     <span>
       {field.label}
       {field.required ? " *" : ""}
