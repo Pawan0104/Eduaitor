@@ -34,13 +34,13 @@ const f = (key, label, type, required, extra = {}) => ({
 
 export const REGISTRATION_STEPS = [
   {
-    key: "reg_main",
-    title: "Registration Details",
+    key: "student_details",
+    title: "1. Student Details",
     builtin: true,
     removedFieldKeys: [],
     fields: [
       f("studentName", "Student Name", "text", true),
-      f("dob", "Date of Birth", "date", false),
+      f("dob", "Date of Birth", "date", true),
       f("gender", "Gender", "select", false, {
         options: ["Male", "Female", "Other"],
       }),
@@ -48,18 +48,51 @@ export const REGISTRATION_STEPS = [
       f("category", "Category", "select", false, {
         options: ["General", "OBC", "SC", "ST", "EWS"],
       }),
+    ],
+  },
+  {
+    key: "parent_details",
+    title: "2. Parent / Guardian Details",
+    builtin: true,
+    removedFieldKeys: [],
+    fields: [
+      f("parentName", "Father / Guardian Name", "text", true),
       f("motherName", "Mother's Name", "text", false),
-      f("classId", "Applied Class", "select", true),
-      f("sectionId", "Section", "select", false),
-      f("streamId", "Stream", "select", false),
-      f("parentName", "Parent / Guardian Name", "text", true),
-      f("parentMobile", "Parent Mobile", "tel", true, {
+    ],
+  },
+  {
+    key: "contact_info",
+    title: "3. Contact Information",
+    builtin: true,
+    removedFieldKeys: [],
+    fields: [
+      f("parentMobile", "Primary Mobile", "tel", true, {
         placeholder: "10-digit mobile number",
       }),
-      f("parentEmail", "Parent Email", "email", false),
       f("alternateMobile", "Alternate Mobile", "tel", false),
-      f("address", "Address", "textarea", false),
-      f("city", "City / Town / Tehsil", "text", false),
+      f("parentEmail", "Email Address", "email", false),
+    ],
+  },
+  {
+    key: "academic_interest",
+    title: "4. Academic Interest",
+    builtin: true,
+    removedFieldKeys: [],
+    fields: [
+      f("classId", "Class Applied", "select", true),
+      f("sectionId", "Section", "select", false),
+      f("streamId", "Stream", "select", false),
+      f("previousSchoolName", "Previous School / Institution", "text", false),
+    ],
+  },
+  {
+    key: "address",
+    title: "5. Residential Address",
+    builtin: true,
+    removedFieldKeys: [],
+    fields: [
+      f("address", "Street / Locality", "textarea", false),
+      f("city", "City / District", "text", false),
       f("state", "State", "select", false, {
         options: INDIA_STATES,
       }),
@@ -67,8 +100,16 @@ export const REGISTRATION_STEPS = [
         options: districtsForState(DEFAULT_STATE),
       }),
       f("pincode", "Pin Code", "text", false),
-      f("previousSchoolName", "Previous School", "text", false),
-      f("notes", "Notes", "textarea", false),
+    ],
+  },
+  {
+    key: "additional_info",
+    title: "6. Additional Information & Initial Follow-up",
+    builtin: true,
+    removedFieldKeys: [],
+    fields: [
+      f("nextFollowUpDate", "Next Follow-up Date", "date", false),
+      f("notes", "Counselor Notes", "textarea", false),
     ],
   },
 ];
@@ -188,8 +229,44 @@ export const mergeRegistrationSteps = (storedSteps) => {
     }));
   }
 
+  // Migrate legacy single-step configs ("reg_main") into the new segmented
+  // layout so existing school customizations are preserved.
+  const legacy = storedSteps.find((s) => s?.key === "reg_main");
+  let workingSteps = storedSteps;
+  if (legacy) {
+    const fieldsByKey = new Map(
+      (legacy.fields || []).map((field) => [field?.key, field]),
+    );
+    const migrated = REGISTRATION_STEPS.map((step) => ({
+      key: step.key,
+      title: step.title,
+      builtin: true,
+      removedFieldKeys: legacy.removedFieldKeys || [],
+      fields: (legacy.fields || []).filter((field) =>
+        step.fields.some((defaultField) => defaultField.key === field?.key),
+      ),
+    }));
+    // Preserve any fields that no longer exist as defaults as a trailing custom step.
+    const knownKeys = new Set(
+      REGISTRATION_STEPS.flatMap((step) => step.fields.map((f) => f.key)),
+    );
+    const leftover = (legacy.fields || []).filter(
+      (field) => field?.key && !knownKeys.has(field.key),
+    );
+    if (leftover.length) {
+      migrated.push({
+        key: "reg_legacy_extra",
+        title: "Additional Details",
+        builtin: false,
+        removedFieldKeys: [],
+        fields: leftover,
+      });
+    }
+    workingSteps = [...migrated, ...storedSteps.filter((s) => s?.key !== "reg_main")];
+  }
+
   const storedByKey = new Map(
-    storedSteps.filter((s) => s?.key).map((s) => [s.key, s]),
+    workingSteps.filter((s) => s?.key).map((s) => [s.key, s]),
   );
 
   const mergedBuiltin = REGISTRATION_STEPS.map((step) =>

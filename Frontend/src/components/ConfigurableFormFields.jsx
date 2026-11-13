@@ -2,7 +2,6 @@
  * Renders fields from a school form-builder config.
  * Built-in keys map into `values`; custom (cf_*) keys map into `customValues`.
  */
-
 const DEFAULT_INPUT =
   "w-full rounded-xl border border-[rgb(var(--border))] bg-[rgb(var(--bg))] px-3 py-2.5 text-sm text-[rgb(var(--text))] outline-none transition focus:border-[rgb(var(--primary))]";
 
@@ -114,119 +113,135 @@ const ConfigurableFormFields = ({
   inputClass = DEFAULT_INPUT,
 }) => {
   const excluded = new Set(excludeKeys);
-  const fields = visibleFieldsFromSteps(steps).filter(
-    (field) => !excluded.has(field.key),
-  );
+  const elements = [];
 
-  return fields.map((field) => {
-    if (typeof renderBuiltin[field.key] === "function") {
-      return (
-        <div key={field.key} className="contents">
-          {renderBuiltin[field.key](field)}
-        </div>
-      );
-    }
-
-    const isCustom = isCustomFieldKey(field.key);
-    const value = isCustom ? customValues?.[field.key] : values?.[field.key];
-    const setValue = (next) =>
-      isCustom
-        ? onChangeCustom?.(field.key, next)
-        : onChangeBuiltin?.(field.key, next);
-
-    if (field.type === "textarea") {
-      return (
-        <FieldShell
-          key={field.key}
-          field={field}
-          className="md:col-span-2"
+  (steps || []).forEach((step, stepIndex) => {
+    if (step?.title) {
+      elements.push(
+        <div
+          key={`step-title-${step.key || stepIndex}`}
+          className="col-span-full mt-3 first:mt-0 rounded-xl border border-slate-200 bg-slate-50/60 px-3 py-2 text-xs font-bold uppercase tracking-wider text-slate-700"
         >
-          <textarea
-            rows={3}
-            value={value ?? ""}
-            placeholder={field.placeholder || ""}
-            onChange={(e) => setValue(e.target.value)}
-            className={inputClass}
-          />
-        </FieldShell>
+          {step.title}
+        </div>,
       );
     }
 
-    if (field.type === "select") {
-      return (
-        <FieldShell key={field.key} field={field}>
-          <select
-            value={value ?? ""}
-            onChange={(e) => setValue(e.target.value)}
-            className={inputClass}
-          >
-            <option value="">Select</option>
-            {(field.options || []).map((option) => (
-              <option key={option} value={option}>
-                {option}
-              </option>
-            ))}
-          </select>
-        </FieldShell>
-      );
-    }
+    (step?.fields || [])
+      .filter((field) => field && field.visible !== false && !excluded.has(field.key))
+      .forEach((field) => {
+        if (typeof renderBuiltin[field.key] === "function") {
+          elements.push(
+            <div key={field.key} className="contents">
+              {renderBuiltin[field.key](field)}
+            </div>,
+          );
+          return;
+        }
 
-    if (field.type === "radio") {
-      return (
-        <FieldShell key={field.key} field={field} className="md:col-span-2">
-          <div className="flex flex-wrap gap-4">
-            {(field.options || []).map((option) => (
-              <label
-                key={option}
-                className="flex items-center gap-2 text-sm font-normal"
+        const isCustom = isCustomFieldKey(field.key);
+        const value = isCustom ? customValues?.[field.key] : values?.[field.key];
+        const setValue = (next) =>
+          isCustom
+            ? onChangeCustom?.(field.key, next)
+            : onChangeBuiltin?.(field.key, next);
+
+        if (field.type === "textarea") {
+          elements.push(
+            <FieldShell key={field.key} field={field} className="md:col-span-2">
+              <textarea
+                rows={3}
+                value={value ?? ""}
+                placeholder={field.placeholder || ""}
+                onChange={(e) => setValue(e.target.value)}
+                className={inputClass}
+              />
+            </FieldShell>,
+          );
+          return;
+        }
+
+        if (field.type === "select") {
+          elements.push(
+            <FieldShell key={field.key} field={field}>
+              <select
+                value={value ?? ""}
+                onChange={(e) => setValue(e.target.value)}
+                className={inputClass}
               >
-                <input
-                  type="radio"
-                  name={`cfg-${field.key}`}
-                  checked={value === option}
-                  onChange={() => setValue(option)}
-                />
-                {option}
-              </label>
-            ))}
-          </div>
-        </FieldShell>
-      );
-    }
+                <option value="">Select</option>
+                {(field.options || []).map((option) => (
+                  <option key={option} value={option}>
+                    {option}
+                  </option>
+                ))}
+              </select>
+            </FieldShell>,
+          );
+          return;
+        }
 
-    if (field.type === "checkbox") {
-      return (
-        <label
-          key={field.key}
-          className="flex items-center gap-2 rounded-xl border border-[rgb(var(--border))] px-3 py-2.5 text-sm font-medium md:col-span-2"
-        >
-          <input
-            type="checkbox"
-            checked={Boolean(value)}
-            onChange={(e) => setValue(e.target.checked)}
-          />
-          {field.label}
-          {field.required ? " *" : ""}
-        </label>
-      );
-    }
+        if (field.type === "radio") {
+          elements.push(
+            <FieldShell key={field.key} field={field} className="md:col-span-2">
+              <div className="flex flex-wrap gap-4">
+                {(field.options || []).map((option) => (
+                  <label
+                    key={option}
+                    className="flex items-center gap-2 text-sm font-normal"
+                  >
+                    <input
+                      type="radio"
+                      name={`cfg-${field.key}`}
+                      checked={value === option}
+                      onChange={() => setValue(option)}
+                    />
+                    {option}
+                  </label>
+                ))}
+              </div>
+            </FieldShell>,
+          );
+          return;
+        }
 
-    return (
-      <FieldShell key={field.key} field={field}>
-        <input
-          type={
-            ["number", "date", "email", "tel"].includes(field.type)
-              ? field.type
-              : "text"
-          }
-          value={value ?? ""}
-          placeholder={field.placeholder || ""}
-          onChange={(e) => setValue(e.target.value)}
-          className={inputClass}
-        />
-      </FieldShell>
-    );
+        if (field.type === "checkbox") {
+          elements.push(
+            <label
+              key={field.key}
+              className="flex items-center gap-2 rounded-xl border border-[rgb(var(--border))] px-3 py-2.5 text-sm font-medium md:col-span-2"
+            >
+              <input
+                type="checkbox"
+                checked={Boolean(value)}
+                onChange={(e) => setValue(e.target.checked)}
+              />
+              {field.label}
+              {field.required ? " *" : ""}
+            </label>,
+          );
+          return;
+        }
+
+        elements.push(
+          <FieldShell key={field.key} field={field}>
+            <input
+              type={
+                ["number", "date", "email", "tel"].includes(field.type)
+                  ? field.type
+                  : "text"
+              }
+              value={value ?? ""}
+              placeholder={field.placeholder || ""}
+              onChange={(e) => setValue(e.target.value)}
+              className={inputClass}
+            />
+          </FieldShell>,
+        );
+      });
   });
+
+  return elements;
 };
 
 export default ConfigurableFormFields;
