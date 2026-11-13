@@ -1876,8 +1876,8 @@ const Registrations = () => {
             ) : null}
 
             {/* Filters */}
-            <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-100 p-3">
-              <div className="flex min-w-[240px] flex-1 flex-wrap items-center gap-2">
+            <div className="flex flex-nowrap items-center justify-between gap-2 overflow-x-auto border-b border-slate-100 p-3">
+              <div className="flex min-w-0 flex-1 items-center gap-2">
                 <div className="relative min-w-[190px] max-w-xs flex-1">
                   <FiSearch className="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-slate-400" />
                   <input
