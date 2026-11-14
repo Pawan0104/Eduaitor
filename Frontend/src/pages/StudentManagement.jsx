@@ -2715,6 +2715,14 @@ const StudentManagement = () => {
                 form.studentType === "Hosteller" ||
                 form.studentType === "Boarder";
 
+              // Soft grey panel behind the section's fields — the same surface
+              // the Parent/Student Portal Credentials cards use. Review and the
+              // credentials step already group their own cards, so they skip it.
+              const fieldPanelClass =
+                isReview || sectionKey === "builtin_7"
+                  ? ""
+                  : "space-y-4 rounded-xl border border-[rgb(var(--border))] bg-[rgb(var(--bg))] p-4";
+
               const renderCustomFields = () =>
                 customFields.map((field) => (
                   <CustomField
@@ -2737,6 +2745,7 @@ const StudentManagement = () => {
                     <DummyFillBar onFill={fillDummyData} sectionKey={sectionKey} />
                   )}
 
+                  <div className={fieldPanelClass}>
                   {sectionKey === "builtin_1" && (
                     <div className="space-y-4">
                       <div className="form-grid grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
@@ -3558,6 +3567,8 @@ const StudentManagement = () => {
                       )}
                     </>
                   )}
+
+                  </div>
 
                   {isReview && (
                     <ReviewStep
