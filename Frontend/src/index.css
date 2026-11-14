@@ -597,3 +597,111 @@ html[data-skin="forest"] .login-submit {
   background: linear-gradient(90deg, #34d399 0%, #059669 100%);
   color: #052e1c;
 }
+
+/* ---------- ALIGNED FIELD GRIDS ----------
+   Labels above form controls can wrap to two lines ("Student Aadhaar Number
+   (12 Digits)"), which used to push that column's input lower than its
+   neighbours. Inside a `.form-grid` every cell participates in the same label
+   row and control row, so inputs stay on one line at any screen width.
+   Browsers without subgrid support simply keep the previous stacked layout. */
+@supports (grid-template-rows: subgrid) {
+  .form-grid {
+    /* Rows are separated by each cell's padding instead of a row gap, so the
+       label and its control stay visually attached. */
+    row-gap: 0;
+  }
+
+  .form-grid > * {
+    display: grid;
+    grid-row: span 3;
+    grid-template-rows: subgrid;
+    align-content: start;
+    padding-bottom: 1rem;
+  }
+
+  .form-grid > * > label {
+    margin-bottom: 0.25rem;
+  }
+
+  /* Validation / hint line under the control. */
+  .form-grid > * > :nth-child(2) ~ * {
+    margin-top: 0.25rem;
+  }
+}
+
+/* ---------- ADMISSION FORM: ONE CONTROL STYLE ----------
+   Every text box, dropdown and textarea in the Add/Edit Student form uses the
+   same sizing, border, radius and typography as the Admission Number /
+   Confirmation Status bar at the top of the form. */
+.admission-form :where(
+  input:not([type="checkbox"]):not([type="radio"]):not([type="hidden"]),
+  select,
+  textarea
+) {
+  width: 100%;
+  border: 1px solid rgb(var(--border));
+  background-color: rgb(var(--surface));
+  color: rgb(var(--text));
+  outline: none;
+  transition: border-color 120ms ease, box-shadow 120ms ease;
+}
+
+.admission-form :where(
+  input:not([type="checkbox"]):not([type="radio"]):not([type="hidden"]),
+  select,
+  textarea
+):focus {
+  border-color: rgb(var(--primary));
+  box-shadow: 0 0 0 1px rgb(var(--primary) / 0.35);
+}
+
+.admission-form :where(
+  input:not([type="file"]):not([type="checkbox"]):not([type="radio"]):not([type="hidden"])
+) {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+}
+
+.admission-form option {
+  background-color: rgb(var(--surface));
+  color: rgb(var(--text));
+}
+
+.admission-form select {
+  font-weight: 500;
+}
+
+.admission-form textarea {
+  resize: none;
+}
+
+.admission-form :where(
+  input:not([type="checkbox"]):not([type="radio"]):not([type="hidden"]),
+  select,
+  textarea
+):disabled {
+  background-color: rgb(var(--bg));
+  opacity: 0.9;
+  cursor: not-allowed;
+}
+
+.admission-form input[readonly] {
+  font-weight: 600;
+}
+
+/* Keep the file picker on the same baseline as the other controls. */
+.admission-form input[type="file"] {
+  padding: 0.5rem 0.75rem;
+  background-color: rgb(var(--surface));
+}
+
+.admission-form input[type="file"]::file-selector-button {
+  margin-right: 0.75rem;
+  padding: 0.25rem 0.75rem;
+  border: 1px solid rgb(var(--border));
+  border-radius: 0.375rem;
+  background-color: rgb(var(--bg));
+  color: rgb(var(--text));
+  font-size: 0.75rem;
+  font-weight: 600;
+  cursor: pointer;
+}

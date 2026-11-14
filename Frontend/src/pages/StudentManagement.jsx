@@ -2638,7 +2638,7 @@ const StudentManagement = () => {
         <div
           className={`col-span-12 ${isSinglePage ? "" : "lg:col-span-9"}`}
         >
-          <div className="bg-[rgb(var(--surface))] text-[rgb(var(--text))]  border border-[rgb(var(--border))] rounded-xl shadow p-6 lg:p-8">
+          <div className="admission-form bg-[rgb(var(--surface))] text-[rgb(var(--text))]  border border-[rgb(var(--border))] rounded-xl shadow p-6 lg:p-8">
             {/* PROGRESS */}
 
             {!isSinglePage && (
@@ -2667,8 +2667,8 @@ const StudentManagement = () => {
             )}
 
             {/* Locked system fields — always visible at the top */}
-            <div className="mb-6 grid gap-4 rounded-xl border border-[rgb(var(--border))] bg-[rgb(var(--bg))] p-4 md:grid-cols-2 lg:grid-cols-3">
-              <label className="flex flex-col gap-1.5 text-sm font-medium">
+            <div className="form-grid mb-6 grid gap-4 rounded-xl border border-[rgb(var(--border))] bg-[rgb(var(--bg))] p-4 md:grid-cols-2 lg:grid-cols-3">
+              <label className="flex flex-col gap-1 text-sm font-medium">
                 <span>Admission Number</span>
                 <input
                   value={form.studentId || (isEdit ? "" : "Loading…")}
@@ -2681,7 +2681,7 @@ const StudentManagement = () => {
                   save. Cannot be edited on this form.
                 </span>
               </label>
-              <label className="flex flex-col gap-1.5 text-sm font-medium">
+              <label className="flex flex-col gap-1 text-sm font-medium">
                 <span>Confirmation Status</span>
                 <select
                   name="confirmationStatus"
@@ -2739,7 +2739,7 @@ const StudentManagement = () => {
 
                   {sectionKey === "builtin_1" && (
                     <div className="space-y-4">
-                      <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+                      <div className="form-grid grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
                         <Input
                           label="First Name *"
                           placeholder="First name"
@@ -2836,7 +2836,7 @@ const StudentManagement = () => {
                         />
                       </div>
 
-                      <div className="grid grid-cols-1 gap-4 pt-1 sm:grid-cols-3">
+                      <div className="form-grid grid grid-cols-1 gap-4 pt-1 sm:grid-cols-2 lg:grid-cols-3">
                         <Input
                           label="SR. No."
                           placeholder="Scholar Register No."
@@ -2863,7 +2863,7 @@ const StudentManagement = () => {
                   )}
 
                   {sectionKey === "builtin_2" && (
-                    <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+                    <div className="form-grid grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
                       <Input
                         label="Father Full Name *"
                         placeholder="Father full name"
@@ -2949,17 +2949,16 @@ const StudentManagement = () => {
                   )}
 
                   {sectionKey === "builtin_address" && (
-                    <div className="grid grid-cols-1 gap-4 sm:grid-cols-4">
-                      <div className="sm:col-span-4">
-                        <Input
-                          label="Address Line (House No. / Flat / Ward / Street)"
-                          placeholder="House / Plot No., Ward No., Street Name"
-                          name="address"
-                          value={form.address}
-                          onChange={handleChange}
-                          error={errors.address}
-                        />
-                      </div>
+                    <div className="form-grid grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+                      <Input
+                        cellClassName="sm:col-span-2 lg:col-span-4"
+                        label="Address Line (House No. / Flat / Ward / Street)"
+                        placeholder="House / Plot No., Ward No., Street Name"
+                        name="address"
+                        value={form.address}
+                        onChange={handleChange}
+                        error={errors.address}
+                      />
                       <Input
                         label="City / Town / Tehsil"
                         placeholder="City / Town / Tehsil"
@@ -3203,16 +3202,15 @@ const StudentManagement = () => {
                   )}
 
                   {sectionKey === "builtin_3" && (
-                    <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-                      <div className="sm:col-span-2">
-                        <Input
-                          label="Previous School Name"
-                          placeholder="Previous school name"
-                          name="previousSchoolName"
-                          value={form.previousSchoolName}
-                          onChange={handleChange}
-                        />
-                      </div>
+                    <div className="form-grid grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                      <Input
+                        cellClassName="sm:col-span-2"
+                        label="Previous School Name"
+                        placeholder="Previous school name"
+                        name="previousSchoolName"
+                        value={form.previousSchoolName}
+                        onChange={handleChange}
+                      />
                       <Input
                         label="Previous School UDISE Code (11 Digits)"
                         placeholder="11-digit UDISE code"
@@ -3700,13 +3698,13 @@ export default StudentManagement;
 
 /* INPUT */
 
-const Input = ({ label, error, ...props }) => {
+const Input = ({ label, error, cellClassName = "", ...props }) => {
   const meta = useAdmissionField(props.name);
   const enforceRequired = useEnforceRequired();
   if (meta?.visible === false) return null;
 
   return (
-    <div>
+    <div className={cellClassName}>
       <label className="block text-sm font-medium text-[rgb(var(--text))] mb-1">
         {applyFieldMetaToLabel(label, meta, enforceRequired)}
       </label>
@@ -3724,13 +3722,13 @@ const Input = ({ label, error, ...props }) => {
 
 /* SELECT */
 
-const Select = ({ label, error, options, ...props }) => {
+const Select = ({ label, error, options, cellClassName = "", ...props }) => {
   const meta = useAdmissionField(props.name);
   const enforceRequired = useEnforceRequired();
   if (meta?.visible === false) return null;
 
   return (
-    <div>
+    <div className={cellClassName}>
       <label className="block text-sm font-medium text-[rgb(var(--text))] mb-1">
         {applyFieldMetaToLabel(label, meta, enforceRequired)}
       </label>
@@ -4068,7 +4066,7 @@ const ParentLoginStep = ({ form, handleChange, isEdit }) => {
           <div className="border-b border-[rgb(var(--border))] pb-1.5 font-bold text-[rgb(var(--text))]">
             Parent Portal Credentials
           </div>
-          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+          <div className="form-grid grid grid-cols-1 gap-3 sm:grid-cols-2">
             <div>
               <label className={labelClass}>
                 {applyFieldMetaToLabel(
@@ -4135,7 +4133,7 @@ const ParentLoginStep = ({ form, handleChange, isEdit }) => {
             <div className="border-b border-[rgb(var(--border))] pb-1.5 font-bold text-[rgb(var(--text))]">
               Student Portal Credentials
             </div>
-            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+            <div className="form-grid grid grid-cols-1 gap-3 sm:grid-cols-2">
               <div>
                 <label className={labelClass}>
                   {applyFieldMetaToLabel(

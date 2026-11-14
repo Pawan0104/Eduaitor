@@ -286,6 +286,49 @@ const normalizeRemovedKeys = (raw) => {
   ];
 };
 
+const normalizeFieldLabel = (value) =>
+  String(value || "")
+    .toLowerCase()
+    .replace(/[^a-z0-9]/g, "");
+
+/**
+ * Custom fields the school added before the prototype layout existed, which are
+ * now product built-ins. Without this, they render a second time inside an
+ * "Additional Details" block on the same section.
+ */
+const LEGACY_LABEL_TO_FIELD_KEY = {
+  srno: "srNo",
+  scholarregisterno: "srNo",
+  srregister: "srNo",
+  religion: "religion",
+  apaarid: "apaarId",
+  schoolleavingdate: "schoolLeavingDate",
+  charactercertificate: "characterCertificate",
+  lastyearmarksheet: "lastMarksheet",
+  lastqualifyingmarksheet: "lastMarksheet",
+  stream: "streamId",
+  academicstream: "streamId",
+};
+
+const isDuplicateOfBuiltin = (field, builtinFields) => {
+  const label = normalizeFieldLabel(field.label);
+  const aliasKey = LEGACY_LABEL_TO_FIELD_KEY[label];
+  return builtinFields.some(
+    (builtinField) =>
+      builtinField.key === field.key ||
+      normalizeFieldLabel(builtinField.label) === label ||
+      (aliasKey && builtinField.key === aliasKey),
+  );
+};
+
+/** Drop custom fields that only repeat a built-in field in the same section. */
+const dropBuiltinDuplicates = (fields) => {
+  const builtinFields = fields.filter((field) => field.builtin);
+  return fields.filter(
+    (field) => field.builtin || !isDuplicateOfBuiltin(field, builtinFields),
+  );
+};
+
 const mergeStep = (defaultStep, storedStep) => {
   if (!storedStep) {
     return {
@@ -335,7 +378,7 @@ const mergeStep = (defaultStep, storedStep) => {
     title: storedStep.title?.trim() || defaultStep.title,
     builtin: true,
     removedFieldKeys,
-    fields: mergedFields,
+    fields: dropBuiltinDuplicates(mergedFields),
   };
 };
 
@@ -392,7 +435,10 @@ export const mergeAdmissionSteps = (storedSteps, storedVersion = 0) => {
       return {
         ...step,
         removedFieldKeys: [],
-        fields: [...step.fields.map(cloneField), ...customFieldsOf(storedStep)],
+        fields: dropBuiltinDuplicates([
+          ...step.fields.map(cloneField),
+          ...customFieldsOf(storedStep),
+        ]),
       };
     }
     return mergeStep(step, storedStep);
