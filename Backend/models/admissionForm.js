@@ -65,6 +65,12 @@ const admissionFormSchema = new mongoose.Schema(
       enum: ["steps", "single"],
       default: "steps",
     },
+    /**
+     * Version of the built-in admission layout these steps were saved against.
+     * Older versions are re-seeded from the current product defaults so the
+     * prototype-parity sections always win over stale customisations.
+     */
+    defaultsVersion: { type: Number, default: 0 },
   },
   { timestamps: true }
 );

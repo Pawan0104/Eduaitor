@@ -4,6 +4,12 @@ import { ensureAdmissionFormIndexes } from "../config/db.js";
 const getSchoolId = (req) => req.user?.school_id;
 
 /**
+ * Bump whenever the built-in admission layout changes in a way that must
+ * override previously saved steps (labels, field set, section order).
+ */
+const ADMISSION_DEFAULTS_VERSION = 2;
+
+/**
  * Prefer findOneAndUpdate($set) over document.save().
  * `steps` is Mixed JSON — Object.assign + save often skipped writing nested
  * changes, so Customize Form looked saved in the API response but the live
@@ -195,6 +201,7 @@ export const getAdmissionForm = async (req, res, next) => {
         steps: config?.steps?.length ? config.steps : null,
         layoutMode:
           config?.layoutMode === "single" ? "single" : "steps",
+        defaultsVersion: Number(config?.defaultsVersion) || 0,
         updatedAt: config?.updatedAt || null,
       },
     });
@@ -267,6 +274,10 @@ export const saveAdmissionForm = async (req, res, next) => {
 
     const formType = resolveFormType(req);
     const steps = sanitizeSteps(req.body?.steps);
+    const versionPatch =
+      formType === "admission"
+        ? { defaultsVersion: ADMISSION_DEFAULTS_VERSION }
+        : {};
 
     if (steps.length === 0) {
       return res.status(400).json({
@@ -277,12 +288,18 @@ export const saveAdmissionForm = async (req, res, next) => {
 
     let config;
     try {
-      config = await upsertFormConfig(schoolId, formType, { steps });
+      config = await upsertFormConfig(schoolId, formType, {
+        steps,
+        ...versionPatch,
+      });
     } catch (error) {
       if (error?.code !== 11000) throw error;
       // Drop legacy unique(schoolId) then retry once.
       await ensureAdmissionFormIndexes();
-      config = await upsertFormConfig(schoolId, formType, { steps });
+      config = await upsertFormConfig(schoolId, formType, {
+        steps,
+        ...versionPatch,
+      });
     }
 
     return res.json({
@@ -291,6 +308,7 @@ export const saveAdmissionForm = async (req, res, next) => {
       data: {
         formType,
         steps: config.steps,
+        defaultsVersion: Number(config?.defaultsVersion) || 0,
         updatedAt: config.updatedAt,
       },
     });

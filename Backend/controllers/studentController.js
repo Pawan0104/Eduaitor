@@ -474,6 +474,8 @@ export const createStudent = async (req, res) => {
     // Upload documents
     await uploadFile("birthCertificate", "documents");
     await uploadFile("transferCertificate", "documents");
+    await uploadFile("characterCertificate", "documents");
+    await uploadFile("lastMarksheet", "documents");
 
     await uploadFile("studentAadhar", "documents");
     await uploadFile("fatherAadhar", "documents");
@@ -567,23 +569,8 @@ export const createStudent = async (req, res) => {
         message: "Last name is required for confirmed admissions",
       });
     }
-    // Guardian is optional. When a guardian name is provided, the guardian's
-    // mobile and relation become mandatory so the record is never half-filled.
-    if (requireFields && String(safeBody.guardianName || "").trim()) {
-      if (!String(safeBody.guardianMobile || "").trim()) {
-        return res.status(400).json({
-          success: false,
-          message: "Guardian mobile is required when a guardian name is provided",
-        });
-      }
-      if (!String(safeBody.guardianRelation || "").trim()) {
-        return res.status(400).json({
-          success: false,
-          message:
-            "Guardian relation is required when a guardian name is provided",
-        });
-      }
-    }
+    // Guardian details are optional (the prototype has no guardian mobile
+    // field). Never block a save just because the guardian block is partial.
 
     // Admission number is system-assigned (locked on the form). Never trust a
     // client-supplied value — the preview can go stale between open and save,
@@ -603,17 +590,27 @@ export const createStudent = async (req, res) => {
     // Always auto on create so unique-index races retry with a fresh STU####.
     const isAutoAdmission = true;
 
-    // â”€â”€ HASH PASSWORD (same password used for both, set at creation) â”€â”€
+    // â”€â”€ HASH PASSWORD (parent account; student may override) â”€â”€
     const rawPassword = safeBody.password?.trim();
+    const rawStudentPassword = String(safeBody.studentPassword || "").trim();
+    if (rawStudentPassword && rawStudentPassword.length < 5) {
+      return res.status(400).json({
+        success: false,
+        message: "Student password must be at least 5 characters",
+      });
+    }
     const hashedPassword = rawPassword
       ? await bcrypt.hash(rawPassword, 10)
       : undefined;
+    const hashedStudentPassword = rawStudentPassword
+      ? await bcrypt.hash(rawStudentPassword, 10)
+      : hashedPassword;
 
     // â”€â”€ BUILD CREDENTIAL OBJECTS â”€â”€
     const studentCredentials = {
       username: studentId, // STU0001 â€” auto generated
-      password: hashedPassword,
-      temp_password: rawPassword || undefined,
+      password: hashedStudentPassword,
+      temp_password: rawStudentPassword || rawPassword || undefined,
       firstTimeLogin: true,
     };
 
@@ -627,6 +624,8 @@ export const createStudent = async (req, res) => {
     // â”€â”€ STRIP OLD TOP-LEVEL CREDENTIAL FIELDS â”€â”€
     delete safeBody.username;
     delete safeBody.password;
+    delete safeBody.studentPassword;
+    delete safeBody.studentUsername;
     delete safeBody.temp_password;
     delete safeBody.firstTimeLogin;
 
@@ -1372,6 +1371,8 @@ export const updateStudent = async (req, res) => {
     // Update documents
     await updateFile("birthCertificate", "documents");
     await updateFile("transferCertificate", "documents");
+    await updateFile("characterCertificate", "documents");
+    await updateFile("lastMarksheet", "documents");
 
     await updateFile("studentAadhar", "documents");
     await updateFile("fatherAadhar", "documents");
@@ -1471,10 +1472,28 @@ export const updateStudent = async (req, res) => {
       const rawPassword = safeBody.password.trim();
       const hashedPassword = await bcrypt.hash(rawPassword, 10);
 
-      credentialUpdate["studentCredentials.password"] = hashedPassword;
-      credentialUpdate["studentCredentials.temp_password"] = rawPassword;
       credentialUpdate["parentCredentials.password"] = hashedPassword;
       credentialUpdate["parentCredentials.temp_password"] = rawPassword;
+      // Keep the student login in sync with the parent unless an explicit
+      // student password was provided below.
+      if (!String(safeBody.studentPassword || "").trim()) {
+        credentialUpdate["studentCredentials.password"] = hashedPassword;
+        credentialUpdate["studentCredentials.temp_password"] = rawPassword;
+      }
+    }
+
+    if (safeBody.studentPassword && safeBody.studentPassword.trim() !== "") {
+      const rawStudentPassword = safeBody.studentPassword.trim();
+      if (rawStudentPassword.length < 5) {
+        return res.status(400).json({
+          success: false,
+          message: "Student password must be at least 5 characters",
+        });
+      }
+      const hashedStudentPassword = await bcrypt.hash(rawStudentPassword, 10);
+      credentialUpdate["studentCredentials.password"] = hashedStudentPassword;
+      credentialUpdate["studentCredentials.temp_password"] =
+        rawStudentPassword;
     }
 
     // Sync parent username if fatherMobile changed
@@ -1501,6 +1520,8 @@ export const updateStudent = async (req, res) => {
 
     // â”€â”€ STRIP password from safeBody so it doesn't conflict â”€â”€
     delete safeBody.password;
+    delete safeBody.studentPassword;
+    delete safeBody.studentUsername;
     delete safeBody.temp_password;
 
     // â”€â”€ ALSO STRIP any nested credential objects if accidentally in safeBody â”€â”€

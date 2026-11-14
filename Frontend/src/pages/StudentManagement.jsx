@@ -9,7 +9,10 @@ import AdmissionFormBuilder from "../components/AdmissionFormBuilder";
 import {
   buildFieldIndex,
   mergeAdmissionSteps,
+  REVIEW_STEP_KEY,
+  ADMISSION_DEFAULTS_VERSION,
 } from "../lib/admissionFormDefaults";
+import { INDIA_STATES } from "../lib/indiaLocations";
 
 const API = import.meta.env.VITE_API_URL;
 
@@ -63,7 +66,11 @@ const errorFieldKey = (error) => {
   if (text.includes("mother email")) return "motherEmail";
   if (text.includes("guardian mobile")) return "guardianMobile";
   if (text.includes("guardian relation")) return "guardianRelation";
+  if (text.includes("guardian email")) return "guardianEmail";
   if (text.includes("guardian")) return "guardianName";
+  if (text.includes("aadhaar") || text.includes("aadhar")) return "aadhaarNumber";
+  if (text.includes("pin code")) return "pincode";
+  if (text.includes("udise")) return "previousSchoolUdise";
   if (text.includes("address")) return "address";
   if (text.includes("student photo")) return "studentPhoto";
   if (text.includes("father aadhar")) return "fatherAadhar";
@@ -84,6 +91,37 @@ const CUSTOM_ERROR_PREFIX = "CF::";
 const isEmptyCustomValue = (value) =>
   value === undefined || value === null || value === "" || value === false;
 
+/** Built-in steps that render the prototype admission-form sections. */
+const PROTOTYPE_SECTION_KEYS = new Set([
+  "builtin_1",
+  "builtin_2",
+  "builtin_address",
+  "builtin_5",
+  "builtin_3",
+  "builtin_4",
+  "builtin_6",
+  "builtin_medical",
+  "builtin_7",
+  "builtin_notes",
+]);
+
+/** "Age: 12 Yrs, 3 Mos" style badge used next to Date of Birth. */
+const formatAge = (dobStr) => {
+  if (!dobStr) return "-- Yrs";
+  const birth = new Date(dobStr);
+  if (Number.isNaN(birth.getTime())) return "-- Yrs";
+  const now = new Date();
+  let years = now.getFullYear() - birth.getFullYear();
+  let months = now.getMonth() - birth.getMonth();
+  if (now.getDate() < birth.getDate()) months -= 1;
+  if (months < 0) {
+    years -= 1;
+    months += 12;
+  }
+  if (years < 0) return "-- Yrs";
+  return `${years} Yrs${months ? `, ${months} Mos` : ""}`;
+};
+
 
 
 const splitStudentName = (fullName = "") => {
@@ -100,48 +138,18 @@ const busFeeQuarterOptions = [
 ];
 
 // Reservation category (Indian school admission forms).
-const CATEGORY_OPTIONS = ["General", "OBC", "SC", "ST", "Minority"];
-
-// Only asked when category === "Minority".
-const COMMUNITY_OPTIONS = [
-  "Muslim",
-  "Christian",
-  "Sikh",
-  "Jain",
-  "Buddhist",
-  "Parsi",
-  "Other",
-];
-
-// Blood group is optional, but must look sane when provided.
-const BLOOD_GROUP_RE = /^(A|B|AB|O)[\s-]?(pos|neg|\+|-)?$/i;
+const CATEGORY_OPTIONS = ["General", "OBC", "SC", "ST", "EWS"];
 
 const GUARDIAN_RELATION_OPTIONS = [
-  "Father",
-  "Mother",
-  "Step Father",
-  "Step Mother",
-  "Grand Father",
-  "Grand Mother",
-  "Uncle",
-  "Aunt",
-  "Brother",
-  "Sister",
+  "Grandfather",
+  "Grandmother",
+  "Paternal Uncle (Tau / Chacha)",
+  "Maternal Uncle (Mama)",
+  "Aunt (Bua / Mausi)",
+  "Elder Brother",
+  "Elder Sister",
   "Legal Guardian",
-  "Other",
-];
-
-const ADMISSION_SOURCE_OPTIONS = [
-  "Newspaper",
-  "Advertisement",
-  "Vendor / Partner",
-  "Website / Online",
-  "Social Media",
-  "Friend / Relative",
-  "Alumni",
-  "Walk-in",
-  "School Camp / Event",
-  "Other",
+  "Other Relative",
 ];
 
 const emptyForm = {
@@ -205,8 +213,8 @@ const emptyForm = {
   stream: "",
   optionalSubjectIds: [],
   rollNo: "",
-  studentType: "",
-    feeBatch: "New",
+  studentType: "Day Scholar",
+  feeBatch: "New",
   transport: "",
   useTransport: false,
   selectedOptionalFees: [],
@@ -225,6 +233,8 @@ const emptyForm = {
 
   birthCertificate: null,
   transferCertificate: null,
+  characterCertificate: null,
+  lastMarksheet: null,
 
   studentAadhar: null,
   fatherAadhar: null,
@@ -232,6 +242,8 @@ const emptyForm = {
 
   username: "",
   password: "",
+  studentUsername: "",
+  studentPassword: "",
   extraDocuments: [],
   custom: {},
 };
@@ -475,28 +487,22 @@ const toDateInputValue = (date) => date.toISOString().slice(0, 10);
 
 // QA helper: fills the currently visible step with sample data so the wizard can
 // be walked end-to-end without typing. Test-only — never auto-applied.
-const DUMMY_DATA_BY_STEP = {
-  1: () => ({
+const DUMMY_DATA_BY_SECTION = {
+  builtin_1: () => ({
     firstName: "Test",
     lastName: "Student",
     dob: "2015-06-15",
     gender: "Male",
-    bloodGroup: "B+",
-    nationality: "Indian",
-    placeOfBirth: "Hyderabad",
-    caste: "",
+    religion: "Hindu",
     category: "General",
-    community: "",
     aadhaarNumber: "123412341234",
+    nicNumber: "NIC123456",
+    srNo: "SR/2026/001",
     penNumber: "PEN123456",
-    admissionSource: "Walk-in",
-    isSpecialChild: false,
-    isEws: false,
-    isPhysicallyDisabled: false,
-    medicalConditionRemarks: "",
+    apaarId: "123456789012",
     admissionDate: toDateInputValue(new Date()),
   }),
-  2: () => ({
+  builtin_2: () => ({
     fatherName: "Ramesh Test",
     fatherMobile: "9876543210",
     fatherEmail: "ramesh.test@example.com",
@@ -504,27 +510,36 @@ const DUMMY_DATA_BY_STEP = {
     motherMobile: "9876543211",
     motherEmail: "sunita.test@example.com",
     guardianName: "Anita Guardian",
-    guardianMobile: "9876543212",
-    guardianRelation: "Aunt",
-    address: "12 Test Park Lane, Test City, Test State 500001",
+    guardianRelation: "Aunt (Bua / Mausi)",
+    guardianEmail: "anita.guardian@example.com",
   }),
-  3: () => ({
-    previousSchoolName: "Test Public School",
-    previousSchoolClass: "Class 4",
-    previousSchoolResult: "Pass",
-    previousSchoolTcNumber: "TC/2024/001",
+  builtin_address: () => ({
+    address: "12 Test Park Lane",
+    city: "Test City",
+    district: "Test District",
+    state: "Rajasthan",
+    pincode: "500001",
   }),
-  5: (classes) => ({
+  builtin_5: (classes) => ({
     classId: classes?.[0]?._id || classes?.[0]?.id || "",
     rollNo: "1",
     studentType: "Day Scholar",
     feeBatch: "New",
   }),
-  6: () => ({
+  builtin_3: () => ({
+    previousSchoolName: "Test Public School",
+    previousSchoolUdise: "12345678901",
+    previousSchoolClass: "Class 4",
+    previousSchoolResult: "Pass",
+    previousSchoolTcNumber: "TC/2024/001",
+    schoolLeavingDate: "2026-03-31",
+    prevSchoolAddress: "Test Town, Test District, Rajasthan",
+  }),
+  builtin_6: () => ({
     discountType: "Percentage",
     discountValue: "10",
   }),
-  7: () => ({
+  builtin_7: () => ({
     username: "9876543210",
     password: "Test@1234",
   }),
@@ -550,14 +565,10 @@ const createDummyImageFile = (label) => {
 
 const DUMMY_DOCUMENT_FIELDS = [
   "studentPhoto",
-  "fatherPhoto",
-  "motherPhoto",
-  "guardianPhoto",
-  "birthCertificate",
   "transferCertificate",
   "studentAadhar",
-  "fatherAadhar",
-  "motherAadhar",
+  "characterCertificate",
+  "lastMarksheet",
 ];
 
 const createExtraDocument = () => {
@@ -574,15 +585,18 @@ const createExtraDocument = () => {
   };
 };
 
-const DUMMY_STEP_HINTS = {
-  1: "name, date of birth, gender, blood group, category and admission date",
-  2: "parent, guardian and address details",
-  3: "previous school details",
-  4: "sample photo, Aadhar and certificate files",
-  5: "class, roll number and student type",
-  6: "discount settings — fee totals recalculate automatically",
-  7: "parent login username and password",
-  8: "every field on all steps at once",
+const DUMMY_SECTION_HINTS = {
+  builtin_1:
+    "name, date of birth, gender, religion, category and admission date",
+  builtin_2: "parent, guardian and contact details",
+  builtin_address: "address, city, district, state and PIN code",
+  builtin_5: "class, section, residence mode and transport route",
+  builtin_3: "previous school details",
+  builtin_4: "sample photo and certificate files",
+  builtin_6: "discount settings — fee totals recalculate automatically",
+  builtin_medical: "a sample medical note",
+  builtin_7: "parent and student login credentials",
+  builtin_notes: "a sample office remark",
 };
 
 const SectionHeading = ({ title }) => {
@@ -594,12 +608,14 @@ const SectionHeading = ({ title }) => {
   );
 };
 
-const DummyFillBar = ({ onFill, step }) => (
+const DummyFillBar = ({ onFill, sectionKey }) => (
   <div className="mb-6 flex flex-wrap items-center justify-between gap-3 rounded-lg border border-dashed border-amber-400 bg-amber-50 px-4 py-3">
     <div className="min-w-0">
       <p className="text-sm font-semibold text-amber-900">Test data</p>
       <p className="text-xs text-amber-800">
-        Fills {DUMMY_STEP_HINTS[step] || "this step"} with sample values.
+        Fills{" "}
+        {DUMMY_SECTION_HINTS[sectionKey] || "every field on all sections"} with
+        sample values.
       </p>
     </div>
     <button
@@ -659,25 +675,31 @@ const StudentManagement = () => {
   const canChangeLayout = ["school_admin", "super_admin"].includes(user?.role);
 
   const activeStepDefs = useMemo(() => {
-    const base = (formStepDefs || []).filter(
+    const all = (formStepDefs || []).filter(
       (step) => step?.key !== "carried_from_funnel",
     );
-    if (!carriedFields.length) return base;
+    const review = all.find((step) => step?.key === REVIEW_STEP_KEY) || {
+      key: REVIEW_STEP_KEY,
+      title: "Review",
+      builtin: true,
+      fields: [],
+    };
+    const body = all.filter((step) => step?.key !== REVIEW_STEP_KEY);
+    if (!carriedFields.length) return [...body, review];
     return [
-      ...base,
+      ...body,
       {
         key: "carried_from_funnel",
         title: "From Lead / Registration",
         builtin: false,
         fields: carriedFields,
       },
+      review,
     ];
   }, [formStepDefs, carriedFields]);
 
-  const customStepDefs = activeStepDefs.filter((s) => !s.builtin);
-  // First seven steps are the built-in wizard steps; custom steps follow them
-  // and Review is always last.
-  const reviewStep = 8 + customStepDefs.length;
+  // Review is always the last step now that sections are data-driven.
+  const reviewStep = activeStepDefs.length;
   const wizardSteps = activeStepDefs.map((s) => s.title);
   const fieldIndex = useMemo(
     () => buildFieldIndex(activeStepDefs),
@@ -703,7 +725,12 @@ const StudentManagement = () => {
           withCredentials: true,
         });
         if (cancelled || gen !== loadGen) return;
-        setFormStepDefs(mergeAdmissionSteps(res.data?.data?.steps));
+        setFormStepDefs(
+          mergeAdmissionSteps(
+            res.data?.data?.steps,
+            res.data?.data?.defaultsVersion,
+          ),
+        );
         setLayoutMode(
           res.data?.data?.layoutMode === "single" ? "single" : "steps",
         );
@@ -716,7 +743,9 @@ const StudentManagement = () => {
     const handleUpdate = (event) => {
       // Invalidate any in-flight GET so it cannot overwrite a fresh save.
       loadGen += 1;
-      setFormStepDefs(mergeAdmissionSteps(event.detail));
+      setFormStepDefs(
+        mergeAdmissionSteps(event.detail, ADMISSION_DEFAULTS_VERSION),
+      );
     };
     window.addEventListener("admission-form-updated", handleUpdate);
 
@@ -1303,6 +1332,8 @@ const StudentManagement = () => {
           "guardianPhoto",
           "birthCertificate",
           "transferCertificate",
+          "characterCertificate",
+          "lastMarksheet",
           "studentAadhar",
           "fatherAadhar",
           "motherAadhar",
@@ -1354,6 +1385,10 @@ const StudentManagement = () => {
           bloodGroup: student.bloodGroup || "",
           nationality: student.nationality || "",
           placeOfBirth: student.placeOfBirth || "",
+          religion: student.religion || "",
+          nicNumber: student.nicNumber || "",
+          srNo: student.srNo || "",
+          apaarId: student.apaarId || "",
           caste: student.caste || "",
           category: student.category || "",
           community: student.community || "",
@@ -1369,6 +1404,7 @@ const StudentManagement = () => {
           isEws: Boolean(student.isEws),
           isPhysicallyDisabled: Boolean(student.isPhysicallyDisabled),
           medicalConditionRemarks: student.medicalConditionRemarks || "",
+          admissionNotes: student.admissionNotes || "",
           admissionDate: toDateInput(student.admissionDate),
           studentId: student.studentId || "",
           fatherName: student.fatherName || "",
@@ -1380,11 +1416,19 @@ const StudentManagement = () => {
           guardianName: student.guardianName || "",
           guardianMobile: student.guardianMobile || "",
           guardianRelation: student.guardianRelation || "",
+          guardianEmail: student.guardianEmail || "",
           address: student.address || "",
+          city: student.city || "",
+          district: student.district || "",
+          state: student.state || "",
+          pincode: student.pincode || "",
           previousSchoolName: student.previousSchoolName || "",
           previousSchoolClass: student.previousSchoolClass || "",
           previousSchoolResult: student.previousSchoolResult || "",
           previousSchoolTcNumber: student.previousSchoolTcNumber || "",
+          previousSchoolUdise: student.previousSchoolUdise || "",
+          schoolLeavingDate: toDateInput(student.schoolLeavingDate),
+          prevSchoolAddress: student.prevSchoolAddress || "",
           classId: student.classId?._id || student.classId || "",
           sectionId: student.sectionId?._id || student.sectionId || "",
           streamId: student.streamId?._id || student.streamId || "",
@@ -1412,6 +1456,8 @@ const StudentManagement = () => {
           username:
             student.parentCredentials?.username || student.fatherMobile || "",
           password: "",
+          studentUsername: student.studentCredentials?.username || "",
+          studentPassword: "",
           documents: student.documents || {},
           extraDocuments,
           custom: Object.fromEntries(
@@ -1434,43 +1480,37 @@ const StudentManagement = () => {
   const fillDummyData = () => {
     if (isEdit) return;
 
+    const dummyDocuments = Object.fromEntries(
+      DUMMY_DOCUMENT_FIELDS.map((field) => [
+        field,
+        createDummyImageFile(`${field}-test.png`),
+      ]),
+    );
+
     // Review step has no inputs of its own — fill everything so the whole
     // wizard can be checked in one click.
     if (step === reviewStep) {
       setForm((prev) => ({
         ...prev,
-        ...DUMMY_DATA_BY_STEP[1](),
-        ...DUMMY_DATA_BY_STEP[2](),
-        ...DUMMY_DATA_BY_STEP[3](),
-        ...DUMMY_DATA_BY_STEP[5](classes),
-        ...DUMMY_DATA_BY_STEP[6](),
-        ...DUMMY_DATA_BY_STEP[7](),
-        ...Object.fromEntries(
-          DUMMY_DOCUMENT_FIELDS.map((field) => [
-            field,
-            createDummyImageFile(`${field}-test.png`),
-          ]),
+        ...Object.values(DUMMY_DATA_BY_SECTION).reduce(
+          (acc, builder) => ({ ...acc, ...builder(classes) }),
+          {},
         ),
+        ...dummyDocuments,
       }));
       setErrors({});
       return;
     }
 
-    if (step === 4) {
-      setForm((prev) => ({
-        ...prev,
-        ...Object.fromEntries(
-          DUMMY_DOCUMENT_FIELDS.map((field) => [
-            field,
-            createDummyImageFile(`${field}-test.png`),
-          ]),
-        ),
-      }));
+    const sectionKey = activeStepDefs[step - 1]?.key;
+
+    if (sectionKey === "builtin_4") {
+      setForm((prev) => ({ ...prev, ...dummyDocuments }));
       setErrors({});
       return;
     }
 
-    const builder = DUMMY_DATA_BY_STEP[step];
+    const builder = DUMMY_DATA_BY_SECTION[sectionKey];
     if (!builder) return;
 
     setForm((prev) => ({ ...prev, ...builder(classes) }));
@@ -1493,6 +1533,16 @@ const StudentManagement = () => {
       nextValue = String(value || "")
         .replace(/\D/g, "")
         .slice(0, 12);
+    }
+    if (name === "pincode") {
+      nextValue = String(value || "")
+        .replace(/\D/g, "")
+        .slice(0, 6);
+    }
+    if (name === "previousSchoolUdise") {
+      nextValue = String(value || "")
+        .replace(/\D/g, "")
+        .slice(0, 11);
     }
 
     if (name === "discountValue") {
@@ -1579,6 +1629,13 @@ const StudentManagement = () => {
       }),
       ...(name === "busFeeFrequency" && {
         busFeeQuarter: value === "quarterly" ? form.busFeeQuarter : "",
+      }),
+      ...(name === "transport" && {
+        useTransport: Boolean(nextValue),
+        busFeeFrequency: nextValue
+          ? prev.busFeeFrequency || "annually"
+          : "annually",
+        busFeeQuarter: nextValue ? prev.busFeeQuarter : "",
       }),
       ...(name === "streamId" && {
         stream:
@@ -1794,7 +1851,9 @@ const StudentManagement = () => {
     // run when a value is present.
     const require = enforceRequiredFields;
 
-    if (targetStep === 1) {
+    const stepKey = activeStepDefs[targetStep - 1]?.key;
+
+    if (stepKey === "builtin_1") {
       if (require && !form.firstName?.trim()) errors.push("First Name required");
       if (require && !form.lastName?.trim()) errors.push("Last Name required");
       if (require && !form.dob) {
@@ -1821,40 +1880,28 @@ const StudentManagement = () => {
         }
       }
       if (require && !form.gender) errors.push("Gender required");
-      if (require && !form.admissionDate) errors.push("Admission Date required");
 
-      // Blood group is optional — only validate the format when provided.
-      if (form.bloodGroup?.trim() && !BLOOD_GROUP_RE.test(form.bloodGroup.trim())) {
-        errors.push("Invalid Blood Group");
-      }
-
-      if (require && !form.category) errors.push("Category required");
-      if (require && form.category === "Minority" && !form.community) {
-        errors.push("Community required");
+      if (
+        form.aadhaarNumber?.trim() &&
+        !/^\d{12}$/.test(String(form.aadhaarNumber).trim())
+      ) {
+        errors.push("Invalid Aadhaar number");
       }
     }
 
-    if (targetStep === 2) {
+    if (stepKey === "builtin_2") {
       if (require && !form.fatherName?.trim()) errors.push("Father name required");
       if (require && !form.fatherMobile?.trim())
         errors.push("Father mobile required");
-      if (require && !form.motherName?.trim()) errors.push("Mother name required");
-      if (require && !form.motherMobile?.trim())
-        errors.push("Mother mobile required");
-      // Guardian is optional. Only validate mobile/relation once a guardian
-      // name is entered — the fields are revealed conditionally in the form.
-      if (require && form.guardianName?.trim()) {
-        if (!form.guardianMobile?.trim())
-          errors.push("Guardian mobile required");
-        if (!form.guardianRelation?.trim())
-          errors.push("Guardian relation required");
-      }
-      if (require && !form.address?.trim()) errors.push("Address required");
+      // Mother and guardian details are optional in the prototype.
       if (form.fatherMobile && !/^\d{10}$/.test(String(form.fatherMobile)))
         errors.push("Invalid Father Mobile Number");
       if (form.motherMobile && !/^\d{10}$/.test(String(form.motherMobile)))
         errors.push("Invalid Mother Mobile Number");
-      if (form.guardianMobile?.trim() && !/^\d{10}$/.test(String(form.guardianMobile).trim()))
+      if (
+        form.guardianMobile?.trim() &&
+        !/^\d{10}$/.test(String(form.guardianMobile).trim())
+      )
         errors.push("Invalid Guardian Mobile Number");
       // Emails are optional — validate format only when filled
       const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/i;
@@ -1862,39 +1909,42 @@ const StudentManagement = () => {
         errors.push("Invalid Father Email");
       if (form.motherEmail?.trim() && !emailRegex.test(form.motherEmail.trim()))
         errors.push("Invalid Mother Email");
+      if (
+        form.guardianEmail?.trim() &&
+        !emailRegex.test(form.guardianEmail.trim())
+      )
+        errors.push("Invalid Guardian Email");
     }
 
-    if (targetStep === 4) {
-      if (
-        require &&
-        !form.studentPhoto &&
-        !form?.documents?.studentPhoto?.url
-      ) {
-        errors.push("Student Photo is required");
-      }
-      if (
-        require &&
-        !form.fatherAadhar &&
-        !form?.documents?.fatherAadhar?.url
-      ) {
-        errors.push("Father Aadhar is required");
-      }
-      if (
-        require &&
-        !form.motherAadhar &&
-        !form?.documents?.motherAadhar?.url
-      ) {
-        errors.push("Mother Aadhar is required");
+    if (stepKey === "builtin_address") {
+      if (form.pincode?.trim() && !/^\d{6}$/.test(String(form.pincode).trim())) {
+        errors.push("Invalid PIN Code");
       }
     }
 
-    if (targetStep === 5) {
+    if (stepKey === "builtin_3") {
+      if (
+        form.previousSchoolUdise?.trim() &&
+        !/^\d{11}$/.test(String(form.previousSchoolUdise).trim())
+      ) {
+        errors.push("Invalid Previous School UDISE Code");
+      }
+    }
+
+    if (stepKey === "builtin_4") {
+      // Documents are optional on the prototype form.
+    }
+
+    if (stepKey === "builtin_5") {
       if (require && !form.classId) errors.push("Class required");
-      if (require && !form.rollNo) errors.push("Roll number required");
     }
 
-    if (targetStep === 6) {
-      if (require && (form.totalFee === "" || form.totalFee === null)) {
+    if (stepKey === "builtin_6") {
+      if (
+        require &&
+        feeStructure.length > 0 &&
+        (form.totalFee === "" || form.totalFee === null)
+      ) {
         errors.push("Total fee required");
       }
 
@@ -1912,15 +1962,18 @@ const StudentManagement = () => {
       }
     }
 
-    if (targetStep === 7) {
+    if (stepKey === "builtin_7") {
       const resolvedUsername = (form.username || form.fatherMobile || "").trim();
       const resolvedPassword = (form.password || "").trim();
+      const studentPassword = (form.studentPassword || "").trim();
 
       if (require && !resolvedUsername) errors.push("Username is required");
       if (require && !isEdit && !resolvedPassword)
         errors.push("Password is required");
       if (resolvedPassword && resolvedPassword.length < 5)
         errors.push("Password must be at least 5 characters");
+      if (studentPassword && studentPassword.length < 5)
+        errors.push("Student password must be at least 5 characters");
     }
 
     // ── Admin-defined fields on this step ──
@@ -2006,6 +2059,11 @@ const StudentManagement = () => {
         errorMap.motherMobile = err;
       if (lowerErr.includes("father email")) errorMap.fatherEmail = err;
       if (lowerErr.includes("mother email")) errorMap.motherEmail = err;
+      if (lowerErr.includes("guardian email")) errorMap.guardianEmail = err;
+      if (lowerErr.includes("aadhaar") || lowerErr.includes("aadhar"))
+        errorMap.aadhaarNumber = err;
+      if (lowerErr.includes("pin code")) errorMap.pincode = err;
+      if (lowerErr.includes("udise")) errorMap.previousSchoolUdise = err;
       if (lowerErr.includes("address")) errorMap.address = err;
       if (lowerErr.includes("student photo")) errorMap.studentPhoto = err;
       if (lowerErr.includes("father aadhar")) errorMap.fatherAadhar = err;
@@ -2033,7 +2091,7 @@ const StudentManagement = () => {
     }
 
     // Keep parent username aligned with father mobile for next step/review.
-    if (step === 7) {
+    if (activeStepDefs[step - 1]?.key === "builtin_7") {
       setForm((prev) => ({
         ...prev,
         username: prev.username || prev.fatherMobile,
@@ -2641,1010 +2699,887 @@ const StudentManagement = () => {
               </label>
             </div>
 
-            {/* STEP 1 */}
+            {/* ADMISSION SECTIONS — rendered in the configured step order */}
 
-{(isSinglePage || step === 1) && (
-                <div className={isSinglePage ? "mb-10" : undefined}>
-                  {isSinglePage ? (
-                    <SectionHeading title={wizardSteps[0]} />
-                  ) : (
-                    <DummyFillBar onFill={fillDummyData} step={step} />
-                  )}
-                  <div className="grid md:grid-cols-2 gap-6">
-                <Input
-                  label="First Name *"
-                  placeholder="Enter first name"
-                  name="firstName"
-                  value={form.firstName}
-                  onChange={handleChange}
-                  error={errors.firstName}
-                />
-                <Input
-                  label="Last Name *"
-                  placeholder="Enter last name"
-                  name="lastName"
-                  value={form.lastName}
-                  onChange={handleChange}
-                  error={errors.lastName}
-                />
-                <Input
-                  type="date"
-                  label="Date of Birth *"
-                  name="dob"
-                  value={form.dob}
-                  onChange={handleChange}
-                  error={errors.dob}
-                  max={new Date().toISOString().split("T")[0]}
-                />
-                <Select
-                  label="Gender *"
-                  name="gender"
-                  value={form.gender}
-                  options={["Male", "Female"]}
-                  onChange={handleChange}
-                  error={errors.gender}
-                />
-                <Input
-                  label="Blood Group"
-                  placeholder="Enter blood group (eg. O+, A-...)"
-                  name="bloodGroup"
-                  value={form.bloodGroup}
-                  onChange={handleChange}
-                  error={errors.bloodGroup}
-                />
-                <Input
-                  label="Nationality"
-                  placeholder="e.g. Indian"
-                  name="nationality"
-                  value={form.nationality}
-                  onChange={handleChange}
-                />
-                <Input
-                  label="Place of Birth"
-                  placeholder="City / Place of birth"
-                  name="placeOfBirth"
-                  value={form.placeOfBirth}
-                  onChange={handleChange}
-                />
-                <Input
-                  label="Caste"
-                  placeholder="Enter caste"
-                  name="caste"
-                  value={form.caste}
-                  onChange={handleChange}
-                />
-                <Select
-                  label="Category *"
-                  name="category"
-                  value={form.category}
-                  options={CATEGORY_OPTIONS}
-                  onChange={handleChange}
-                  error={errors.category}
-                />
-                {form.category === "Minority" && (
-                  <Select
-                    label="Community *"
-                    name="community"
-                    value={form.community}
-                    options={COMMUNITY_OPTIONS}
-                    onChange={handleChange}
-                    error={errors.community}
-                  />
-                )}
-                <Input
-                  label="Aadhaar Number / Aadhaar ID"
-                  placeholder="12-digit Aadhaar number"
-                  name="aadhaarNumber"
-                  value={form.aadhaarNumber}
-                  onChange={handleChange}
-                  maxLength={12}
-                  inputMode="numeric"
-                />
-                <Input
-                  label="PEN Number"
-                  placeholder="Permanent Education Number"
-                  name="penNumber"
-                  value={form.penNumber}
-                  onChange={handleChange}
-                />
-                <Select
-                  label="Admission Source"
-                  name="admissionSource"
-                  value={form.admissionSource}
-                  options={ADMISSION_SOURCE_OPTIONS}
-                  onChange={handleChange}
-                />
-                {(fieldIndex.get("isSpecialChild")?.visible !== false ||
-                  fieldIndex.get("isEws")?.visible !== false ||
-                  fieldIndex.get("isPhysicallyDisabled")?.visible !==
-                    false) && (
-                  <div className="md:col-span-2 grid gap-3 sm:grid-cols-3">
-                    {fieldIndex.get("isSpecialChild")?.visible !== false && (
-                      <label className="flex items-center gap-2 text-sm font-medium rounded-xl border border-[rgb(var(--border))] px-3 py-2.5 bg-[rgb(var(--surface))]">
-                        <input
-                          type="checkbox"
-                          checked={Boolean(form.isSpecialChild)}
-                          onChange={(e) =>
-                            setForm((prev) => ({
-                              ...prev,
-                              isSpecialChild: e.target.checked,
-                            }))
-                          }
-                        />
-                        Is special child?
-                      </label>
-                    )}
-                    {fieldIndex.get("isEws")?.visible !== false && (
-                      <label className="flex items-center gap-2 text-sm font-medium rounded-xl border border-[rgb(var(--border))] px-3 py-2.5 bg-[rgb(var(--surface))]">
-                        <input
-                          type="checkbox"
-                          checked={Boolean(form.isEws)}
-                          onChange={(e) =>
-                            setForm((prev) => ({
-                              ...prev,
-                              isEws: e.target.checked,
-                            }))
-                          }
-                        />
-                        EWS (Economically Weaker Section)
-                      </label>
-                    )}
-                    {fieldIndex.get("isPhysicallyDisabled")?.visible !==
-                      false && (
-                      <label className="flex items-center gap-2 text-sm font-medium rounded-xl border border-[rgb(var(--border))] px-3 py-2.5 bg-[rgb(var(--surface))]">
-                        <input
-                          type="checkbox"
-                          checked={Boolean(form.isPhysicallyDisabled)}
-                          onChange={(e) =>
-                            setForm((prev) => ({
-                              ...prev,
-                              isPhysicallyDisabled: e.target.checked,
-                            }))
-                          }
-                        />
-                        Is physically disabled?
-                      </label>
-                    )}
-                  </div>
-                )}
-                {fieldIndex.get("medicalConditionRemarks")?.visible !==
-                  false && (
-                  <div className="md:col-span-2">
-                    <label className="block text-sm font-medium text-[rgb(var(--text))] mb-1">
-                      Medical Condition / History
-                    </label>
-                    <textarea
-                      name="medicalConditionRemarks"
-                      rows={3}
-                      placeholder="Any medical history or remarks"
-                      value={form.medicalConditionRemarks}
-                      onChange={handleChange}
-                      className="w-full border px-3 py-2 rounded-lg bg-[rgb(var(--surface))]"
-                    />
-                  </div>
-                )}
-                <Input
-                  type="date"
-                  label="Admission Date *"
-                  name="admissionDate"
-                  value={form.admissionDate}
-                  onChange={handleChange}
-                  error={errors.admissionDate}
-                  max={new Date().toISOString().split("T")[0]}
-                />
-              </div>
-                </div>
-              )}
-            {/* STEP 2 */}
+            {activeStepDefs.map((stepDef, stepIndex) => {
+              const stepNumber = stepIndex + 1;
+              if (!isSinglePage && step !== stepNumber) return null;
 
-{(isSinglePage || step === 2) && (
-                <div className={isSinglePage ? "mb-10" : undefined}>
-                  {isSinglePage ? (
-                    <SectionHeading title={wizardSteps[1]} />
-                  ) : (
-                    <DummyFillBar onFill={fillDummyData} step={step} />
-                  )}
-                  <div className="space-y-6">
-                <Input
-                  label="Father Name *"
-                  placeholder="Enter full name"
-                  name="fatherName"
-                  value={form.fatherName}
-                  onChange={handleChange}
-                  error={errors.fatherName}
-                />
-                <Input
-                  label="Father Mobile *"
-                  placeholder="10-digit mobile number"
-                  name="fatherMobile"
-                  type="tel"
-                  inputMode="numeric"
-                  maxLength={10}
-                  value={form.fatherMobile}
-                  onChange={handleChange}
-                  error={errors.fatherMobile}
-                />
-                <Input
-                  label="Father Email"
-                  placeholder="Enter email (optional)"
-                  name="fatherEmail"
-                  type="email"
-                  value={form.fatherEmail}
-                  onChange={handleChange}
-                  error={errors.fatherEmail}
-                />
-
-                <Input
-                  label="Mother Name *"
-                  placeholder="Enter full name"
-                  name="motherName"
-                  value={form.motherName}
-                  onChange={handleChange}
-                  error={errors.motherName}
-                />
-                <Input
-                  label="Mother Mobile *"
-                  placeholder="10-digit mobile number"
-                  name="motherMobile"
-                  type="tel"
-                  inputMode="numeric"
-                  maxLength={10}
-                  value={form.motherMobile}
-                  onChange={handleChange}
-                  error={errors.motherMobile}
-                />
-                <Input
-                  label="Mother Email"
-                  placeholder="Enter email (optional)"
-                  name="motherEmail"
-                  type="email"
-                  value={form.motherEmail}
-                  onChange={handleChange}
-                  error={errors.motherEmail}
-                />
-
-                <Input
-                  label="Guardian Name"
-                  placeholder="Enter full name (optional)"
-                  name="guardianName"
-                  value={form.guardianName}
-                  onChange={handleChange}
-                  error={errors.guardianName}
-                />
-
-                {form.guardianName?.trim() && (
-                  <>
-                    <Input
-                      label="Guardian Mobile *"
-                      placeholder="10-digit mobile number"
-                      name="guardianMobile"
-                      type="tel"
-                      inputMode="numeric"
-                      maxLength={10}
-                      value={form.guardianMobile}
-                      onChange={handleChange}
-                      error={errors.guardianMobile}
-                    />
-                    <Select
-                      label="Guardian Relation *"
-                      name="guardianRelation"
-                      value={form.guardianRelation}
-                      onChange={handleChange}
-                      error={errors.guardianRelation}
-                      options={GUARDIAN_RELATION_OPTIONS}
-                    />
-                  </>
-                )}
-
-                <Input
-                  label="Address *"
-                  placeholder="Enter full address"
-                  name="address"
-                  value={form.address}
-                  onChange={handleChange}
-                  error={errors.address}
-                />
-</div>
-                </div>
-              )}
-            {/* STEP 3 */}
-
-{(isSinglePage || step === 3) && (
-                <div className={isSinglePage ? "mb-10" : undefined}>
-                  {isSinglePage ? (
-                    <SectionHeading title={wizardSteps[2]} />
-                  ) : (
-                    <DummyFillBar onFill={fillDummyData} step={step} />
-                  )}
-                  <div className="grid gap-6">
-                <Input
-                  label="Previous School Name"
-                  placeholder="Enter previous school name"
-                  name="previousSchoolName"
-                  value={form.previousSchoolName}
-                  onChange={handleChange}
-                />
-                <Input
-                  label="Previous School Class"
-                  placeholder="Enter previous school class"
-                  name="previousSchoolClass"
-                  value={form.previousSchoolClass}
-                  onChange={handleChange}
-                />
-                <Input
-                  label="Previous School Result"
-                  placeholder="Enter previous school result"
-                  name="previousSchoolResult"
-                  value={form.previousSchoolResult}
-                  onChange={handleChange}
-                />
-                <Input
-                  label="TC Number"
-                  placeholder="Transfer Certificate number"
-                  name="previousSchoolTcNumber"
-                  value={form.previousSchoolTcNumber}
-                  onChange={handleChange}
-                />
-</div>
-                </div>
-              )}
-            {/* STEP 4 */}
-
-{(isSinglePage || step === 4) && (
-                <div className={isSinglePage ? "mb-10" : undefined}>
-                  {isSinglePage ? (
-                    <SectionHeading title={wizardSteps[3]} />
-                  ) : (
-                    <DummyFillBar onFill={fillDummyData} step={step} />
-                  )}
-                  <div className="grid gap-4">
-                <File
-                  label="Student Photo *"
-                  name="studentPhoto"
-                  existingUrl={form?.documents?.studentPhoto?.url}
-                  onChange={handleFileChange}
-                  error={errors.studentPhoto}
-                />
-
-                <File
-                  label="Father Photo"
-                  name="fatherPhoto"
-                  existingUrl={form?.documents?.fatherPhoto?.url}
-                  onChange={handleFileChange}
-                  error={errors.fatherPhoto}
-                />
-
-                <File
-                  label="Mother Photo"
-                  name="motherPhoto"
-                  existingUrl={form?.documents?.motherPhoto?.url}
-                  onChange={handleFileChange}
-                  error={errors.motherPhoto}
-                />
-
-                <File
-                  label="Guardian Photo"
-                  name="guardianPhoto"
-                  existingUrl={form?.documents?.guardianPhoto?.url}
-                  onChange={handleFileChange}
-                />
-
-                <File
-                  label="Birth Certificate"
-                  name="birthCertificate"
-                  existingUrl={form?.documents?.birthCertificate?.url}
-                  onChange={handleFileChange}
-                />
-
-                <File
-                  label="Transfer Certificate"
-                  name="transferCertificate"
-                  existingUrl={form?.documents?.transferCertificate?.url}
-                  onChange={handleFileChange}
-                />
-
-                <File
-                  label="Student Aadhar"
-                  name="studentAadhar"
-                  existingUrl={form?.documents?.studentAadhar?.url}
-                  onChange={handleFileChange}
-                />
-
-                <File
-                  label="Father Aadhar *"
-                  name="fatherAadhar"
-                  existingUrl={form?.documents?.fatherAadhar?.url}
-                  onChange={handleFileChange}
-                  error={errors.fatherAadhar}
-                />
-
-                <File
-                  label="Mother Aadhar *"
-                  name="motherAadhar"
-                  existingUrl={form?.documents?.motherAadhar?.url}
-                  onChange={handleFileChange}
-                  error={errors.motherAadhar}
-                />
-
-                <div className="border rounded-xl p-4 bg-[rgb(var(--surface))]">
-                  <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between mb-4">
-                    <div>
-                      <h3 className="text-base font-semibold">Additional Documents</h3>
-                      <p className="text-sm text-slate-500">
-                        Add more files for this student.
-                      </p>
-                    </div>
-                    <button
-                      type="button"
-                      onClick={addExtraDocument}
-                      className="inline-flex items-center justify-center rounded-lg border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50"
-                    >
-                      Add more
-                    </button>
-                  </div>
-
-                  {(!form.extraDocuments || form.extraDocuments.length === 0) ? (
-                    <p className="text-sm text-slate-500">
-                      No additional documents added yet.
-                    </p>
-                  ) : (
-                    <div className="space-y-4">
-                      {(form.extraDocuments || []).map((doc, index) => (
-                        <div
-                          key={doc.id}
-                          className="rounded-xl border border-slate-200 p-4"
-                        >
-                          <div className="grid gap-4 sm:grid-cols-[1fr_auto]">
-                            <Input
-                              label={`Document name ${index + 1}`}
-                              value={doc.label}
-                              placeholder="Enter document label"
-                              onChange={(e) =>
-                                updateExtraDocument(doc.id, {
-                                  label: e.target.value,
-                                })
-                              }
-                            />
-                            <button
-                              type="button"
-                              onClick={() => removeExtraDocument(doc.id)}
-                              className="self-end rounded-lg bg-red-500 px-3 py-2 text-sm font-semibold text-white hover:bg-red-600"
-                            >
-                              Remove
-                            </button>
-                          </div>
-                          <File
-                            label={`Upload document ${index + 1}`}
-                            name={doc.fieldName}
-                            existingUrl={doc.existingUrl}
-                            onChange={handleFileChange}
-                          />
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                </div>
-              </div>
-                </div>
-              )}
-
-            {/* STEP 5 */}
-
-{(isSinglePage || step === 5) && (
-                <div className={isSinglePage ? "mb-10" : undefined}>
-                  {isSinglePage ? (
-                    <SectionHeading title={wizardSteps[4]} />
-                  ) : (
-                    <DummyFillBar onFill={fillDummyData} step={step} />
-                  )}
-                  <div className="grid gap-4">
-                    <Select
-                      label="Class *"
-                  name="classId"
-                  value={form.classId}
-                  options={classes.map((c) => ({
-                    label: c.name || c.className,
-                    value: c._id,
-                  }))}
-                  onChange={handleChange}
-                  error={errors.classId}
-                />
-
-                {form.classId && sections.length > 0 && (
-                  <Select
-                    label="Section"
-                    name="sectionId"
-                    value={form.sectionId}
-                    options={sections}
-                    onChange={handleChange}
-                    error={errors.sectionId}
-                  />
-                )}
-
-                <Select
-                  label="Stream"
-                  name="streamId"
-                  value={form.streamId}
-                  options={(streams || [])
-                    .filter((s) => {
-                      const linked = (s.classIds || []).map(String);
-                      if (!linked.length) return true;
-                      if (!form.classId) return false;
-                      return linked.includes(String(form.classId));
-                    })
-                    .map((s) => ({
-                      label: s.name,
-                      value: s._id,
-                    }))}
-                  onChange={handleChange}
-                  error={errors.streamId}
-                />
-
-                {form.streamId ? (
-                  <div className="space-y-3 sm:col-span-2">
-                    <div>
-                      <p className="mb-1.5 text-xs font-semibold text-[rgb(var(--text))]">
-                        Compulsory subjects
-                      </p>
-                      <p className="mb-2 text-[11px] text-[rgb(var(--text-muted))]">
-                        Applied automatically from the selected stream.
-                      </p>
-                      {streamCompulsorySubjects.length === 0 &&
-                      streamCompulsoryIds.size === 0 ? (
-                        <p className="rounded-xl border border-dashed border-[rgb(var(--border))] px-3 py-3 text-xs text-[rgb(var(--text-muted))]">
-                          No compulsory subjects configured for this stream.
-                        </p>
-                      ) : (
-                        <div className="grid grid-cols-2 gap-2 rounded-xl border border-[rgba(var(--primary),0.25)] bg-[rgba(var(--primary),0.04)] p-3 sm:grid-cols-3">
-                          {(streamCompulsorySubjects.length
-                            ? streamCompulsorySubjects
-                            : [...streamCompulsoryIds].map((id) => ({
-                                _id: id,
-                                name:
-                                  classSubjectsForStudent.find(
-                                    (s) => String(s._id) === id,
-                                  )?.name || id,
-                              }))
-                          ).map((sub) => (
-                            <label
-                              key={String(sub._id || sub.name)}
-                              className="flex cursor-default items-center gap-2 text-xs opacity-90"
-                            >
-                              <input
-                                type="checkbox"
-                                checked
-                                disabled
-                                className="accent-[rgb(var(--primary))]"
-                              />
-                              <span className="font-medium">
-                                {sub.name || "Subject"}
-                              </span>
-                            </label>
-                          ))}
-                        </div>
-                      )}
-                    </div>
-
-                    <div>
-                      <p className="mb-1.5 text-xs font-semibold text-[rgb(var(--text))]">
-                        Optional subjects
-                      </p>
-                      <p className="mb-2 text-[11px] text-[rgb(var(--text-muted))]">
-                        Select the optional subjects this student will take.
-                      </p>
-                      {!form.classId ? (
-                        <p className="rounded-xl border border-dashed border-[rgb(var(--border))] px-3 py-3 text-xs text-[rgb(var(--text-muted))]">
-                          Select a class to see optional subjects.
-                        </p>
-                      ) : optionalSubjectsForStudent.length === 0 ? (
-                        <p className="rounded-xl border border-dashed border-[rgb(var(--border))] px-3 py-3 text-xs text-[rgb(var(--text-muted))]">
-                          No optional subjects on this class. Add optional
-                          subjects when creating the class.
-                        </p>
-                      ) : (
-                        <div className="grid max-h-40 grid-cols-2 gap-2 overflow-y-auto rounded-xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))] p-3 sm:grid-cols-3">
-                          {optionalSubjectsForStudent.map((sub) => {
-                            const sid = String(sub._id);
-                            const checked = (
-                              form.optionalSubjectIds || []
-                            ).includes(sid);
-                            return (
-                              <label
-                                key={sid}
-                                className="flex cursor-pointer items-center gap-2 text-xs text-[rgb(var(--text))]"
-                              >
-                                <input
-                                  type="checkbox"
-                                  checked={checked}
-                                  onChange={() => toggleOptionalSubject(sid)}
-                                  className="accent-[rgb(var(--primary))]"
-                                />
-                                <span>{sub.name}</span>
-                              </label>
-                            );
-                          })}
-                        </div>
-                      )}
-                      {errors.optionalSubjectIds ? (
-                        <p className="mt-1 text-xs text-red-500">
-                          {errors.optionalSubjectIds}
-                        </p>
-                      ) : null}
-                    </div>
-                  </div>
-                ) : null}
-
-                <Input
-                  label="Roll Number *"
-                  name="rollNo"
-                  value={form.rollNo}
-                  onChange={handleChange}
-                  error={errors.rollNo}
-                  placeholder={
-                    form.classId
-                      ? "Auto-assigned — you can still edit"
-                      : "Select a class first"
-                  }
-                />
-
-                <Select
-                  label="Student Type"
-                  name="studentType"
-                  value={form.studentType}
-                  options={["Day Scholar", "Day Boarder", "Boarder"]}
-                  onChange={handleChange}
-                />
-                <Select
-                  label="Fee batch"
-                  name="feeBatch"
-                  value={form.feeBatch || "New"}
-                  options={["New", "Old"]}
-                  onChange={handleChange}
-                />
-                <p className="text-[11px] text-[rgb(var(--text-muted))] -mt-2 sm:col-span-2">
-                  New / Old controls which fee-structure components apply (admin
-                  configures heads separately for each batch).
-                </p>
-              </div>
-                </div>
-              )}
-
-            {/* STEP 5 */}
-
-            {/* STEP 6 */}
-            {(isSinglePage || step === 6) && (
-                <div className={isSinglePage ? "mb-10" : undefined}>
-                  {isSinglePage ? (
-                    <SectionHeading title={wizardSteps[5]} />
-                  ) : (
-                    <DummyFillBar onFill={fillDummyData} step={step} />
-                  )}
-                  <div className="grid gap-4">
-                    {feeStructure.length === 0 && form.classId && (
-                  <div className="text-sm text-[rgb(var(--text))] ">
-                    No fee structure found for this class
-                  </div>
-                )}
-
-                <div className="mb-4">
-                  <label className="block text-xs font-semibold mb-1">
-                    View As
-                  </label>
-
-                  <select
-                    value={freqFilter}
-                    onChange={(e) => setFreqFilter(e.target.value)}
-                    className="w-full border px-3 py-2 rounded-lg text-[rgb(var(--text))] bg-[rgb(var(--surface))] "
-                  >
-                    <option value="monthly">Monthly</option>
-                    <option value="quarterly">Quarterly</option>
-                    <option value="half-yearly">Half Yearly</option>
-                    <option value="annually">Annually</option>
-                  </select>
-                </div>
-
-                {optionalFees.length > 0 && (
-                  <div className="grid gap-3">
-                    {optionalFees.map((fee) =>
-                      isBusFeeComponent(fee) ? (
-                        <div
-                          key={fee._id}
-                          className="rounded-lg  text-[rgb(var(--text))]  border border-[rgb(var(--border))] p-4"
-                        >
-                          <label className="flex items-center gap-3">
-                            <input
-                              type="checkbox"
-                              checked={form.useTransport}
-                              onChange={(e) =>
-                                setForm((prev) => ({
-                                  ...prev,
-                                  useTransport: e.target.checked,
-                                  transport: e.target.checked
-                                    ? prev.transport
-                                    : "",
-                                  busFeeFrequency: e.target.checked
-                                    ? prev.busFeeFrequency || "annually"
-                                    : "annually",
-                                  busFeeQuarter:
-                                    e.target.checked &&
-                                    prev.busFeeFrequency === "quarterly"
-                                      ? prev.busFeeQuarter || ""
-                                      : "",
-                                }))
-                              }
-                              className="h-4 w-4"
-                            />
-                            <div>
-                              <div className="text-sm font-medium text-[rgb(var(--text))]">
-                                Add {fee.name}
-                              </div>
-                              <div className="text-xs text-[rgb(var(--text))]">
-                                Include this fee only when the student uses
-                                transport.
-                              </div>
-                            </div>
-                          </label>
-
-                          {form.useTransport && (
-                            <div className="mt-4 grid gap-4 md:grid-cols-2">
-                              <Select
-                                label="Transport Route"
-                                name="transport"
-                                value={form.transport}
-                                options={transportRoutes.map((route) => ({
-                                  label: route.name,
-                                  value: route._id,
-                                }))}
-                                onChange={handleChange}
-                              />
-
-                              <Select
-                                label="Bus Fee Type"
-                                name="busFeeFrequency"
-                                value={form.busFeeFrequency}
-                                options={[
-                                  { label: "Annually", value: "annually" },
-                                  { label: "Quarterly", value: "quarterly" },
-                                ]}
-                                onChange={handleChange}
-                              />
-                            </div>
-                          )}
-                        </div>
-                      ) : (
-                        <label
-                          key={fee._id}
-                          className="flex items-center gap-3 rounded-lg border border-gray-200 bg-gray-50 px-4 py-3"
-                        >
-                          <input
-                            type="checkbox"
-                            checked={(form.selectedOptionalFees || []).includes(
-                              String(fee._id),
-                            )}
-                            onChange={() => toggleOptionalFee(fee._id)}
-                            className="h-4 w-4"
-                          />
-                          <div>
-                            <div className="text-sm font-medium text-gray-800">
-                              Add {fee.name}
-                            </div>
-                            <div className="text-xs text-gray-500">
-                              Include this optional fee in the final annual
-                              total.
-                            </div>
-                          </div>
-                        </label>
-                      ),
-                    )}
-                  </div>
-                )}
-
-                {feeStructure.length > 0 && (
-                  <div className=" border rounded-lg p-4 mb-4">
-                    <h3 className="font-semibold mb-2">Fee Breakdown</h3>
-
-                    {feeStructure.map((f, i) => (
-                      <div
-                        key={i}
-                        className="flex justify-between text-sm py-1 text-[rgb(var(--text))]"
-                      >
-                        <span>
-                          {f.name}
-                          {f.isOptional && (
-                            <span className="text-xs ml-2">
-                              {isOptionalFeeSelected(f)
-                                ? "(Selected)"
-                                : "(Optional)"}
-                            </span>
-                          )}
-                        </span>
-
-                        <span>₹{getDisplayAmount(f)}</span>
-                      </div>
-                    ))}
-
-                    <div className="flex justify-between font-bold border-t mt-2 pt-2">
-                      <span>Annual Total</span>
-                      <span>
-                        {/* Must match getIncludedAnnualTotal() — the same base
-                            the Final Fee discount is applied to. Using a
-                            different base here is what made discounts look like
-                            they "zeroed" the fee. */}
-                        ₹{Number(getIncludedAnnualTotal()).toFixed(2)}
-                      </span>
-                    </div>
-
-                    {/* {freqFilter === "quarterly" && (
-                      <div className="mt-3 rounded-lg bg-white p-3 text-sm text-gray-600">
-                        {["April-July", "Aug-Nov", "Dec-March"].map(
-                          (months) => (
-                            <div
-                              key={months}
-                              className="flex justify-between py-1"
-                            >
-                              <span>{months}</span>
-                              <span>
-                                Rs. {calcAmount(getIncludedAnnualTotal())}
-                              </span>
-                            </div>
-                          ),
-                        )}
-                      </div>
-                    )} */}
-                  </div>
-                )}
-
-                {form.useTransport && form.busFeeFrequency === "quarterly" && (
-                  <Select
-                    label="Bus Fee Quarter"
-                    name="busFeeQuarter"
-                    value={form.busFeeQuarter}
-                    options={busFeeQuarterOptions}
-                    onChange={handleChange}
-                  />
-                )}
-
-                <Input
-                  label="Total Annual Fee"
-                  name="totalFee"
-                  value={form.totalFee}
-                  onChange={handleChange}
-                  readOnly
-                  error={errors.totalFee}
-                />
-
-                <Select
-                  label="Discount Type"
-                  name="discountType"
-                  value={form.discountType}
-                  options={["Rupees", "Percentage"]}
-                  onChange={handleChange}
-                />
-
-                <Input
-                  label="Discount Value"
-                  placeholder="Enter amount or %"
-                  name="discountValue"
-                  type="number"
-                  inputMode="decimal"
-                  min="0"
-                  max={form.discountType === "Percentage" ? 100 : undefined}
-                  step="any"
-                  value={form.discountValue}
-                  onChange={handleChange}
-                  disabled={!form.discountType}
-                />
-
-                <Input
-                  label="Final Fee"
-                  name="finalFee"
-                  value={form.finalFee}
-                  readOnly
-                />
-              </div>
-                </div>
-              )}
-
-            {/* STEP 6 PARENT LOGIN */}
-{(isSinglePage || step === 7) && (
-                <div className={isSinglePage ? "mb-10" : undefined}>
-                  {isSinglePage ? (
-                    <SectionHeading title={wizardSteps[6]} />
-                  ) : (
-                    <DummyFillBar onFill={fillDummyData} step={step} />
-                  )}
-                  <ParentLoginStep
-                    form={form}
-                    handleChange={handleChange}
-                    isEdit={isEdit}
-                  />
-                </div>
-              )}
-
-            {/* ADMIN-DEFINED FIELDS ON BUILT-IN STEPS */}
-            {[1, 2, 3, 4, 5, 6, 7]
-              .filter((stepNumber) => isSinglePage || step === stepNumber)
-              .map((stepNumber) => {
-                const fields = customFieldsForStep(stepNumber).filter(
-                  (field) => field.visible !== false,
-                );
-                if (!fields.length) return null;
-                return (
-                  <div key={`custom-builtin-${stepNumber}`} className="mt-6 grid gap-4">
-                    <h3 className="text-sm font-semibold text-[rgb(var(--text-muted))] uppercase tracking-wide">
-                      Additional Details
-                      {isSinglePage && wizardSteps[stepNumber - 1]
-                        ? ` · ${wizardSteps[stepNumber - 1]}`
-                        : ""}
-                    </h3>
-                    {fields.map((field) => (
-                      <CustomField
-                        key={field.key}
-                        field={field}
-                        value={form.custom?.[field.key]}
-                        error={errors[field.key]}
-                        onChange={(value) => setCustomValue(field.key, value)}
-                      />
-                    ))}
-                  </div>
-                );
-              })}
-
-            {/* ADMIN-DEFINED STEPS */}
-            {customStepDefs.map((stepDef, index) => {
-              if (!isSinglePage && step !== 8 + index) return null;
-              const fields = (stepDef.fields || []).filter(
-                (field) => field.visible !== false
+              const sectionKey = stepDef.key;
+              const isReview = sectionKey === REVIEW_STEP_KEY;
+              const isPrototypeSection = PROTOTYPE_SECTION_KEYS.has(sectionKey);
+              const customFields = (stepDef.fields || []).filter(
+                (field) => field && field.visible !== false && !field.builtin,
               );
+              const isHosteller =
+                form.studentType === "Hosteller" ||
+                form.studentType === "Boarder";
+
+              const renderCustomFields = () =>
+                customFields.map((field) => (
+                  <CustomField
+                    key={field.key}
+                    field={field}
+                    value={form.custom?.[field.key]}
+                    error={errors[field.key]}
+                    onChange={(value) => setCustomValue(field.key, value)}
+                  />
+                ));
 
               return (
                 <div
-                  key={stepDef.key}
-                  className={isSinglePage ? "mb-10 grid gap-4" : "grid gap-4"}
+                  key={sectionKey}
+                  className={isSinglePage ? "mb-10" : undefined}
                 >
                   {isSinglePage ? (
-                    <SectionHeading title={stepDef.title || `Section ${8 + index}`} />
-                  ) : null}
-                  {fields.length === 0 ? (
-                    <p className="text-sm text-[rgb(var(--text-muted))]">
-                      This step has no fields yet.
-                    </p>
+                    <SectionHeading title={stepDef.title} />
                   ) : (
-                    fields.map((field) => (
-                      <CustomField
-                        key={field.key}
-                        field={field}
-                        value={form.custom?.[field.key]}
-                        error={errors[field.key]}
-                        onChange={(value) => setCustomValue(field.key, value)}
+                    <DummyFillBar onFill={fillDummyData} sectionKey={sectionKey} />
+                  )}
+
+                  {sectionKey === "builtin_1" && (
+                    <div className="space-y-4">
+                      <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+                        <Input
+                          label="First Name *"
+                          placeholder="First name"
+                          name="firstName"
+                          value={form.firstName}
+                          onChange={handleChange}
+                          error={errors.firstName}
+                        />
+                        <Input
+                          label="Last Name *"
+                          placeholder="Last name"
+                          name="lastName"
+                          value={form.lastName}
+                          onChange={handleChange}
+                          error={errors.lastName}
+                        />
+                        <div>
+                          <div className="mb-1 flex items-center justify-between gap-2">
+                            <label className="block text-sm font-medium text-[rgb(var(--text))]">
+                              Date of Birth *
+                            </label>
+                            <span className="rounded bg-slate-100 px-2 py-0.5 font-mono text-[11px] font-bold text-slate-500">
+                              Age: {formatAge(form.dob)}
+                            </span>
+                          </div>
+                          <input
+                            type="date"
+                            name="dob"
+                            value={form.dob}
+                            onChange={handleChange}
+                            max={new Date().toISOString().split("T")[0]}
+                            className="w-full rounded-lg border border-[rgb(var(--border))] bg-[rgb(var(--surface))] px-3 py-2 font-mono text-sm text-[rgb(var(--text))] outline-none focus:border-[rgb(var(--primary))]"
+                          />
+                          {errors.dob && (
+                            <span className="text-xs font-medium text-red-500">
+                              {errors.dob}
+                            </span>
+                          )}
+                        </div>
+                        <Select
+                          label="Gender *"
+                          name="gender"
+                          value={form.gender}
+                          options={["Male", "Female", "Other"]}
+                          onChange={handleChange}
+                          error={errors.gender}
+                        />
+                        <Select
+                          label="Religion"
+                          name="religion"
+                          value={form.religion}
+                          options={[
+                            "Hindu",
+                            "Jain",
+                            "Sikh",
+                            "Muslim",
+                            "Christian",
+                            "Buddhism",
+                          ]}
+                          onChange={handleChange}
+                        />
+                        <Select
+                          label="Caste Category"
+                          name="category"
+                          value={form.category}
+                          options={CATEGORY_OPTIONS}
+                          onChange={handleChange}
+                          error={errors.category}
+                        />
+                        <Input
+                          label="Student Aadhaar Number (12 Digits)"
+                          placeholder="XXXX XXXX XXXX"
+                          name="aadhaarNumber"
+                          value={form.aadhaarNumber}
+                          onChange={handleChange}
+                          maxLength={12}
+                          inputMode="numeric"
+                        />
+                        <Input
+                          type="date"
+                          label="Admission Date"
+                          name="admissionDate"
+                          value={form.admissionDate}
+                          onChange={handleChange}
+                          error={errors.admissionDate}
+                          max={new Date().toISOString().split("T")[0]}
+                        />
+                        <Input
+                          label="NIC Number"
+                          placeholder="Enter NIC Number"
+                          name="nicNumber"
+                          value={form.nicNumber}
+                          onChange={handleChange}
+                        />
+                      </div>
+
+                      <div className="grid grid-cols-1 gap-4 pt-1 sm:grid-cols-3">
+                        <Input
+                          label="SR. No."
+                          placeholder="Scholar Register No."
+                          name="srNo"
+                          value={form.srNo}
+                          onChange={handleChange}
+                        />
+                        <Input
+                          label="PEN Number"
+                          placeholder="Permanent Education No."
+                          name="penNumber"
+                          value={form.penNumber}
+                          onChange={handleChange}
+                        />
+                        <Input
+                          label="APAAR ID"
+                          placeholder="12-digit APAAR ID"
+                          name="apaarId"
+                          value={form.apaarId}
+                          onChange={handleChange}
+                        />
+                      </div>
+                    </div>
+                  )}
+
+                  {sectionKey === "builtin_2" && (
+                    <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+                      <Input
+                        label="Father Full Name *"
+                        placeholder="Father full name"
+                        name="fatherName"
+                        value={form.fatherName}
+                        onChange={handleChange}
+                        error={errors.fatherName}
                       />
-                    ))
+                      <Input
+                        label="Father Mobile (10 Digits) *"
+                        placeholder="10-digit mobile"
+                        name="fatherMobile"
+                        type="tel"
+                        inputMode="numeric"
+                        maxLength={10}
+                        value={form.fatherMobile}
+                        onChange={handleChange}
+                        error={errors.fatherMobile}
+                      />
+                      <Input
+                        label="Father Email Address (Contact Email)"
+                        placeholder="father.email@example.com"
+                        name="fatherEmail"
+                        type="email"
+                        value={form.fatherEmail}
+                        onChange={handleChange}
+                        error={errors.fatherEmail}
+                      />
+                      <Input
+                        label="Mother Full Name"
+                        placeholder="Mother full name"
+                        name="motherName"
+                        value={form.motherName}
+                        onChange={handleChange}
+                        error={errors.motherName}
+                      />
+                      <Input
+                        label="Mother Mobile (10 Digits)"
+                        placeholder="10-digit mobile"
+                        name="motherMobile"
+                        type="tel"
+                        inputMode="numeric"
+                        maxLength={10}
+                        value={form.motherMobile}
+                        onChange={handleChange}
+                        error={errors.motherMobile}
+                      />
+                      <Input
+                        label="Mother Email Address (Contact Email)"
+                        placeholder="mother.email@example.com"
+                        name="motherEmail"
+                        type="email"
+                        value={form.motherEmail}
+                        onChange={handleChange}
+                        error={errors.motherEmail}
+                      />
+                      <Input
+                        label="Local Guardian Name"
+                        placeholder="Local guardian name"
+                        name="guardianName"
+                        value={form.guardianName}
+                        onChange={handleChange}
+                        error={errors.guardianName}
+                      />
+                      <Select
+                        label="Local Guardian Relation"
+                        name="guardianRelation"
+                        value={form.guardianRelation}
+                        options={GUARDIAN_RELATION_OPTIONS}
+                        onChange={handleChange}
+                        error={errors.guardianRelation}
+                      />
+                      <Input
+                        label="Local Guardian Email Address (Contact Email)"
+                        placeholder="guardian.email@example.com"
+                        name="guardianEmail"
+                        type="email"
+                        value={form.guardianEmail}
+                        onChange={handleChange}
+                        error={errors.guardianEmail}
+                      />
+                    </div>
+                  )}
+
+                  {sectionKey === "builtin_address" && (
+                    <div className="grid grid-cols-1 gap-4 sm:grid-cols-4">
+                      <div className="sm:col-span-4">
+                        <Input
+                          label="Address Line (House No. / Flat / Ward / Street)"
+                          placeholder="House / Plot No., Ward No., Street Name"
+                          name="address"
+                          value={form.address}
+                          onChange={handleChange}
+                          error={errors.address}
+                        />
+                      </div>
+                      <Input
+                        label="City / Town / Tehsil"
+                        placeholder="City / Town / Tehsil"
+                        name="city"
+                        value={form.city}
+                        onChange={handleChange}
+                      />
+                      <Input
+                        label="District"
+                        placeholder="District"
+                        name="district"
+                        value={form.district}
+                        onChange={handleChange}
+                      />
+                      <Select
+                        label="State"
+                        name="state"
+                        value={form.state}
+                        options={INDIA_STATES}
+                        onChange={handleChange}
+                      />
+                      <Input
+                        label="PIN Code"
+                        placeholder="6-digit PIN"
+                        name="pincode"
+                        value={form.pincode}
+                        onChange={handleChange}
+                        maxLength={6}
+                        inputMode="numeric"
+                        error={errors.pincode}
+                      />
+                    </div>
+                  )}
+
+                  {sectionKey === "builtin_5" && (
+                    <div className="space-y-4">
+                      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                        <Select
+                          label="Admitting Class *"
+                          name="classId"
+                          value={form.classId}
+                          options={classes.map((c) => ({
+                            label: c.name || c.className,
+                            value: c._id,
+                          }))}
+                          onChange={handleChange}
+                          error={errors.classId}
+                        />
+
+                        {form.classId && sections.length > 0 && (
+                          <Select
+                            label="Allocated Section"
+                            name="sectionId"
+                            value={form.sectionId}
+                            options={sections}
+                            onChange={handleChange}
+                            error={errors.sectionId}
+                          />
+                        )}
+
+                        {(streams || []).length > 0 && (
+                          <Select
+                            label="Academic Stream"
+                            name="streamId"
+                            value={form.streamId}
+                            options={(streams || [])
+                              .filter((s) => {
+                                const linked = (s.classIds || []).map(String);
+                                if (!linked.length) return true;
+                                if (!form.classId) return false;
+                                return linked.includes(String(form.classId));
+                              })
+                              .map((s) => ({
+                                label: s.name,
+                                value: s._id,
+                              }))}
+                            onChange={handleChange}
+                            error={errors.streamId}
+                          />
+                        )}
+                      </div>
+
+                      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                        <div>
+                          <label className="mb-1 block text-sm font-medium text-[rgb(var(--text))]">
+                            Student Residence Mode
+                          </label>
+                          <div className="grid grid-cols-2 gap-2.5">
+                            {["Day Scholar", "Hosteller"].map((mode) => {
+                              const active =
+                                mode === "Hosteller"
+                                  ? isHosteller
+                                  : form.studentType === "Day Scholar" ||
+                                    form.studentType === "Day Boarder";
+                              return (
+                                <button
+                                  key={mode}
+                                  type="button"
+                                  onClick={() =>
+                                    setForm((prev) => ({
+                                      ...prev,
+                                      studentType: mode,
+                                      ...(mode === "Hosteller"
+                                        ? { transport: "", useTransport: false }
+                                        : {}),
+                                    }))
+                                  }
+                                  className={`cursor-pointer rounded-lg border px-3 py-2 text-sm font-semibold transition-colors ${
+                                    active
+                                      ? "border-slate-900 bg-slate-900 text-white"
+                                      : "border-[rgb(var(--border))] bg-[rgb(var(--surface))] text-[rgb(var(--text))] hover:bg-[rgb(var(--bg))]"
+                                  }`}
+                                >
+                                  {mode}
+                                </button>
+                              );
+                            })}
+                          </div>
+                        </div>
+
+                        <div>
+                          <Select
+                            label="Transport Bus Route"
+                            name="transport"
+                            value={isHosteller ? "" : form.transport}
+                            disabled={isHosteller}
+                            options={transportRoutes.map((route) => ({
+                              label: route.code
+                                ? `${route.code}: ${route.name}`
+                                : route.name,
+                              value: route._id,
+                            }))}
+                            onChange={handleChange}
+                          />
+                          {isHosteller && (
+                            <p className="mt-1 rounded-lg border border-amber-300 bg-amber-50 px-3 py-2 text-xs font-medium text-amber-900">
+                              Transport not applicable for hostellers.
+                            </p>
+                          )}
+                        </div>
+                      </div>
+
+                      {form.streamId ? (
+                        <div className="grid gap-3">
+                          <div>
+                            <p className="mb-1.5 text-xs font-semibold text-[rgb(var(--text))]">
+                              Compulsory subjects
+                            </p>
+                            <p className="mb-2 text-[11px] text-[rgb(var(--text-muted))]">
+                              Applied automatically from the selected stream.
+                            </p>
+                            {streamCompulsorySubjects.length === 0 &&
+                            streamCompulsoryIds.size === 0 ? (
+                              <p className="rounded-xl border border-dashed border-[rgb(var(--border))] px-3 py-3 text-xs text-[rgb(var(--text-muted))]">
+                                No compulsory subjects configured for this
+                                stream.
+                              </p>
+                            ) : (
+                              <div className="grid grid-cols-2 gap-2 rounded-xl border border-[rgba(var(--primary),0.25)] bg-[rgba(var(--primary),0.04)] p-3 sm:grid-cols-3">
+                                {(streamCompulsorySubjects.length
+                                  ? streamCompulsorySubjects
+                                  : [...streamCompulsoryIds].map((id) => ({
+                                      _id: id,
+                                      name:
+                                        classSubjectsForStudent.find(
+                                          (s) => String(s._id) === id,
+                                        )?.name || id,
+                                    }))
+                                ).map((sub) => (
+                                  <label
+                                    key={String(sub._id || sub.name)}
+                                    className="flex cursor-default items-center gap-2 text-xs opacity-90"
+                                  >
+                                    <input
+                                      type="checkbox"
+                                      checked
+                                      disabled
+                                      className="accent-[rgb(var(--primary))]"
+                                    />
+                                    <span className="font-medium">
+                                      {sub.name || "Subject"}
+                                    </span>
+                                  </label>
+                                ))}
+                              </div>
+                            )}
+                          </div>
+
+                          <div>
+                            <p className="mb-1.5 text-xs font-semibold text-[rgb(var(--text))]">
+                              Optional subjects
+                            </p>
+                            <p className="mb-2 text-[11px] text-[rgb(var(--text-muted))]">
+                              Select the optional subjects this student will
+                              take.
+                            </p>
+                            {!form.classId ? (
+                              <p className="rounded-xl border border-dashed border-[rgb(var(--border))] px-3 py-3 text-xs text-[rgb(var(--text-muted))]">
+                                Select a class to see optional subjects.
+                              </p>
+                            ) : optionalSubjectsForStudent.length === 0 ? (
+                              <p className="rounded-xl border border-dashed border-[rgb(var(--border))] px-3 py-3 text-xs text-[rgb(var(--text-muted))]">
+                                No optional subjects on this class. Add optional
+                                subjects when creating the class.
+                              </p>
+                            ) : (
+                              <div className="grid max-h-40 grid-cols-2 gap-2 overflow-y-auto rounded-xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))] p-3 sm:grid-cols-3">
+                                {optionalSubjectsForStudent.map((sub) => {
+                                  const sid = String(sub._id);
+                                  const checked = (
+                                    form.optionalSubjectIds || []
+                                  ).includes(sid);
+                                  return (
+                                    <label
+                                      key={sid}
+                                      className="flex cursor-pointer items-center gap-2 text-xs text-[rgb(var(--text))]"
+                                    >
+                                      <input
+                                        type="checkbox"
+                                        checked={checked}
+                                        onChange={() =>
+                                          toggleOptionalSubject(sid)
+                                        }
+                                        className="accent-[rgb(var(--primary))]"
+                                      />
+                                      <span>{sub.name}</span>
+                                    </label>
+                                  );
+                                })}
+                              </div>
+                            )}
+                            {errors.optionalSubjectIds ? (
+                              <p className="mt-1 text-xs text-red-500">
+                                {errors.optionalSubjectIds}
+                              </p>
+                            ) : null}
+                          </div>
+                        </div>
+                      ) : null}
+                    </div>
+                  )}
+
+                  {sectionKey === "builtin_3" && (
+                    <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+                      <div className="sm:col-span-2">
+                        <Input
+                          label="Previous School Name"
+                          placeholder="Previous school name"
+                          name="previousSchoolName"
+                          value={form.previousSchoolName}
+                          onChange={handleChange}
+                        />
+                      </div>
+                      <Input
+                        label="Previous School UDISE Code (11 Digits)"
+                        placeholder="11-digit UDISE code"
+                        name="previousSchoolUdise"
+                        value={form.previousSchoolUdise}
+                        onChange={handleChange}
+                        maxLength={11}
+                        inputMode="numeric"
+                        error={errors.previousSchoolUdise}
+                      />
+                      <Input
+                        label="Transfer Certificate (TC) No."
+                        placeholder="TC number"
+                        name="previousSchoolTcNumber"
+                        value={form.previousSchoolTcNumber}
+                        onChange={handleChange}
+                      />
+                      <Input
+                        type="date"
+                        label="School Leaving Date"
+                        name="schoolLeavingDate"
+                        value={form.schoolLeavingDate}
+                        onChange={handleChange}
+                        error={errors.schoolLeavingDate}
+                      />
+                      <Input
+                        label="Previous School Address"
+                        placeholder="Town / City, District, State"
+                        name="prevSchoolAddress"
+                        value={form.prevSchoolAddress}
+                        onChange={handleChange}
+                      />
+                    </div>
+                  )}
+
+                  {sectionKey === "builtin_4" && (
+                    <div className="grid grid-cols-1 gap-3.5 sm:grid-cols-2 lg:grid-cols-3">
+                      <File
+                        label="Student Passport Photo"
+                        name="studentPhoto"
+                        existingUrl={form?.documents?.studentPhoto?.url}
+                        onChange={handleFileChange}
+                        error={errors.studentPhoto}
+                      />
+                      <File
+                        label="Transfer Certificate (TC)"
+                        name="transferCertificate"
+                        existingUrl={form?.documents?.transferCertificate?.url}
+                        onChange={handleFileChange}
+                        error={errors.transferCertificate}
+                      />
+                      <File
+                        label="Student Aadhaar Card"
+                        name="studentAadhar"
+                        existingUrl={form?.documents?.studentAadhar?.url}
+                        onChange={handleFileChange}
+                      />
+                      <File
+                        label="Character Certificate"
+                        name="characterCertificate"
+                        existingUrl={form?.documents?.characterCertificate?.url}
+                        onChange={handleFileChange}
+                      />
+                      <File
+                        label="Last Qualifying Marksheet"
+                        name="lastMarksheet"
+                        existingUrl={form?.documents?.lastMarksheet?.url}
+                        onChange={handleFileChange}
+                      />
+                    </div>
+                  )}
+
+                  {sectionKey === "builtin_6" && (
+                    <div className="grid gap-4">
+                      {feeStructure.length === 0 && form.classId && (
+                        <div className="text-sm text-[rgb(var(--text))]">
+                          No fee structure found for this class
+                        </div>
+                      )}
+
+                      <div className="mb-4">
+                        <label className="mb-1 block text-xs font-semibold">
+                          View As
+                        </label>
+
+                        <select
+                          value={freqFilter}
+                          onChange={(e) => setFreqFilter(e.target.value)}
+                          className="w-full rounded-lg border bg-[rgb(var(--surface))] px-3 py-2 text-[rgb(var(--text))]"
+                        >
+                          <option value="monthly">Monthly</option>
+                          <option value="quarterly">Quarterly</option>
+                          <option value="half-yearly">Half Yearly</option>
+                          <option value="annually">Annually</option>
+                        </select>
+                      </div>
+
+                      {optionalFees.length > 0 && (
+                        <div className="grid gap-3">
+                          {optionalFees.map((fee) =>
+                            isBusFeeComponent(fee) ? (
+                              <div
+                                key={fee._id}
+                                className="rounded-lg border border-[rgb(var(--border))] p-4 text-[rgb(var(--text))]"
+                              >
+                                <label className="flex items-center gap-3">
+                                  <input
+                                    type="checkbox"
+                                    checked={form.useTransport}
+                                    onChange={(e) =>
+                                      setForm((prev) => ({
+                                        ...prev,
+                                        useTransport: e.target.checked,
+                                        transport: e.target.checked
+                                          ? prev.transport
+                                          : "",
+                                        busFeeFrequency: e.target.checked
+                                          ? prev.busFeeFrequency || "annually"
+                                          : "annually",
+                                        busFeeQuarter:
+                                          e.target.checked &&
+                                          prev.busFeeFrequency === "quarterly"
+                                            ? prev.busFeeQuarter || ""
+                                            : "",
+                                      }))
+                                    }
+                                    className="h-4 w-4"
+                                  />
+                                  <div>
+                                    <div className="text-sm font-medium text-[rgb(var(--text))]">
+                                      Add {fee.name}
+                                    </div>
+                                    <div className="text-xs text-[rgb(var(--text))]">
+                                      Include this fee only when the student
+                                      uses transport.
+                                    </div>
+                                  </div>
+                                </label>
+
+                                {form.useTransport && (
+                                  <div className="mt-4 grid gap-4 md:grid-cols-2">
+                                    <Select
+                                      label="Transport Route"
+                                      name="transport"
+                                      value={form.transport}
+                                      options={transportRoutes.map((route) => ({
+                                        label: route.name,
+                                        value: route._id,
+                                      }))}
+                                      onChange={handleChange}
+                                    />
+
+                                    <Select
+                                      label="Bus Fee Type"
+                                      name="busFeeFrequency"
+                                      value={form.busFeeFrequency}
+                                      options={[
+                                        { label: "Annually", value: "annually" },
+                                        {
+                                          label: "Quarterly",
+                                          value: "quarterly",
+                                        },
+                                      ]}
+                                      onChange={handleChange}
+                                    />
+                                  </div>
+                                )}
+                              </div>
+                            ) : (
+                              <label
+                                key={fee._id}
+                                className="flex items-center gap-3 rounded-lg border border-gray-200 bg-gray-50 px-4 py-3"
+                              >
+                                <input
+                                  type="checkbox"
+                                  checked={(
+                                    form.selectedOptionalFees || []
+                                  ).includes(String(fee._id))}
+                                  onChange={() => toggleOptionalFee(fee._id)}
+                                  className="h-4 w-4"
+                                />
+                                <div>
+                                  <div className="text-sm font-medium text-gray-800">
+                                    Add {fee.name}
+                                  </div>
+                                  <div className="text-xs text-gray-500">
+                                    Include this optional fee in the final
+                                    annual total.
+                                  </div>
+                                </div>
+                              </label>
+                            ),
+                          )}
+                        </div>
+                      )}
+
+                      {feeStructure.length > 0 && (
+                        <div className="mb-4 rounded-lg border p-4">
+                          <h3 className="mb-2 font-semibold">Fee Heads</h3>
+
+                          {feeStructure.map((f, i) => (
+                            <div
+                              key={i}
+                              className="flex justify-between py-1 text-sm text-[rgb(var(--text))]"
+                            >
+                              <span>
+                                {f.name}
+                                {f.isOptional && (
+                                  <span className="ml-2 text-xs">
+                                    {isOptionalFeeSelected(f)
+                                      ? "(Selected)"
+                                      : "(Optional)"}
+                                  </span>
+                                )}
+                              </span>
+
+                              <span>₹{getDisplayAmount(f)}</span>
+                            </div>
+                          ))}
+
+                          <div className="mt-2 flex justify-between border-t pt-2 font-bold">
+                            <span>Annual Total</span>
+                            <span>
+                              ₹{Number(getIncludedAnnualTotal()).toFixed(2)}
+                            </span>
+                          </div>
+                        </div>
+                      )}
+
+                      {form.useTransport &&
+                        form.busFeeFrequency === "quarterly" && (
+                          <Select
+                            label="Bus Fee Quarter"
+                            name="busFeeQuarter"
+                            value={form.busFeeQuarter}
+                            options={busFeeQuarterOptions}
+                            onChange={handleChange}
+                          />
+                        )}
+
+                      <Input
+                        label="Total Annual Fee"
+                        name="totalFee"
+                        value={form.totalFee}
+                        onChange={handleChange}
+                        readOnly
+                        error={errors.totalFee}
+                      />
+
+                      <Select
+                        label="Discount Type"
+                        name="discountType"
+                        value={form.discountType}
+                        options={["Rupees", "Percentage"]}
+                        onChange={handleChange}
+                      />
+
+                      <Input
+                        label="Discount Value"
+                        placeholder="Enter amount or %"
+                        name="discountValue"
+                        type="number"
+                        inputMode="decimal"
+                        min="0"
+                        max={
+                          form.discountType === "Percentage" ? 100 : undefined
+                        }
+                        step="any"
+                        value={form.discountValue}
+                        onChange={handleChange}
+                        disabled={!form.discountType}
+                      />
+
+                      <Input
+                        label="Final Fee"
+                        name="finalFee"
+                        value={form.finalFee}
+                        readOnly
+                      />
+                    </div>
+                  )}
+
+                  {sectionKey === "builtin_medical" && (
+                    <div>
+                      <label className="mb-1 block text-sm font-medium text-[rgb(var(--text))]">
+                        Medical Condition / Health History
+                      </label>
+                      <textarea
+                        name="medicalConditionRemarks"
+                        rows={2}
+                        placeholder="Enter any medical condition, allergies, or health history"
+                        value={form.medicalConditionRemarks}
+                        onChange={handleChange}
+                        className="w-full resize-none rounded-lg border border-[rgb(var(--border))] bg-[rgb(var(--surface))] px-3 py-2 text-sm text-[rgb(var(--text))] outline-none focus:border-[rgb(var(--primary))]"
+                      />
+                    </div>
+                  )}
+
+                  {sectionKey === "builtin_7" && (
+                    <ParentLoginStep
+                      form={form}
+                      handleChange={handleChange}
+                      isEdit={isEdit}
+                    />
+                  )}
+
+                  {sectionKey === "builtin_notes" && (
+                    <div>
+                      <label className="mb-1 block text-sm font-medium text-[rgb(var(--text))]">
+                        Admission Notes / Office Remarks
+                      </label>
+                      <textarea
+                        name="admissionNotes"
+                        rows={2}
+                        placeholder="Enter any special admission notes, scholarship reference, or office remarks"
+                        value={form.admissionNotes}
+                        onChange={handleChange}
+                        className="w-full resize-none rounded-lg border border-[rgb(var(--border))] bg-[rgb(var(--surface))] px-3 py-2 text-sm text-[rgb(var(--text))] outline-none focus:border-[rgb(var(--primary))]"
+                      />
+                    </div>
+                  )}
+
+                  {isPrototypeSection && customFields.length > 0 && (
+                    <div className="mt-6 grid gap-4">
+                      <h3 className="text-sm font-semibold uppercase tracking-wide text-[rgb(var(--text-muted))]">
+                        Additional Details
+                        {isSinglePage && stepDef.title
+                          ? ` · ${stepDef.title}`
+                          : ""}
+                      </h3>
+                      {renderCustomFields()}
+                    </div>
+                  )}
+
+                  {!isPrototypeSection && !isReview && (
+                    <>
+                      {customFields.length === 0 ? (
+                        <p className="text-sm text-[rgb(var(--text-muted))]">
+                          This step has no fields yet.
+                        </p>
+                      ) : (
+                        <div className="grid gap-4">
+                          {renderCustomFields()}
+                        </div>
+                      )}
+                    </>
+                  )}
+
+                  {isReview && (
+                    <ReviewStep
+                      form={form}
+                      classes={classes}
+                      sections={sections}
+                      streams={streams}
+                      transportRoutes={transportRoutes}
+                      feeStructure={feeStructure}
+                      freqFilter={freqFilter}
+                      customFields={activeStepDefs.flatMap((stepDef) =>
+                        (stepDef.fields || []).filter(
+                          (field) => !field.builtin,
+                        ),
+                      )}
+                    />
                   )}
                 </div>
               );
             })}
-
-            {/* REVIEW */}
-            {(isSinglePage || step === reviewStep) && (
-              <div className={isSinglePage ? "mb-10" : undefined}>
-                {isSinglePage ? (
-                  <SectionHeading title={wizardSteps[reviewStep - 1] || "Review"} />
-                ) : (
-                  <DummyFillBar onFill={fillDummyData} step={step} />
-                )}
-                <ReviewStep
-                  form={form}
-                  classes={classes}
-                  sections={sections}
-                  transportRoutes={transportRoutes}
-                  feeStructure={feeStructure}
-                  freqFilter={freqFilter}
-                  customFields={activeStepDefs.flatMap((stepDef) =>
-                    (stepDef.fields || []).filter((field) => !field.builtin)
-                  )}
-                />
-              </div>
-            )}
 
             {/* NAV */}
 
@@ -3747,7 +3682,9 @@ const StudentManagement = () => {
         <AdmissionFormBuilder
           onClose={() => setBuilderOpen(false)}
           onSaved={(steps) => {
-            setFormStepDefs(mergeAdmissionSteps(steps));
+            setFormStepDefs(
+              mergeAdmissionSteps(steps, ADMISSION_DEFAULTS_VERSION),
+            );
             window.dispatchEvent(
               new CustomEvent("admission-form-updated", { detail: steps }),
             );
@@ -4110,71 +4047,148 @@ const CustomField = ({ field, value, error, onChange }) => {
   );
 };
 
-/* PARENT LOGIN STEP */
+/* PARENT & STUDENT LOGIN STEP */
 const ParentLoginStep = ({ form, handleChange, isEdit }) => {
   const [showPassword, setShowPassword] = useState(false);
+  const [showStudentPassword, setShowStudentPassword] = useState(false);
   const usernameMeta = useAdmissionField("username");
   const passwordMeta = useAdmissionField("password");
+  const studentUsernameMeta = useAdmissionField("studentUsername");
+  const studentPasswordMeta = useAdmissionField("studentPassword");
   const enforceRequired = useEnforceRequired();
 
+  const inputClass =
+    "w-full rounded-lg border border-[rgb(var(--border))] bg-[rgb(var(--surface))] px-3 py-2 font-mono text-sm text-[rgb(var(--text))] outline-none focus:border-[rgb(var(--primary))]";
+  const labelClass = "mb-1 block text-sm font-medium text-[rgb(var(--text))]";
+
   return (
-    <div className="grid gap-5">
-      <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 text-sm text-blue-700">
-        These credentials will be used by the parent to log into the portal.
-      </div>
-
-      {usernameMeta?.visible !== false && (
-        <div>
-          <label className="block text-sm font-medium text-[rgb(var(--text))] mb-1">
-            {applyFieldMetaToLabel("Username *", usernameMeta, enforceRequired)}
-          </label>
-          <input
-            name="username"
-            value={form.fatherMobile || ""}
-            onChange={handleChange}
-            disabled
-            placeholder="e.g. john.doe2024"
-            className="w-full border px-3 py-2 rounded-lg focus:ring-2 focus:ring-indigo-500"
-          />
-        </div>
-      )}
-
-      {passwordMeta?.visible !== false && (
-        <div>
-          <label className="block text-sm font-medium text-[rgb(var(--text))] mb-1">
-            {isEdit
-              ? "New Password (leave blank to keep current)"
-              : applyFieldMetaToLabel(
-                  "Password *",
-                  passwordMeta,
+    <div className="grid gap-4 lg:grid-cols-2">
+      {usernameMeta?.visible !== false && passwordMeta?.visible !== false && (
+        <div className="space-y-3 rounded-xl border border-[rgb(var(--border))] bg-[rgb(var(--bg))] p-4">
+          <div className="border-b border-[rgb(var(--border))] pb-1.5 font-bold text-[rgb(var(--text))]">
+            Parent Portal Credentials
+          </div>
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+            <div>
+              <label className={labelClass}>
+                {applyFieldMetaToLabel(
+                  "Parent Username",
+                  usernameMeta,
                   enforceRequired,
                 )}
-          </label>
-          <div className="relative">
-            <input
-              name="password"
-              type={showPassword ? "text" : "password"}
-              value={form.password || ""}
-              onChange={handleChange}
-              placeholder={isEdit ? "Leave blank to keep current" : "Min. 5 characters or leave blank for default"}
-              className="w-full border px-3 py-2 rounded-lg focus:ring-2 focus:ring-indigo-500 pr-10"
-            />
-            <button
-              type="button"
-              onClick={() => setShowPassword((v) => !v)}
-              className="absolute right-3 top-2.5 text-gray-400 hover:text-gray-600 text-sm"
-            >
-              {showPassword ? "Hide" : "Show"}
-            </button>
+              </label>
+              <input
+                name="username"
+                value={form.fatherMobile || ""}
+                readOnly
+                disabled
+                placeholder="parent.stu0003"
+                className={`${inputClass} cursor-not-allowed opacity-90`}
+              />
+            </div>
+
+            <div>
+              <label className={labelClass}>
+                {isEdit
+                  ? "New Password (leave blank to keep current)"
+                  : applyFieldMetaToLabel(
+                      "Parent Initial Password",
+                      passwordMeta,
+                      enforceRequired,
+                    )}
+              </label>
+              <div className="relative">
+                <input
+                  name="password"
+                  type={showPassword ? "text" : "password"}
+                  value={form.password || ""}
+                  onChange={handleChange}
+                  placeholder={
+                    isEdit
+                      ? "Leave blank to keep current"
+                      : "Default: father mobile number"
+                  }
+                  className={`${inputClass} pr-14`}
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword((v) => !v)}
+                  className="absolute right-2.5 top-1/2 -translate-y-1/2 cursor-pointer rounded px-1.5 py-0.5 text-[11px] font-semibold text-[rgb(var(--text-muted))] hover:text-[rgb(var(--text))]"
+                >
+                  {showPassword ? "Hide" : "Show"}
+                </button>
+              </div>
+            </div>
           </div>
+          {form.temp_password && isEdit && (
+            <div className="text-xs text-[rgb(var(--text-muted))]">
+              Current saved password (dev only):{" "}
+              <code>{form.temp_password}</code>
+            </div>
+          )}
         </div>
       )}
 
-      {form.temp_password && isEdit && (
-        <div className="text-xs text-gray-400">
-          Current saved password (dev only): <code>{form.temp_password}</code>
-        </div>
-      )}
+      {studentUsernameMeta?.visible !== false &&
+        studentPasswordMeta?.visible !== false && (
+          <div className="space-y-3 rounded-xl border border-[rgb(var(--border))] bg-[rgb(var(--bg))] p-4">
+            <div className="border-b border-[rgb(var(--border))] pb-1.5 font-bold text-[rgb(var(--text))]">
+              Student Portal Credentials
+            </div>
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+              <div>
+                <label className={labelClass}>
+                  {applyFieldMetaToLabel(
+                    "Student Username",
+                    studentUsernameMeta,
+                    enforceRequired,
+                  )}
+                </label>
+                <input
+                  name="studentUsername"
+                  value={form.studentUsername || form.studentId || ""}
+                  readOnly
+                  disabled
+                  placeholder="Auto-generated on save"
+                  className={`${inputClass} cursor-not-allowed opacity-90`}
+                />
+              </div>
+
+              <div>
+                <label className={labelClass}>
+                  {isEdit
+                    ? "New Password (leave blank to keep current)"
+                    : applyFieldMetaToLabel(
+                        "Student Initial Password",
+                        studentPasswordMeta,
+                        enforceRequired,
+                      )}
+                </label>
+                <div className="relative">
+                  <input
+                    name="studentPassword"
+                    type={showStudentPassword ? "text" : "password"}
+                    value={form.studentPassword || ""}
+                    onChange={handleChange}
+                    placeholder={
+                      isEdit
+                        ? "Leave blank to keep current"
+                        : "Default: same as parent password"
+                    }
+                    className={`${inputClass} pr-14`}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowStudentPassword((v) => !v)}
+                    className="absolute right-2.5 top-1/2 -translate-y-1/2 cursor-pointer rounded px-1.5 py-0.5 text-[11px] font-semibold text-[rgb(var(--text-muted))] hover:text-[rgb(var(--text))]"
+                  >
+                    {showStudentPassword ? "Hide" : "Show"}
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
     </div>
   );
 };
@@ -4184,6 +4198,7 @@ const ReviewStep = ({
   form,
   classes,
   sections,
+  streams = [],
   transportRoutes,
   feeStructure,
   freqFilter,
@@ -4198,6 +4213,16 @@ const ReviewStep = ({
     sections.find((s) => s.value === form.sectionId)?.label ||
     form.sectionId ||
     "—";
+  const streamName =
+    streams.find((s) => String(s._id) === String(form.streamId))?.name ||
+    form.stream ||
+    "";
+  const yesNo = (value) => (value ? "Yes" : "No");
+  const formatDate = (value) => {
+    if (!value) return "";
+    const d = new Date(value);
+    return Number.isNaN(d.getTime()) ? value : d.toLocaleDateString("en-IN");
+  };
 
   const transportName =
     transportRoutes.find((route) => route._id === form.transport)?.name ||
@@ -4216,14 +4241,17 @@ const ReviewStep = ({
   const initials =
     `${form.firstName?.[0] || ""}${form.lastName?.[0] || ""}`.toUpperCase();
 
-  const Section = ({ title, headerClass, children }) => (
-    <div className="border border-gray-200 rounded-xl overflow-hidden mb-3 bg-[rgb(var(--surface))]">
-      <div className={`px-4 py-2.5 border-b border-gray-200 ${headerClass}`}>
-        <span className="text-sm font-medium ">{title}</span>
+  const Section = ({ title, headerClass, show = true, children }) => {
+    if (!show) return null;
+    return (
+      <div className="border border-gray-200 rounded-xl overflow-hidden mb-3 bg-[rgb(var(--surface))]">
+        <div className={`px-4 py-2.5 border-b border-gray-200 ${headerClass}`}>
+          <span className="text-sm font-medium ">{title}</span>
+        </div>
+        <div className="grid grid-cols-2 md:grid-cols-3 bg-white">{children}</div>
       </div>
-      <div className="grid grid-cols-2 md:grid-cols-3 bg-white">{children}</div>
-    </div>
-  );
+    );
+  };
 
   const Field = ({ label, value, name }) => {
     const meta = useAdmissionField(name);
@@ -4274,76 +4302,157 @@ const ReviewStep = ({
         )}
       </div>
 
-      <Section title="Student details" headerClass="">
+      <Section title="Student identity" headerClass="">
         <Field name="studentId" label="Admission number" value={form.studentId || "—"} />
         <Field
-          label="Confirmation"
+          label="Confirmation status"
           value={form.confirmationStatus || "Non-Confirmed"}
         />
         <Field name="firstName" label="First name" value={form.firstName} />
         <Field name="lastName" label="Last name" value={form.lastName} />
-        <Field name="dob" label="Date of birth" value={form.dob} />
+        <Field name="dob" label="Date of birth" value={formatDate(form.dob)} />
         <Field name="gender" label="Gender" value={form.gender} />
+        <Field name="religion" label="Religion" value={form.religion} />
+        <Field name="category" label="Caste category" value={form.category} />
+        <Field
+          name="aadhaarNumber"
+          label="Student Aadhaar number"
+          value={form.aadhaarNumber}
+        />
+        <Field
+          name="admissionDate"
+          label="Admission date"
+          value={formatDate(form.admissionDate)}
+        />
+        <Field name="nicNumber" label="NIC number" value={form.nicNumber} />
+        <Field name="srNo" label="SR. No." value={form.srNo} />
+        <Field name="penNumber" label="PEN number" value={form.penNumber} />
+        <Field name="apaarId" label="APAAR ID" value={form.apaarId} />
         <Field name="bloodGroup" label="Blood group" value={form.bloodGroup} />
         <Field name="nationality" label="Nationality" value={form.nationality} />
-        <Field name="placeOfBirth" label="Place of birth" value={form.placeOfBirth} />
         <Field name="caste" label="Caste" value={form.caste} />
-        <Field name="category" label="Category" value={form.category} />
-        {form.category === "Minority" && (
-          <Field name="community" label="Community" value={form.community} />
-        )}
-        <Field name="aadhaarNumber" label="Aadhaar number" value={form.aadhaarNumber} />
-        <Field name="penNumber" label="PEN number" value={form.penNumber} />
-        <Field name="admissionSource" label="Admission source" value={form.admissionSource} />
+        <Field
+          name="admissionSource"
+          label="Admission source"
+          value={form.admissionSource}
+        />
         <Field
           name="isSpecialChild"
           label="Special child"
-          value={form.isSpecialChild ? "Yes" : "No"}
+          value={yesNo(form.isSpecialChild)}
         />
-        <Field name="isEws" label="EWS" value={form.isEws ? "Yes" : "No"} />
+        <Field name="isEws" label="EWS" value={yesNo(form.isEws)} />
         <Field
           name="isPhysicallyDisabled"
           label="Physically disabled"
-          value={form.isPhysicallyDisabled ? "Yes" : "No"}
+          value={yesNo(form.isPhysicallyDisabled)}
         />
-        <Field
-          name="medicalConditionRemarks"
-          label="Medical condition / history"
-          value={form.medicalConditionRemarks}
-        />
-        <Field name="admissionDate" label="Admission date" value={form.admissionDate} />
       </Section>
 
-      <Section title="Parent / guardian" headerClass="">
-        <Field name="fatherName" label="Father name" value={form.fatherName} />
+      <Section title="Parent &amp; contact details" headerClass="">
+        <Field name="fatherName" label="Father full name" value={form.fatherName} />
         <Field name="fatherMobile" label="Father mobile" value={form.fatherMobile} />
         <Field name="fatherEmail" label="Father email" value={form.fatherEmail} />
-        <Field name="motherName" label="Mother name" value={form.motherName} />
+        <Field name="motherName" label="Mother full name" value={form.motherName} />
         <Field name="motherMobile" label="Mother mobile" value={form.motherMobile} />
         <Field name="motherEmail" label="Mother email" value={form.motherEmail} />
-{form.guardianName?.trim() && (
-              <>
-                <Field name="guardianName" label="Guardian name" value={form.guardianName} />
-                <Field name="guardianMobile" label="Guardian mobile" value={form.guardianMobile} />
-                <Field name="guardianRelation" label="Relation" value={form.guardianRelation} />
-              </>
-            )}
-        <Field name="address" label="Address" value={form.address} />
+        {form.guardianName?.trim() && (
+          <>
+            <Field name="guardianName" label="Local guardian name" value={form.guardianName} />
+            <Field
+              name="guardianRelation"
+              label="Local guardian relation"
+              value={form.guardianRelation}
+            />
+            <Field
+              name="guardianEmail"
+              label="Local guardian email"
+              value={form.guardianEmail}
+            />
+          </>
+        )}
       </Section>
 
-      <Section title="Previous School" headerClass="">
-        <Field name="previousSchoolName" label="Previous School Name" value={form.previousSchoolName} />
-        <Field name="previousSchoolClass" label="Previous School Class" value={form.previousSchoolClass} />
-        <Field name="previousSchoolResult" label="Previous School Result" value={form.previousSchoolResult} />
-        <Field name="previousSchoolTcNumber" label="TC Number" value={form.previousSchoolTcNumber} />
+      <Section
+        title="Residential address"
+        headerClass=""
+        show={Boolean(
+          form.address ||
+            form.city ||
+            form.district ||
+            form.state ||
+            form.pincode,
+        )}
+      >
+        <Field name="address" label="Address line" value={form.address} />
+        <Field name="city" label="City / town / tehsil" value={form.city} />
+        <Field name="district" label="District" value={form.district} />
+        <Field name="state" label="State" value={form.state} />
+        <Field name="pincode" label="PIN code" value={form.pincode} />
       </Section>
 
-      <Section title="Class details" headerClass="">
-        <Field name="classId" label="Class" value={className} />
-        <Field name="sectionId" label="Section" value={sectionName} />
+      <Section
+        title="Previous school details"
+        headerClass=""
+        show={Boolean(
+          form.previousSchoolName ||
+            form.previousSchoolUdise ||
+            form.previousSchoolTcNumber ||
+            form.schoolLeavingDate ||
+            form.prevSchoolAddress ||
+            form.previousSchoolClass ||
+            form.previousSchoolResult,
+        )}
+      >
+        <Field
+          name="previousSchoolName"
+          label="Previous school name"
+          value={form.previousSchoolName}
+        />
+        <Field
+          name="previousSchoolUdise"
+          label="Previous school UDISE code"
+          value={form.previousSchoolUdise}
+        />
+        <Field
+          name="previousSchoolTcNumber"
+          label="Transfer certificate (TC) no."
+          value={form.previousSchoolTcNumber}
+        />
+        <Field
+          name="schoolLeavingDate"
+          label="School leaving date"
+          value={formatDate(form.schoolLeavingDate)}
+        />
+        <Field
+          name="prevSchoolAddress"
+          label="Previous school address"
+          value={form.prevSchoolAddress}
+        />
+        <Field
+          name="previousSchoolClass"
+          label="Last class attended"
+          value={form.previousSchoolClass}
+        />
+        <Field
+          name="previousSchoolResult"
+          label="Last result"
+          value={form.previousSchoolResult}
+        />
+      </Section>
+
+      <Section title="Class placement, hostel &amp; transport" headerClass="">
+        <Field name="classId" label="Admitting class" value={className} />
+        <Field name="sectionId" label="Allocated section" value={sectionName} />
+        <Field name="streamId" label="Academic stream" value={streamName} />
+        <Field
+          name="studentType"
+          label="Student residence mode"
+          value={form.studentType}
+        />
+        <Field name="transport" label="Transport bus route" value={transportName} />
         <Field name="rollNo" label="Roll number" value={form.rollNo} />
-        <Field name="studentType" label="Student type" value={form.studentType} />
-        <Field name="transport" label="Transport route" value={transportName} />
+        <Field name="relative" label="Relative / sibling" value={form.relative} />
       </Section>
 
       <Section title="Fee structure" headerClass="">
@@ -4397,9 +4506,43 @@ const ReviewStep = ({
         />
       </Section>
 
-      <Section title="Parent login" headerClass="">
-        <Field label="Username" value={form.username} />
-        <Field label="Password" value={form.password ? "••••••••" : null} />
+      <Section
+        title="Medical condition / history"
+        headerClass=""
+        show={Boolean(form.medicalConditionRemarks)}
+      >
+        <Field
+          name="medicalConditionRemarks"
+          label="Medical condition / health history"
+          value={form.medicalConditionRemarks}
+        />
+      </Section>
+
+      <Section
+        title="Notes / remarks"
+        headerClass=""
+        show={Boolean(form.admissionNotes)}
+      >
+        <Field
+          name="admissionNotes"
+          label="Admission notes / office remarks"
+          value={form.admissionNotes}
+        />
+      </Section>
+
+      <Section title="Parent &amp; student portal credentials" headerClass="">
+        <Field name="username" label="Parent username" value={form.username || form.fatherMobile} />
+        <Field label="Parent password" value={form.password ? "••••••••" : null} />
+        <Field
+          name="studentUsername"
+          label="Student username"
+          value={form.studentUsername || form.studentId}
+        />
+        <Field
+          name="studentPassword"
+          label="Student password"
+          value={form.studentPassword ? "••••••••" : null}
+        />
       </Section>
 
       {customFields.some(

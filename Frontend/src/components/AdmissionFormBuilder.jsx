@@ -92,7 +92,10 @@ const AdmissionFormBuilder = ({
           withCredentials: true,
         });
         if (cancelled) return;
-        const loaded = mergeSteps(res.data?.data?.steps);
+        const loaded = mergeSteps(
+          res.data?.data?.steps,
+          res.data?.data?.defaultsVersion,
+        );
         setSteps(loaded);
         setActiveKey(loaded[0]?.key || "");
       } catch {
@@ -244,6 +247,7 @@ const AdmissionFormBuilder = ({
       // Re-read after write so the live form applies what Mongo actually stored
       // (avoids trusting an in-memory response that never persisted).
       let saved = steps;
+      let savedVersion = 0;
       try {
         const verify = await axios.get(`${API}${apiPath}`, {
           withCredentials: true,
@@ -251,10 +255,11 @@ const AdmissionFormBuilder = ({
         if (Array.isArray(verify.data?.data?.steps)) {
           saved = verify.data.data.steps;
         }
+        savedVersion = verify.data?.data?.defaultsVersion || 0;
       } catch {
         /* fall back to the payload we just sent */
       }
-      const merged = mergeSteps(saved);
+      const merged = mergeSteps(saved, savedVersion);
       setSteps(merged);
       toast.success("Form saved");
       onSaved?.(merged);
@@ -625,7 +630,7 @@ const AdmissionFormBuilder = ({
   if (inline) return body;
 
   return (
-    <div className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-3">
+    <div className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-3 overflow-y-auto">
       {body}
     </div>
   );

@@ -33,7 +33,7 @@ const studentSchema = new mongoose.Schema(
     // Reservation category + (for Minority) the specific community.
     category: {
       type: String,
-      enum: ["General", "OBC", "SC", "ST", "Minority"],
+      enum: ["General", "OBC", "SC", "ST", "EWS", "Minority"],
       default: "General",
     },
     community: {
@@ -60,6 +60,7 @@ const studentSchema = new mongoose.Schema(
     isEws: { type: Boolean, default: false },
     isPhysicallyDisabled: { type: Boolean, default: false },
     medicalConditionRemarks: { type: String, default: "" },
+    admissionNotes: { type: String, default: "" },
 
     admissionDate: Date,
 
@@ -188,6 +189,8 @@ const studentSchema = new mongoose.Schema(
 
       birthCertificate: fileSchema,
       transferCertificate: fileSchema,
+      characterCertificate: fileSchema,
+      lastMarksheet: fileSchema,
 
       studentAadhar: fileSchema,
       fatherAadhar: fileSchema,
