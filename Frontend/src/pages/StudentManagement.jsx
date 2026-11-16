@@ -3308,7 +3308,7 @@ const StudentManagement = () => {
                         <select
                           value={freqFilter}
                           onChange={(e) => setFreqFilter(e.target.value)}
-                          className="w-full rounded-lg border bg-[rgb(var(--surface))] px-3 py-2 text-[rgb(var(--text))]"
+                          className="w-full rounded-lg border border-[rgb(var(--border))] bg-[rgb(var(--surface))] px-3 py-2 text-[rgb(var(--text))]"
                         >
                           <option value="monthly">Monthly</option>
                           <option value="quarterly">Quarterly</option>
@@ -3417,7 +3417,7 @@ const StudentManagement = () => {
                       )}
 
                       {feeStructure.length > 0 && (
-                        <div className="mb-4 rounded-lg border p-4">
+                        <div className="mb-4 rounded-lg border border-[rgb(var(--border))] p-4">
                           <h3 className="mb-2 font-semibold">Fee Heads</h3>
 
                           {feeStructure.map((f, i) => (
@@ -3440,7 +3440,7 @@ const StudentManagement = () => {
                             </div>
                           ))}
 
-                          <div className="mt-2 flex justify-between border-t pt-2 font-bold">
+                          <div className="mt-2 flex justify-between border-t border-[rgb(var(--border))] pt-2 font-bold">
                             <span>Annual Total</span>
                             <span>
                               ₹{Number(getIncludedAnnualTotal()).toFixed(2)}
@@ -3859,7 +3859,7 @@ const File = ({ label, name, onChange, existingUrl, error }) => {
   if (meta?.visible === false) return null;
 
   return (
-    <div className="border rounded-xl p-4 text-[rgb(var(--text))]">
+    <div className="rounded-xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))] p-4 text-[rgb(var(--text))]">
       <label
         className={`block text-sm font-medium mb-2 ${error ? "text-red-600" : "text-[rgb(var(--text))]"}`}
       >
@@ -3871,7 +3871,7 @@ const File = ({ label, name, onChange, existingUrl, error }) => {
         name={name}
         accept={accept}
         onChange={handlePreview}
-        className="w-full border px-3 py-2 rounded-lg"
+        className="w-full rounded-lg border border-[rgb(var(--border))] px-3 py-2"
       />
       <p className="text-[10px] text-slate-500 mt-1">
         {isPhotoField
@@ -4008,12 +4008,12 @@ const CustomField = ({ field, value, error, onChange }) => {
 
   if (field.type === "file") {
     return (
-      <div className="border rounded-xl p-4">
+      <div className="rounded-xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))] p-4">
         {labelNode}
         <input
           type="file"
           onChange={(e) => onChange(e.target.files?.[0] || "")}
-          className="w-full border px-3 py-2 rounded-lg"
+          className="w-full rounded-lg border border-[rgb(var(--border))] px-3 py-2"
         />
         {value && typeof value === "string" && (
           <a
