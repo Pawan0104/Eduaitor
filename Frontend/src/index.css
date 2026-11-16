@@ -705,3 +705,88 @@ html[data-skin="forest"] .login-submit {
   font-weight: 600;
   cursor: pointer;
 }
+
+/* ==================== DOCUMENT MANAGEMENT MODULE ==================== */
+/* Scoped to the Documents page so the classic ERP table look does not
+   leak into other tables. */
+.docs-module .erp-doc-table {
+  border-collapse: collapse;
+  width: 100%;
+}
+
+.docs-module .erp-doc-table th {
+  background-color: #f1f5f9;
+  color: #1e293b;
+  font-weight: 700;
+  font-size: 12.5px;
+  padding: 10px 12px;
+  border: 1px solid #dbe3ef;
+  text-align: left;
+  white-space: nowrap;
+}
+
+.docs-module .erp-doc-table td {
+  padding: 8px 12px;
+  border: 1px solid #e2e8f0;
+  font-size: 12.5px;
+  vertical-align: middle;
+}
+
+.docs-module .erp-doc-table tbody tr:nth-child(odd) {
+  background-color: #f0f9ff;
+}
+
+.docs-module .erp-doc-table tbody tr:nth-child(even) {
+  background-color: #ffffff;
+}
+
+.docs-module .erp-doc-table tbody tr:hover {
+  background-color: #e0f2fe !important;
+  transition: background-color 0.15s ease;
+}
+
+.docs-module .checklist-card {
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  background: #ffffff;
+  padding: 18px 20px;
+  transition: all 0.2s ease;
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.03);
+}
+
+.docs-module .checklist-card:hover {
+  border-color: #cbd5e1;
+  box-shadow: 0 6px 16px -4px rgba(15, 23, 42, 0.07);
+}
+
+.docs-module .upload-orig-btn {
+  border: 1px solid #cbd5e1;
+  border-radius: 8px;
+  background: #ffffff;
+  color: #0f172a;
+  font-weight: 600;
+  font-size: 13.5px;
+  padding: 9px 14px;
+  width: 100%;
+  text-align: center;
+  transition: all 0.15s ease;
+}
+
+.docs-module .upload-orig-btn:hover {
+  background: #f8fafc;
+  border-color: #6366f1;
+  color: #4338ca;
+}
+
+@keyframes docsRowHighlight {
+  0% {
+    background-color: #bbf7d0;
+  }
+  100% {
+    background-color: transparent;
+  }
+}
+
+.docs-module .newly-uploaded-row {
+  animation: docsRowHighlight 2.6s ease-out;
+}

@@ -5,6 +5,14 @@ const fileSchema = new mongoose.Schema({
   url: String,
   public_id: String,
   type: String,
+  /** Documents module: ERP display name (defaults to a generated name). */
+  displayName: { type: String, default: "" },
+  /** Documents module approval state. */
+  status: {
+    type: String,
+    enum: ["Pending", "Approved"],
+    default: "Pending",
+  },
 });
 
 const extraDocumentSchema = new mongoose.Schema(

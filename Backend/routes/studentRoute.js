@@ -11,6 +11,8 @@ import {
   getNextRollNo,
   getNextAdmissionNumber,
   getStudentDocuments,
+  updateStudentDocumentMeta,
+  deleteStudentDocument,
 } from "../controllers/studentController.js";
 import uploadSpreadsheet from "../middlewares/uploadSpreadsheet.js";
 import {
@@ -70,6 +72,18 @@ router.get(
 );
 
 router.put("/:id", authMiddleware, withUpload, updateStudent);
+
+router.put(
+  "/:id/documents/:documentKey",
+  authMiddleware,
+  updateStudentDocumentMeta,
+);
+
+router.delete(
+  "/:id/documents/:documentKey",
+  authMiddleware,
+  deleteStudentDocument,
+);
 
 router.get("/:id", authMiddleware, getStudent);
 

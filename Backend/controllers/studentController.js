@@ -443,6 +443,8 @@ export const createStudent = async (req, res) => {
           url: uploaded.url,
           public_id: uploaded.public_id,
           type: uploaded.type,
+          displayName: "",
+          status: "Pending",
         };
       } catch (err) {
         console.error(`Upload failed for ${field}`, err);
@@ -1335,10 +1337,13 @@ export const updateStudent = async (req, res) => {
 
           const uploaded = await uploadToCloudinary(files[field][0], folder);
 
+          const previousFile = documents[field];
           documents[field] = {
             url: uploaded.url,
             public_id: uploaded.public_id,
             type: uploaded.type,
+            displayName: previousFile?.displayName || "",
+            status: "Pending",
           };
         } catch (err) {
           console.error(`Upload failed for ${field}`, err);
@@ -1958,13 +1963,15 @@ export const getStudentsByTeacher = async (req, res) => {
 /* ================= STUDENT DOCUMENTS DIRECTORY ================= */
 
 const DOCUMENT_LABELS = {
-  studentPhoto: "Student Photo",
+  studentPhoto: "Student Passport Photo",
   fatherPhoto: "Father Photo",
   motherPhoto: "Mother Photo",
   guardianPhoto: "Guardian Photo",
   birthCertificate: "Birth Certificate",
   transferCertificate: "Transfer Certificate",
-  studentAadhar: "Student Aadhaar",
+  characterCertificate: "Character Certificate",
+  lastMarksheet: "Last Qualifying Marksheet",
+  studentAadhar: "Student Aadhaar Card",
   fatherAadhar: "Father Aadhaar",
   motherAadhar: "Mother Aadhaar",
 };
@@ -1978,8 +1985,36 @@ const pushDocRow = (rows, base, key, label, file, source) => {
     documentLabel: label || key,
     url,
     fileType: file?.type || "",
+    displayName: String(file?.displayName || "").trim(),
+    status: file?.status === "Approved" ? "Approved" : "Pending",
     source,
   });
+};
+
+/**
+ * Normalise an ERP document key coming from the client.
+ * Accepts "passportPhoto"/"aadhar"/"lastYearMarksheet" aliases so older
+ * uploads in the admission form still resolve to a stored document.
+ */
+const DOCUMENT_KEY_ALIASES = {
+  passportphoto: "studentPhoto",
+  studentpassportphoto: "studentPhoto",
+  photo: "studentPhoto",
+  aadhar: "studentAadhar",
+  aadhaar: "studentAadhar",
+  studentaadhaar: "studentAadhar",
+  lastyearmarksheet: "lastMarksheet",
+  lastqualifyingmarksheet: "lastMarksheet",
+  marksheet: "lastMarksheet",
+  tc: "transferCertificate",
+  character: "characterCertificate",
+};
+
+const resolveDocumentKey = (value) => {
+  const raw = String(value || "").trim();
+  if (!raw) return "";
+  if (DOCUMENT_LABELS[raw]) return raw;
+  return DOCUMENT_KEY_ALIASES[raw.toLowerCase()] || "";
 };
 
 export const getStudentDocuments = async (req, res) => {
@@ -2018,7 +2053,7 @@ export const getStudentDocuments = async (req, res) => {
     const students = await Student.find(filter)
       .setOptions({ skipSession: true })
       .select(
-        "firstName lastName studentId rollNo classId sectionId documents extraDocuments customFields",
+        "firstName lastName studentId rollNo fatherName motherName isActive classId sectionId documents extraDocuments customFields",
       )
       .populate("classId", "name className")
       .populate("sectionId", "name sectionName")
@@ -2032,6 +2067,9 @@ export const getStudentDocuments = async (req, res) => {
         studentId: student.studentId || "",
         studentName: `${student.firstName || ""} ${student.lastName || ""}`.trim(),
         rollNo: student.rollNo || "",
+        fatherName: student.fatherName || "",
+        motherName: student.motherName || "",
+        isActive: student.isActive !== false,
         className:
           student.classId?.name || student.classId?.className || "",
         sectionName:
@@ -2075,6 +2113,8 @@ export const getStudentDocuments = async (req, res) => {
           documentLabel: "",
           url: "",
           fileType: "",
+          displayName: "",
+          status: "",
           source: "none",
         });
       }
@@ -2090,6 +2130,150 @@ export const getStudentDocuments = async (req, res) => {
     return res.status(500).json({
       success: false,
       message: error.message || "Failed to fetch student documents",
+    });
+  }
+};
+
+/** Update a stored student document's approval status, display name or category. */
+export const updateStudentDocumentMeta = async (req, res) => {
+  try {
+    const schoolId = req.user?.school_id;
+    if (!schoolId) {
+      return res
+        .status(400)
+        .json({ success: false, message: "School ID is required" });
+    }
+
+    const documentKey = resolveDocumentKey(req.params.documentKey);
+    if (!documentKey) {
+      return res
+        .status(400)
+        .json({ success: false, message: "Invalid document category" });
+    }
+
+    const student = await Student.findOne({
+      _id: req.params.id,
+      schoolId,
+    }).setOptions({ skipSession: true });
+
+    if (!student) {
+      return res
+        .status(404)
+        .json({ success: false, message: "Student not found" });
+    }
+
+    const current = student.documents?.[documentKey];
+    if (!current?.url) {
+      return res
+        .status(404)
+        .json({ success: false, message: "Document not found" });
+    }
+
+    const requestedCategory =
+      typeof req.body?.category === "string" && req.body.category.trim()
+        ? resolveDocumentKey(req.body.category)
+        : "";
+    const targetKey = requestedCategory || documentKey;
+
+    const status = ["Approved", "Pending"].includes(req.body?.status)
+      ? req.body.status
+      : current.status === "Approved"
+        ? "Approved"
+        : "Pending";
+
+    const displayName =
+      typeof req.body?.displayName === "string"
+        ? req.body.displayName.trim().slice(0, 180)
+        : String(current.displayName || "").trim();
+
+    const nextFile = {
+      url: current.url,
+      public_id: current.public_id,
+      type: current.type,
+      displayName,
+      status,
+    };
+
+    student.set(`documents.${targetKey}`, nextFile);
+    if (targetKey !== documentKey) {
+      student.set(`documents.${documentKey}`, undefined);
+    }
+    student.markModified("documents");
+    await student.save();
+
+    return res.json({
+      success: true,
+      message: "Document updated",
+      data: {
+        studentMongoId: String(student._id),
+        documentKey: targetKey,
+        documentLabel: DOCUMENT_LABELS[targetKey] || targetKey,
+        displayName,
+        status,
+      },
+    });
+  } catch (error) {
+    console.error("updateStudentDocumentMeta error:", error);
+    return res.status(500).json({
+      success: false,
+      message: error.message || "Failed to update document",
+    });
+  }
+};
+
+/** Permanently delete one stored student document. */
+export const deleteStudentDocument = async (req, res) => {
+  try {
+    const schoolId = req.user?.school_id;
+    if (!schoolId) {
+      return res
+        .status(400)
+        .json({ success: false, message: "School ID is required" });
+    }
+
+    const documentKey = resolveDocumentKey(req.params.documentKey);
+    if (!documentKey) {
+      return res
+        .status(400)
+        .json({ success: false, message: "Invalid document category" });
+    }
+
+    const student = await Student.findOne({
+      _id: req.params.id,
+      schoolId,
+    }).setOptions({ skipSession: true });
+
+    if (!student) {
+      return res
+        .status(404)
+        .json({ success: false, message: "Student not found" });
+    }
+
+    const current = student.documents?.[documentKey];
+    if (!current?.url) {
+      return res
+        .status(404)
+        .json({ success: false, message: "Document not found" });
+    }
+
+    if (current.public_id) {
+      await deleteFromCloudinary(current.public_id).catch(() => {});
+    }
+
+    student.set(`documents.${documentKey}`, undefined);
+    student.markModified("documents");
+    await student.save();
+
+    return res.json({
+      success: true,
+      message: "Document deleted",
+      data: { documentKey },
+    });
+  } catch (error) {
+    console.error("deleteStudentDocument error:", error);
+    return res.status(500).json({
+      success: false,
+      message: error.message || "Failed to delete document",
     });
   }
 };
