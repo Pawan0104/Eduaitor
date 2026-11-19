@@ -72,8 +72,8 @@ const STATUS_META = {
   },
   cancelled: {
     label: "Cancelled",
-    className: "bg-slate-100 text-slate-500 border-slate-200",
-    dot: "bg-slate-400",
+    className: "bg-rose-50 text-rose-700 border-rose-200",
+    dot: "bg-rose-600",
   },
   new: {
     label: "New",
@@ -113,6 +113,7 @@ const emptyRegistration = () => ({
   gender: "",
   bloodGroup: "",
   category: "",
+  aadhaarNumber: "",
   motherName: "",
   classId: "",
   sectionId: "",
@@ -2412,17 +2413,6 @@ const Registrations = () => {
                                         Cancel Registration
                                       </button>
                                     )}
-
-                                    <button
-                                      type="button"
-                                      onClick={() =>
-                                        openConfirm("delete", registration)
-                                      }
-                                      className="flex w-full items-center gap-2 px-3 py-2 font-medium text-rose-600 hover:bg-rose-50"
-                                    >
-                                      <FiTrash2 size={13} />
-                                      Delete Record
-                                    </button>
                                   </>
                                 )}
                               </div>
@@ -3154,48 +3144,6 @@ const Registrations = () => {
             />
           </div>
 
-          <div className="rounded-xl border border-slate-200 bg-slate-50/30 p-4">
-            <h4 className="mb-3 flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-slate-700">
-              <span className="flex h-5 w-5 items-center justify-center rounded-full bg-blue-100 text-[11px] text-blue-700">
-                6
-              </span>
-              Additional Information &amp; Initial Follow-up
-            </h4>
-            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-              <div>
-                <label className="mb-1 block font-medium text-slate-700">
-                  Next Follow-up Date
-                </label>
-                <input
-                  type="date"
-                  value={regForm.nextFollowUpDate || ""}
-                  onChange={(event) =>
-                    setRegForm((prev) => ({
-                      ...prev,
-                      nextFollowUpDate: event.target.value,
-                    }))
-                  }
-                  className={inputClass}
-                />
-              </div>
-              <div>
-                <label className="mb-1 block font-medium text-slate-700">
-                  Counselor Notes
-                </label>
-                <input
-                  value={regForm.notes || ""}
-                  onChange={(event) =>
-                    setRegForm((prev) => ({
-                      ...prev,
-                      notes: event.target.value,
-                    }))
-                  }
-                  placeholder="Optional initial remarks..."
-                  className={inputClass}
-                />
-              </div>
-            </div>
-          </div>
         </div>
       </Modal>
 
@@ -4028,95 +3976,92 @@ const Registrations = () => {
               </div>
             </div>
 
-            {[
-              {
-                title: "1. Student Details",
-                fields: [
-                  ["Full Name", viewModal.data.studentName],
-                  ["Date of Birth", formatDate(viewModal.data.dob)],
-                  ["Gender", viewModal.data.gender],
-                  ["Blood Group", viewModal.data.bloodGroup],
-                ],
-              },
-              {
-                title: "2. Parent / Guardian Details",
-                fields: [
-                  ["Parent / Guardian", viewModal.data.parentName],
-                  ["Email Address", viewModal.data.parentEmail],
-                  ["Registration No.", viewModal.data.registrationNumber],
-                ],
-              },
-              {
-                title: "3. Contact Information",
-                fields: [
-                  ["Primary Mobile", viewModal.data.parentMobile],
-                  ["Email Address", viewModal.data.parentEmail],
-                ],
-              },
-              {
-                title: "4. Academic Interest",
-                fields: [
-                  [
-                    "Class & Section",
-                    `${viewModal.data.className || "—"}${
-                      viewModal.data.sectionName
-                        ? ` · Section ${viewModal.data.sectionName}`
-                        : ""
-                    }`,
-                  ],
-                  ["Stream", viewModal.data.stream],
-                  ["Lead Source", sourceText(viewModal.data)],
-                  ["Previous School", viewModal.data.previousSchoolName],
-                ],
-              },
-              {
-                title: "5. Address",
-                fields: [
-                  ["Street / Locality", viewModal.data.address],
-                  ["City / Town / Tehsil", viewModal.data.city],
-                  ["State", viewModal.data.state],
-                  ["District", viewModal.data.district],
-                  ["Pin Code", viewModal.data.pincode],
-                ],
-              },
-              {
-                title: "6. Additional Information & Admission Status",
-                fields: [
-                  [
-                    "Current Status",
-                    STATUS_META[displayStatusOf(viewModal.data, mode)]?.label ||
-                      displayStatusOf(viewModal.data, mode),
-                  ],
-                  [
-                    "Next Follow-up",
-                    viewModal.data.nextFollowUpDate
-                      ? formatDate(viewModal.data.nextFollowUpDate)
-                      : "Not set",
-                  ],
-                  ["Counselor Notes", viewModal.data.notes],
-                  ["Total Logs", String(viewModal.data.followUps?.length || 0)],
-                ],
-              },
-            ].map((section) => (
-              <div
-                key={section.title}
-                className="rounded-xl border border-slate-200 bg-slate-50/40 p-4"
-              >
-                <h4 className="mb-3 text-[11px] font-bold uppercase tracking-wider text-slate-500">
-                  {section.title}
-                </h4>
-                <div className="grid grid-cols-2 gap-3 text-xs sm:grid-cols-3">
-                  {section.fields.map(([label, value]) => (
-                    <div key={label}>
-                      <span className="block text-slate-400">{label}</span>
-                      <span className="font-semibold text-slate-800">
-                        {value || "—"}
-                      </span>
-                    </div>
-                  ))}
+            {formSteps.map((step, stepIndex) => {
+              const removedKeys = new Set(step.removedFieldKeys || []);
+              let fields = (step.fields || []).filter(
+                (field) =>
+                  field &&
+                  field.visible !== false &&
+                  !removedKeys.has(field.key),
+              );
+              // Always show Aadhaar in the Student Details segment, even when a
+              // school's saved form config predates the field.
+              if (
+                stepIndex === 0 &&
+                !fields.some((field) => field.key === "aadhaarNumber")
+              ) {
+                fields = [
+                  ...fields.slice(0, 3),
+                  {
+                    key: "aadhaarNumber",
+                    label: "Aadhaar Number",
+                    visible: true,
+                  },
+                  ...fields.slice(3),
+                ];
+              }
+              if (fields.length === 0) return null;
+
+              const data = viewModal.data;
+              const valueFor = (field) => {
+                const key = field.key;
+                const values = {
+                  studentName: data.studentName,
+                  dob: formatDate(data.dob),
+                  gender: data.gender,
+                  aadhaarNumber: data.aadhaarNumber,
+                  bloodGroup: data.bloodGroup,
+                  category: data.category,
+                  parentName: data.parentName,
+                  motherName: data.motherName,
+                  parentMobile: data.parentMobile,
+                  alternateMobile: data.alternateMobile,
+                  parentEmail: data.parentEmail,
+                  classId: `${data.className || "—"}${
+                    data.sectionName ? ` · Section ${data.sectionName}` : ""
+                  }`,
+                  streamId: data.stream,
+                  previousSchoolName: data.previousSchoolName,
+                  address: data.address,
+                  city: data.city,
+                  state: data.state,
+                  district: data.district,
+                  pincode: data.pincode,
+                  nextFollowUpDate: formatDate(data.nextFollowUpDate),
+                  notes: data.notes,
+                };
+                if (Object.prototype.hasOwnProperty.call(values, key)) {
+                  return values[key];
+                }
+                const custom = (data.customFields || []).find(
+                  (item) => item && item.key === key,
+                );
+                return custom ? custom.value : "";
+              };
+
+              return (
+                <div
+                  key={step.key || stepIndex}
+                  className="rounded-xl border border-slate-200 bg-slate-50/40 p-4"
+                >
+                  <h4 className="mb-3 text-[11px] font-bold uppercase tracking-wider text-slate-500">
+                    {step.title || `${stepIndex + 1}. Section`}
+                  </h4>
+                  <div className="grid grid-cols-2 gap-3 text-xs sm:grid-cols-3">
+                    {fields.map((field) => (
+                      <div key={field.key}>
+                        <span className="block text-slate-400">
+                          {field.label || field.key}
+                        </span>
+                        <span className="font-semibold text-slate-800">
+                          {valueFor(field) || "—"}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
                 </div>
-              </div>
-            ))}
+              );
+            })}
 
             {Array.isArray(viewModal.data.customFields) &&
             viewModal.data.customFields.length > 0 ? (

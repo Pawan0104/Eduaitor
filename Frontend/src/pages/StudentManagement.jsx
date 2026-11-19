@@ -12,7 +12,7 @@ import {
   REVIEW_STEP_KEY,
   ADMISSION_DEFAULTS_VERSION,
 } from "../lib/admissionFormDefaults";
-import { INDIA_STATES } from "../lib/indiaLocations";
+import { INDIA_STATES, districtsForState } from "../lib/indiaLocations";
 
 const API = import.meta.env.VITE_API_URL;
 
@@ -1790,36 +1790,17 @@ const StudentManagement = () => {
   };
 
   useEffect(() => {
+    // Fee Breakdown is display-only: no discounts, so the payable amount is
+    // always the annual total derived from the class fee structure.
     const annual = getIncludedAnnualTotal();
-    const rawDiscount = Number(form.discountValue) || 0;
-
-    // Clamp the discount to something that can never wipe the whole fee:
-    // percentage to 0–100%, rupees to 0–annual total. Without this an
-    // over-typed value silently produced finalFee = 0.
-    const discount =
-      form.discountType === "Percentage"
-        ? Math.min(Math.max(rawDiscount, 0), 100)
-        : Math.min(Math.max(rawDiscount, 0), annual);
-
-    let final = annual;
-
-    if (form.discountType === "Percentage") {
-      final = annual - (annual * discount) / 100;
-    }
-
-    if (form.discountType === "Rupees") {
-      final = annual - discount;
-    }
 
     setForm((prev) => ({
       ...prev,
       totalFee: Number(annual.toFixed(2)),
-      finalFee: Number(Math.max(0, final).toFixed(2)),
+      finalFee: Number(annual.toFixed(2)),
     }));
   }, [
     feeStructure,
-    form.discountType,
-    form.discountValue,
     form.useTransport,
     form.selectedOptionalFees,
     form.busFeeFrequency,
@@ -2946,13 +2927,14 @@ const StudentManagement = () => {
                         error={errors.guardianRelation}
                       />
                       <Input
-                        label="Local Guardian Email Address (Contact Email)"
-                        placeholder="guardian.email@example.com"
-                        name="guardianEmail"
-                        type="email"
-                        value={form.guardianEmail}
+                        label="Local Guardian mobile number (10 digits)"
+                        placeholder="10-digit mobile number"
+                        name="guardianMobile"
+                        type="tel"
+                        maxLength={10}
+                        value={form.guardianMobile}
                         onChange={handleChange}
-                        error={errors.guardianEmail}
+                        error={errors.guardianMobile}
                       />
                     </div>
                   )}
@@ -2975,19 +2957,31 @@ const StudentManagement = () => {
                         value={form.city}
                         onChange={handleChange}
                       />
-                      <Input
+                      <Select
                         label="District"
-                        placeholder="District"
                         name="district"
                         value={form.district}
+                        options={districtsForState(form.state)}
                         onChange={handleChange}
+                        error={errors.district}
                       />
                       <Select
                         label="State"
                         name="state"
                         value={form.state}
                         options={INDIA_STATES}
-                        onChange={handleChange}
+                        onChange={(e) => {
+                          const nextState = e.target.value;
+                          setForm((prev) => ({
+                            ...prev,
+                            state: nextState,
+                            district: districtsForState(nextState).includes(
+                              prev.district,
+                            )
+                              ? prev.district
+                              : "",
+                          }));
+                        }}
                       />
                       <Input
                         label="PIN Code"
@@ -3246,10 +3240,10 @@ const StudentManagement = () => {
                         error={errors.schoolLeavingDate}
                       />
                       <Input
-                        label="Previous School Address"
-                        placeholder="Town / City, District, State"
-                        name="prevSchoolAddress"
-                        value={form.prevSchoolAddress}
+                        label="Previous School class"
+                        placeholder="e.g. Class 8"
+                        name="previousSchoolClass"
+                        value={form.previousSchoolClass}
                         onChange={handleChange}
                       />
                     </div>
@@ -3300,122 +3294,6 @@ const StudentManagement = () => {
                         </div>
                       )}
 
-                      <div className="mb-4">
-                        <label className="mb-1 block text-xs font-semibold">
-                          View As
-                        </label>
-
-                        <select
-                          value={freqFilter}
-                          onChange={(e) => setFreqFilter(e.target.value)}
-                          className="w-full rounded-lg border border-[rgb(var(--border))] bg-[rgb(var(--surface))] px-3 py-2 text-[rgb(var(--text))]"
-                        >
-                          <option value="monthly">Monthly</option>
-                          <option value="quarterly">Quarterly</option>
-                          <option value="half-yearly">Half Yearly</option>
-                          <option value="annually">Annually</option>
-                        </select>
-                      </div>
-
-                      {optionalFees.length > 0 && (
-                        <div className="grid gap-3">
-                          {optionalFees.map((fee) =>
-                            isBusFeeComponent(fee) ? (
-                              <div
-                                key={fee._id}
-                                className="rounded-lg border border-[rgb(var(--border))] p-4 text-[rgb(var(--text))]"
-                              >
-                                <label className="flex items-center gap-3">
-                                  <input
-                                    type="checkbox"
-                                    checked={form.useTransport}
-                                    onChange={(e) =>
-                                      setForm((prev) => ({
-                                        ...prev,
-                                        useTransport: e.target.checked,
-                                        transport: e.target.checked
-                                          ? prev.transport
-                                          : "",
-                                        busFeeFrequency: e.target.checked
-                                          ? prev.busFeeFrequency || "annually"
-                                          : "annually",
-                                        busFeeQuarter:
-                                          e.target.checked &&
-                                          prev.busFeeFrequency === "quarterly"
-                                            ? prev.busFeeQuarter || ""
-                                            : "",
-                                      }))
-                                    }
-                                    className="h-4 w-4"
-                                  />
-                                  <div>
-                                    <div className="text-sm font-medium text-[rgb(var(--text))]">
-                                      Add {fee.name}
-                                    </div>
-                                    <div className="text-xs text-[rgb(var(--text))]">
-                                      Include this fee only when the student
-                                      uses transport.
-                                    </div>
-                                  </div>
-                                </label>
-
-                                {form.useTransport && (
-                                  <div className="mt-4 grid gap-4 md:grid-cols-2">
-                                    <Select
-                                      label="Transport Route"
-                                      name="transport"
-                                      value={form.transport}
-                                      options={transportRoutes.map((route) => ({
-                                        label: route.name,
-                                        value: route._id,
-                                      }))}
-                                      onChange={handleChange}
-                                    />
-
-                                    <Select
-                                      label="Bus Fee Type"
-                                      name="busFeeFrequency"
-                                      value={form.busFeeFrequency}
-                                      options={[
-                                        { label: "Annually", value: "annually" },
-                                        {
-                                          label: "Quarterly",
-                                          value: "quarterly",
-                                        },
-                                      ]}
-                                      onChange={handleChange}
-                                    />
-                                  </div>
-                                )}
-                              </div>
-                            ) : (
-                              <label
-                                key={fee._id}
-                                className="flex items-center gap-3 rounded-lg border border-gray-200 bg-gray-50 px-4 py-3"
-                              >
-                                <input
-                                  type="checkbox"
-                                  checked={(
-                                    form.selectedOptionalFees || []
-                                  ).includes(String(fee._id))}
-                                  onChange={() => toggleOptionalFee(fee._id)}
-                                  className="h-4 w-4"
-                                />
-                                <div>
-                                  <div className="text-sm font-medium text-gray-800">
-                                    Add {fee.name}
-                                  </div>
-                                  <div className="text-xs text-gray-500">
-                                    Include this optional fee in the final
-                                    annual total.
-                                  </div>
-                                </div>
-                              </label>
-                            ),
-                          )}
-                        </div>
-                      )}
-
                       {feeStructure.length > 0 && (
                         <div className="mb-4 rounded-lg border border-[rgb(var(--border))] p-4">
                           <h3 className="mb-2 font-semibold">Fee Heads</h3>
@@ -3449,17 +3327,6 @@ const StudentManagement = () => {
                         </div>
                       )}
 
-                      {form.useTransport &&
-                        form.busFeeFrequency === "quarterly" && (
-                          <Select
-                            label="Bus Fee Quarter"
-                            name="busFeeQuarter"
-                            value={form.busFeeQuarter}
-                            options={busFeeQuarterOptions}
-                            onChange={handleChange}
-                          />
-                        )}
-
                       <Input
                         label="Total Annual Fee"
                         name="totalFee"
@@ -3467,30 +3334,6 @@ const StudentManagement = () => {
                         onChange={handleChange}
                         readOnly
                         error={errors.totalFee}
-                      />
-
-                      <Select
-                        label="Discount Type"
-                        name="discountType"
-                        value={form.discountType}
-                        options={["Rupees", "Percentage"]}
-                        onChange={handleChange}
-                      />
-
-                      <Input
-                        label="Discount Value"
-                        placeholder="Enter amount or %"
-                        name="discountValue"
-                        type="number"
-                        inputMode="decimal"
-                        min="0"
-                        max={
-                          form.discountType === "Percentage" ? 100 : undefined
-                        }
-                        step="any"
-                        value={form.discountValue}
-                        onChange={handleChange}
-                        disabled={!form.discountType}
                       />
 
                       <Input
@@ -4047,6 +3890,7 @@ const CustomField = ({ field, value, error, onChange }) => {
         }
         value={value ?? ""}
         placeholder={field.placeholder || ""}
+        maxLength={field.maxLength || undefined}
         onChange={(e) => onChange(e.target.value)}
         className={inputClass}
       />
@@ -4365,7 +4209,7 @@ const ReviewStep = ({
         <Field name="motherName" label="Mother full name" value={form.motherName} />
         <Field name="motherMobile" label="Mother mobile" value={form.motherMobile} />
         <Field name="motherEmail" label="Mother email" value={form.motherEmail} />
-        {form.guardianName?.trim() && (
+        {(form.guardianName?.trim() || form.guardianMobile?.trim() || form.guardianRelation) && (
           <>
             <Field name="guardianName" label="Local guardian name" value={form.guardianName} />
             <Field
@@ -4374,9 +4218,9 @@ const ReviewStep = ({
               value={form.guardianRelation}
             />
             <Field
-              name="guardianEmail"
-              label="Local guardian email"
-              value={form.guardianEmail}
+              name="guardianMobile"
+              label="Local guardian mobile"
+              value={form.guardianMobile}
             />
           </>
         )}
@@ -4408,7 +4252,6 @@ const ReviewStep = ({
             form.previousSchoolUdise ||
             form.previousSchoolTcNumber ||
             form.schoolLeavingDate ||
-            form.prevSchoolAddress ||
             form.previousSchoolClass ||
             form.previousSchoolResult,
         )}
@@ -4434,13 +4277,8 @@ const ReviewStep = ({
           value={formatDate(form.schoolLeavingDate)}
         />
         <Field
-          name="prevSchoolAddress"
-          label="Previous school address"
-          value={form.prevSchoolAddress}
-        />
-        <Field
           name="previousSchoolClass"
-          label="Last class attended"
+          label="Previous school class"
           value={form.previousSchoolClass}
         />
         <Field
@@ -4466,42 +4304,10 @@ const ReviewStep = ({
 
       <Section title="Fee structure" headerClass="">
         <Field
-          label="Bus service"
-          value={form.useTransport ? "Included" : "Not selected"}
-        />
-        <Field
-          label="Bus fee type"
-          value={form.useTransport ? form.busFeeFrequency : null}
-        />
-        <Field
-          label="Bus fee quarter"
-          value={
-            form.useTransport && form.busFeeFrequency === "quarterly"
-              ? selectedBusQuarter || null
-              : null
-          }
-        />
-        <Field
-          label="Other optional fees"
-          value={selectedOptionalFeeNames || null}
-        />
-        <Field label="Fee frequency" value={freqFilter || null} />
-        <Field
           label="Total annual fee"
           value={
             form.totalFee
               ? `₹${Number(form.totalFee).toLocaleString("en-IN")}`
-              : null
-          }
-        />
-        <Field label="Discount type" value={form.discountType} />
-        <Field
-          label="Discount value"
-          value={
-            form.discountValue
-              ? form.discountType === "Percentage"
-                ? `${form.discountValue}%`
-                : `₹${form.discountValue}`
               : null
           }
         />

@@ -44,6 +44,7 @@ export const REGISTRATION_STEPS = [
       f("gender", "Gender", "select", false, {
         options: ["Male", "Female", "Other"],
       }),
+      f("aadhaarNumber", "Aadhaar Number", "text", false),
       f("bloodGroup", "Blood Group", "text", false),
       f("category", "Category", "select", false, {
         options: ["General", "OBC", "SC", "ST", "EWS"],

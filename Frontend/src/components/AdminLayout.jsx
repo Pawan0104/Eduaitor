@@ -75,9 +75,9 @@ const getNavItems = (role, loginAs, openProfile, tn) => {
           path: "/school/students",
         },
         {
-          label: tn("Teachers"),
+          label: tn("Staff & Teachers"),
           icon: <FaChalkboardTeacher />,
-          path: "/school/teachers",
+          path: "/school/staff-and-teachers",
         },
         { label: tn("Chat"), icon: <FaComments />, path: "/school/messages" },
         profileItem,

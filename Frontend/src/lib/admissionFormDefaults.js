@@ -1,4 +1,8 @@
-import { INDIA_STATES } from "./indiaLocations";
+import {
+  DEFAULT_STATE,
+  INDIA_STATES,
+  districtsForState,
+} from "./indiaLocations";
 
 /**
  * Built-in admission wizard layout.
@@ -109,8 +113,10 @@ export const ADMISSION_STEPS = [
       f("guardianRelation", "Local Guardian Relation", "select", false, {
         options: GUARDIAN_RELATION_OPTIONS,
       }),
-      f("guardianEmail", "Local Guardian Email Address (Contact Email)", "email", false),
-      f("guardianMobile", "Guardian Mobile", "tel", false, { visible: false }),
+      f("guardianMobile", "Local Guardian mobile number (10 digits)", "tel", false, {
+        placeholder: "10-digit mobile number",
+        maxLength: 10,
+      }),
     ],
   },
   {
@@ -125,7 +131,9 @@ export const ADMISSION_STEPS = [
         false,
       ),
       f("city", "City / Town / Tehsil", "text", false),
-      f("district", "District", "text", false),
+      f("district", "District", "select", false, {
+        options: districtsForState(DEFAULT_STATE),
+      }),
       f("state", "State", "select", false, {
         options: INDIA_STATES,
       }),
@@ -162,10 +170,10 @@ export const ADMISSION_STEPS = [
       ),
       f("previousSchoolTcNumber", "Transfer Certificate (TC) No.", "text", false),
       f("schoolLeavingDate", "School Leaving Date", "date", false),
-      f("prevSchoolAddress", "Previous School Address", "text", false),
-      f("previousSchoolClass", "Last Class Attended", "text", false, {
+      f("prevSchoolAddress", "Previous School Address", "text", false, {
         visible: false,
       }),
+      f("previousSchoolClass", "Previous School class", "text", false),
       f("previousSchoolResult", "Last Result", "text", false, {
         visible: false,
       }),
@@ -198,16 +206,7 @@ export const ADMISSION_STEPS = [
     fields: [
       f("feeBatch", "Fee Batch", "select", false, { visible: false }),
       f("totalFee", "Total Annual Fee", "number", false),
-      f("discountType", "Discount Type", "select", false),
-      f("discountValue", "Discount Value", "number", false),
       f("finalFee", "Final Fee", "number", false),
-      f("busFeeFrequency", "Bus Fee Type", "select", false, {
-        options: [
-          { label: "Annually", value: "annually" },
-          { label: "Quarterly", value: "quarterly" },
-        ],
-      }),
-      f("busFeeQuarter", "Bus Fee Quarter", "select", false),
     ],
   },
   {
@@ -264,7 +263,7 @@ export const REVIEW_STEP_KEY = "builtin_8";
  * over previously saved steps (labels, field set, section order). Must match
  * `ADMISSION_DEFAULTS_VERSION` in the backend admission form controller.
  */
-export const ADMISSION_DEFAULTS_VERSION = 2;
+export const ADMISSION_DEFAULTS_VERSION = 6;
 
 /** Structural fields the wizard/backend cannot create a student without. */
 export const LOCKED_VISIBLE_FIELD_KEYS = new Set(["firstName", "lastName"]);

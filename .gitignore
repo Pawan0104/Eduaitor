@@ -27,5 +27,8 @@ Docs/Eduaitor_Login_Credentials.docx
 # Nested git repo — committing it would store a broken gitlink and lose contents
 eduaitorcpanel-deploy/
 
+# Local cPanel sync copy — tracked deploy bundle lives in Frontend/hosting-upload
+eduaitorcpanel/
+
 # Mail-relay production secret — commit only config.example.php
 **/mail-relay/config.php

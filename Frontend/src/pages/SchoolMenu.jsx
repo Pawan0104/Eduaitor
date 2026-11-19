@@ -477,6 +477,16 @@ export default function SchoolMenu() {
       ],
     },
     {
+      name: "Classes & Subjects",
+      icon: <HiAcademicCap />,
+      path: "/school/classes-subjects",
+    },
+    {
+      name: "Staff & Teachers",
+      icon: <FiUsers />,
+      path: "/school/staff-and-teachers",
+    },
+    {
       name: "Attendance",
       icon: <FaClipboardCheck />,
       children: [
@@ -485,7 +495,7 @@ export default function SchoolMenu() {
       ],
     },
     {
-      name: "Access Control",
+      name: "Access Control (RBAC)",
       icon: <FaUserShield />,
       path: "/school/access-control",
     },

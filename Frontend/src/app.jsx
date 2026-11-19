@@ -30,8 +30,14 @@ import TeacherView from "./components/TeacherView";
 import SectionManagement from "./pages/SectionManagement";
 import StreamManagement from "./pages/StreamManagement";
 import Class from "./pages/Class";
+import ClassesSubjects from "./pages/ClassesSubjects";
+import CompulsorySubjects from "./pages/CompulsorySubjects";
+import OptionalGroups from "./pages/OptionalGroups";
+import TeachersAssignment from "./pages/TeachersAssignment";
+import FlowSimulator from "./pages/FlowSimulator";
 import ClassView from "./components/ClassView";
 import Subject from "./pages/Subject";
+import SubjectsMaster from "./pages/SubjectsMaster";
 import TimeTable from "./pages/TimeTable";
 import FeeStructure from "./pages/FeeStructure";
 import Event from "./pages/Event";
@@ -112,6 +118,8 @@ import BlogDetail from "./components/BlogDetail";
 import ClassAttendanceMarking from "./pages/ClassAttendanceMarking";
 import StudentAttendanceDetail from "./pages/StudentAttendanceDetail";
 import StaffManagement from "./pages/StaffManagement";
+import StaffAndTeachers from "./pages/StaffAndTeachers";
+import AccessControlRbac from "./pages/AccessControlRbac";
 import SchoolStaffRoles from "./pages/SchoolStaffRoles";
 import ParentGatepass from "./pages/ParentGatepass";
 import ParentHostelVisit from "./pages/ParentHostelVisit";
@@ -235,8 +243,14 @@ const App = () => {
           <Route path="section" element={<SectionManagement />} />
           <Route path="streams" element={<StreamManagement />} />
           <Route path="class" element={<Class />} />
+           <Route path="classes-subjects" element={<ClassesSubjects />} />
+           <Route path="compulsory-subjects" element={<CompulsorySubjects />} />
+           <Route path="optional-groups" element={<OptionalGroups />} />
+           <Route path="teachers-assignment" element={<TeachersAssignment />} />
+           <Route path="flow-simulator" element={<FlowSimulator />} />
           <Route path="class-view/:id" element={<ClassView />} />
           <Route path="subject" element={<Subject />} />
+           <Route path="subjects-master" element={<SubjectsMaster />} />
           <Route path="syllabus" element={<Syllabus />} />
           <Route path="attendance" element={<ClassAttendanceReportPrincipal />} />
           <Route
@@ -244,7 +258,7 @@ const App = () => {
             element={<StudentAttendanceDetail />}
           />
           <Route path="staff-attendance" element={<StaffAttendance />} />
-          <Route path="access-control" element={<SchoolStaffRoles />} />
+          <Route path="access-control" element={<AccessControlRbac />} />
           <Route path="staff-roles" element={<SchoolStaffRoles />} />
           <Route path="timetable" element={<TimeTable />} />
           <Route path="fee-structure" element={<FeeStructure />} />
@@ -286,6 +300,7 @@ const App = () => {
           <Route path="commerce/orders" element={<CommerceOrders />} />
           <Route path="commerce/:section" element={<CommerceInventory />} />
           <Route path="blogs" element={<Blogs />} />
+          <Route path="staff-and-teachers" element={<StaffAndTeachers />} />
           <Route path="staff" element={<StaffManagement />} />
           <Route path="staff-leave" element={<StaffLeaveAdmin />} />
           <Route path="messages" element={<MessagesPage />} />
@@ -319,6 +334,11 @@ const App = () => {
           <Route path="student-view/:id" element={<StudentView />} />
           <Route path="id-card/student/:id" element={<IdCard />} />
           <Route path="class" element={<Class />} />
+           <Route path="classes-subjects" element={<ClassesSubjects />} />
+           <Route path="compulsory-subjects" element={<CompulsorySubjects />} />
+           <Route path="optional-groups" element={<OptionalGroups />} />
+           <Route path="teachers-assignment" element={<TeachersAssignment />} />
+           <Route path="flow-simulator" element={<FlowSimulator />} />
           <Route path="class-view/:id" element={<ClassView />} />
           <Route path="assignment" element={<Assignment />} />
           <Route

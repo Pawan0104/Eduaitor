@@ -14,6 +14,7 @@ import {
   FaBookDead,
   FaCalendar,
   FaBookOpen,
+  FaBook,
   FaUserAlt,
   FaUsers,
   FaLock,
@@ -262,6 +263,16 @@ const Sidebar = ({ closeSidebar, unreadMessages = 0 }) => {
       ],
     },
     {
+      name: "Classes & Subjects",
+      icon: <HiAcademicCap />,
+      path: "/school/classes-subjects",
+    },
+    {
+      name: "Staff & Teachers",
+      icon: <FaUsers />,
+      path: "/school/staff-and-teachers",
+    },
+    {
       name: "Attendance",
       icon: <FaUserAlt />,
       module: "attendance",
@@ -274,7 +285,7 @@ const Sidebar = ({ closeSidebar, unreadMessages = 0 }) => {
       ],
     },
     {
-      name: "Access Control",
+      name: "Access Control (RBAC)",
       icon: <FaUserShield />,
       path: "/school/access-control",
     },
