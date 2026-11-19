@@ -105,13 +105,13 @@ export default function AppUpdatePrompt() {
 
   return (
     <div
-      className="fixed inset-0 z-[99999] flex items-end sm:items-center justify-center p-4"
+      className="fixed inset-0 z-[99999] flex items-end sm:items-center justify-center p-4 overflow-y-auto"
       style={{ background: "rgba(15, 23, 42, 0.55)" }}
       role="dialog"
       aria-modal="true"
       aria-labelledby="app-update-title"
     >
-      <div className="w-full max-w-sm rounded-2xl bg-[rgb(var(--surface))] border border-[rgb(var(--border))] shadow-xl p-5 space-y-4">
+      <div className="w-full max-w-sm rounded-2xl bg-[rgb(var(--surface))] border border-[rgb(var(--border))] shadow-xl p-5 space-y-4 max-h-[min(92vh,880px)] overflow-y-auto">
         <div>
           <h2
             id="app-update-title"

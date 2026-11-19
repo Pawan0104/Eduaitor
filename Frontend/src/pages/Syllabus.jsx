@@ -865,8 +865,8 @@ function Syllabus() {
       </div>
       {/* delete modal */}
       {confirmState.open && (
-        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50">
-          <div className="text-[rgb(var(--text))] bg-[rgb(var(--surface))]  rounded-2xl shadow-xl w-[90%] max-w-sm p-6">
+        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 overflow-y-auto">
+          <div className="text-[rgb(var(--text))] bg-[rgb(var(--surface))] rounded-2xl shadow-xl w-[90%] max-w-sm p-6 my-auto max-h-[min(92vh,880px)] overflow-y-auto">
             <h2 className="text-lg font-semibold mb-2">
               Delete{" "}
               {confirmState.type === "pdf"
@@ -926,7 +926,7 @@ function Syllabus() {
       )}
 
       {activeModal === "viewChapter" && (
-        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4 overflow-y-auto">
           <div className="text-[rgb(var(--text))] bg-[rgb(var(--surface))] rounded-lg shadow-xl max-w-4xl w-full border border-slate-700 max-h-[90vh] flex flex-col">
             <div className="flex items-center justify-between p-5 border-b border-slate-700">
               <div>
@@ -1042,20 +1042,20 @@ function Syllabus() {
 // ==================== CHAPTER MODAL ====================
 function ChapterModal({ formData, setFormData, onSubmit, onClose, terms }) {
   return (
-    <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-      <div className="text-[rgb(var(--text))] bg-[rgb(var(--surface))]  rounded-lg shadow-xl max-w-md w-full border border-slate-700">
-        <div className="flex items-center justify-between p-6 border-b border-slate-700">
+    <div className="fixed inset-0 z-50 flex items-center justify-center overflow-y-auto bg-black/50 p-4 backdrop-blur-sm">
+      <div className="my-auto flex max-h-[min(92vh,880px)] w-full max-w-md flex-col overflow-hidden rounded-lg border border-slate-700 bg-[rgb(var(--surface))] text-[rgb(var(--text))] shadow-xl">
+        <div className="flex shrink-0 items-center justify-between border-b border-slate-700 p-4 sm:p-6">
           <h2 className="text-xl font-bold">
             {formData.type === "addChapter" ? "Add Chapter" : "Edit Chapter"}
           </h2>
-          <button onClick={onClose} className="transition">
-            <FiX className="w-6 h-6" />
+          <button type="button" onClick={onClose} className="transition">
+            <FiX className="h-6 w-6" />
           </button>
         </div>
 
-        <div className="p-6 space-y-4">
+        <div className="min-h-0 flex-1 space-y-4 overflow-y-auto overscroll-contain p-4 sm:p-6">
           <div className="relative">
-            <label className="block text-sm font-semibold mb-2 ">
+            <label className="mb-2 block text-sm font-semibold">
               Select Term
             </label>
             <div className="relative">
@@ -1064,9 +1064,7 @@ function ChapterModal({ formData, setFormData, onSubmit, onClose, terms }) {
                 onChange={(e) =>
                   setFormData({ ...formData, termId: e.target.value })
                 }
-                className="w-full px-4 py-3 border border-slate-700 rounded-lg 
-                text-[rgb(var(--text))] bg-[rgb(var(--surface))]
-                focus:border-cyan-400 focus:ring-2 focus:ring-cyan-400/20 outline-none transition appearance-none cursor-pointer"
+                className="w-full cursor-pointer appearance-none rounded-lg border border-slate-700 bg-[rgb(var(--surface))] px-4 py-3 text-[rgb(var(--text))] outline-none transition focus:border-cyan-400 focus:ring-2 focus:ring-cyan-400/20"
               >
                 <option value="">All Terms</option>
                 {terms?.map((t) => (
@@ -1075,12 +1073,12 @@ function ChapterModal({ formData, setFormData, onSubmit, onClose, terms }) {
                   </option>
                 ))}
               </select>
-              <FiChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-5 h-5 pointer-events-none" />
+              <FiChevronDown className="pointer-events-none absolute right-3 top-1/2 h-5 w-5 -translate-y-1/2" />
             </div>
           </div>
 
           <div>
-            <label className="block text-sm font-semibold  mb-2">
+            <label className="mb-2 block text-sm font-semibold">
               Chapter Name *
             </label>
             <input
@@ -1090,12 +1088,12 @@ function ChapterModal({ formData, setFormData, onSubmit, onClose, terms }) {
                 setFormData({ ...formData, name: e.target.value })
               }
               placeholder="e.g., Introduction to Biology"
-              className="w-full px-4 py-2 border border-slate-600 rounded-lg placeholder-slate-400 outline-none transition"
+              className="w-full rounded-lg border border-slate-600 px-4 py-2 outline-none transition placeholder:text-slate-400"
             />
           </div>
 
           <div>
-            <label className="block text-sm font-semibold  mb-2">
+            <label className="mb-2 block text-sm font-semibold">
               Main content *
             </label>
             <textarea
@@ -1108,13 +1106,13 @@ function ChapterModal({ formData, setFormData, onSubmit, onClose, terms }) {
                 })
               }
               placeholder="Write the full main content of this chapter"
-              rows="8"
-              className="w-full px-4 py-2  border border-slate-600 rounded-lg  placeholder-slate-400  outline-none transition resize-none"
+              rows="6"
+              className="max-h-48 w-full resize-y rounded-lg border border-slate-600 px-4 py-2 outline-none transition placeholder:text-slate-400"
             />
           </div>
 
           <div>
-            <label className="block text-sm font-semibold  mb-2">
+            <label className="mb-2 block text-sm font-semibold">
               Learning Outcomes (one per line)
             </label>
             <textarea
@@ -1124,21 +1122,23 @@ function ChapterModal({ formData, setFormData, onSubmit, onClose, terms }) {
               }
               placeholder="Students will be able to...&#10;Understand..."
               rows="3"
-              className="w-full px-4 py-2 border border-slate-600 rounded-lg placeholder-slate-400  outline-none transition resize-none"
+              className="w-full resize-y rounded-lg border border-slate-600 px-4 py-2 outline-none transition placeholder:text-slate-400"
             />
           </div>
         </div>
 
-        <div className="flex gap-3 p-6 border-t border-slate-700 ">
+        <div className="flex shrink-0 gap-3 border-t border-slate-700 p-4 sm:p-6">
           <button
+            type="button"
             onClick={onClose}
-            className="flex-1 px-4 py-2 text-[rgb(var(--text))] bg-[rgb(var(--primary))] border border-slate-600 rounded-lg  transition"
+            className="flex-1 rounded-lg border border-slate-600 bg-[rgb(var(--primary))] px-4 py-2 text-[rgb(var(--text))] transition"
           >
             Cancel
           </button>
           <button
+            type="button"
             onClick={onSubmit}
-            className="flex-1 px-4 py-2 bg-linear-to-r font-semibold rounded-lg text-[rgb(var(--text))] bg-[rgb(var(--primary))] transition"
+            className="flex-1 rounded-lg bg-[rgb(var(--primary))] px-4 py-2 font-semibold text-[rgb(var(--text))] transition"
           >
             {formData.type === "addChapter" ? "Create" : "Update"}
           </button>
@@ -1151,18 +1151,18 @@ function ChapterModal({ formData, setFormData, onSubmit, onClose, terms }) {
 // ==================== TOPIC MODAL ====================
 function TopicModal({ formData, setFormData, onSubmit, onClose }) {
   return (
-    <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-      <div className="text-[rgb(var(--text))] bg-[rgb(var(--surface))] rounded-lg shadow-xl max-w-md w-full border border-slate-700">
-        <div className="flex items-center justify-between p-6 border-b border-slate-700">
+    <div className="fixed inset-0 z-50 flex items-center justify-center overflow-y-auto bg-black/50 p-4 backdrop-blur-sm">
+      <div className="my-auto flex max-h-[min(92vh,880px)] w-full max-w-md flex-col overflow-hidden rounded-lg border border-slate-700 bg-[rgb(var(--surface))] text-[rgb(var(--text))] shadow-xl">
+        <div className="flex shrink-0 items-center justify-between border-b border-slate-700 p-4 sm:p-6">
           <h2 className="text-xl font-bold ">
             {formData.type === "addTopic" ? "Add Topic" : "Edit Topic"}
           </h2>
-          <button onClick={onClose} className=" transition">
+          <button type="button" onClick={onClose} className=" transition">
             <FiX className="w-6 h-6" />
           </button>
         </div>
 
-        <div className="p-6 space-y-4">
+        <div className="min-h-0 flex-1 space-y-4 overflow-y-auto overscroll-contain p-4 sm:p-6">
           <div>
             <label className="block text-sm font-semibold t300 mb-2">
               Topic Name *
@@ -1186,8 +1186,8 @@ function TopicModal({ formData, setFormData, onSubmit, onClose }) {
                 setFormData({ ...formData, content: e.target.value })
               }
               placeholder="Topic content/description"
-              rows="6"
-              className="w-full px-4 py-2 border border-slate-600 rounded-lg  placeholder-slate-400 focus:border-cyan-400 outline-none transition resize-none"
+              rows="5"
+              className="max-h-40 w-full resize-y rounded-lg border border-slate-600 px-4 py-2 outline-none transition placeholder:text-slate-400 focus:border-cyan-400"
             />
           </div>
 
@@ -1257,16 +1257,18 @@ function TopicModal({ formData, setFormData, onSubmit, onClose }) {
           </div>
         </div>
 
-        <div className="flex gap-3 p-6 border-t border-slate-700 ">
+        <div className="flex shrink-0 gap-3 border-t border-slate-700 p-4 sm:p-6">
           <button
+            type="button"
             onClick={onClose}
-            className="flex-1 px-4 py-2  border border-slate-600 rounded-lg transition"
+            className="flex-1 rounded-lg border border-slate-600 px-4 py-2 transition"
           >
             Cancel
           </button>
           <button
+            type="button"
             onClick={onSubmit}
-            className="flex-1 px-4 py-2 bg-linear-to-r  font-semibold rounded-lg text-[rgb(var(--text))] bg-[rgb(var(--primary))] transition"
+            className="flex-1 rounded-lg bg-[rgb(var(--primary))] px-4 py-2 font-semibold text-[rgb(var(--text))] transition"
           >
             {formData.type === "addTopic" ? "Create" : "Update"}
           </button>

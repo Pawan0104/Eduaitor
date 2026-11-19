@@ -273,8 +273,26 @@ export const mergeRegistrationSteps = (storedSteps) => {
     mergeStep(step, storedByKey.get(step.key)),
   );
 
+  const builtinFieldKeys = new Set(
+    REGISTRATION_STEPS.flatMap((step) => step.fields.map((f) => f.key)),
+  );
+
   const customSteps = storedSteps
     .filter((step) => step && !step.builtin)
+    .filter((step) => {
+      const key = String(step.key || "");
+      const title = String(step.title || "").trim().toLowerCase();
+      if (builtinKeys.has(key)) return false;
+      if (builtinTitles.has(String(step.title || "").trim())) return false;
+      if (title.includes("additional")) return false;
+      // Drop steps that only contain fields already present in builtin steps
+      // (legacy leftover duplicates like motherName / aadhaarNumber).
+      const fields = Array.isArray(step.fields) ? step.fields : [];
+      if (fields.length > 0 && fields.every((f) => builtinFieldKeys.has(f?.key))) {
+        return false;
+      }
+      return true;
+    })
     .map((step) => ({
       key: String(step.key),
       title: step.title?.trim() || "Additional Details",

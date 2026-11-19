@@ -96,6 +96,7 @@ export default function StaffMenu() {
       // { name: "Dashboard", icon: <FaTachometerAlt />, path: "/staff/dashboard" },
       { name: "My ID Card", icon: <FaIdCard />, path: "/staff/id-card" },
       { name: "Notifications", icon: <FaBell />, path: "/staff/notification" },
+      { name: "Smart Notifications", icon: <FaBell />, path: "/staff/smart-notifications", module: "notices" },
       {
         name: "Academic Sessions",
         icon: <FaCalendarAlt />,

@@ -100,9 +100,16 @@ export const createHomework = async (req, res) => {
             : ""
         }`,
         notificationType: "homework",
+        eventType: "DIARY.HOMEWORK_ASSIGNED",
         createdBy: req.user._id,
         schoolId,
         targets: [{ type: "class", classId, sectionId }],
+        systemKey: `homework:${homework._id}:assigned`,
+        payloadExtras: {
+          homeworkTitle: title.trim(),
+          dueDate: dueDate ? new Date(dueDate).toLocaleDateString("en-IN") : "",
+          classId,
+        },
       });
     } catch (notifErr) {
       console.error("Homework assign notification error:", notifErr);

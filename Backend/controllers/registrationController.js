@@ -463,6 +463,7 @@ export const createRegistration = async (req, res) => {
         : "",
       bloodGroup: sanitize(body.bloodGroup, 10),
       category: sanitize(body.category, 40),
+      aadhaarNumber: sanitize(body.aadhaarNumber, 20),
       motherName: sanitize(body.motherName, 160),
       classId: body.classId,
       className,
@@ -628,6 +629,9 @@ export const updateRegistration = async (req, res) => {
     }
     if (body.category !== undefined) {
       registration.category = sanitize(body.category, 40);
+    }
+    if (body.aadhaarNumber !== undefined) {
+      registration.aadhaarNumber = sanitize(body.aadhaarNumber, 20);
     }
     if (body.motherName !== undefined) {
       registration.motherName = sanitize(body.motherName, 160);

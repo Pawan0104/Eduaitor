@@ -566,7 +566,7 @@ const BulkStudentUpload = ({ onComplete }) => {
 
       {/* ── FIELD PICKER MODAL ── */}
       {templateModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 overflow-y-auto">
           <div className="flex w-full max-w-2xl max-h-[90vh] flex-col overflow-hidden rounded-2xl bg-white shadow-2xl">
             <div className="flex items-start justify-between gap-3 border-b border-gray-200 px-5 py-4">
               <div>

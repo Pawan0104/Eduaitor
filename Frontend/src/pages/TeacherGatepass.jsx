@@ -412,7 +412,7 @@ const TeacherGatepass = () => {
       ══════════════════════════════════════════════ */}
       {showView && viewItem && (
         <div className="fixed inset-0 bg-black/50
-          flex items-center justify-center z-50 p-4">
+          flex items-center justify-center z-50 p-4 overflow-y-auto">
           <div className="bg-[rgb(var(--surface))]
             text-[rgb(var(--text))] rounded-2xl shadow-2xl
             w-full max-w-md max-h-[92vh] flex flex-col">
@@ -570,7 +570,7 @@ const TeacherGatepass = () => {
       ══════════════════════════════════════════════ */}
       {showAction && actionItem && (
         <div className="fixed inset-0 bg-black/50
-          flex items-center justify-center z-[60] p-4">
+          flex items-center justify-center z-[60] p-4 overflow-y-auto">
           <div className="bg-[rgb(var(--surface))]
             text-[rgb(var(--text))] rounded-2xl
             shadow-2xl w-full max-w-sm">

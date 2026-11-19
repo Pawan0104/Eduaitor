@@ -54,6 +54,7 @@ const TRIP_EVENTS = [
 const TRIP_EVENT_META = {
   pickup: {
     field: "pickup",
+    eventType: "TRANSPORT.MORNING_BOARDING",
     title: "Bus Pickup 🚌",
     message: (busLabel, routeName) =>
       `Your child's school bus (${busLabel}) has started pickup${
@@ -62,6 +63,7 @@ const TRIP_EVENT_META = {
   },
   arrive_school: {
     field: "arriveSchool",
+    eventType: "TRANSPORT.MORNING_DROPOFF",
     title: "Arrived at School 🏫",
     message: (busLabel, routeName) =>
       `Your child's school bus (${busLabel}) has arrived at school${
@@ -70,6 +72,7 @@ const TRIP_EVENT_META = {
   },
   depart_school: {
     field: "departSchool",
+    eventType: "TRANSPORT.EVENING_BOARDING",
     title: "Departed from School 🚌",
     message: (busLabel, routeName) =>
       `Your child's school bus (${busLabel}) has left school for drop-off${
@@ -78,6 +81,7 @@ const TRIP_EVENT_META = {
   },
   arrive_home: {
     field: "arriveHome",
+    eventType: "TRANSPORT.EVENING_DROPOFF",
     title: "Arrived Home 🏠",
     message: (busLabel, routeName) =>
       `Your child's school bus (${busLabel}) has completed drop-off / arrived near home${
@@ -215,13 +219,21 @@ const fireTripEvent = async ({
   }));
 
   if (targets.length > 0) {
+    const day = todayKey();
     await createNotificationHelper({
       title: meta.title,
       message: meta.message(busLabel, routeName),
       notificationType: "transport",
+      eventType: meta.eventType,
       createdBy,
       schoolId,
       targets,
+      systemKey: `transport:${bus._id}:${meta.field}:${day}`,
+      payloadExtras: {
+        routeName,
+        vehicleNumber: busLabel,
+        routeStudentIds: students.map((s) => s._id),
+      },
     });
   }
 

@@ -131,12 +131,6 @@ const splitStudentName = (fullName = "") => {
   return { firstName: parts[0], lastName: parts.slice(1).join(" ") };
 };
 
-const busFeeQuarterOptions = [
-  { label: "April-July", value: "april-july" },
-  { label: "Aug-Nov", value: "august-november" },
-  { label: "Dec-March", value: "december-march" },
-];
-
 // Reservation category (Indian school admission forms).
 const CATEGORY_OPTIONS = ["General", "OBC", "SC", "ST", "EWS"];
 
@@ -878,24 +872,6 @@ const StudentManagement = () => {
     ["monthly", "quarterly", "half-yearly", "annually"].includes(value)
       ? value
       : "annually";
-
-  const optionalFees = feeStructure.filter((fee) => fee?.isOptional);
-
-  const toggleOptionalFee = (feeId) => {
-    const normalizedId = String(feeId);
-
-    setForm((prev) => {
-      const current = Array.isArray(prev.selectedOptionalFees)
-        ? prev.selectedOptionalFees
-        : [];
-      return {
-        ...prev,
-        selectedOptionalFees: current.includes(normalizedId)
-          ? current.filter((id) => id !== normalizedId)
-          : [...current, normalizedId],
-      };
-    });
-  };
 
   const progress = (step / wizardSteps.length) * 100;
 
@@ -1790,17 +1766,36 @@ const StudentManagement = () => {
   };
 
   useEffect(() => {
-    // Fee Breakdown is display-only: no discounts, so the payable amount is
-    // always the annual total derived from the class fee structure.
     const annual = getIncludedAnnualTotal();
+    const rawDiscount = Number(form.discountValue) || 0;
+
+    // Clamp the discount to something that can never wipe the whole fee:
+    // percentage to 0–100%, rupees to 0–annual total. Without this an
+    // over-typed value silently produced finalFee = 0.
+    const discount =
+      form.discountType === "Percentage"
+        ? Math.min(Math.max(rawDiscount, 0), 100)
+        : Math.min(Math.max(rawDiscount, 0), annual);
+
+    let final = annual;
+
+    if (form.discountType === "Percentage") {
+      final = annual - (annual * discount) / 100;
+    }
+
+    if (form.discountType === "Rupees") {
+      final = annual - discount;
+    }
 
     setForm((prev) => ({
       ...prev,
       totalFee: Number(annual.toFixed(2)),
-      finalFee: Number(annual.toFixed(2)),
+      finalFee: Number(Math.max(0, final).toFixed(2)),
     }));
   }, [
     feeStructure,
+    form.discountType,
+    form.discountValue,
     form.useTransport,
     form.selectedOptionalFees,
     form.busFeeFrequency,
@@ -1890,11 +1885,6 @@ const StudentManagement = () => {
         errors.push("Invalid Father Email");
       if (form.motherEmail?.trim() && !emailRegex.test(form.motherEmail.trim()))
         errors.push("Invalid Mother Email");
-      if (
-        form.guardianEmail?.trim() &&
-        !emailRegex.test(form.guardianEmail.trim())
-      )
-        errors.push("Invalid Guardian Email");
     }
 
     if (stepKey === "builtin_address") {
@@ -2927,10 +2917,11 @@ const StudentManagement = () => {
                         error={errors.guardianRelation}
                       />
                       <Input
-                        label="Local Guardian mobile number (10 digits)"
-                        placeholder="10-digit mobile number"
+                        label="Local Guardian Mobile (10 Digits)"
+                        placeholder="10-digit mobile"
                         name="guardianMobile"
                         type="tel"
+                        inputMode="numeric"
                         maxLength={10}
                         value={form.guardianMobile}
                         onChange={handleChange}
@@ -2958,30 +2949,27 @@ const StudentManagement = () => {
                         onChange={handleChange}
                       />
                       <Select
-                        label="District"
-                        name="district"
-                        value={form.district}
-                        options={districtsForState(form.state)}
-                        onChange={handleChange}
-                        error={errors.district}
-                      />
-                      <Select
                         label="State"
                         name="state"
                         value={form.state}
                         options={INDIA_STATES}
-                        onChange={(e) => {
-                          const nextState = e.target.value;
+                        onChange={(event) => {
+                          const nextState = event.target.value;
                           setForm((prev) => ({
                             ...prev,
                             state: nextState,
-                            district: districtsForState(nextState).includes(
-                              prev.district,
-                            )
-                              ? prev.district
-                              : "",
+                            district:
+                              prev.state === nextState ? prev.district : "",
                           }));
                         }}
+                      />
+                      <Select
+                        label="District"
+                        name="district"
+                        value={form.district}
+                        disabled={!form.state}
+                        options={districtsForState(form.state)}
+                        onChange={handleChange}
                       />
                       <Input
                         label="PIN Code"
@@ -3240,8 +3228,8 @@ const StudentManagement = () => {
                         error={errors.schoolLeavingDate}
                       />
                       <Input
-                        label="Previous School class"
-                        placeholder="e.g. Class 8"
+                        label="Previous School Class"
+                        placeholder="Class studied at previous school"
                         name="previousSchoolClass"
                         value={form.previousSchoolClass}
                         onChange={handleChange}
@@ -3295,7 +3283,7 @@ const StudentManagement = () => {
                       )}
 
                       {feeStructure.length > 0 && (
-                        <div className="mb-4 rounded-lg border border-[rgb(var(--border))] p-4">
+                        <div className="rounded-lg border border-[rgb(var(--border))] p-4">
                           <h3 className="mb-2 font-semibold">Fee Heads</h3>
 
                           {feeStructure.map((f, i) => (
@@ -3308,7 +3296,7 @@ const StudentManagement = () => {
                                 {f.isOptional && (
                                   <span className="ml-2 text-xs">
                                     {isOptionalFeeSelected(f)
-                                      ? "(Selected)"
+                                      ? "(Included)"
                                       : "(Optional)"}
                                   </span>
                                 )}
@@ -3324,24 +3312,38 @@ const StudentManagement = () => {
                               ₹{Number(getIncludedAnnualTotal()).toFixed(2)}
                             </span>
                           </div>
+                          {form.useTransport ? (
+                            <p className="mt-2 text-xs text-[rgb(var(--text-muted))]">
+                              Transport fee is included
+                              {form.busFeeFrequency === "quarterly"
+                                ? " (quarterly plan)"
+                                : ""}
+                              .
+                            </p>
+                          ) : null}
                         </div>
                       )}
 
-                      <Input
-                        label="Total Annual Fee"
-                        name="totalFee"
-                        value={form.totalFee}
-                        onChange={handleChange}
-                        readOnly
-                        error={errors.totalFee}
-                      />
+                      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                        <Input
+                          label="Total Annual Fee"
+                          name="totalFee"
+                          value={form.totalFee}
+                          readOnly
+                          error={errors.totalFee}
+                        />
+                        <Input
+                          label="Final Fee"
+                          name="finalFee"
+                          value={form.finalFee}
+                          readOnly
+                        />
+                      </div>
 
-                      <Input
-                        label="Final Fee"
-                        name="finalFee"
-                        value={form.finalFee}
-                        readOnly
-                      />
+                      <p className="text-xs text-[rgb(var(--text-muted))]">
+                        Fees are taken from the class fee structure. They are
+                        shown here for reference and cannot be edited.
+                      </p>
                     </div>
                   )}
 
@@ -3420,8 +3422,6 @@ const StudentManagement = () => {
                       sections={sections}
                       streams={streams}
                       transportRoutes={transportRoutes}
-                      feeStructure={feeStructure}
-                      freqFilter={freqFilter}
                       customFields={activeStepDefs.flatMap((stepDef) =>
                         (stepDef.fields || []).filter(
                           (field) => !field.builtin,
@@ -3890,7 +3890,6 @@ const CustomField = ({ field, value, error, onChange }) => {
         }
         value={value ?? ""}
         placeholder={field.placeholder || ""}
-        maxLength={field.maxLength || undefined}
         onChange={(e) => onChange(e.target.value)}
         className={inputClass}
       />
@@ -4053,8 +4052,6 @@ const ReviewStep = ({
   sections,
   streams = [],
   transportRoutes,
-  feeStructure,
-  freqFilter,
   customFields = [],
 }) => {
   const className =
@@ -4081,15 +4078,6 @@ const ReviewStep = ({
     transportRoutes.find((route) => route._id === form.transport)?.name ||
     form.transport?.name ||
     "";
-  const selectedOptionalFeeNames = feeStructure
-    .filter((fee) =>
-      (form.selectedOptionalFees || []).includes(String(fee._id)),
-    )
-    .map((fee) => fee.name)
-    .join(", ");
-  const selectedBusQuarter =
-    busFeeQuarterOptions.find((option) => option.value === form.busFeeQuarter)
-      ?.label || "";
 
   const initials =
     `${form.firstName?.[0] || ""}${form.lastName?.[0] || ""}`.toUpperCase();
@@ -4209,7 +4197,7 @@ const ReviewStep = ({
         <Field name="motherName" label="Mother full name" value={form.motherName} />
         <Field name="motherMobile" label="Mother mobile" value={form.motherMobile} />
         <Field name="motherEmail" label="Mother email" value={form.motherEmail} />
-        {(form.guardianName?.trim() || form.guardianMobile?.trim() || form.guardianRelation) && (
+        {form.guardianName?.trim() && (
           <>
             <Field name="guardianName" label="Local guardian name" value={form.guardianName} />
             <Field
@@ -4252,6 +4240,7 @@ const ReviewStep = ({
             form.previousSchoolUdise ||
             form.previousSchoolTcNumber ||
             form.schoolLeavingDate ||
+            form.prevSchoolAddress ||
             form.previousSchoolClass ||
             form.previousSchoolResult,
         )}
@@ -4303,6 +4292,16 @@ const ReviewStep = ({
       </Section>
 
       <Section title="Fee structure" headerClass="">
+        {form.useTransport ? (
+          <Field
+            label="Transport fee"
+            value={
+              form.busFeeFrequency === "quarterly"
+                ? "Included (quarterly)"
+                : "Included (annual)"
+            }
+          />
+        ) : null}
         <Field
           label="Total annual fee"
           value={

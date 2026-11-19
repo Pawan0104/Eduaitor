@@ -945,8 +945,8 @@ const IssueTable = ({ records, mode, onReturn }) => {
 };
 
 const ModalWrapper = ({ children, onClose, title }) => (
-  <div className="fixed inset-0 z-50 flex items-end justify-center bg-slate-900/40 p-0 backdrop-blur-sm sm:items-center sm:p-4">
-    <div className="w-full max-w-xl rounded-t-3xl bg-[rgb(var(--primary))] text-[rgb(var(--text))] shadow-2xl sm:rounded-3xl">
+  <div className="fixed inset-0 z-50 flex items-end justify-center bg-slate-900/40 p-0 backdrop-blur-sm sm:items-center sm:p-4 overflow-y-auto">
+    <div className="w-full max-w-xl rounded-t-3xl bg-[rgb(var(--primary))] text-[rgb(var(--text))] shadow-2xl sm:rounded-3xl max-h-[min(92vh,880px)] overflow-y-auto">
       <div className="flex items-center justify-between border-b border-slate-200 p-4">
         <h2 className="text-lg ">{title}</h2>
         <button
@@ -968,8 +968,8 @@ const ConfirmDialog = ({
   onConfirm,
   confirmLabel,
 }) => (
-  <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-    <div className="w-full max-w-sm rounded-3xl text-[rgb(var(--text))] bg-[rgb(var(--surface))] p-6 shadow-2xl">
+  <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 overflow-y-auto">
+    <div className="w-full max-w-sm rounded-3xl text-[rgb(var(--text))] bg-[rgb(var(--surface))] p-6 shadow-2xl my-auto max-h-[min(92vh,880px)] overflow-y-auto">
       <h3 className="text-lg font-black ">{title}</h3>
       <p className="mt-2 text-sm ">{description}</p>
       <div className="mt-6 flex gap-3">

@@ -79,6 +79,7 @@ export const COLOR_MAP = {
   Events: { bg: "#FFF1F2", icon: "#E11D48", dot: "#FECDD3" },
 
   Notices: { bg: "#FFF7ED", icon: "#EA580C", dot: "#FED7AA" },
+  "Smart Notifications": { bg: "#EEF2FF", icon: "#4338CA", dot: "#C7D2FE" },
 
   Calendar: { bg: "#EFF6FF", icon: "#0EA5E9", dot: "#BAE6FD" },
 
@@ -170,11 +171,11 @@ function GreetingHeader({ name, role, loginAs }) {
 function ExitPopup({ onConfirm, onCancel }) {
   return (
     <div
-      className="fixed inset-0 z-50 flex items-end justify-center"
+      className="fixed inset-0 z-50 flex items-end justify-center overflow-y-auto"
       style={{ background: "rgba(0,0,0,0.45)" }}
     >
       <div
-        className="w-full max-w-lg rounded-t-3xl px-6 pt-3 pb-10"
+        className="w-full max-w-lg rounded-t-3xl px-6 pt-3 pb-10 max-h-[min(92vh,880px)] overflow-y-auto"
         style={{ background: "rgb(var(--bg))" }}
       >
         <div
@@ -552,6 +553,11 @@ export default function SchoolMenu() {
       name: "Notices",
       icon: <FaBell />,
       path: "/school/notice",
+    },
+    {
+      name: "Smart Notifications",
+      icon: <FaBell />,
+      path: "/school/smart-notifications",
     },
     {
       name: "Calendar",

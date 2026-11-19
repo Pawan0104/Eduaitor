@@ -1,5 +1,6 @@
 ﻿import mongoose from "mongoose";
 import Student from "../models/student.js";
+import HostelResident from "../models/hostelResident.js";
 import Lead from "../models/lead.js";
 import Registration from "../models/registration.js";
 import Group from "../models/group.js";
@@ -1108,7 +1109,19 @@ export const getStudents = async (req, res) => {
     }
 
     const { page, limit, skip, paginate } = parsePagination(req.query);
-    const { search, classId, gender, category, status } = req.query;
+    const {
+      search,
+      classId,
+      sectionId,
+      gender,
+      category,
+      status,
+      confirmationStatus,
+      feeBatch,
+      facility,
+      feeDue,
+      sort,
+    } = req.query;
 
     const filter = { schoolId };
 
@@ -1116,6 +1129,10 @@ export const getStudents = async (req, res) => {
 
     if (classId && mongoose.Types.ObjectId.isValid(String(classId))) {
       filter.classId = classId;
+    }
+
+    if (sectionId && mongoose.Types.ObjectId.isValid(String(sectionId))) {
+      filter.sectionId = sectionId;
     }
 
     if (gender === "Male" || gender === "Female") {
@@ -1134,6 +1151,59 @@ export const getStudents = async (req, res) => {
       } else {
         filter.category = category;
       }
+    }
+
+    // Admission confirmation (legacy rows without the field count as Confirmed).
+    if (confirmationStatus === "Confirmed") {
+      andClauses.push({
+        $or: [
+          { confirmationStatus: "Confirmed" },
+          { confirmationStatus: { $exists: false } },
+          { confirmationStatus: null },
+        ],
+      });
+    } else if (
+      confirmationStatus === "Not Confirmed" ||
+      confirmationStatus === "Non-Confirmed"
+    ) {
+      filter.confirmationStatus = "Non-Confirmed";
+    }
+
+    // New vs old/promoted intake (legacy rows default to New).
+    if (feeBatch === "Old") {
+      filter.feeBatch = "Old";
+    } else if (feeBatch === "New") {
+      andClauses.push({
+        $or: [
+          { feeBatch: "New" },
+          { feeBatch: { $exists: false } },
+          { feeBatch: null },
+        ],
+      });
+    }
+
+    // Outstanding fees.
+    if (feeDue === "due" || feeDue === "true") {
+      filter.totalDue = { $gt: 0 };
+    } else if (feeDue === "clear") {
+      andClauses.push({
+        $or: [
+          { totalDue: { $lte: 0 } },
+          { totalDue: { $exists: false } },
+          { totalDue: null },
+        ],
+      });
+    }
+
+    // Facility: school transport or active hostel residency.
+    if (facility === "Transport") {
+      filter.transport = { $ne: null };
+    } else if (facility === "Boarding") {
+      const residentIds = await HostelResident.find({
+        schoolId,
+        status: "Active",
+      }).distinct("studentId");
+      andClauses.push({ _id: { $in: residentIds } });
     }
 
     // Default: Active only (legacy rows without isActive count as Active).
@@ -1161,6 +1231,8 @@ export const getStudents = async (req, res) => {
           { lastName: rx },
           { studentId: rx },
           { rollNo: rx },
+          { srNo: rx },
+          { aadhaarNumber: rx },
           { fatherName: rx },
           { motherName: rx },
           { guardianName: rx },
@@ -1185,28 +1257,157 @@ export const getStudents = async (req, res) => {
       skipSession: true,
     });
 
-    const students = await applyPagination(
+    const SORTABLE_FIELDS = {
+      admNo: "studentId",
+      studentId: "studentId",
+      srNo: "srNo",
+      name: "firstName",
+      admissionDate: "admissionDate",
+      dob: "dob",
+      rollNo: "rollNo",
+    };
+    const sortKey = String(sort || "").trim();
+    const sortDesc = sortKey.startsWith("-");
+    const sortField = SORTABLE_FIELDS[sortKey.replace(/^-/, "")];
+    const sortSpec = sortField
+      ? { [sortField]: sortDesc ? -1 : 1, createdAt: -1 }
+      : { createdAt: -1 };
+
+    const studentDocs = await applyPagination(
       Student.find(filter)
         .setOptions({ skipSession: true })
         .populate("classId", "name className")
         .populate("sectionId", "name sectionName")
         .populate("transport", "name routeId")
         .populate("houseId", "name code color")
-        .sort({ createdAt: -1 }),
+        .sort(sortSpec)
+        .collation({ locale: "en", numericOrdering: true }),
       { page, limit, skip, paginate },
     );
 
-    if (!paginate) {
-      return res.json({ success: true, data: students });
+    const studentList = studentDocs.map((doc) =>
+      typeof doc.toObject === "function" ? doc.toObject() : doc,
+    );
+
+    const pageIds = studentList.map((s) => s._id).filter(Boolean);
+    let boardingIds = new Set();
+    if (pageIds.length) {
+      const residents = await HostelResident.find({
+        schoolId,
+        status: "Active",
+        studentId: { $in: pageIds },
+      })
+        .select("studentId")
+        .lean();
+      boardingIds = new Set(residents.map((r) => String(r.studentId)));
     }
 
-    return res.json(sendPaginated(res, { items: students, total, page, limit }));
+    // Directory defaults for legacy rows stored before these fields existed.
+    const items = studentList.map((s) => ({
+      ...s,
+      feeBatch: s.feeBatch || "New",
+      confirmationStatus: s.confirmationStatus || "Confirmed",
+      category: s.category || "General",
+      isBoarding: boardingIds.has(String(s._id)),
+    }));
+
+    if (!paginate) {
+      return res.json({ success: true, data: items });
+    }
+
+    return res.json(sendPaginated(res, { items, total, page, limit }));
   } catch (error) {
     console.error("Get students error:", error);
 
     res.status(500).json({
       success: false,
       message: error.message || "Failed to fetch students",
+    });
+  }
+};
+
+/* ================= DIRECTORY KPI COUNTS ================= */
+
+export const getStudentDirectoryStats = async (req, res) => {
+  try {
+    const schoolId = req.user?.school_id;
+    if (!schoolId) {
+      return res.status(400).json({
+        success: false,
+        message: "School ID is required",
+      });
+    }
+
+    // Aggregations skip Mongoose casting, so the school id must be an ObjectId.
+    const filter = { schoolId: new mongoose.Types.ObjectId(String(schoolId)) };
+    applyAcademicYearInclusive(req, filter);
+
+    const [facet] = await Student.aggregate(
+      [
+        { $match: filter },
+        {
+          $facet: {
+            total: [{ $count: "n" }],
+            inactive: [{ $match: { isActive: false } }, { $count: "n" }],
+            old: [{ $match: { feeBatch: "Old" } }, { $count: "n" }],
+            male: [{ $match: { gender: "Male" } }, { $count: "n" }],
+            female: [{ $match: { gender: "Female" } }, { $count: "n" }],
+            notConfirmed: [
+              { $match: { confirmationStatus: "Non-Confirmed" } },
+              { $count: "n" },
+            ],
+            feeDue: [{ $match: { totalDue: { $gt: 0 } } }, { $count: "n" }],
+            transport: [{ $match: { transport: { $ne: null } } }, { $count: "n" }],
+          },
+        },
+      ],
+      { skipSession: true },
+    );
+
+    const count = (key) => Number(facet?.[key]?.[0]?.n || 0);
+    const total = count("total");
+    const inactive = count("inactive");
+    const old = count("old");
+    const notConfirmed = count("notConfirmed");
+
+    let boarding = 0;
+    try {
+      const residentIds = await HostelResident.find({
+        schoolId,
+        status: "Active",
+      }).distinct("studentId");
+      if (residentIds.length) {
+        boarding = await Student.countDocuments({
+          schoolId,
+          _id: { $in: residentIds },
+        }).setOptions({ skipSession: true });
+      }
+    } catch (hostelError) {
+      console.error("Boarding KPI error:", hostelError);
+    }
+
+    res.json({
+      success: true,
+      data: {
+        total,
+        active: total - inactive,
+        inactive,
+        old,
+        new: total - old,
+        male: count("male"),
+        female: count("female"),
+        boarding,
+        transport: count("transport"),
+        feeDue: count("feeDue"),
+        confirmed: total - notConfirmed,
+        notConfirmed,
+      },
+    });
+  } catch (error) {
+    console.error("Student directory stats error:", error);
+    res.status(500).json({
+      success: false,
+      message: error.message || "Failed to load directory stats",
     });
   }
 };

@@ -783,9 +783,17 @@ const collectStudentFeeInternal = async (req, res) => {
         periodRemark ? ` (${periodRemark})` : ""
       }. Remaining Due: ${student.totalDue}`,
       notificationType: "fee",
+      eventType: "FEES.PAYMENT_SUCCESS",
       targets: [{ type: "student", studentId: student._id }],
       schoolId,
       createdBy: req.user._id,
+      systemKey: `fee-payment:${newPayment?._id || student._id}:${amountPaid}`,
+      payloadExtras: {
+        studentId: student._id,
+        studentName: `${student.firstName} ${student.lastName}`.trim(),
+        amount: String(amountPaid),
+        receiptNo: newPayment?.receiptNo || "",
+      },
     });
 
     return res.status(200).json({
@@ -1675,9 +1683,16 @@ export const notifyAllDefaulters = async (req, res) => {
         title: `Fee Due Reminder`,
         message: `Dear ${student.firstName} ${student.lastName}, you have a pending fee due of ₹${student.calculatedDue}. Please clear it as soon as possible.`,
         notificationType: "fee",
+        eventType: "FEES.DUE_REMINDER",
         targets: [{ type: "student", studentId: student._id }],
         schoolId,
         createdBy: req.user._id,
+        systemKey: `fee-due:${student._id}:${new Date().toISOString().slice(0, 10)}`,
+        payloadExtras: {
+          studentId: student._id,
+          studentName: `${student.firstName} ${student.lastName}`.trim(),
+          dueAmount: String(student.calculatedDue),
+        },
       }),
     );
 
@@ -1714,9 +1729,16 @@ export const notifyDefaulter = async (req, res) => {
       title: `Fee Due Reminder`,
       message: `Dear ${student.firstName} ${student.lastName}, you have a pending fee due of ₹${due}. Please clear it as soon as possible.`,
       notificationType: "fee",
+      eventType: "FEES.DUE_REMINDER",
       targets: [{ type: "student", studentId: student._id }],
       schoolId,
       createdBy: req.user._id,
+      systemKey: `fee-due-one:${student._id}:${Date.now()}`,
+      payloadExtras: {
+        studentId: student._id,
+        studentName: `${student.firstName} ${student.lastName}`.trim(),
+        dueAmount: String(due),
+      },
     });
 
     return res

@@ -137,7 +137,7 @@ export default function MarketingApprovals() {
 
       {/* Review modal */}
       {review && (
-        <div className="fixed inset-0 z-50 flex items-end justify-center p-0 sm:items-center sm:p-4" style={{ background: "rgba(0,0,0,0.45)" }}>
+        <div className="fixed inset-0 z-50 flex items-end justify-center p-0 sm:items-center sm:p-4 overflow-y-auto" style={{ background: "rgba(0,0,0,0.45)" }}>
           <div
             className="w-full max-w-2xl max-h-[88vh] overflow-y-auto rounded-t-3xl sm:rounded-3xl p-5"
             style={{ background: "rgb(var(--bg))" }}

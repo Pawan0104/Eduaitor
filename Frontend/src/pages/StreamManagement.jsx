@@ -269,7 +269,7 @@ export default function StreamManagement() {
       </div>
 
       {showModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 overflow-y-auto">
           <div className="flex max-h-[92vh] w-full max-w-lg flex-col overflow-hidden rounded-2xl bg-[rgb(var(--surface))] text-[rgb(var(--text))] shadow-2xl">
             <div className="border-b border-[rgb(var(--border))] px-6 py-4">
               <h2 className="text-lg font-semibold">

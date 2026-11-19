@@ -581,8 +581,8 @@ export default function PlatformAnalytics() {
       </section>
 
       {showActionModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
-          <div className="w-full max-w-md rounded-3xl bg-white p-6 shadow-2xl">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4 overflow-y-auto">
+          <div className="w-full max-w-md rounded-3xl bg-white p-6 shadow-2xl my-auto max-h-[min(92vh,880px)] overflow-y-auto">
             <div className="flex items-start gap-3">
               <div className="mt-1 rounded-2xl bg-indigo-50 p-3 text-indigo-600">
                 {actionForm.mode === "extend" ? <FaCalendarAlt /> : <FaBolt />}

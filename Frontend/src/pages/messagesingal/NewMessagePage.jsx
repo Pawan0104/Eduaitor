@@ -320,7 +320,7 @@
 //       {/* ── Starting thread overlay ── */}
 //       {starting && (
 //         <div className="fixed inset-0 bg-black/30 flex items-center
-//                         justify-center z-50">
+//                         justify-center z-50 overflow-y-auto">
 //           <div
 //             className="rounded-2xl px-8 py-6 flex flex-col
 //                        items-center gap-3 shadow-xl"
@@ -959,7 +959,7 @@ export default function NewMessagePage() {
       {/* ── Starting thread overlay ── */}
       {starting && (
         <div className="fixed inset-0 bg-black/30 flex items-center
-                        justify-center z-50">
+                        justify-center z-50 overflow-y-auto">
           <div
             className="rounded-2xl px-8 py-6 flex flex-col
                        items-center gap-3 shadow-xl"

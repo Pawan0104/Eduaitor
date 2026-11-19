@@ -526,7 +526,7 @@ function ExamCreate() {
 
       {/* Responsive Modal / Slide-over */}
       {isModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-end md:items-center justify-center">
+        <div className="fixed inset-0 z-50 flex items-end md:items-center justify-center overflow-y-auto">
           <div
             className="absolute inset-0 bg-slate-900/60 backdrop-blur-sm"
             onClick={() => setIsModalOpen(false)}
@@ -772,7 +772,7 @@ function ExamCreate() {
       )}
 
       {confirmModal.isOpen && (
-        <div className="fixed inset-0 z-100 flex items-end md:items-center justify-center p-4">
+        <div className="fixed inset-0 z-100 flex items-end md:items-center justify-center p-4 overflow-y-auto">
           {/* Backdrop */}
           <div
             className="absolute inset-0  backdrop-blur-md animate-in fade-in duration-300"
@@ -780,7 +780,7 @@ function ExamCreate() {
           ></div>
 
           {/* Popup Card */}
-          <div className="relative text-[rgb(var(--text))] bg-[rgb(var(--surface))] w-full max-w-sm rounded-[2.5rem] p-8 shadow-2xl animate-in slide-in-from-bottom-10 md:zoom-in-95 duration-300">
+          <div className="relative text-[rgb(var(--text))] bg-[rgb(var(--surface))] w-full max-w-sm rounded-[2.5rem] p-8 shadow-2xl animate-in slide-in-from-bottom-10 md:zoom-in-95 duration-300 max-h-[min(92vh,880px)] overflow-y-auto">
             <div
               className={`w-20 h-20 rounded-3xl flex items-center justify-center mx-auto mb-6 rotate-12 ${
                 confirmModal.type === "delete"

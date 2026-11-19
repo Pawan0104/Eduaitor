@@ -306,7 +306,7 @@ export default function SchoolStaffRoles() {
       )}
 
       {showModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 overflow-y-auto">
           <div className="w-full max-w-lg max-h-[90vh] overflow-y-auto rounded-2xl bg-[rgb(var(--surface))] border shadow-xl">
             <div className="flex items-center justify-between p-4 border-b border-[rgb(var(--border))]">
               <h2 className="font-bold text-lg">

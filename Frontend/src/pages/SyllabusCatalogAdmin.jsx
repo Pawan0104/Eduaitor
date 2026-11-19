@@ -25,7 +25,7 @@ const fieldCls =
 
 function Modal({ title, onClose, children, wide, subtitle }) {
   return (
-    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/30 backdrop-blur-sm p-0 sm:p-4">
+    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/30 backdrop-blur-sm p-0 sm:p-4 overflow-y-auto">
       <div
         className={`bg-[rgb(var(--surface))] w-full ${
           wide ? "sm:max-w-4xl" : "sm:max-w-md"

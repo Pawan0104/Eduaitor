@@ -27,7 +27,7 @@ function ViewChapterModal({ chapter, book, onClose }) {
     chapter.ncertPortalUrl || book?.ncertPortalUrl || NCERT_HOME;
 
   return (
-    <div className="fixed inset-0 z-[80] flex items-end sm:items-center justify-center bg-black/45 p-0 sm:p-4">
+    <div className="fixed inset-0 z-[80] flex items-end sm:items-center justify-center bg-black/45 p-0 sm:p-4 overflow-y-auto">
       <div className="bg-[rgb(var(--surface))] w-full sm:max-w-4xl rounded-t-2xl sm:rounded-2xl shadow-xl max-h-[92vh] flex flex-col text-[rgb(var(--text))]">
         <div className="flex items-center justify-between px-5 py-4 border-b border-slate-100">
           <div className="min-w-0 pr-3">

@@ -18,12 +18,12 @@ export default function ScheduleModal({ open, onClose, onSubmit, title = "Approv
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center p-4"
+      className="fixed inset-0 z-50 flex items-center justify-center p-4 overflow-y-auto"
       style={{ background: "rgba(0,0,0,0.45)" }}
       onClick={onClose}
     >
       <div
-        className="w-full max-w-md rounded-3xl p-6"
+        className="w-full max-w-md rounded-3xl p-6 my-auto max-h-[min(92vh,880px)] overflow-y-auto"
         style={{ background: "rgb(var(--bg))" }}
         onClick={(e) => e.stopPropagation()}
       >

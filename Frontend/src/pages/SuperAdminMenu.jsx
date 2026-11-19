@@ -40,11 +40,11 @@ const DEFAULT_COLOR = { bg: "#F3F4F6", icon: "#6B7280", dot: "#E5E7EB" };
 function ExitPopup({ onConfirm, onCancel }) {
   return (
     <div
-      className="fixed inset-0 z-50 flex items-end justify-center"
+      className="fixed inset-0 z-50 flex items-end justify-center overflow-y-auto"
       style={{ background: "rgba(0,0,0,0.45)" }}
     >
       <div
-        className="w-full max-w-lg rounded-t-3xl px-6 pt-3 pb-10"
+        className="w-full max-w-lg rounded-t-3xl px-6 pt-3 pb-10 max-h-[min(92vh,880px)] overflow-y-auto"
         style={{ background: "rgb(var(--bg))" }}
       >
         <div

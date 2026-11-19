@@ -63,7 +63,7 @@ export default function DesignSkinPicker({
     open &&
     createPortal(
       <div
-        className="fixed inset-0 z-[220] flex items-end justify-center p-3 sm:items-center"
+        className="fixed inset-0 z-[220] flex items-end justify-center p-3 sm:items-center overflow-y-auto"
         style={{
           background: "rgba(15, 23, 42, 0.5)",
           paddingTop: "max(0.75rem, env(safe-area-inset-top))",

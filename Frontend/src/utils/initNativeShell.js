@@ -27,8 +27,7 @@ export function signalAppShellReady() {
 function ensureWebSplash() {
   if (document.getElementById("eduaitor-native-splash")) return;
 
-  const splashSrc = publicAsset("eduaitor-splash-logo.png");
-  const splashAiSrc = publicAsset("eduaitor-splash-ai.png");
+  const splashSrc = publicAsset("eduaitor.png");
   const isNative = Capacitor.isNativePlatform();
   const el = document.createElement("div");
   el.id = "eduaitor-native-splash";
@@ -39,7 +38,6 @@ function ensureWebSplash() {
   el.innerHTML = `
     <div class="eduaitor-splash-wrap">
       <img class="eduaitor-splash-full" src="${splashSrc}" alt="Eduaitor" />
-      <img class="eduaitor-splash-ai-spin" src="${splashAiSrc}" alt="" />
     </div>
   `;
   document.body.appendChild(el);
@@ -77,17 +75,6 @@ function ensureWebSplash() {
       width: min(100%, 40rem);
       max-width: 100%;
       margin: 0 auto;
-    }
-    #eduaitor-native-splash .eduaitor-splash-ai-spin {
-      position: absolute;
-      left: 43%;
-      top: 2%;
-      width: 24%;
-      height: 72%;
-      object-fit: contain;
-      transform-origin: 50% 50%;
-      animation: eduaitor-ai-swing-spin 2.8s ease-in-out infinite;
-      pointer-events: none;
     }
     @keyframes eduaitor-ai-swing-spin {
       0% { transform: rotate(0deg); }
@@ -185,3 +172,6 @@ export async function initNativeShell() {
     }
   }
 }
+
+
+

@@ -239,9 +239,9 @@ const RoleManagement = () => {
       {/* Add/Edit Modal */}
       {showModal && (
 
-        <div className="fixed inset-0 bg-black/40 flex items-center justify-center">
+        <div className="fixed inset-0 bg-black/40 flex items-center justify-center overflow-y-auto">
 
-          <div className="bg-[rgb(var(--surface))] text-[rgb(var(--text))] rounded-xl p-6 w-full max-w-md">
+          <div className="bg-[rgb(var(--surface))] text-[rgb(var(--text))] rounded-xl p-6 w-full max-w-md my-auto max-h-[min(92vh,880px)] overflow-y-auto">
 
             <h2 className="text-lg font-semibold mb-4">
               {editingId ? "Edit Role" : "Add Role"}
@@ -336,9 +336,9 @@ const ConfirmModal = ({ title, text, confirm, cancel }) => {
 
   return (
 
-    <div className="fixed inset-0 bg-black/40 flex items-center justify-center">
+    <div className="fixed inset-0 bg-black/40 flex items-center justify-center overflow-y-auto">
 
-      <div className="bg-[rgb(var(--surface))] text-[rgb(var(--text))] rounded-xl p-6 w-full max-w-sm">
+      <div className="bg-[rgb(var(--surface))] text-[rgb(var(--text))] rounded-xl p-6 w-full max-w-sm my-auto max-h-[min(92vh,880px)] overflow-y-auto">
 
         <h2 className="text-lg font-semibold mb-2">
           {title}

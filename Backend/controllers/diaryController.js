@@ -37,6 +37,7 @@ export const createDiary = async (req, res) => {
       title,
       message,
       notificationType: "diary",
+      eventType: data.type === "homework" ? "DIARY.HOMEWORK_ASSIGNED" : "DIARY.DIARY_NOTE",
       createdBy: req.user._id,
       schoolId: req.user.school_id,
       targets: [
@@ -45,7 +46,9 @@ export const createDiary = async (req, res) => {
           classId: data.classId,
           sectionId: data.sectionId
         }
-      ]
+      ],
+      systemKey: `diary:${data._id}:create`,
+      payloadExtras: { message, classId: data.classId },
     });
 
     res.json(data);

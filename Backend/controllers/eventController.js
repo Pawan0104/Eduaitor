@@ -135,11 +135,13 @@ export const createEvent = async (req, res) => {
       title: `New Event: ${event.title}`,
       message: `${event.description}`,
       notificationType: "general",
+      eventType: "COMMUNICATION.SCHOOL_ANNOUNCEMENT",
       targets,
       schoolId,
       createdBy: req.user.id,
       startingDate:event.startDate || date.now,
       endingDate:event.endDate || "",
+      systemKey: `event:${event._id}:create`,
     });
     emitMarketingTrigger({
       schoolId,
@@ -175,11 +177,13 @@ export const updateEvent = async (req, res) => {
       title: `Event Updated: ${event.title}`,
       message: `${event.description}.`,
       notificationType: "general",
+      eventType: "COMMUNICATION.SCHOOL_ANNOUNCEMENT",
       targets,
       schoolId,
       createdBy: req.user.id,
       startingDate:event.startDate || date.now,
       endingDate:event.endDate || "",
+      systemKey: `event:${event._id}:update:${Date.now()}`,
     });
     res
       .status(200)

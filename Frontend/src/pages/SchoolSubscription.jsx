@@ -274,8 +274,8 @@ const SchoolSubscription = () => {
       {/* FORM MODAL */}
 
       {showModal && (
-        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50">
-          <div className="bg-[rgb(var(--surface))] text-[rgb(var(--text))] rounded-xl p-6 w-full max-w-lg">
+        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 overflow-y-auto">
+          <div className="bg-[rgb(var(--surface))] text-[rgb(var(--text))] rounded-xl p-6 w-full max-w-lg my-auto max-h-[min(92vh,880px)] overflow-y-auto">
             <h2 className="text-xl font-semibold mb-6">
               {editingId ? "Edit Plan" : "Create Plan"}
             </h2>
@@ -395,7 +395,7 @@ const SchoolSubscription = () => {
       {/* CONFIRMATION POPUP */}
 
       {confirmModal && (
-        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50">
+        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 overflow-y-auto">
           <div className="bg-[rgb(var(--surface))] text-[rgb(var(--text))] rounded-lg p-6 w-100">
             <p className="text-lg mb-6">{confirmMessage}</p>
 

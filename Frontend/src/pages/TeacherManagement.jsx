@@ -1245,12 +1245,12 @@ if (key === "subjects" || key === "assignedClasses" || key === "permissions") {
 
       {showAddSubject && (
         <div
-          className="fixed inset-0 z-[10040] flex items-center justify-center p-4"
+          className="fixed inset-0 z-[10040] flex items-center justify-center p-4 overflow-y-auto"
           style={{ background: "rgba(15, 23, 42, 0.55)" }}
           role="dialog"
           aria-modal="true"
         >
-          <div className="w-full max-w-md rounded-2xl bg-white shadow-xl border border-slate-200 p-5">
+          <div className="w-full max-w-md rounded-2xl bg-white shadow-xl border border-slate-200 p-5 my-auto max-h-[min(92vh,880px)] overflow-y-auto">
             <div className="flex items-center justify-between mb-4">
               <h3 className="text-lg font-bold text-slate-800">Add subject</h3>
               <button
@@ -1410,8 +1410,8 @@ const ReviewField = ({ label, value }) => (
 );
 
 const ConfirmModal = ({ message, onCancel, onConfirm }) => (
-  <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50">
-    <div className="bg-[rgb(var(--surface))] rounded-xl p-6 w-96 max-w-full mx-4">
+  <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 overflow-y-auto">
+    <div className="bg-[rgb(var(--surface))] rounded-xl p-6 w-96 max-w-full mx-4 my-auto max-h-[min(92vh,880px)] overflow-y-auto">
       <h3 className="text-lg font-semibold mb-3">Confirmation</h3>
       <p className="mb-6 text-[rgb(var(--text))]">{message}</p>
 

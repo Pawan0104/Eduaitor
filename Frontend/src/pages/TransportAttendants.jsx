@@ -558,7 +558,7 @@ const AttendantFormModal = ({
   loading,
 }) => {
   return (
-    <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50">
+    <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 overflow-y-auto">
       <div className="text-[rgb(var(--text))] bg-[rgb(var(--surface))] rounded-xl p-6 w-full max-w-lg mx-4 max-h-[90vh] overflow-y-auto">
         {/* Header */}
         <div className="flex items-center justify-between mb-5">
@@ -748,8 +748,8 @@ const AttendantFormModal = ({
 
 const AttendanceModal = ({ attendant, form, setForm, onClose, onSubmit, loading }) => {
   return (
-    <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50">
-      <div className="text-[rgb(var(--text))] bg-[rgb(var(--surface))] rounded-xl p-6 w-full max-w-md mx-4">
+    <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 overflow-y-auto">
+      <div className="text-[rgb(var(--text))] bg-[rgb(var(--surface))] rounded-xl p-6 w-full max-w-md mx-4 my-auto max-h-[min(92vh,880px)] overflow-y-auto">
         {/* Header */}
         <div className="flex items-center justify-between mb-5">
           <div className="flex items-center gap-3">
@@ -833,8 +833,8 @@ const AttendanceModal = ({ attendant, form, setForm, onClose, onSubmit, loading 
 /* ── DELETE MODAL ─────────────────────────────────────────────────────────── */
 
 const DeleteModal = ({ attendant, onCancel, onConfirm }) => (
-  <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50">
-    <div className="text-[rgb(var(--text))] bg-[rgb(var(--surface))] rounded-xl p-6 w-96 max-w-full mx-4">
+  <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 overflow-y-auto">
+    <div className="text-[rgb(var(--text))] bg-[rgb(var(--surface))] rounded-xl p-6 w-96 max-w-full mx-4 my-auto max-h-[min(92vh,880px)] overflow-y-auto">
       <div className="flex items-center gap-3 mb-4">
         <div className="w-12 h-12 bg-red-100 rounded-full flex items-center justify-center">
           <FaTrash className="text-red-600" />

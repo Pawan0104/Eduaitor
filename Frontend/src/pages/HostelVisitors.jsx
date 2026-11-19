@@ -763,7 +763,7 @@ const HostelVisitors = () => {
 
       {/* Form modal — security guard */}
       {formModal && (
-        <div className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center p-4">
+        <div className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center p-4 overflow-y-auto">
           <div className="bg-[rgb(var(--surface))] rounded-2xl w-full max-w-lg shadow-xl max-h-[90vh] overflow-y-auto">
             <div className="p-5 border-b border-slate-100 flex items-center gap-2">
               <FaIdCard className="text-violet-600" />
@@ -980,8 +980,8 @@ const HostelVisitors = () => {
       )}
 
       {rejectModal && (
-        <div className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center p-4">
-          <div className="bg-[rgb(var(--surface))] rounded-2xl w-full max-w-sm p-5 shadow-xl">
+        <div className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center p-4 overflow-y-auto">
+          <div className="bg-[rgb(var(--surface))] rounded-2xl w-full max-w-sm p-5 shadow-xl my-auto max-h-[min(92vh,880px)] overflow-y-auto">
             <h3 className="font-bold text-lg mb-2">Reject visitor?</h3>
             <p className="text-sm text-[rgb(var(--text-muted))] mb-3">
               {rejectTarget?.visitorName} will not be granted entry.
@@ -1014,8 +1014,8 @@ const HostelVisitors = () => {
       )}
 
       {deleteModal && (
-        <div className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center p-4">
-          <div className="bg-[rgb(var(--surface))] rounded-2xl w-full max-w-sm p-5 shadow-xl">
+        <div className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center p-4 overflow-y-auto">
+          <div className="bg-[rgb(var(--surface))] rounded-2xl w-full max-w-sm p-5 shadow-xl my-auto max-h-[min(92vh,880px)] overflow-y-auto">
             <h3 className="font-bold text-lg mb-2">Delete visitor record?</h3>
             <p className="text-sm text-[rgb(var(--text-muted))] mb-4">
               This will permanently remove{" "}

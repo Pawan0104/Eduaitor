@@ -572,8 +572,8 @@ export default function Notice() {
 
       {/* ════════ View Modal ════════ */}
       {viewNotice && (
-        <div className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center p-4">
-          <div className="text-[rgb(var(--text))] bg-[rgb(var(--surface))] rounded-2xl w-full max-w-lg shadow-xl overflow-hidden">
+        <div className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center p-4 overflow-y-auto">
+          <div className="text-[rgb(var(--text))] bg-[rgb(var(--surface))] rounded-2xl w-full max-w-lg shadow-xl overflow-hidden my-auto max-h-[min(92vh,880px)] overflow-y-auto">
             <div
               className={`h-1.5 w-full ${CATEGORY_STYLES[viewNotice.category]?.bg || "bg-gray-100"}`}
             />
@@ -659,7 +659,7 @@ export default function Notice() {
 
       {/* ════════ Create / Edit Modal ════════ */}
       {showModal && (
-        <div className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center p-4">
+        <div className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center p-4 overflow-y-auto">
           <div className="text-[rgb(var(--text))] bg-[rgb(var(--surface))] rounded-2xl w-full max-w-xl max-h-[90vh] overflow-y-auto shadow-xl">
             <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100">
               <h2 className="text-lg font-bold ">
@@ -914,8 +914,8 @@ export default function Notice() {
 
       {/* ════════ Delete Confirm ════════ */}
       {deleteId && (
-        <div className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center p-4">
-          <div className="bg-[rgb(var(--surface))] rounded-2xl w-full max-w-sm shadow-xl p-6 text-center">
+        <div className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center p-4 overflow-y-auto">
+          <div className="bg-[rgb(var(--surface))] rounded-2xl w-full max-w-sm shadow-xl p-6 text-center my-auto max-h-[min(92vh,880px)] overflow-y-auto">
             <div className="w-12 h-12 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-4">
               <FiTrash2 size={22} className="text-red-500" />
             </div>
@@ -941,8 +941,8 @@ export default function Notice() {
 
       {/* ════════ Save Confirm Popup ════════ */}
       {confirmSave && (
-        <div className="fixed inset-0 z-60 bg-black/40 flex items-center justify-center p-4">
-          <div className=" bg-[rgb(var(--surface))] rounded-2xl w-full max-w-sm shadow-xl overflow-hidden">
+        <div className="fixed inset-0 z-60 bg-black/40 flex items-center justify-center p-4 overflow-y-auto">
+          <div className="bg-[rgb(var(--surface))] rounded-2xl w-full max-w-sm shadow-xl overflow-hidden my-auto max-h-[min(92vh,880px)] overflow-y-auto">
             {/* top colour strip */}
             <div className="h-1.5 w-full " />
             <div className="p-6 text-center">
@@ -987,8 +987,8 @@ export default function Notice() {
 
       {/* ════════ Discard Confirm Popup ════════ */}
       {confirmDiscard && (
-        <div className="fixed inset-0 z-60 bg-black/40 flex items-center justify-center p-4">
-          <div className="text-[rgb(var(--text))] bg-[rgb(var(--surface))] rounded-2xl w-full max-w-sm shadow-xl overflow-hidden">
+        <div className="fixed inset-0 z-60 bg-black/40 flex items-center justify-center p-4 overflow-y-auto">
+          <div className="text-[rgb(var(--text))] bg-[rgb(var(--surface))] rounded-2xl w-full max-w-sm shadow-xl overflow-hidden my-auto max-h-[min(92vh,880px)] overflow-y-auto">
             {/* top colour strip */}
             <div className="h-1.5 w-full bg-[rgb(var(--primary))]" />
             <div className="p-6 text-center">

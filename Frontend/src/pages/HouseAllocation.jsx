@@ -497,8 +497,8 @@ const HouseAllocation = () => {
 
       {/* FORM MODAL */}
       {formModal && (
-        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
-          <div className="bg-[rgb(var(--surface))] rounded-xl p-6 w-full max-w-md">
+        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4 overflow-y-auto">
+          <div className="bg-[rgb(var(--surface))] rounded-xl p-6 w-full max-w-md my-auto max-h-[min(92vh,880px)] overflow-y-auto">
             <h3 className="text-lg font-semibold mb-4">
               {isEdit ? "Edit / rename house" : "Add new house"}
             </h3>
@@ -567,8 +567,8 @@ const HouseAllocation = () => {
 
       {/* DELETE MODAL */}
       {deleteModal && deleteTarget && (
-        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
-          <div className="bg-[rgb(var(--surface))] rounded-xl p-6 w-full max-w-sm">
+        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4 overflow-y-auto">
+          <div className="bg-[rgb(var(--surface))] rounded-xl p-6 w-full max-w-sm my-auto max-h-[min(92vh,880px)] overflow-y-auto">
             <h3 className="text-lg font-semibold mb-2">Delete house?</h3>
             <p className="text-sm text-[rgb(var(--text-light))] mb-6">
               Delete <strong>{deleteTarget.name}</strong>? Students must be
@@ -594,8 +594,8 @@ const HouseAllocation = () => {
 
       {/* RANDOM CONFIRM */}
       {confirmRandom && (
-        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
-          <div className="bg-[rgb(var(--surface))] rounded-xl p-6 w-full max-w-md">
+        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4 overflow-y-auto">
+          <div className="bg-[rgb(var(--surface))] rounded-xl p-6 w-full max-w-md my-auto max-h-[min(92vh,880px)] overflow-y-auto">
             <h3 className="text-lg font-semibold mb-2">
               {confirmRandom === "all"
                 ? "Reallocate all students?"

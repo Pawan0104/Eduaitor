@@ -173,8 +173,8 @@ function TermManagement({ onDataChange }) {
       </div>
 
       {deleteId && (
-        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex justify-center items-center z-100 p-4">
-          <div className="text-[rgb(var(--text))] bg-[rgb(var(--surface))] rounded-3xl p-6 w-full max-w-[320px] shadow-2xl text-center">
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex justify-center items-center z-100 p-4 overflow-y-auto">
+          <div className="text-[rgb(var(--text))] bg-[rgb(var(--surface))] rounded-3xl p-6 w-full max-w-[320px] shadow-2xl text-center my-auto max-h-[min(92vh,880px)] overflow-y-auto">
             <div className="w-16 h-16 bg-red-50 text-red-500 rounded-full flex items-center justify-center mx-auto mb-4">
               <FiAlertTriangle size={32} />
             </div>
@@ -201,7 +201,7 @@ function TermManagement({ onDataChange }) {
       )}
 
       {showModal && (
-        <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-[2px] flex justify-center items-center z-50 p-4">
+        <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-[2px] flex justify-center items-center z-50 p-4 overflow-y-auto">
           <div className="text-[rgb(var(--text))] bg-[rgb(var(--surface))] rounded-3xl p-8 w-full max-w-md shadow-2xl relative max-h-[90vh] overflow-y-auto">
             <button
               onClick={() => setShowModal(false)}

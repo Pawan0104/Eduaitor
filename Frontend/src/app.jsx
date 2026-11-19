@@ -113,6 +113,7 @@ import ParentTransport from "./pages/ParentTransport";
 
 import ChangePassword from "./components/ChangePassword";
 import NotificationPage from "./pages/NotificationPage";
+import SmartNotifications from "./pages/smartNotifications/SmartNotifications";
 import Blogs from "./pages/Blogs";
 import BlogDetail from "./components/BlogDetail";
 import ClassAttendanceMarking from "./pages/ClassAttendanceMarking";
@@ -220,6 +221,7 @@ const App = () => {
           <Route path="menu" element={<SchoolMenu />} />
           <Route path="dashboard" element={<Navigate to="/school/menu" replace />} />
           <Route path="notification" element={<NotificationPage />} />
+          <Route path="smart-notifications" element={<SmartNotifications />} />
           <Route path="students" element={<Students />} />
           <Route path="documents" element={<StudentDocuments />} />
           <Route path="leads" element={<LeadManagement />} />
@@ -488,6 +490,7 @@ const App = () => {
           <Route path="menu" element={<StaffMenu />} />
           <Route path="dashboard" element={<Navigate to="/staff/menu" replace />} />
           <Route path="notification" element={<NotificationPage />} />
+          <Route path="smart-notifications" element={<SmartNotifications />} />
           <Route path="notice" element={<Notice />} />
           <Route path="event" element={<Event />} />
           <Route path="event/:id" element={<EventView />} />

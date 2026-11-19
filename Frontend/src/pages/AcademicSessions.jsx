@@ -337,7 +337,7 @@ const AcademicSessions = () => {
       </div>
 
       {modalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 p-4 backdrop-blur-[2px]">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 p-4 backdrop-blur-[2px] overflow-y-auto">
           <div className="relative max-h-[90vh] w-full max-w-md overflow-y-auto rounded-3xl bg-[rgb(var(--surface))] p-8 text-[rgb(var(--text))] shadow-2xl">
             <button
               type="button"
@@ -411,8 +411,8 @@ const AcademicSessions = () => {
       )}
 
       {deleteTarget && (
-        <div className="fixed inset-0 z-100 flex items-center justify-center bg-slate-900/60 p-4 backdrop-blur-sm">
-          <div className="w-full max-w-[340px] rounded-3xl bg-[rgb(var(--surface))] p-6 text-center text-[rgb(var(--text))] shadow-2xl">
+        <div className="fixed inset-0 z-100 flex items-center justify-center bg-slate-900/60 p-4 backdrop-blur-sm overflow-y-auto">
+          <div className="w-full max-w-[340px] rounded-3xl bg-[rgb(var(--surface))] p-6 text-center text-[rgb(var(--text))] shadow-2xl my-auto max-h-[min(92vh,880px)] overflow-y-auto">
             <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-red-50 text-red-500">
               <FiAlertTriangle size={30} />
             </div>

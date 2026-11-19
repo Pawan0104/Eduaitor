@@ -445,7 +445,7 @@ const ParentGatepass = () => {
       ══════════════════════════════════════════════ */}
       {showForm && (
         <div className="fixed inset-0 bg-black/50 flex items-center
-          justify-center z-50 p-4">
+          justify-center z-50 p-4 overflow-y-auto">
           <div className="bg-[rgb(var(--surface))] text-[rgb(var(--text))]
             rounded-2xl shadow-2xl w-full max-w-lg
             max-h-[94vh] flex flex-col">
@@ -689,7 +689,7 @@ const ParentGatepass = () => {
       ══════════════════════════════════════════════ */}
       {showView && viewItem && (
         <div className="fixed inset-0 bg-black/50 flex items-center
-          justify-center z-50 p-4">
+          justify-center z-50 p-4 overflow-y-auto">
           <div className="bg-[rgb(var(--surface))] text-[rgb(var(--text))]
             rounded-2xl shadow-2xl w-full max-w-md
             max-h-[92vh] flex flex-col">
@@ -814,7 +814,7 @@ const ParentGatepass = () => {
       ══════════════════════════════════════════════ */}
       {confirmModal && (
         <div className="fixed inset-0 bg-black/50 flex items-center
-          justify-center z-[60] p-4">
+          justify-center z-[60] p-4 overflow-y-auto">
           <div className="bg-[rgb(var(--surface))] text-[rgb(var(--text))]
             rounded-2xl p-6 w-full max-w-sm shadow-2xl">
             <p className="text-base font-semibold mb-1">

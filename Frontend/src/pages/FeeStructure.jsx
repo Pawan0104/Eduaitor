@@ -620,11 +620,11 @@ const FeeStructure = () => {
       {/* ── Custom delete confirmation ── */}
       {confirmVisible && (
         <div
-          className="fixed inset-0 bg-[#1a1625]/40 backdrop-blur-sm flex items-center justify-center z-50 p-4"
+          className="fixed inset-0 bg-[#1a1625]/40 backdrop-blur-sm flex items-center justify-center z-50 p-4 overflow-y-auto"
           onClick={() => setConfirmVisible(false)} // click backdrop to cancel
         >
           <div
-            className="bg-[rgb(var(--surface))] text-[rgb(var(--text))] rounded-2xl p-6 w-full max-w-xs shadow-2xl"
+            className="bg-[rgb(var(--surface))] text-[rgb(var(--text))] rounded-2xl p-6 w-full max-w-xs shadow-2xl my-auto max-h-[min(92vh,880px)] overflow-y-auto"
             onClick={(e) => e.stopPropagation()} // prevent backdrop click closing when clicking card
           >
             <div className="text-2xl mb-3">🗑</div>
@@ -659,10 +659,10 @@ const FeeStructure = () => {
       ══════════════════════════════════════════ */}
       {showModal && (
         <div
-          className="fixed inset-0 bg-[#1a1625]/50 backdrop-blur-sm flex items-center justify-center z-50 p-4"
+          className="fixed inset-0 bg-[#1a1625]/50 backdrop-blur-sm flex items-center justify-center z-50 p-4 overflow-y-auto"
           onClick={(e) => e.target === e.currentTarget && closeModal()}
         >
-          <div className="bg-[rgb(var(--surface))] text-[rgb(var(--text))]  rounded-2xl p-6 w-full max-w-sm shadow-2xl">
+          <div className="bg-[rgb(var(--surface))] text-[rgb(var(--text))] rounded-2xl p-6 w-full max-w-sm shadow-2xl my-auto max-h-[min(92vh,880px)] overflow-y-auto">
             {/* Title changes depending on add vs edit mode */}
             <h2
               className="text-lg font-bold mb-5"

@@ -489,8 +489,8 @@ export default function SectionManagement() {
 /* MODALS */
 
 const Modal = ({ title, children }) => (
-  <div className="fixed inset-0 bg-black/40 flex items-center justify-center p-4 text-[rgb(var(--text))]">
-    <div className="bg-[rgb(var(--surface))] p-6 rounded-xl w-full max-w-md space-y-4">
+  <div className="fixed inset-0 bg-black/40 flex items-center justify-center p-4 text-[rgb(var(--text))] overflow-y-auto">
+    <div className="bg-[rgb(var(--surface))] p-6 rounded-xl w-full max-w-md space-y-4 my-auto max-h-[min(92vh,880px)] overflow-y-auto">
       <h3 className="text-lg font-semibold">{title}</h3>
       {children}
     </div>
@@ -509,8 +509,8 @@ const ModalActions = ({ cancel, save }) => (
 );
 
 const ConfirmModal = ({ title = "Delete this item?", confirm, cancel }) => (
-  <div className="fixed inset-0 bg-black/40 flex items-center justify-center p-4 text-[rgb(var(--text))]">
-    <div className="bg-[rgb(var(--surface))] p-6 rounded-xl space-y-4 text-center w-full max-w-sm">
+  <div className="fixed inset-0 bg-black/40 flex items-center justify-center p-4 text-[rgb(var(--text))] overflow-y-auto">
+    <div className="bg-[rgb(var(--surface))] p-6 rounded-xl space-y-4 text-center w-full max-w-sm my-auto max-h-[min(92vh,880px)] overflow-y-auto">
       <h3>{title}</h3>
 
       <div className="flex gap-4 justify-center">

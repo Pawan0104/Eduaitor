@@ -531,8 +531,8 @@ const ParentStore = () => {
       )}
 
       {devCheckout && (
-        <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center">
-          <div className="bg-[rgb(var(--surface))] rounded-xl p-6 w-full max-w-md mx-4">
+        <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center overflow-y-auto">
+          <div className="bg-[rgb(var(--surface))] rounded-xl p-6 w-full max-w-md mx-4 my-auto max-h-[min(92vh,880px)] overflow-y-auto">
             <h3 className="text-lg font-semibold mb-2">Dev Payment Gateway</h3>
             <p className="text-sm text-[rgb(var(--text-muted))] mb-3">
               School Razorpay keys not configured — same mock flow as fee

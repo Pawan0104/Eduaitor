@@ -1055,7 +1055,7 @@ export default function ClassPage() {
         <>
           {/* ════════ Add / Edit Modal ════════ */}
           {showModal && (
-            <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+            <div className="fixed inset-0 z-50 flex items-center justify-center p-4 overflow-y-auto">
               <div className="bg-[rgb(var(--surface))] text-[rgb(var(--text))]  rounded-2xl w-full max-w-2xl max-h-[90vh] overflow-y-auto shadow-xl">
                 <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100 sticky top-0  z-10">
                   <h2 className="text-lg font-bold text-[rgb(var(--text))]">
@@ -1527,7 +1527,7 @@ export default function ClassPage() {
       {/* Teacher: day schedule popup */}
       {ttModal && (
         <div
-          className="fixed inset-0 z-60 bg-black/40 flex items-center justify-center p-4"
+          className="fixed inset-0 z-60 bg-black/40 flex items-center justify-center p-4 overflow-y-auto"
           onClick={() => setTtModal(null)}
         >
           <div
@@ -1632,7 +1632,7 @@ export default function ClassPage() {
       {/* Teacher: full week timetable popup */}
       {weekModal && weekModal.length > 0 && (
         <div
-          className="fixed inset-0 z-60 bg-black/40 flex items-center justify-center p-4"
+          className="fixed inset-0 z-60 bg-black/40 flex items-center justify-center p-4 overflow-y-auto"
           onClick={() => setWeekModal(null)}
         >
           <div
@@ -1792,8 +1792,8 @@ function ConfirmPopup({
   disabled = false,
 }) {
   return (
-    <div className="fixed inset-0 z-60 bg-black/40 flex items-center justify-center p-4">
-      <div className="bg-[rgb(var(--surface))]  text-[rgb(var(--text))] rounded-2xl w-full max-w-sm shadow-xl overflow-hidden">
+    <div className="fixed inset-0 z-60 bg-black/40 flex items-center justify-center p-4 overflow-y-auto">
+      <div className="bg-[rgb(var(--surface))] text-[rgb(var(--text))] rounded-2xl w-full max-w-sm shadow-xl overflow-hidden my-auto max-h-[min(92vh,880px)] overflow-y-auto">
         <div className={`h-1.5 w-full ${strip}`} />
         <div className="p-6 text-center">
           <div

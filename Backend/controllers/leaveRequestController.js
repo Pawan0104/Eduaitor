@@ -102,8 +102,18 @@ export const createLeaveRequest = async (req, res, next) => {
         title:            "New Leave Request",
         message:          `A leave request has been submitted for ${student.firstName} ${student.lastName}.`,
         notificationType: "general",
+        eventType:        "LEAVE.APPLIED",
         schoolId,
         targets,
+        systemKey: `leave:${leaveRequest._id}:applied`,
+        payloadExtras: {
+          studentId: student._id,
+          studentName: `${student.firstName} ${student.lastName}`.trim(),
+          fromDate,
+          toDate,
+          leaveType,
+          reason,
+        },
       });
     } catch (notifErr) {
       // notification failure should not break leave request creation
@@ -333,6 +343,7 @@ export const actionLeaveRequest = async (req, res, next) => {
         title:            `Leave Request ${actionWord}`,
         message:          `Leave request for ${studentName} has been ${action}${action === "rejected" ? `. Reason: ${note}` : "."}`,
         notificationType: "general",
+        eventType:        "LEAVE.STATUS_UPDATED",
         schoolId,
         targets: [
           {
@@ -341,6 +352,12 @@ export const actionLeaveRequest = async (req, res, next) => {
             schoolId,
           },
         ],
+        systemKey: `leave:${leaveRequest._id}:${action}`,
+        payloadExtras: {
+          studentId: leaveRequest.studentId._id,
+          studentName,
+          status: action,
+        },
       });
     } catch (notifErr) {
       console.error("Notification error:", notifErr);
@@ -415,8 +432,11 @@ export const cancelLeaveRequest = async (req, res, next) => {
         title:            "Leave Request Cancelled",
         message:          `Leave request for ${studentName} has been cancelled by parent.`,
         notificationType: "general",
+        eventType:        "LEAVE.STATUS_UPDATED",
         schoolId,
         targets,
+        systemKey: `leave:${leaveRequest._id}:cancelled`,
+        payloadExtras: { studentName, status: "cancelled" },
       });
     } catch (notifErr) {
       console.error("Notification error:", notifErr);

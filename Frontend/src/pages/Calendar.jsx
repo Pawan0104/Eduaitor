@@ -700,8 +700,8 @@ export default function Calendar({ schoolId /* academicYearId */ }) {
       />
 
       {deleteId && (
-        <div className="fixed inset-0 z-50 bg-black/40 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="text-[rgb(var(--text))] bg-[rgb(var(--surface))] rounded-2xl w-full max-w-sm shadow-2xl overflow-hidden">
+        <div className="fixed inset-0 z-50 bg-black/40 backdrop-blur-sm flex items-center justify-center p-4 overflow-y-auto">
+          <div className="text-[rgb(var(--text))] bg-[rgb(var(--surface))] rounded-2xl w-full max-w-sm shadow-2xl overflow-hidden my-auto max-h-[min(92vh,880px)] overflow-y-auto">
             <div className="h-1.5 bg-[rgb(var(--primary))] w-full" />
             <div className="p-6 text-center">
               <div className="w-12 h-12 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-4">
@@ -868,8 +868,8 @@ function EventModal({
   const typeCfg = TYPE_CONFIG[form.type] || TYPE_CONFIG["Event"];
 
   return (
-    <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4">
-      <div className="text-[rgb(var(--text))] bg-[rgb(var(--surface))] rounded-2xl w-full max-w-lg shadow-2xl overflow-hidden">
+    <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4 overflow-y-auto">
+      <div className="text-[rgb(var(--text))] bg-[rgb(var(--surface))] rounded-2xl w-full max-w-lg shadow-2xl overflow-hidden my-auto max-h-[min(92vh,880px)] overflow-y-auto">
         {/* Accent bar — reflects selected type color */}
         <div className={`h-1.5 w-full transition-colors duration-300`} />
 

@@ -289,8 +289,8 @@ const Defaulters = () => {
 
       {/* View Modal */}
       {viewData && (
-        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-md flex items-center justify-center p-4 z-50">
-          <div className="bg-[rgb(var(--surface))] text-[rgb(var(--text))] p-8 rounded-[2.5rem] max-w-sm w-full shadow-2xl animate-in zoom-in-95 duration-200">
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-md flex items-center justify-center p-4 z-50 overflow-y-auto">
+          <div className="bg-[rgb(var(--surface))] text-[rgb(var(--text))] p-8 rounded-[2.5rem] max-w-sm w-full shadow-2xl animate-in zoom-in-95 duration-200 my-auto max-h-[min(92vh,880px)] overflow-y-auto">
             <div className="text-center mb-6">
               <div className="h-16 w-16 bg-[rgb(var(--primary))]  rounded-2xl flex items-center justify-center text-2xl mx-auto mb-4 font-black italic">
                 i

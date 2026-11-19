@@ -127,7 +127,7 @@ function EditModal({ entry, classes, onClose, onSaved }) {
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/30 backdrop-blur-sm p-0 sm:p-4">
+    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/30 backdrop-blur-sm p-0 sm:p-4 overflow-y-auto">
       <div className="bg-[rgb(var(--surface))]  w-full sm:max-w-md rounded-t-2xl sm:rounded-2xl shadow-xl max-h-[90vh] flex flex-col">
         {/* Header */}
         <div className="flex items-center justify-between px-5 py-4 border-b border-slate-100">
@@ -670,8 +670,8 @@ export default function DiaryTeacher() {
 
       {/* ── Delete Confirm ──────────────────────────────────────────────────── */}
       {deleteId && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/30 backdrop-blur-sm">
-          <div className="bg-[rgb(var(--surface))] text-[rgb(var(--text))] rounded-2xl shadow-xl p-6 w-full max-w-xs">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/30 backdrop-blur-sm overflow-y-auto">
+          <div className="bg-[rgb(var(--surface))] text-[rgb(var(--text))] rounded-2xl shadow-xl p-6 w-full max-w-xs my-auto max-h-[min(92vh,880px)] overflow-y-auto">
             <div className="w-10 h-10 rounded-full bg-red-50 flex items-center justify-center mb-3">
               <svg
                 className="w-5 h-5 text-red-500"

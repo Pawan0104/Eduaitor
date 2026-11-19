@@ -376,7 +376,7 @@ const ParentLeaveRequest = () => {
       ══════════════════════════════════════════════ */}
       {showForm && (
         <div className="fixed inset-0 bg-black/50 flex items-center
-          justify-center z-50 p-4">
+          justify-center z-50 p-4 overflow-y-auto">
           <div className="bg-[rgb(var(--surface))] text-[rgb(var(--text))]
             rounded-2xl shadow-2xl w-full max-w-lg
             max-h-[94vh] flex flex-col">
@@ -515,7 +515,7 @@ const ParentLeaveRequest = () => {
       ══════════════════════════════════════════════ */}
       {confirmModal && (
         <div className="fixed inset-0 bg-black/50 flex items-center
-          justify-center z-50 p-4">
+          justify-center z-50 p-4 overflow-y-auto">
           <div className="bg-[rgb(var(--surface))] text-[rgb(var(--text))]
             rounded-2xl shadow-2xl w-full max-w-sm p-6">
             <h2 className="text-lg font-semibold mb-2">Cancel Leave Request</h2>

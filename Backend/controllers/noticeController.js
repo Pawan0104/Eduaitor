@@ -143,9 +143,12 @@ export const createNotice = async (req, res) => {
       title: `Notice: ${notice.title}`,
       message: notice.content,
       notificationType: "general",
+      eventType: "COMMUNICATION.SCHOOL_ANNOUNCEMENT",
       targets,
       schoolId,
       createdBy: req.user._id,
+      systemKey: `notice:${notice._id}:create`,
+      payloadExtras: { title: notice.title, message: notice.content },
     });
     emitMarketingTrigger({
       schoolId,
@@ -182,9 +185,12 @@ export const updateNotice = async (req, res) => {
       title: `Notice Updated: ${notice.title}`,
       message: notice.content,
       notificationType: "general",
+      eventType: "COMMUNICATION.SCHOOL_ANNOUNCEMENT",
       targets,
       schoolId,
       createdBy: req.user.school_id,
+      systemKey: `notice:${notice._id}:update:${Date.now()}`,
+      payloadExtras: { title: notice.title, message: notice.content },
     });
 
     res

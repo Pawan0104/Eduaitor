@@ -73,7 +73,7 @@ const IconBadge = ({ icon, variant = "default" }) => {
 const UpgradePopup = ({ moduleName, onClose }) => {
   const { t, tn } = useLanguage();
   return (
-    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-999 p-4">
+    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-999 p-4 overflow-y-auto">
       <div className="card w-full max-w-sm p-6 text-center">
         <div className="w-12 h-12 bg-orange-100 rounded-full flex items-center justify-center mx-auto mb-4">
           <FaLock className="text-orange-500" size={20} />

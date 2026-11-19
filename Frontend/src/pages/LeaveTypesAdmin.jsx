@@ -207,8 +207,8 @@ export default function LeaveTypesAdmin() {
       </div>
 
       {showModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40">
-          <div className="w-full max-w-md rounded-2xl bg-[rgb(var(--surface))] p-5 shadow-xl">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 overflow-y-auto">
+          <div className="w-full max-w-md rounded-2xl bg-[rgb(var(--surface))] p-5 shadow-xl my-auto max-h-[min(92vh,880px)] overflow-y-auto">
             <h2 className="text-lg font-bold mb-4">
               {editingId ? "Edit leave type" : "Add leave type"}
             </h2>

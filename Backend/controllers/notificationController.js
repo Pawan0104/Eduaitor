@@ -364,6 +364,10 @@
 import Notification from "../models/notification.js";
 import Student from "../models/student.js";
 import {uploadToCloudinary} from "../utils/uploadToCloudinary.js"
+import {
+  emitFromLegacyHelper,
+} from "../services/smartNotifications/emitNotificationEvent.js";
+import NotificationJob from "../models/smartNotifications/notificationJob.js";
 
 // ─── HELPER: build the per-role target match using $elemMatch ─────────────────
 // $elemMatch ensures schoolId AND type/role come from the SAME target subdocument.
@@ -467,22 +471,88 @@ const buildTargetQuery = async (user) => {
 };
 
 // ─── HELPER: create a notification programmatically ──────────────────────────
-// Call this from exam/result/fee controllers to auto-create notifications
+// Thin wrapper → Smart Notifications engine (keeps return shape for callers).
+const LEGACY_EVENT_MAP = {
+  attendance: "ATTENDANCE.ABSENT_MARKED",
+  transport: "TRANSPORT.MORNING_BOARDING",
+  homework: "DIARY.HOMEWORK_ASSIGNED",
+  diary: "DIARY.DIARY_NOTE",
+  daily_learning: "DIARY.CIRCULAR",
+  assignment: "DIARY.HOMEWORK_ASSIGNED",
+  exam: "EXAMS.SCHEDULE_PUBLISHED",
+  result: "EXAMS.RESULT_PUBLISHED",
+  fee: "FEES.PAYMENT_SUCCESS",
+  gatepass: "PARENT.GATE_PASS",
+  general: "COMMUNICATION.MANUAL_BROADCAST",
+};
+
 export const createNotificationHelper = async ({
   title, message, notificationType = 'general',
   createdBy = null, schoolId = null,
   startingDate = null, endingDate = null,
   targets = [],
-  status = 'sent',        // ← explicit, defaults to sent for auto-generated notifications
+  status = 'sent',
   scheduledAt = null,
   systemKey = null,
+  eventType = null,
+  payloadExtras = {},
 }) => {
-  // Always inject schoolId into every target for correct scoping
   const resolvedTargets = targets.map((t) => ({
     ...t,
     ...(schoolId ? { schoolId } : {}),
   }));
 
+  // Scheduled / draft still use the legacy inbox document directly
+  if (status === 'scheduled' || scheduledAt) {
+    const notification = new Notification({
+      title, message, notificationType,
+      createdBy,
+      targets: resolvedTargets,
+      startingDate, endingDate,
+      status,
+      scheduledAt,
+      ...(systemKey ? { systemKey } : {}),
+    });
+    await notification.save();
+    return notification;
+  }
+
+  if (schoolId) {
+    try {
+      const mappedType =
+        eventType ||
+        LEGACY_EVENT_MAP[notificationType] ||
+        "COMMUNICATION.MANUAL_BROADCAST";
+
+      const result = await emitFromLegacyHelper({
+        title,
+        message,
+        schoolId,
+        targets: resolvedTargets,
+        eventType: mappedType,
+        notificationType,
+        createdBy,
+        systemKey,
+        payloadExtras,
+      });
+
+      if (result?.eventId) {
+        const job = await NotificationJob.findOne({
+          eventId: result.eventId,
+          channel: "in_app",
+          inboxNotificationId: { $ne: null },
+        }).lean();
+        if (job?.inboxNotificationId) {
+          const inbox = await Notification.findById(job.inboxNotificationId);
+          if (inbox) return inbox;
+        }
+      }
+    } catch (err) {
+      console.error("[smart-notifications] helper bridge failed, falling back:", err.message);
+    }
+  }
+
+  // Fallback: direct inbox write (safety during rollout)
   const notification = new Notification({
     title, message, notificationType,
     createdBy,
@@ -490,11 +560,8 @@ export const createNotificationHelper = async ({
     startingDate, endingDate,
     status,
     scheduledAt,
-    schoolId,
-    // Only set when present — unique index rejects multiple null systemKeys
     ...(systemKey ? { systemKey } : {}),
   });
-
   await notification.save();
   return notification;
 };
@@ -565,6 +632,40 @@ const uploaded = await uploadToCloudinary(
     });
 
     await notification.save();
+
+    // Fan-out to Smart Notifications channels (push/email/…) without duplicating inbox
+    if (status === "sent" && schoolId) {
+      try {
+        const { emitNotificationEvent } = await import(
+          "../services/smartNotifications/emitNotificationEvent.js"
+        );
+        await emitNotificationEvent({
+          schoolId,
+          eventType: "COMMUNICATION.MANUAL_BROADCAST",
+          entityType: "notification",
+          entityId: notification._id,
+          idempotencyKey: `manual:${notification._id}`,
+          source: `user:${req.user.id || req.user._id}`,
+          payload: {
+            title,
+            message,
+            _preRendered: true,
+            _skipInApp: true,
+            recipientRoles: ["custom"],
+            audience: [
+              {
+                userId: `manual:${notification._id}`,
+                role: "custom",
+                name: "Broadcast audience",
+                legacyTargets: targets,
+              },
+            ],
+          },
+        });
+      } catch (emitErr) {
+        console.error("[smart-notifications] manual create emit failed:", emitErr.message);
+      }
+    }
 
     const messages = {
       scheduled: `Notification scheduled for ${scheduleDate?.toLocaleString()}`,

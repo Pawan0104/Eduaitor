@@ -36,11 +36,11 @@ const ProfileSheet = ({ onClose }) => {
 
   return (
     <div
-      className="fixed inset-0 z-[60] flex items-end justify-center bg-black/45 backdrop-blur-[2px]"
+      className="fixed inset-0 z-[60] flex items-end justify-center bg-black/45 backdrop-blur-[2px] overflow-y-auto"
       onClick={onClose}
     >
       <div
-        className="flex w-full max-w-lg flex-col overflow-hidden rounded-t-[1.75rem] border border-[rgb(var(--border))] bg-[rgb(var(--surface))] shadow-2xl"
+        className="flex w-full max-w-lg flex-col overflow-hidden rounded-t-[1.75rem] border border-[rgb(var(--border))] bg-[rgb(var(--surface))] shadow-2xl max-h-[min(92vh,880px)] overflow-y-auto"
         style={{
           maxHeight:
             "min(88dvh, calc(100dvh - 5.5rem - env(safe-area-inset-bottom, 0px)))",

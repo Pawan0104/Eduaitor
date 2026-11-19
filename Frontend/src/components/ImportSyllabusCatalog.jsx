@@ -133,7 +133,7 @@ export default function ImportSyllabusCatalog({
     "w-full text-sm border border-slate-200 rounded-xl px-3 py-2.5 bg-[rgb(var(--surface))] text-[rgb(var(--text))] focus:outline-none focus:ring-2 focus:ring-slate-400";
 
   return (
-    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/40 backdrop-blur-sm p-0 sm:p-4">
+    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/40 backdrop-blur-sm p-0 sm:p-4 overflow-y-auto">
       <div className="bg-[rgb(var(--surface))] w-full sm:max-w-2xl rounded-t-2xl sm:rounded-2xl shadow-xl max-h-[92vh] flex flex-col text-[rgb(var(--text))]">
         <div className="flex items-center justify-between px-5 py-4 border-b border-slate-100">
           <div>

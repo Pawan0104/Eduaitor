@@ -272,14 +272,19 @@ export const saveAttendance = async (req, res) => {
   sectionId
 }));
   if (absentStudents.length > 0) {
-  await createNotificationHelper({
-    title: "Absent Alert 🚫",
-    message: "You were marked absent today. Please check with your school if this is incorrect.",
-    notificationType: "attendance",
-    createdBy: req.user._id,
-    schoolId,
-    targets
-  });
+  for (const s of absentStudents) {
+    await createNotificationHelper({
+      title: "Absent Alert",
+      message: "You were marked absent today. Please check with your school if this is incorrect.",
+      notificationType: "attendance",
+      eventType: "ATTENDANCE.ABSENT_MARKED",
+      createdBy: req.user._id,
+      schoolId,
+      targets: [{ type: "student", studentId: s.studentId, classId, sectionId }],
+      systemKey: `attendance:${s._id}:Absent`,
+      payloadExtras: { studentId: s.studentId, classId, date },
+    });
+  }
 }
 
     // Return saved docs with studentId + _id so frontend stores them

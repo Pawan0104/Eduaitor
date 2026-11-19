@@ -23,8 +23,7 @@ export default function BootSplash({ className = "" }) {
 
   if (deferred) return null;
 
-  const src = publicAsset("eduaitor-splash-logo.png");
-  const aiSrc = publicAsset("eduaitor-splash-ai.png");
+  const src = publicAsset("eduaitor.png");
   return (
     <>
       <style>{`
@@ -64,22 +63,6 @@ export default function BootSplash({ className = "" }) {
               height: "auto",
               objectFit: "contain",
               objectPosition: "center center",
-            }}
-          />
-          <img
-            src={aiSrc}
-            alt=""
-            aria-hidden="true"
-            style={{
-              position: "absolute",
-              left: "43%",
-              top: "2%",
-              width: "24%",
-              height: "72%",
-              objectFit: "contain",
-              transformOrigin: "50% 50%",
-              animation: "eduaitor-ai-swing-spin 2.8s ease-in-out infinite",
-              pointerEvents: "none",
             }}
           />
         </div>

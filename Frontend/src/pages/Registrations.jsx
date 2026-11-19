@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+﻿import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import axios from "axios";
 import {
@@ -105,8 +105,6 @@ const FOLLOWUP_FILTERS = [
   { value: "cancelled", label: "Cancelled" },
 ];
 
-const SOURCE_OPTIONS = ["Website", "Walk-in", "Referral", "Previous School"];
-
 const emptyRegistration = () => ({
   studentName: "",
   dob: "",
@@ -135,7 +133,7 @@ const emptyRegistration = () => ({
 const normalizeFieldLabel = (value) =>
   String(value || "")
     .toLowerCase()
-    .replace(/['’]/g, "")
+    .replace(/['â€™]/g, "")
     .replace(/[^a-z0-9]+/g, "");
 
 const fieldsOfSteps = (steps = []) =>
@@ -270,9 +268,9 @@ const dateInput = (value) => {
 };
 
 const formatDate = (value) => {
-  if (!value) return "—";
+  if (!value) return "â€”";
   const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return "—";
+  if (Number.isNaN(date.getTime())) return "â€”";
   return date.toLocaleDateString("en-IN", {
     day: "2-digit",
     month: "short",
@@ -281,9 +279,9 @@ const formatDate = (value) => {
 };
 
 const formatDateTime = (value) => {
-  if (!value) return "—";
+  if (!value) return "â€”";
   const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return "—";
+  if (Number.isNaN(date.getTime())) return "â€”";
   return date.toLocaleString("en-IN", {
     day: "2-digit",
     month: "short",
@@ -294,13 +292,33 @@ const formatDateTime = (value) => {
 };
 
 const shortDate = (value) => {
-  if (!value) return "—";
+  if (!value) return "â€”";
   const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return "—";
+  if (Number.isNaN(date.getTime())) return "â€”";
   return date.toLocaleDateString("en-IN", { day: "2-digit", month: "short" });
 };
 
 const todayISO = () => dateInput(new Date());
+
+const shiftedISO = (days) => {
+  const date = new Date();
+  date.setHours(12, 0, 0, 0);
+  date.setDate(date.getDate() + days);
+  return dateInput(date);
+};
+
+const tomorrowISO = () => shiftedISO(1);
+
+/** Today / Tomorrow / Yesterday, otherwise a normal date. */
+const relativeDateLabel = (value) => {
+  if (!value) return "â€”";
+  const target = dateInput(value);
+  if (!target) return "â€”";
+  if (target === todayISO()) return "Today";
+  if (target === shiftedISO(1)) return "Tomorrow";
+  if (target === shiftedISO(-1)) return "Yesterday";
+  return formatDate(value);
+};
 
 const isSameDay = (value) => {
   if (!value) return false;
@@ -536,6 +554,7 @@ const Registrations = () => {
   const [followUpDates, setFollowUpDates] = useState({});
   const [followUpAssignees, setFollowUpAssignees] = useState({});
   const [followUpSavingId, setFollowUpSavingId] = useState("");
+  const [staffAssignees, setStaffAssignees] = useState([]);
   const [followUpHistory, setFollowUpHistory] = useState({
     open: false,
     loading: false,
@@ -617,7 +636,25 @@ const Registrations = () => {
     } catch {
       setStreams([]);
     }
+    try {
+      const { data } = await axios.get(`${API}/leads/assignable-users`, {
+        withCredentials: true,
+      });
+      const list = Array.isArray(data?.data) ? data.data : [];
+      setStaffAssignees(
+        list.map((item) => String(item?.name || "").trim()).filter(Boolean),
+      );
+    } catch {
+      setStaffAssignees([]);
+    }
   }, []);
+
+  const assigneeOptions = useMemo(() => {
+    const names = [...staffAssignees];
+    const current = String(user?.name || "").trim();
+    if (current && !names.includes(current)) names.unshift(current);
+    return [...new Set(names)].sort((a, b) => a.localeCompare(b));
+  }, [staffAssignees, user?.name]);
 
   const loadApplyLink = useCallback(async () => {
     try {
@@ -700,6 +737,7 @@ const Registrations = () => {
         gender: registration.gender || "",
         bloodGroup: registration.bloodGroup || "",
         category: registration.category || "",
+        aadhaarNumber: registration.aadhaarNumber || "",
         motherName: registration.motherName || "",
         classId: registration.classId || "",
         streamId: registration.streamId ? String(registration.streamId) : "",
@@ -848,6 +886,15 @@ const Registrations = () => {
       : registration?.source === "lead"
         ? "Lead"
         : registration?.createdByName || "Office");
+
+  const sourceOptions = useMemo(() => {
+    const values = new Set();
+    registrations.forEach((row) => {
+      const value = String(sourceText(row) || "").trim();
+      if (value) values.add(value);
+    });
+    return [...values].sort((a, b) => a.localeCompare(b));
+  }, [registrations]);
 
   const publicUrl = linkModal.data?.token
     ? `${window.location.origin}${import.meta.env.BASE_URL}register/${linkModal.data.token}`
@@ -1376,6 +1423,11 @@ const Registrations = () => {
         return String(a.studentName || "").localeCompare(
           String(b.studentName || ""),
         );
+      if (sortOrder === "source")
+        return (
+          sourceText(a).localeCompare(sourceText(b)) ||
+          String(a.studentName || "").localeCompare(String(b.studentName || ""))
+        );
       const aTime = new Date(a.createdAt || 0).getTime();
       const bTime = new Date(b.createdAt || 0).getTime();
       return sortOrder === "oldest" ? aTime - bTime : bTime - aTime;
@@ -1438,8 +1490,11 @@ const Registrations = () => {
             key: "total",
             label: "TOTAL",
             value: totalCount,
-            sub: `All leads · ${selectedName || "Session"}`,
-            onClick: () => setSubTab("all"),
+            sub: `All registrations Â· ${selectedName || "Session"}`,
+            onClick: () => {
+              setSubTab("all");
+              setFilter({ status: "" });
+            },
           },
           {
             key: "registered",
@@ -1447,6 +1502,10 @@ const Registrations = () => {
             value: stats.registered || 0,
             sub: "Awaiting exam",
             tone: "text-slate-700",
+            onClick: () => {
+              setSubTab("all");
+              setFilter({ status: "registered" });
+            },
           },
           {
             key: "exam_scheduled",
@@ -1454,7 +1513,10 @@ const Registrations = () => {
             value: stats.exam_scheduled || 0,
             sub: `${exams.length} exam${exams.length === 1 ? "" : "s"} set up`,
             tone: "text-indigo-600",
-            onClick: () => setSubTab("exams"),
+            onClick: () => {
+              setSubTab("exams");
+              setFilter({ status: "exam_scheduled" });
+            },
           },
           {
             key: "passed",
@@ -1471,6 +1533,10 @@ const Registrations = () => {
             }% pass rate`,
             tone: "text-emerald-600",
             subTone: "text-emerald-600",
+            onClick: () => {
+              setSubTab("all");
+              setFilter({ status: "passed" });
+            },
           },
           {
             key: "failed",
@@ -1478,13 +1544,21 @@ const Registrations = () => {
             value: stats.failed || 0,
             sub: `${stats.failed || 0} re-test pending`,
             tone: "text-rose-600",
+            onClick: () => {
+              setSubTab("all");
+              setFilter({ status: "failed" });
+            },
           },
           {
             key: "admitted",
             label: "ADMITTED",
             value: admittedCount,
-            sub: `${conversionRate}% conversion · ${cancelledCount} cancelled`,
+            sub: `${conversionRate}% conversion Â· ${cancelledCount} cancelled`,
             tone: "text-blue-600",
+            onClick: () => {
+              setSubTab("all");
+              setFilter({ status: "admitted" });
+            },
           },
         ]
       : [
@@ -1492,8 +1566,11 @@ const Registrations = () => {
             key: "total",
             label: "TOTAL",
             value: totalCount,
-            sub: `All leads · ${selectedName || "Session"}`,
-            onClick: () => setSubTab("all"),
+            sub: `All registrations Â· ${selectedName || "Session"}`,
+            onClick: () => {
+              setSubTab("all");
+              setFilter({ status: "" });
+            },
           },
           {
             key: "new",
@@ -1501,6 +1578,10 @@ const Registrations = () => {
             value: followupCounts.next,
             sub: "Not contacted yet",
             tone: "text-blue-600",
+            onClick: () => {
+              setSubTab("all");
+              setFilter({ status: "new" });
+            },
           },
           {
             key: "in_followup",
@@ -1508,12 +1589,16 @@ const Registrations = () => {
             value: followupCounts.inFollowup,
             sub: "Being contacted",
             tone: "text-amber-600",
+            onClick: () => {
+              setSubTab("all");
+              setFilter({ status: "in_followup" });
+            },
           },
           {
             key: "due",
             label: "DUE TODAY",
             value: dueTodayCount,
-            sub: "Follow-ups pending →",
+            sub: "Follow-ups pending â†’",
             tone: "text-amber-700",
             subTone: "text-amber-700",
             onClick: () => setSubTab("followups_due"),
@@ -1526,12 +1611,20 @@ const Registrations = () => {
             sub: `${conversionRate}% conversion`,
             tone: "text-emerald-600",
             subTone: "text-emerald-600",
+            onClick: () => {
+              setSubTab("all");
+              setFilter({ status: "admitted" });
+            },
           },
           {
             key: "cancelled",
             label: "CANCELLED",
             value: cancelledCount,
             sub: "Dropped leads",
+            onClick: () => {
+              setSubTab("all");
+              setFilter({ status: "cancelled" });
+            },
           },
         ];
 
@@ -1603,9 +1696,9 @@ const Registrations = () => {
   const openNextFollowUp = (registration) => {
     setFollowUpDates((prev) => ({
       ...prev,
-      [registration._id]: todayISO(),
+      [registration._id]: tomorrowISO(),
     }));
-    toast.success("Next follow-up date set to today.");
+    toast.success("Next follow-up date set to tomorrow.");
   };
 
   return (
@@ -1629,7 +1722,7 @@ const Registrations = () => {
                 Registrations
               </h1>
               <span className="rounded-full border border-slate-200 bg-slate-100 px-2 py-0.5 text-[11px] font-medium text-slate-600">
-                Session {selectedName || "—"}
+                Session {selectedName || "â€”"}
               </span>
             </div>
             <p className="mt-0.5 text-[13px] text-slate-500">
@@ -1861,7 +1954,7 @@ const Registrations = () => {
                   </div>
                   <div>
                     <div className="flex flex-wrap items-center gap-2 text-xs font-semibold text-amber-950">
-                      <span>Today&apos;s Follow-ups Queue — {formatDate(new Date())}</span>
+                      <span>Today&apos;s Follow-ups Queue â€” {formatDate(new Date())}</span>
                       <span className="rounded bg-amber-200/80 px-1.5 py-0.5 text-[10px] font-bold text-amber-900">
                         {dueTodayCount} due
                       </span>
@@ -1932,7 +2025,7 @@ const Registrations = () => {
                   className={`${inputClass} w-auto`}
                 >
                   <option value="">Source: All</option>
-                  {SOURCE_OPTIONS.map((source) => (
+                  {sourceOptions.map((source) => (
                     <option key={source} value={source}>
                       {source}
                     </option>
@@ -1956,7 +2049,8 @@ const Registrations = () => {
                 >
                   <option value="newest">Newest</option>
                   <option value="oldest">Oldest</option>
-                  <option value="name">Name A–Z</option>
+                  <option value="name">Name Aâ€“Z</option>
+                  <option value="source">Source Aâ€“Z</option>
                 </select>
                 <button type="button" onClick={exportCSV} className={btnSecondary}>
                   <FiDownload size={13} /> Export
@@ -1973,10 +2067,10 @@ const Registrations = () => {
                     ? "follow-ups due today"
                     : "registrations"}
                 </span>
-                <span className="text-slate-300">·</span>
+                <span className="text-slate-300">Â·</span>
                 <span className="font-medium text-blue-600">
                   {selectedRegistration
-                    ? `1 selected (${selectedRegistration.registrationNumber || "—"})`
+                    ? `1 selected (${selectedRegistration.registrationNumber || "â€”"})`
                     : "0 selected"}
                 </span>
               </div>
@@ -1993,7 +2087,7 @@ const Registrations = () => {
                     <tr>
                       <th className="w-9 py-2.5 pl-4 pr-2" />
                       <th className="px-3 py-2.5">Student</th>
-                      <th className="px-3 py-2.5">Parent / Contact</th>
+                      <th className="px-3 py-2.5">Father's Name / Contact</th>
                       <th className="px-3 py-2.5">Class</th>
                       <th className="px-3 py-2.5">Latest Discussion / Note</th>
                       <th className="px-3 py-2.5">Due Date</th>
@@ -2003,7 +2097,7 @@ const Registrations = () => {
                     <tr>
                       <th className="w-9 py-2.5 pl-4 pr-2" />
                       <th className="px-3 py-2.5">Student</th>
-                      <th className="px-3 py-2.5">Parent / Contact</th>
+                      <th className="px-3 py-2.5">Father's Name / Contact</th>
                       <th className="px-3 py-2.5">Class</th>
                       <th className="px-3 py-2.5">Entrance exam</th>
                       <th className="px-3 py-2.5">Status</th>
@@ -2014,7 +2108,7 @@ const Registrations = () => {
                     <tr>
                       <th className="w-9 py-2.5 pl-4 pr-2" />
                       <th className="px-3 py-2.5">Student</th>
-                      <th className="px-3 py-2.5">Parent / Contact</th>
+                      <th className="px-3 py-2.5">Father's Name / Contact</th>
                       <th className="px-3 py-2.5">Class</th>
                       <th className="px-3 py-2.5">Status</th>
                       <th className="px-3 py-2.5">Last follow-up</th>
@@ -2027,7 +2121,7 @@ const Registrations = () => {
                   {loading ? (
                     <tr>
                       <td colSpan={8} className="px-4 py-12 text-center text-sm text-slate-400">
-                        Loading registrations…
+                        Loading registrationsâ€¦
                       </td>
                     </tr>
                   ) : visibleRegistrations.length === 0 ? (
@@ -2055,9 +2149,9 @@ const Registrations = () => {
                       const statusKey = displayStatusOf(registration, mode);
                       const selected = registration._id === selectedId;
                       const latest = latestFollowUpOf(registration);
-                      const classLabel = `${registration.className || "—"}${
+                      const classLabel = `${registration.className || "â€”"}${
                         registration.sectionName
-                          ? ` · ${registration.sectionName}`
+                          ? ` Â· ${registration.sectionName}`
                           : ""
                       }`;
 
@@ -2072,7 +2166,7 @@ const Registrations = () => {
                                 passed ? "text-emerald-700" : "text-rose-700"
                               }`}
                             >
-                              {registration.entrance.obtainedMarks ?? "—"}/
+                              {registration.entrance.obtainedMarks ?? "â€”"}/
                               {registration.entrance.totalMarks || 100}
                             </div>
                             <div className="mt-0.5 text-[11px] text-slate-400">
@@ -2247,16 +2341,16 @@ const Registrations = () => {
                               {registration.studentName}
                             </div>
                             <div className="mt-0.5 text-[11px] text-slate-500">
-                              {registration.registrationNumber || "—"} ·{" "}
+                              {registration.registrationNumber || "â€”"} Â·{" "}
                               {formatDate(registration.createdAt)}
                             </div>
                           </td>
                           <td className="px-3 py-3 align-middle">
                             <div className="font-medium text-slate-800">
-                              {registration.parentName || "—"}
+                              {registration.parentName || "â€”"}
                             </div>
                             <div className="mt-0.5 text-[11px] text-slate-500">
-                              {registration.parentMobile || "—"}
+                              {registration.parentMobile || "â€”"}
                             </div>
                           </td>
                           <td className="px-3 py-3 align-middle">
@@ -2264,7 +2358,7 @@ const Registrations = () => {
                               {classLabel}
                             </div>
                             <div className="mt-0.5 text-[11px] text-slate-400">
-                              {registration.academicYear || selectedName || "—"}
+                              {registration.academicYear || selectedName || "â€”"}
                             </div>
                           </td>
 
@@ -2279,11 +2373,11 @@ const Registrations = () => {
                           ) : null}
 
                           {subTab === "followups_due" ? (
-                            <td className="max-w-[240px] px-3 py-3 align-middle">
-                              <div className="truncate text-xs font-medium text-slate-800">
-                                {latest?.comment || registration.notes || "—"}
+                            <td className="max-w-[320px] px-3 py-3 align-middle">
+                              <div className="whitespace-normal break-words text-xs font-medium leading-relaxed text-slate-800">
+                                {latest?.comment || registration.notes || "â€”"}
                               </div>
-                              <div className="mt-0.5 truncate text-[11px] text-slate-500">
+                              <div className="mt-0.5 whitespace-normal break-words text-[11px] text-slate-500">
                                 {latest?.addedBy?.name
                                   ? `Logged by ${latest.addedBy.name}`
                                   : sourceText(registration)}
@@ -2296,7 +2390,7 @@ const Registrations = () => {
                                   ? shortDate(latest.createdAt)
                                   : formatDate(registration.createdAt)}
                               </div>
-                              <div className="mt-0.5 max-w-[150px] truncate text-[11px] text-slate-400">
+                              <div className="mt-0.5 max-w-[220px] whitespace-normal break-words text-[11px] text-slate-400">
                                 {latest?.comment || "Registration created"}
                               </div>
                             </td>
@@ -2319,7 +2413,7 @@ const Registrations = () => {
                                       : "text-slate-700"
                                   }`}
                                 >
-                                  {formatDate(nextFollowUpOf(registration))}
+                                  {relativeDateLabel(nextFollowUpOf(registration))}
                                 </span>
                               ) : (
                                 <span className="text-xs text-slate-400">Not set</span>
@@ -2502,7 +2596,7 @@ const Registrations = () => {
                               passed ? "text-emerald-600" : "text-rose-600"
                             }
                           >
-                            {registration.entrance.obtainedMarks ?? "—"}/
+                            {registration.entrance.obtainedMarks ?? "â€”"}/
                             {registration.entrance.totalMarks || 100}
                           </span>{" "}
                           ({passed ? "Passed" : "Below cutoff"})
@@ -2510,7 +2604,7 @@ const Registrations = () => {
                         <div className="mt-0.5 text-[11px] text-slate-500">
                           {formatDate(registration.entrance.examDate)}
                           {registration.entrance.venue
-                            ? ` · ${registration.entrance.venue}`
+                            ? ` Â· ${registration.entrance.venue}`
                             : ""}
                         </div>
                       </div>
@@ -2535,11 +2629,11 @@ const Registrations = () => {
                             ? `, ${registration.entrance.startTime}`
                             : ""}
                           {registration.entrance?.venue
-                            ? ` · ${registration.entrance.venue}`
+                            ? ` Â· ${registration.entrance.venue}`
                             : ""}
                         </div>
                         <div className="mt-0.5 text-[11px] text-slate-500">
-                          Scheduled · Awaiting score entry
+                          Scheduled Â· Awaiting score entry
                         </div>
                       </div>
                       {!isLocked ? (
@@ -2598,7 +2692,7 @@ const Registrations = () => {
                               <StatusBadge status={statusKey} />
                             </div>
                             <div className="mt-0.5 text-[11px] text-slate-500">
-                              {registration.registrationNumber || "—"} ·{" "}
+                              {registration.registrationNumber || "â€”"} Â·{" "}
                               {formatDateTime(registration.createdAt)}
                             </div>
                           </div>
@@ -2666,7 +2760,7 @@ const Registrations = () => {
                       <div className="flex items-center justify-between text-[11px]">
                         <div className="flex items-center gap-1.5 font-semibold text-emerald-700">
                           <span className="flex h-4 w-4 items-center justify-center rounded-full bg-emerald-600 text-[10px] text-white">
-                            ✓
+                            âœ“
                           </span>
                           <span>Registered</span>
                         </div>
@@ -2689,7 +2783,7 @@ const Registrations = () => {
                                 : "border border-slate-300 bg-slate-100 text-slate-500"
                             }`}
                           >
-                            {step2Done ? "✓" : "2"}
+                            {step2Done ? "âœ“" : "2"}
                           </span>
                           <span>{mode === "exam" ? "Exam" : "Follow-up"}</span>
                         </div>
@@ -2712,7 +2806,7 @@ const Registrations = () => {
                                 : "border border-slate-300 bg-slate-100 text-slate-500"
                             }`}
                           >
-                            {step3Done ? "✓" : "3"}
+                            {step3Done ? "âœ“" : "3"}
                           </span>
                           <span>Admitted</span>
                         </div>
@@ -2735,15 +2829,15 @@ const Registrations = () => {
                       </div>
                       <div className="grid grid-cols-2 gap-x-3 gap-y-2.5 text-xs">
                         <div>
-                          <div className="text-[11px] text-slate-400">Parent</div>
+                          <div className="text-[11px] text-slate-400">Father's name</div>
                           <div className="mt-0.5 font-medium text-slate-800">
-                            {registration.parentName || "—"}
+                            {registration.parentName || "â€”"}
                           </div>
                         </div>
                         <div>
                           <div className="text-[11px] text-slate-400">Mobile</div>
                           <div className="mt-0.5 font-medium text-slate-800">
-                            {registration.parentMobile || "—"}
+                            {registration.parentMobile || "â€”"}
                           </div>
                         </div>
                         <div>
@@ -2751,9 +2845,9 @@ const Registrations = () => {
                             Class applied
                           </div>
                           <div className="mt-0.5 font-medium text-slate-800">
-                            {registration.className || "—"}
+                            {registration.className || "â€”"}
                             {registration.sectionName
-                              ? ` · Section ${registration.sectionName}`
+                              ? ` Â· Section ${registration.sectionName}`
                               : ""}
                           </div>
                         </div>
@@ -2763,17 +2857,24 @@ const Registrations = () => {
                           </div>
                           <div className="mt-0.5 font-medium text-slate-800">
                             {mode === "exam"
-                              ? registration.academicYear || selectedName || "—"
+                              ? registration.academicYear || selectedName || "â€”"
                               : registration.stream || "None"}
                           </div>
                         </div>
                         <div className="col-span-2">
                           <div className="text-[11px] text-slate-400">
-                            Source / previous school
+                            Previous school
                           </div>
                           <div className="mt-0.5 font-medium leading-snug text-slate-800">
-                            {registration.previousSchoolName ||
-                              sourceText(registration)}
+                            {registration.previousSchoolName || "â€”"}
+                          </div>
+                        </div>
+                        <div className="col-span-2">
+                          <div className="text-[11px] text-slate-400">
+                            Source
+                          </div>
+                          <div className="mt-0.5 font-medium leading-snug text-slate-800">
+                            {sourceText(registration)}
                           </div>
                         </div>
                       </div>
@@ -2803,7 +2904,7 @@ const Registrations = () => {
                             onClick={() => openNextFollowUp(registration)}
                             className="rounded border border-amber-200 bg-amber-50 px-2 py-0.5 text-[11px] font-semibold text-amber-700 transition hover:bg-amber-100"
                           >
-                            Set Today
+                            Set Tomorrow
                           </button>
                         ) : null}
                       </div>
@@ -2812,7 +2913,7 @@ const Registrations = () => {
                         <div className="flex items-center gap-2 rounded-xl border border-slate-200 bg-slate-50 p-3 text-xs text-slate-500">
                           <FiLock className="h-4 w-4 shrink-0 text-slate-400" />
                           <span>
-                            Follow-ups locked — Student is already{" "}
+                            Follow-ups locked â€” Student is already{" "}
                             <strong>{STATUS_META[statusKey]?.label || statusKey}</strong>.
                           </span>
                         </div>
@@ -2855,7 +2956,7 @@ const Registrations = () => {
                               </label>
                               <select
                                 value={
-                                  followUpAssignees[registration._id] || "Me"
+                                  followUpAssignees[registration._id] || ""
                                 }
                                 onChange={(event) =>
                                   setFollowUpAssignees((prev) => ({
@@ -2865,9 +2966,12 @@ const Registrations = () => {
                                 }
                                 className={`${inputClass} px-2.5 py-1.5`}
                               >
-                                <option value="Me">Me</option>
-                                <option value="Admin">Admin</option>
-                                <option value="Counselor">Counselor</option>
+                                <option value="">Select staff</option>
+                                {assigneeOptions.map((name) => (
+                                  <option key={name} value={name}>
+                                    {name}
+                                  </option>
+                                ))}
                               </select>
                             </div>
                           </div>
@@ -2882,7 +2986,7 @@ const Registrations = () => {
                             className="w-full rounded-lg bg-slate-900 px-3 py-2 text-xs font-semibold text-white shadow-sm transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-50"
                           >
                             {followUpSavingId === registration._id
-                              ? "Saving…"
+                              ? "Savingâ€¦"
                               : "Save follow-up"}
                           </button>
                         </div>
@@ -2915,7 +3019,7 @@ const Registrations = () => {
                             <div className="min-w-0 flex-1">
                               <div className="text-xs font-semibold leading-snug text-slate-800">
                                 {latest.assignedTo
-                                  ? `Follow-up logged · Assigned to ${latest.assignedTo}`
+                                  ? `Follow-up logged Â· Assigned to ${latest.assignedTo}`
                                   : "Follow-up logged"}
                               </div>
                               <p className="mt-0.5 text-[11px] leading-relaxed text-slate-600">
@@ -2923,7 +3027,7 @@ const Registrations = () => {
                               </p>
                               <div className="mt-2 flex flex-wrap items-center justify-between gap-1.5 border-t border-slate-100 pt-1.5 text-[10px] text-slate-400">
                                 <span>
-                                  {latest.addedBy?.name || "System"} ·{" "}
+                                  {latest.addedBy?.name || "System"} Â·{" "}
                                   {formatDateTime(latest.createdAt)}
                                 </span>
                                 {latest.nextFollowUpDate ? (
@@ -2934,7 +3038,7 @@ const Registrations = () => {
                                         : "text-blue-600"
                                     }`}
                                   >
-                                    Next: {formatDate(latest.nextFollowUpDate)}
+                                    Next: {relativeDateLabel(latest.nextFollowUpDate)}
                                   </span>
                                 ) : null}
                               </div>
@@ -2968,7 +3072,7 @@ const Registrations = () => {
           leadInfo
             ? `Linked to lead: ${leadInfo.name}`
             : `Complete the admission inquiry form for Session ${
-                selectedName || "—"
+                selectedName || "â€”"
               }`
         }
         width="max-w-3xl"
@@ -3158,7 +3262,7 @@ const Registrations = () => {
         width="max-w-xl"
       >
         {linkModal.loading || !linkModal.data ? (
-          <p className="py-8 text-center text-sm text-slate-400">Loading…</p>
+          <p className="py-8 text-center text-sm text-slate-400">Loadingâ€¦</p>
         ) : (
           <div className="space-y-4 text-xs">
             <div className="flex items-center justify-between rounded-xl border border-slate-200 px-3 py-2.5">
@@ -3310,7 +3414,7 @@ const Registrations = () => {
                 disabled={linkModal.saving}
                 className={btnPrimary}
               >
-                {linkModal.saving ? "Saving…" : "Save changes"}
+                {linkModal.saving ? "Savingâ€¦" : "Save changes"}
               </button>
             </div>
           </div>
@@ -3344,7 +3448,7 @@ const Registrations = () => {
               className={btnPrimary}
             >
               {examSaving
-                ? "Saving…"
+                ? "Savingâ€¦"
                 : examModal.mode === "edit"
                   ? "Update Exam"
                   : "Schedule Exam"}
@@ -3506,7 +3610,7 @@ const Registrations = () => {
       >
         {examsLoading ? (
           <p className="py-8 text-center text-sm text-slate-400">
-            Loading entrance exams…
+            Loading entrance examsâ€¦
           </p>
         ) : exams.length === 0 ? (
           <div className="rounded-xl border border-dashed border-slate-200 px-5 py-10 text-center">
@@ -3545,12 +3649,12 @@ const Registrations = () => {
                       </span>
                     </div>
                     <p className="mt-1 text-xs text-slate-500">
-                      {exam.className} · {formatDate(exam.examDate)} ·{" "}
-                      {exam.startTime || "—"}–{exam.endTime || "—"}
-                      {exam.venue ? ` · ${exam.venue}` : ""}
+                      {exam.className} Â· {formatDate(exam.examDate)} Â·{" "}
+                      {exam.startTime || "â€”"}â€“{exam.endTime || "â€”"}
+                      {exam.venue ? ` Â· ${exam.venue}` : ""}
                     </p>
                     <p className="mt-0.5 text-[11px] text-slate-400">
-                      Total {exam.totalMarks} · Passing {exam.passingMarks} ·{" "}
+                      Total {exam.totalMarks} Â· Passing {exam.passingMarks} Â·{" "}
                       {exam.counts?.total || 0} candidate
                       {(exam.counts?.total || 0) === 1 ? "" : "s"} (
                       {exam.counts?.passed || 0} passed,{" "}
@@ -3609,19 +3713,19 @@ const Registrations = () => {
             candidates: [],
           })
         }
-        title={marksModal.exam ? `Marks · ${marksModal.exam.name}` : "Entrance marks"}
+        title={marksModal.exam ? `Marks Â· ${marksModal.exam.name}` : "Entrance marks"}
         subtitle={
           marksModal.exam
-            ? `${marksModal.exam.className} · ${formatDate(
+            ? `${marksModal.exam.className} Â· ${formatDate(
                 marksModal.exam.examDate,
-              )} · Passing ${marksModal.exam.passingMarks}/${marksModal.exam.totalMarks}`
+              )} Â· Passing ${marksModal.exam.passingMarks}/${marksModal.exam.totalMarks}`
             : ""
         }
         width="max-w-4xl"
       >
         {marksModal.loading ? (
           <p className="py-8 text-center text-sm text-slate-400">
-            Loading candidates…
+            Loading candidatesâ€¦
           </p>
         ) : marksModal.candidates.length === 0 ? (
           <p className="py-8 text-center text-sm text-slate-400">
@@ -3677,7 +3781,7 @@ const Registrations = () => {
                               }))
                             }
                             className={`${inputClass} w-24`}
-                            placeholder="—"
+                            placeholder="â€”"
                           />
                         </td>
                         <td className="px-3 py-2">
@@ -3728,7 +3832,7 @@ const Registrations = () => {
                 disabled={marksModal.saving}
                 className={btnSecondary}
               >
-                {marksModal.saving ? "Saving…" : "Save marks"}
+                {marksModal.saving ? "Savingâ€¦" : "Save marks"}
               </button>
               <button
                 type="button"
@@ -3817,7 +3921,7 @@ const Registrations = () => {
         }
       >
         {followUpHistory.loading ? (
-          <p className="py-6 text-center text-sm text-slate-400">Loading…</p>
+          <p className="py-6 text-center text-sm text-slate-400">Loadingâ€¦</p>
         ) : followUpHistory.followUps.length === 0 ? (
           <p className="py-6 text-center text-sm text-slate-400">
             No follow-up feedback yet.
@@ -3856,7 +3960,7 @@ const Registrations = () => {
                       <div className="flex items-center gap-2">
                         <span className="text-xs font-bold text-slate-900">
                           {entry.assignedTo
-                            ? `Follow-up logged · Assigned to ${entry.assignedTo}`
+                            ? `Follow-up logged Â· Assigned to ${entry.assignedTo}`
                             : "Follow-up logged"}
                         </span>
                         {index === 0 ? (
@@ -3878,7 +3982,7 @@ const Registrations = () => {
                         <strong className="text-slate-700">
                           {entry.addedBy?.name || "Unknown"}
                         </strong>{" "}
-                        · {formatDateTime(entry.createdAt)}
+                        Â· {formatDateTime(entry.createdAt)}
                       </span>
                       {entry.nextFollowUpDate ? (
                         <span
@@ -3888,7 +3992,7 @@ const Registrations = () => {
                               : "text-blue-600"
                           }`}
                         >
-                          Next follow-up: {formatDate(entry.nextFollowUpDate)}
+                          Next follow-up: {relativeDateLabel(entry.nextFollowUpDate)}
                         </span>
                       ) : null}
                     </div>
@@ -3906,9 +4010,9 @@ const Registrations = () => {
         title="Student Profile"
         subtitle={
           viewModal.data?.registrationNumber
-            ? `${viewModal.data.registrationNumber} · Registered ${formatDate(
+            ? `${viewModal.data.registrationNumber} Â· Registered ${formatDate(
                 viewModal.data.createdAt,
-              )} · Session ${viewModal.data.academicYear || "—"}`
+              )} Â· Session ${viewModal.data.academicYear || "â€”"}`
             : "Filled registration details"
         }
         width="max-w-3xl"
@@ -3948,7 +4052,7 @@ const Registrations = () => {
         }
       >
         {viewModal.loading || !viewModal.data ? (
-          <p className="py-8 text-center text-sm text-slate-400">Loading…</p>
+          <p className="py-8 text-center text-sm text-slate-400">Loadingâ€¦</p>
         ) : (
           <div id="registration-print-area" className="space-y-4 text-sm">
             <div className="flex items-center gap-3">
@@ -3977,35 +4081,20 @@ const Registrations = () => {
             </div>
 
             {formSteps.map((step, stepIndex) => {
-              const removedKeys = new Set(step.removedFieldKeys || []);
-              let fields = (step.fields || []).filter(
+              const removed = new Set(step.removedFieldKeys || []);
+              const stepFields = (step.fields || []).filter(
                 (field) =>
                   field &&
                   field.visible !== false &&
-                  !removedKeys.has(field.key),
+                  !removed.has(field.key),
               );
-              // Always show Aadhaar in the Student Details segment, even when a
-              // school's saved form config predates the field.
-              if (
-                stepIndex === 0 &&
-                !fields.some((field) => field.key === "aadhaarNumber")
-              ) {
-                fields = [
-                  ...fields.slice(0, 3),
-                  {
-                    key: "aadhaarNumber",
-                    label: "Aadhaar Number",
-                    visible: true,
-                  },
-                  ...fields.slice(3),
-                ];
-              }
-              if (fields.length === 0) return null;
-
-              const data = viewModal.data;
-              const valueFor = (field) => {
+              if (stepFields.length === 0) return null;
+              const title =
+                step.title || `${stepIndex + 1}. Section`;
+              const getVal = (field) => {
                 const key = field.key;
-                const values = {
+                const data = viewModal.data;
+                const map = {
                   studentName: data.studentName,
                   dob: formatDate(data.dob),
                   gender: data.gender,
@@ -4017,9 +4106,7 @@ const Registrations = () => {
                   parentMobile: data.parentMobile,
                   alternateMobile: data.alternateMobile,
                   parentEmail: data.parentEmail,
-                  classId: `${data.className || "—"}${
-                    data.sectionName ? ` · Section ${data.sectionName}` : ""
-                  }`,
+                  classId: `${data.className || "â€”"}${data.sectionName ? ` Â· Section ${data.sectionName}` : ""}`,
                   streamId: data.stream,
                   previousSchoolName: data.previousSchoolName,
                   address: data.address,
@@ -4030,31 +4117,30 @@ const Registrations = () => {
                   nextFollowUpDate: formatDate(data.nextFollowUpDate),
                   notes: data.notes,
                 };
-                if (Object.prototype.hasOwnProperty.call(values, key)) {
-                  return values[key];
+                if (Object.prototype.hasOwnProperty.call(map, key)) {
+                  return map[key];
                 }
-                const custom = (data.customFields || []).find(
-                  (item) => item && item.key === key,
+                const cf = (data.customFields || []).find(
+                  (c) => c && c.key === key,
                 );
-                return custom ? custom.value : "";
+                return cf ? cf.value : "";
               };
-
               return (
                 <div
                   key={step.key || stepIndex}
                   className="rounded-xl border border-slate-200 bg-slate-50/40 p-4"
                 >
                   <h4 className="mb-3 text-[11px] font-bold uppercase tracking-wider text-slate-500">
-                    {step.title || `${stepIndex + 1}. Section`}
+                    {title}
                   </h4>
                   <div className="grid grid-cols-2 gap-3 text-xs sm:grid-cols-3">
-                    {fields.map((field) => (
+                    {stepFields.map((field) => (
                       <div key={field.key}>
                         <span className="block text-slate-400">
                           {field.label || field.key}
                         </span>
                         <span className="font-semibold text-slate-800">
-                          {valueFor(field) || "—"}
+                          {getVal(field) || "—"}
                         </span>
                       </div>
                     ))}
@@ -4070,13 +4156,22 @@ const Registrations = () => {
                   Additional Fields
                 </h4>
                 <div className="grid grid-cols-2 gap-3 text-xs sm:grid-cols-3">
-                  {viewModal.data.customFields.map((field) => (
+                  {viewModal.data.customFields
+                    .filter((field) => {
+                      if (!field) return false;
+                      const key = String(field.key || "").toLowerCase();
+                      const label = String(field.label || "").toLowerCase();
+                      if (key.includes("mother") || label.includes("mother")) return false;
+                      if (key.includes("aadhaar") || key.includes("aadhar") || label.includes("aadhaar") || label.includes("aadhar")) return false;
+                      return true;
+                    })
+                    .map((field) => (
                     <div key={field.key}>
                       <span className="block text-slate-400">
                         {field.label || field.key}
                       </span>
                       <span className="font-semibold text-slate-800">
-                        {field.value || "—"}
+                        {field.value || "â€”"}
                       </span>
                     </div>
                   ))}
@@ -4183,3 +4278,4 @@ const Registrations = () => {
 };
 
 export default Registrations;
+

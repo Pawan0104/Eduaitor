@@ -7,7 +7,7 @@ const getSchoolId = (req) => req.user?.school_id;
  * Bump whenever the built-in admission layout changes in a way that must
  * override previously saved steps (labels, field set, section order).
  */
-const ADMISSION_DEFAULTS_VERSION = 6;
+const ADMISSION_DEFAULTS_VERSION = 3;
 
 /**
  * Prefer findOneAndUpdate($set) over document.save().

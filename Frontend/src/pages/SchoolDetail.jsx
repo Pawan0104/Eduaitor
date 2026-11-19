@@ -2456,7 +2456,7 @@ export default function SchoolDetail() {
 
       {/* MANAGE ADMIN MODAL */}
       {showAdminModal && ws && (
-        <div className="fixed inset-0 z-[70] bg-black/40 flex items-center justify-center p-4">
+        <div className="fixed inset-0 z-[70] bg-black/40 flex items-center justify-center p-4 overflow-y-auto">
           <div className="bg-white rounded-2xl w-full max-w-md p-6 shadow-xl max-h-[90vh] overflow-y-auto">
             <h2 className="text-lg font-semibold text-slate-900 mb-1">
               Manage School Admin

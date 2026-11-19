@@ -156,8 +156,8 @@ const TeacherView = () => {
       {/* MESSAGE POPUP */}
 
       {messageOpen && (
-        <div className="fixed inset-0 bg-black/40 flex items-center justify-center p-4">
-          <div className="bg-[rgb(var(--surface))]  text-[rgb(var(--text))]  rounded-xl p-6 w-full max-w-md sm:max-w-lg space-y-4">
+        <div className="fixed inset-0 bg-black/40 flex items-center justify-center p-4 overflow-y-auto">
+          <div className="bg-[rgb(var(--surface))] text-[rgb(var(--text))] rounded-xl p-6 w-full max-w-md sm:max-w-lg space-y-4 my-auto max-h-[min(92vh,880px)] overflow-y-auto">
             <h3 className="text-lg font-semibold">Send Message</h3>
 
             <p className="text-sm text-[rgb(var(--text))]">To: {teacher.fullName}</p>

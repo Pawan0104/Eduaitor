@@ -516,7 +516,7 @@ if (form.staffRole === "other" && !form.staffRoleCustom.trim())
       {/* ── TYPE PICKER — teaching vs non-teaching ─── */}
       {showTypePicker && (
         <div className="fixed inset-0 z-50 flex items-center justify-center
-          bg-black/40 p-4" onClick={() => setShowTypePicker(false)}>
+          bg-black/40 p-4 overflow-y-auto" onClick={() => setShowTypePicker(false)}>
           <div
             className="w-full max-w-lg bg-[rgb(var(--surface))]
               border border-[rgb(var(--border))] rounded-2xl shadow-xl p-6"
@@ -926,7 +926,7 @@ if (form.staffRole === "other" && !form.staffRoleCustom.trim())
       ══════════════════════════════════════════════ */}
       {showFormModal && (
         <div className="fixed inset-0 bg-black/50 flex items-center
-          justify-center z-50 p-4">
+          justify-center z-50 p-4 overflow-y-auto">
           <div className="bg-[rgb(var(--surface))] text-[rgb(var(--text))]
             rounded-2xl shadow-2xl w-full max-w-2xl
             max-h-[94vh] flex flex-col">
@@ -1349,7 +1349,7 @@ if (form.staffRole === "other" && !form.staffRoleCustom.trim())
       ══════════════════════════════════════════════ */}
       {showViewModal && viewStaff && (
         <div className="fixed inset-0 bg-black/50 flex items-center
-          justify-center z-50 p-4">
+          justify-center z-50 p-4 overflow-y-auto">
           <div className="bg-[rgb(var(--surface))] text-[rgb(var(--text))]
             rounded-2xl shadow-2xl w-full max-w-lg
             max-h-[92vh] flex flex-col">
@@ -1529,7 +1529,7 @@ if (form.staffRole === "other" && !form.staffRoleCustom.trim())
       ══════════════════════════════════════════════ */}
       {confirmModal && (
         <div className="fixed inset-0 bg-black/50 flex items-center
-          justify-center z-[60] p-4">
+          justify-center z-[60] p-4 overflow-y-auto">
           <div className="bg-[rgb(var(--surface))] text-[rgb(var(--text))]
             rounded-2xl p-6 w-full max-w-sm shadow-2xl">
             <p className="text-base font-semibold mb-1">Are you sure?</p>

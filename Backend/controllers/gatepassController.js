@@ -125,9 +125,16 @@ export const createGatePass = async (req, res, next) => {
       await createNotificationHelper({
         title:            "New Gate Pass Request",
         message:          `A gate pass has been requested for ${student.firstName} ${student.lastName}.`,
-        notificationType: "general",
+        notificationType: "gatepass",
+        eventType:        "PARENT.GATE_PASS",
         schoolId,
         targets,
+        systemKey: `gatepass:request:${student._id}:${Date.now()}`,
+        payloadExtras: {
+          studentId: student._id,
+          studentName: `${student.firstName} ${student.lastName}`.trim(),
+          message: `Gate pass requested for ${student.firstName} ${student.lastName}.`,
+        },
       });
     } catch (notifErr) {
       // notification failure should not break gatepass creation
@@ -390,7 +397,8 @@ export const actionGatePass = async (req, res, next) => {
       await createNotificationHelper({
         title:            `Gate Pass ${actionWord}`,
         message:          `Gate pass for ${studentName} has been ${action}${action === "rejected" ? `. Reason: ${note}` : "."}`,
-        notificationType: "general",
+        notificationType: "gatepass",
+        eventType:        "PARENT.GATE_PASS",
         schoolId,
         targets: [
           {
@@ -399,6 +407,13 @@ export const actionGatePass = async (req, res, next) => {
             schoolId,
           },
         ],
+        systemKey: `gatepass:${gatepass._id}:${action}`,
+        payloadExtras: {
+          studentId: gatepass.studentId._id,
+          studentName,
+          message: `Gate pass ${action}`,
+          status: action,
+        },
       });
     } catch (notifErr) {
       console.error("Notification error:", notifErr);
@@ -472,9 +487,12 @@ export const cancelGatePass = async (req, res, next) => {
       await createNotificationHelper({
         title:            "Gate Pass Cancelled",
         message:          `Gate pass request for ${studentName} has been cancelled by parent.`,
-        notificationType: "general",
+        notificationType: "gatepass",
+        eventType:        "PARENT.GATE_PASS",
         schoolId,
         targets,
+        systemKey: `gatepass:${gatepass._id}:cancelled`,
+        payloadExtras: { studentName, message: "Gate pass cancelled", status: "cancelled" },
       });
     } catch (notifErr) {
       console.error("Notification error:", notifErr);

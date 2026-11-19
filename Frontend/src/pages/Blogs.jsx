@@ -43,11 +43,11 @@ function ShareSheet({ shareUrl, onClose }) {
 
   return (
     <div
-      className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4"
+      className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4 overflow-y-auto"
       onClick={onClose}
     >
       <div
-        className="w-full max-w-sm rounded-2xl shadow-2xl overflow-hidden"
+        className="w-full max-w-sm rounded-2xl shadow-2xl overflow-hidden my-auto max-h-[min(92vh,880px)] overflow-y-auto"
         style={{ background: "rgb(var(--bg))" }}
         onClick={(e) => e.stopPropagation()}
       >
@@ -502,7 +502,7 @@ function BlogFormModal({ blog, isStudent, onClose, onSave }) {
   };
 
   return (
-    <div className="fixed inset-0 bg-black/50 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4">
+    <div className="fixed inset-0 bg-black/50 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 overflow-y-auto">
       <div
         className="rounded-t-2xl sm:rounded-2xl w-full sm:max-w-lg max-h-[92vh] overflow-y-auto"
         style={{ background: "rgb(var(--bg))" }}
@@ -714,9 +714,9 @@ function BlogFormModal({ blog, isStudent, onClose, onSave }) {
 // ─── Delete Modal ─────────────────────────────────────────────
 function DeleteModal({ onCancel, onConfirm }) {
   return (
-    <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+    <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4 overflow-y-auto">
       <div
-        className="rounded-2xl p-6 max-w-sm w-full shadow-xl"
+        className="rounded-2xl p-6 max-w-sm w-full shadow-xl my-auto max-h-[min(92vh,880px)] overflow-y-auto"
         style={{ background: "rgb(var(--bg))" }}
       >
         <div className="w-12 h-12 bg-red-50 rounded-full flex items-center justify-center mx-auto mb-4">

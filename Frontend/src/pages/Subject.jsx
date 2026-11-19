@@ -316,8 +316,8 @@ export default function Subject() {
 
       {/* ════════ Add / Edit Modal ════════ */}
       {showModal && (
-        <div className="fixed inset-0 z-50  flex items-center justify-center p-4">
-          <div className="bg-[rgb(var(--surface))] rounded-2xl w-full max-w-md shadow-xl">
+        <div className="fixed inset-0 z-50  flex items-center justify-center p-4 overflow-y-auto">
+          <div className="bg-[rgb(var(--surface))] rounded-2xl w-full max-w-md shadow-xl my-auto max-h-[min(92vh,880px)] overflow-y-auto">
             <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100">
               <h2 className="text-lg font-bold text-[rgb(var(--text))]">
                 {editing ? "Edit Subject" : "Add Subject"}
@@ -446,8 +446,8 @@ function ConfirmPopup({
   disabled = false,
 }) {
   return (
-    <div className="fixed inset-0 z-60  flex items-center justify-center p-4">
-      <div className="bg-[rgb(var(--surface))] rounded-2xl w-full max-w-sm shadow-xl overflow-hidden">
+    <div className="fixed inset-0 z-60  flex items-center justify-center p-4 overflow-y-auto">
+      <div className="bg-[rgb(var(--surface))] rounded-2xl w-full max-w-sm shadow-xl overflow-hidden my-auto max-h-[min(92vh,880px)] overflow-y-auto">
         <div className={`h-1.5 w-full ${strip}`} />
         <div className="p-6 text-center">
           <div

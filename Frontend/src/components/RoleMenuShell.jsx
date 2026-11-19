@@ -270,11 +270,11 @@ export function ExitPopup({ onConfirm, onCancel }) {
   const { t } = useLanguage();
   return (
     <div
-      className="fixed inset-0 z-50 flex items-end justify-center"
+      className="fixed inset-0 z-50 flex items-end justify-center overflow-y-auto"
       style={{ background: "rgba(0,0,0,0.45)" }}
     >
       <div
-        className="w-full max-w-lg rounded-t-3xl px-6 pt-3 pb-10"
+        className="w-full max-w-lg rounded-t-3xl px-6 pt-3 pb-10 max-h-[min(92vh,880px)] overflow-y-auto"
         style={{ background: "rgb(var(--bg))" }}
       >
         <div
@@ -836,7 +836,7 @@ export function MenuStylePicker({ className = "" }) {
     open &&
     createPortal(
       <div
-        className="fixed inset-0 z-[200] flex items-end justify-center sm:items-center p-3"
+        className="fixed inset-0 z-[200] flex items-end justify-center sm:items-center p-3 overflow-y-auto"
         style={{
           background: "rgba(15, 23, 42, 0.45)",
           paddingTop: "max(0.75rem, env(safe-area-inset-top))",
@@ -1012,7 +1012,7 @@ export function MenuPinEditor({
 
   return createPortal(
     <div
-      className="fixed inset-0 z-[120] flex items-end justify-center"
+      className="fixed inset-0 z-[120] flex items-end justify-center overflow-y-auto"
       role="dialog"
       aria-modal="true"
     >

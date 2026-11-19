@@ -53,6 +53,7 @@ const registrationSchema = new mongoose.Schema(
     },
     bloodGroup: { type: String, default: "" },
     category: { type: String, default: "" },
+    aadhaarNumber: { type: String, default: "", trim: true },
     motherName: { type: String, default: "" },
 
     classId: {

@@ -785,8 +785,8 @@ export default function ExamPapers() {
       )}
 
       {reviewModal && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-xl shadow-xl max-w-lg w-full p-6">
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4 overflow-y-auto">
+          <div className="bg-white rounded-xl shadow-xl max-w-lg w-full p-6 my-auto max-h-[min(92vh,880px)] overflow-y-auto">
             <h3 className="text-lg font-bold mb-2">
               {reviewAction === "approve" ? "✅ Approve Paper" : reviewAction === "reject" ? "❌ Reject Paper" : "📝 Send for Revision"}
             </h3>
@@ -1641,7 +1641,7 @@ function CreateWizard({
       </div>
 
       {bankOpen && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4 overflow-y-auto">
           <div className="bg-white rounded-xl shadow-xl max-w-3xl w-full max-h-[85vh] flex flex-col">
             <div className="flex items-center justify-between px-6 py-4 border-b">
               <h3 className="text-lg font-bold text-gray-900">Question Bank — {paper.className ? `Class ${paper.className}` : ""}{paper.subjectName ? ` / ${paper.subjectName}` : ""}</h3>

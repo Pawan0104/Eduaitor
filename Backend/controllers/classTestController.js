@@ -88,6 +88,7 @@ const notifyClassTestScheduled = async ({
       ? `${subjectName} class test has been updated to ${dateLabel}${timeLabel} by ${teacherName}.`
       : `${subjectName} class test is scheduled on ${dateLabel}${timeLabel} (Teacher: ${teacherName}).`,
     notificationType: "exam",
+    eventType: "EXAMS.SCHEDULE_PUBLISHED",
     targets: [
       {
         type: "class",
@@ -100,6 +101,7 @@ const notifyClassTestScheduled = async ({
     schoolId,
     createdBy,
     startingDate: testDate ? new Date(testDate) : null,
+    systemKey: `classtest:${schoolId}:${classId}:${sectionId || "all"}:${subjectName}:${dateLabel}:${updated ? "upd" : "new"}`,
   });
 };
 
@@ -425,6 +427,7 @@ export const submitClassTestMarks = async (req, res) => {
       title: "Class test results published",
       message: `${subjectDoc?.name || "Subject"} class test results are now available.`,
       notificationType: "result",
+      eventType: "EXAMS.RESULT_PUBLISHED",
       createdBy: req.user._id,
       schoolId,
       targets: [
@@ -435,6 +438,7 @@ export const submitClassTestMarks = async (req, res) => {
           classes: [{ classId: test.className, sectionId: test.sectionId || null }],
         },
       ],
+      systemKey: `classtest-result:${id}:published`,
     });
 
     res.json({ message: "Marks saved successfully", saved: results.length });

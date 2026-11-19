@@ -90,14 +90,14 @@ export default function OptionalPasswordChangeModal() {
 
   return (
     <div
-      className="fixed inset-0 z-[10050] flex items-center justify-center p-4"
+      className="fixed inset-0 z-[10050] flex items-center justify-center p-4 overflow-y-auto"
       style={{ background: "rgba(15, 23, 42, 0.55)" }}
       role="dialog"
       aria-modal="true"
       aria-labelledby="optional-pw-title"
     >
       <div
-        className="w-full max-w-md rounded-2xl shadow-2xl border p-6"
+        className="w-full max-w-md rounded-2xl shadow-2xl border p-6 my-auto max-h-[min(92vh,880px)] overflow-y-auto"
         style={{
           background: "rgb(var(--card-bg, 255 255 255))",
           borderColor: "rgba(148, 163, 184, 0.35)",

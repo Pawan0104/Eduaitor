@@ -262,7 +262,7 @@ export default function SchoolDataImport({ school, onClose, onDone }) {
     : 0;
 
   return (
-    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[90] p-4">
+    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[90] p-4 overflow-y-auto">
       <div className="bg-[rgb(var(--surface))] text-[rgb(var(--text))] rounded-2xl
         shadow-xl w-full max-w-2xl max-h-[92vh] flex flex-col">
         {/* header */}

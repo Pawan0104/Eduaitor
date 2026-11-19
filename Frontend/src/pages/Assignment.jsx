@@ -1472,12 +1472,12 @@ function ConfirmModal({
     red: "bg-red-500 hover:bg-red-600",
   };
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 overflow-y-auto">
       <div
         className="absolute inset-0 bg-black/40 backdrop-blur-sm"
         onClick={onCancel}
       />
-      <div className="relative bg-[rgb(var(--surface))]  rounded-2xl shadow-2xl w-full max-w-sm p-6 animate-modal">
+      <div className="relative bg-[rgb(var(--surface))] rounded-2xl shadow-2xl w-full max-w-sm p-6 animate-modal my-auto max-h-[min(92vh,880px)] overflow-y-auto">
         <div
           className={`w-12 h-12 rounded-full flex items-center justify-center mb-4 mx-auto ${confirmColor === "red" ? "bg-red-100" : "bg-indigo-100"}`}
         >
@@ -1511,7 +1511,7 @@ function ConfirmModal({
 function ViewModal({ assignment, onClose }) {
   if (!assignment) return null;
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 overflow-y-auto">
       <div
         className="absolute inset-0 bg-black/40 backdrop-blur-sm"
         onClick={onClose}

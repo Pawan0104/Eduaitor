@@ -283,6 +283,7 @@ export const submitPublicRegistration = async (req, res) => {
         ? body.gender
         : "",
       bloodGroup: sanitize(body.bloodGroup, 10),
+      aadhaarNumber: sanitize(body.aadhaarNumber, 20),
       classId: cls._id,
       className: cls.name,
       sectionId: section?._id || null,

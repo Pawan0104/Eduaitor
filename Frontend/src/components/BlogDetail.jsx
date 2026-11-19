@@ -126,12 +126,12 @@ function ShareSheet({ shareUrl, onClose }) {
   return (
     // dark backdrop
     <div
-      className="fixed inset-0 bg-black/50 z-50 flex items-end justify-center"
+      className="fixed inset-0 bg-black/50 z-50 flex items-end justify-center overflow-y-auto"
       onClick={onClose} // tap outside to close
     >
       {/* sheet — stop click from closing when tapping inside */}
       <div
-        className="bg-white w-full max-w-md rounded-t-2xl p-5 pb-8"
+        className="bg-white w-full max-w-md rounded-t-2xl p-5 pb-8 max-h-[min(92vh,880px)] overflow-y-auto"
         onClick={(e) => e.stopPropagation()}
       >
         {/* handle bar */}

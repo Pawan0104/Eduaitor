@@ -3,6 +3,7 @@ import upload, { handleUploadError } from "../middlewares/upload.js";import { au
 import {
   createStudent,
   getStudents,
+  getStudentDirectoryStats,
   getStudent,
   updateStudent,
   deleteStudent,
@@ -63,6 +64,7 @@ router.get("/", authMiddleware, getStudents);
 router.get("/teacher/my-students", authMiddleware, getStudentsByTeacher);
 
 // Must stay above `/:id` so Express does not treat these as ids.
+router.get("/stats", authMiddleware, getStudentDirectoryStats);
 router.get("/documents", authMiddleware, getStudentDocuments);
 router.get("/next-roll-no", authMiddleware, getNextRollNo);
 router.get(

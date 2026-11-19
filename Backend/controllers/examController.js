@@ -62,6 +62,7 @@ const notifyExamScheduled = async ({
       ? `${subjectName} exam has been updated to ${dateLabel}${timeLabel} by ${teacherName}. Parents and students, please note the change.`
       : `${subjectName} exam is scheduled on ${dateLabel}${timeLabel} (Teacher: ${teacherName}). Parents and students, please prepare accordingly.`,
     notificationType: "exam",
+    eventType: "EXAMS.SCHEDULE_PUBLISHED",
     targets: [
       {
         type: "class",
@@ -74,6 +75,8 @@ const notifyExamScheduled = async ({
     schoolId,
     createdBy,
     startingDate: examDate ? new Date(examDate) : null,
+    systemKey: `exam-schedule:${schoolId}:${classId}:${sectionId || "all"}:${subjectName}:${dateLabel}:${updated ? "upd" : "new"}`,
+    payloadExtras: { examName: subjectName, date: dateLabel, classId },
   });
 };
 
@@ -607,6 +610,7 @@ export const submitMarks = async (req, res) => {
       title: "Exam results published",
       message: `${subjectName} results are now available. Parents and students can view marks and report card.`,
       notificationType: "result",
+      eventType: "EXAMS.RESULT_PUBLISHED",
       createdBy: req.user._id,
       schoolId,
       targets: [
@@ -617,6 +621,8 @@ export const submitMarks = async (req, res) => {
           classes: [{ classId, sectionId }],
         },
       ],
+      systemKey: `exam-result:${exam._id}:published`,
+      payloadExtras: { examName: subjectName, classId },
     });
 
     res.status(200).json({

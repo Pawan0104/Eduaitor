@@ -802,7 +802,7 @@ function FeeCollection() {
       </div>
 
       {isModalOpen && selectedStudent && (
-        <div className="fixed inset-0 z-999 flex items-center justify-center p-3 sm:p-4">
+        <div className="fixed inset-0 z-999 flex items-center justify-center p-3 sm:p-4 overflow-y-auto">
           <div
             className="absolute inset-0 backdrop-blur-[3px] bg-black/20"
             onClick={() => setIsModalOpen(false)}

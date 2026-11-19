@@ -305,8 +305,8 @@ export default function ParentHostelVisit() {
       </div>
 
       {rejectId && (
-        <div className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center p-4">
-          <div className="bg-[rgb(var(--surface))] rounded-2xl w-full max-w-sm p-5 shadow-xl">
+        <div className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center p-4 overflow-y-auto">
+          <div className="bg-[rgb(var(--surface))] rounded-2xl w-full max-w-sm p-5 shadow-xl my-auto max-h-[min(92vh,880px)] overflow-y-auto">
             <h3 className="font-bold text-lg mb-2">Reject visitor?</h3>
             <p className="text-sm text-[rgb(var(--text-muted))] mb-3">
               This request will be rejected immediately. It will not go to the

@@ -228,37 +228,46 @@ export const saveClassAttendance = async (req, res) => {
     // ── Grouped Notifications (Absent, Late, Present) ─────────────────────
     const notificationConfig = {
       Absent: {
-        title: "Absent Alert 🚫",
-        message: "You were marked absent today in class attendance. Please check with your class teacher."
+        eventType: "ATTENDANCE.ABSENT_MARKED",
+        title: "Absent Alert",
+        message: "You were marked absent today in class attendance. Please check with your class teacher.",
       },
       Late: {
-        title: "Late Arrival Notice ⏰",
-        message: "You were marked late for class today. Please ensure timely arrival."
+        eventType: "ATTENDANCE.LATE_MARKED",
+        title: "Late Arrival Notice",
+        message: "You were marked late for class today. Please ensure timely arrival.",
       },
       Present: {
-        title: "Attendance Marked ✅",
-        message: "You were marked present for class today."
-      }
+        eventType: "ATTENDANCE.PRESENT_MARKED",
+        title: "Attendance Marked",
+        message: "You were marked present for class today.",
+      },
     };
 
     for (const status of ["Absent", "Late", "Present"]) {
       const studentsWithStatus = saved.filter((s) => s.status === status);
-      
-      if (studentsWithStatus.length > 0) {
-        const targets = studentsWithStatus.map((s) => ({
-          type: "student",
-          studentId: s.studentId,
-          classId,
-          sectionId,
-        }));
-
+      for (const s of studentsWithStatus) {
         await createNotificationHelper({
           title: notificationConfig[status].title,
           message: notificationConfig[status].message,
           notificationType: "attendance",
+          eventType: notificationConfig[status].eventType,
           createdBy: req.user._id,
           schoolId,
-          targets,
+          targets: [
+            {
+              type: "student",
+              studentId: s.studentId,
+              classId,
+              sectionId,
+            },
+          ],
+          systemKey: `attendance:${s._id}:${status}`,
+          payloadExtras: {
+            studentId: s.studentId,
+            classId,
+            date: parsedDate?.toISOString?.() || String(date),
+          },
         });
       }
     }
@@ -349,37 +358,42 @@ export const updateClassAttendance = async (req, res) => {
     // We categorize incoming status payloads so updated notifications are triggered
     const notificationConfig = {
       Absent: {
-        title: "Attendance Updated: Absent 🚫",
-        message: "Your attendance status has been updated to Absent. Please check with your class teacher if this is an error."
+        eventType: "ATTENDANCE.ABSENT_MARKED",
+        title: "Attendance Updated: Absent",
+        message: "Your attendance status has been updated to Absent. Please check with your class teacher if this is an error.",
       },
       Late: {
-        title: "Attendance Updated: Late ⏰",
-        message: "Your attendance status has been updated to Late."
+        eventType: "ATTENDANCE.LATE_MARKED",
+        title: "Attendance Updated: Late",
+        message: "Your attendance status has been updated to Late.",
       },
       Present: {
-        title: "Attendance Updated: Present ✅",
-        message: "Your attendance status has been updated to Present."
-      }
+        eventType: "ATTENDANCE.PRESENT_MARKED",
+        title: "Attendance Updated: Present",
+        message: "Your attendance status has been updated to Present.",
+      },
     };
 
     for (const status of ["Absent", "Late", "Present"]) {
       const studentsWithStatus = records.filter((r) => r.status === status);
-
-      if (studentsWithStatus.length > 0) {
-        const targets = studentsWithStatus.map((s) => ({
-          type: "student",
-          studentId: s.studentId,
-          classId,
-          sectionId,
-        }));
-
+      for (const s of studentsWithStatus) {
         await createNotificationHelper({
           title: notificationConfig[status].title,
           message: notificationConfig[status].message,
           notificationType: "attendance",
+          eventType: notificationConfig[status].eventType,
           createdBy: req.user._id,
           schoolId,
-          targets,
+          targets: [
+            {
+              type: "student",
+              studentId: s.studentId,
+              classId,
+              sectionId,
+            },
+          ],
+          systemKey: `attendance-update:${s.attendanceId || s.studentId}:${date}:${status}`,
+          payloadExtras: { studentId: s.studentId, classId, date },
         });
       }
     }

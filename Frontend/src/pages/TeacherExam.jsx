@@ -941,7 +941,7 @@ export default function TeacherExam() {
       )}
 
       {studentLoading && (
-        <div className="fixed inset-0 bg-[rgb(var(--surface))] backdrop-blur-sm z-40 flex items-center justify-center">
+        <div className="fixed inset-0 bg-[rgb(var(--surface))] backdrop-blur-sm z-40 flex items-center justify-center overflow-y-auto">
           <div className="flex flex-col items-center gap-2">
             <div className="w-8 h-8 border-4 border-indigo-600 border-t-transparent rounded-full animate-spin" />
             <p className="text-sm font-semibold text-[rgb(var(--text))]">
