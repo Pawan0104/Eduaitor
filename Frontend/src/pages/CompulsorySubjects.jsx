@@ -5,6 +5,13 @@ import LoadingSpinner from "../components/LoadingSpinner";
 import AcademicHeaderActions from "../components/AcademicHeaderActions";
 
 const API = import.meta.env.VITE_API_URL;
+const PRESET_CLASS_STREAM_NAMES = [
+  "Science",
+  "Commerce",
+  "Arts",
+  "Agriculture",
+  "Sanskrit Sahitya",
+];
 
 export default function CompulsorySubjects() {
   const [classes, setClasses] = useState([]);
@@ -21,7 +28,9 @@ export default function CompulsorySubjects() {
   const [sectionNames, setSectionNames] = useState(["A", "B"]);
   const [maxStrength, setMaxStrength] = useState(40);
   const [streamMode, setStreamMode] = useState("direct");
+  const [availableClassStreams, setAvailableClassStreams] = useState([...PRESET_CLASS_STREAM_NAMES]);
   const [selectedStreams, setSelectedStreams] = useState([]);
+  const [customClassStreamName, setCustomClassStreamName] = useState("");
   // Rename modal state
   const [renameOpen, setRenameOpen] = useState(false);
   const [renameClass, setRenameClass] = useState(null);
@@ -107,6 +116,48 @@ export default function CompulsorySubjects() {
     setSectionNames(names);
   };
 
+  const isClassStreamSelected = (name) =>
+    selectedStreams.some(
+      (s) => String(s).toLowerCase() === String(name).trim().toLowerCase(),
+    );
+
+  const addNewClassStreamToList = (value) => {
+    const trimmed = String(value || "").trim();
+    if (!trimmed) return;
+    const key = trimmed.toLowerCase();
+    setAvailableClassStreams((prev) => {
+      if (prev.some((s) => String(s).toLowerCase() === key)) return prev;
+      return [...prev, trimmed];
+    });
+    setSelectedStreams((prev) => {
+      if (prev.some((s) => String(s).toLowerCase() === key)) return prev;
+      return [...prev, trimmed];
+    });
+    setCustomClassStreamName("");
+  };
+
+  const removeClassStreamFromList = (name) => {
+    const key = String(name).toLowerCase();
+    setAvailableClassStreams((prev) =>
+      prev.filter((s) => String(s).toLowerCase() !== key),
+    );
+    setSelectedStreams((prev) =>
+      prev.filter((s) => String(s).toLowerCase() !== key),
+    );
+  };
+
+  const toggleClassStreamSelection = (name) => {
+    const key = String(name).toLowerCase();
+    setSelectedStreams((prev) => {
+      if (prev.some((s) => String(s).toLowerCase() === key)) {
+        return prev.filter((s) => String(s).toLowerCase() !== key);
+      }
+      const canonical =
+        availableClassStreams.find((s) => String(s).toLowerCase() === key) || name;
+      return [...prev, canonical];
+    });
+  };
+
   if (loading) return <LoadingSpinner />;
 
   const toggleCommon = (id) => {
@@ -155,7 +206,7 @@ export default function CompulsorySubjects() {
           const activeCls = isActive ? "bg-[#4834b8] border-[#4834b8] text-white" : "bg-slate-50/70 border-slate-200 text-slate-700 hover:bg-slate-100";
           const badgeCls = isActive ? "bg-white text-[#4834b8]" : (["2","3","4"].includes(tab.badge) ? "bg-emerald-600 text-white" : (tab.badge === "check" ? "bg-emerald-600 text-white" : "bg-white border border-slate-300 text-slate-600"));
           return (
-            <button key={tab.key} type="button" onClick={() => { if (tab.key === "optional") { window.location.href = "/school/optional-groups"; return; } if (tab.key === "subjects") { window.location.href = "/school/subjects-master"; return; } if (tab.key === "classes") { window.location.href = "/school/classes-subjects"; return; } if (tab.key === "teachers") { window.location.href = "/school/teachers-assignment"; return; } if (tab.key === "flow") { window.location.href = "/school/flow-simulator"; return; } }} className={`px-3 py-2.5 rounded-lg border text-left transition flex items-start gap-2.5 cursor-pointer ${activeCls}`}>
+            <button key={tab.key} type="button" onClick={() => { if (tab.key === "optional") { window.location.href = `${import.meta.env.BASE_URL}school/optional-groups`; return; } if (tab.key === "subjects") { window.location.href = `${import.meta.env.BASE_URL}school/subjects-master`; return; } if (tab.key === "classes") { window.location.href = `${import.meta.env.BASE_URL}school/classes-subjects`; return; } if (tab.key === "teachers") { window.location.href = `${import.meta.env.BASE_URL}school/teachers-assignment`; return; } if (tab.key === "flow") { window.location.href = `${import.meta.env.BASE_URL}school/flow-simulator`; return; } }} className={`px-3 py-2.5 rounded-lg border text-left transition flex items-start gap-2.5 cursor-pointer ${activeCls}`}>
               <span className={`w-6 h-6 rounded-md text-xs font-mono font-bold flex items-center justify-center shrink-0 mt-0.5 ${badgeCls}`}>
                 {tab.badge === "book" && (<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 7v14"></path><path d="M3 18a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1h5a4 4 0 0 1 4 4 4 4 0 0 1 4-4h5a1 1 0 0 1 1 1v13a1 1 0 0 1-1 1h-6a3 3 0 0 0-3 3 3 3 0 0 0-3-3z"></path></svg>)}
                 {["1","2","3","4"].includes(tab.badge) && tab.badge}
@@ -189,7 +240,9 @@ export default function CompulsorySubjects() {
                   setSectionNames(["A", "B"]);
                   setMaxStrength(40);
                   setStreamMode("direct");
+                  setAvailableClassStreams([...PRESET_CLASS_STREAM_NAMES]);
                   setSelectedStreams([]);
+                  setCustomClassStreamName("");
                   setNewClassOpen(true);
                 }}
                 className="px-2.5 py-1.5 rounded-lg bg-[#4834b8] hover:bg-[#3a289c] text-white text-[11px] font-bold inline-flex items-center gap-1 whitespace-nowrap cursor-pointer"
@@ -260,7 +313,7 @@ export default function CompulsorySubjects() {
               </div>
               <div className="flex flex-wrap items-center gap-2">
                 <input placeholder="Filter subjects..." className="pl-3 pr-3 py-1.5 border border-slate-300 rounded-lg w-44 focus:outline-none focus:border-[#4834b8] text-sm" type="text" />
-                <button type="button" onClick={() => (window.location.href = "/school/subjects-master")} className="px-3 py-1.5 rounded-lg border border-indigo-200 bg-indigo-50 hover:bg-indigo-100 text-[#4834b8] font-semibold inline-flex items-center gap-1.5 cursor-pointer text-xs">
+                <button type="button" onClick={() => (window.location.href = `${import.meta.env.BASE_URL}school/subjects-master`)} className="px-3 py-1.5 rounded-lg border border-indigo-200 bg-indigo-50 hover:bg-indigo-100 text-[#4834b8] font-semibold inline-flex items-center gap-1.5 cursor-pointer text-xs">
                   Open Subjects Master
                 </button>
               </div>
@@ -337,7 +390,7 @@ export default function CompulsorySubjects() {
                   <p className="text-xs text-slate-400">No streams assigned to this class.</p>
                   <button
                     type="button"
-                    onClick={() => (window.location.href = "/school/classes-subjects")}
+                    onClick={() => (window.location.href = `${import.meta.env.BASE_URL}school/classes-subjects`)}
                     className="px-4 py-2 rounded-lg border border-[#4834b8] bg-white text-[#4834b8] text-xs font-bold hover:bg-indigo-50 cursor-pointer"
                   >
                     Configure Stream in Step 1
@@ -352,7 +405,7 @@ export default function CompulsorySubjects() {
             <div className="flex items-center gap-2">
               <button
                 type="button"
-                onClick={() => (window.location.href = "/school/classes-subjects")}
+                onClick={() => (window.location.href = `${import.meta.env.BASE_URL}school/classes-subjects`)}
                 className="px-3.5 py-2 rounded-lg border border-slate-300 bg-white hover:bg-slate-50 text-slate-700 font-semibold inline-flex items-center gap-1.5 cursor-pointer"
               >
                 <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="lucide lucide-arrow-left w-3.5 h-3.5" aria-hidden="true"><path d="m12 19-7-7 7-7"></path><path d="M19 12H5"></path></svg>
@@ -362,7 +415,7 @@ export default function CompulsorySubjects() {
             <div className="flex items-center gap-2">
               <button
                 type="button"
-                onClick={() => (window.location.href = "/school/optional-groups")}
+                onClick={() => (window.location.href = `${import.meta.env.BASE_URL}school/optional-groups`)}
                 className="px-4 py-2 rounded-lg bg-[#4834b8] hover:bg-[#3a289c] text-white font-bold inline-flex items-center gap-1.5 cursor-pointer"
               >
                 <span>Next: Step 3 · Optional Groups</span>
@@ -450,14 +503,14 @@ export default function CompulsorySubjects() {
     )}
     {newClassOpen && (
       <div className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center p-4">
-        <div className="bg-white rounded-2xl w-full max-w-lg shadow-xl overflow-hidden">
-          <div className="px-5 py-4 border-b border-slate-200 flex items-center justify-between">
+        <div className="bg-white rounded-2xl w-full max-w-lg shadow-xl overflow-hidden max-h-[90vh] flex flex-col">
+          <div className="px-5 py-4 border-b border-slate-200 flex items-center justify-between shrink-0">
             <div>
               <h3 className="text-base font-bold text-slate-900">Create New Class — Sections &amp; Optional Streams Setup</h3>
             </div>
             <button type="button" onClick={() => setNewClassOpen(false)} className="text-slate-400 hover:text-slate-600">✕</button>
           </div>
-          <div className="p-5 space-y-4">
+          <div className="p-5 space-y-4 flex-1 overflow-y-auto min-h-0">
             <div>
               <label className="block text-xs font-semibold text-slate-700 mb-1">1. Class Name *</label>
               <input type="text" value={newClassName} onChange={(e) => setNewClassName(e.target.value)} placeholder="e.g. 5th, LKG, 11th" className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm" />
@@ -495,36 +548,82 @@ export default function CompulsorySubjects() {
             <div>
               <label className="block text-xs font-semibold text-slate-700 mb-1">4. Does this Class have Academic Streams? (Optional)</label>
               <div className="flex gap-2">
-                <button type="button" onClick={() => { setStreamMode("direct"); setSelectedStreams([]); }} className={`px-3 py-2 rounded-lg text-xs font-semibold border ${streamMode === "direct" ? "bg-slate-900 text-white border-slate-900" : "bg-white text-slate-700 border-slate-300"}`}>No Streams (Direct Class)</button>
-                <button type="button" onClick={() => setStreamMode("streams")} className={`px-3 py-2 rounded-lg text-xs font-semibold border ${streamMode === "streams" ? "bg-[#4834b8] text-white border-[#4834b8]" : "bg-white text-slate-700 border-slate-300"}`}>Has Streams</button>
+                <button type="button" onClick={() => { setStreamMode("direct"); setSelectedStreams([]); setCustomClassStreamName(""); }} className={`px-3 py-2 rounded-lg text-xs font-semibold border ${streamMode === "direct" ? "bg-slate-900 text-white border-slate-900" : "bg-white text-slate-700 border-slate-300"}`}>No Streams (Direct Class)</button>
+                <button type="button" onClick={() => {
+                  setStreamMode("streams");
+                  setSelectedStreams((prev) => prev.length > 0 ? prev : [...availableClassStreams]);
+                }} className={`px-3 py-2 rounded-lg text-xs font-semibold border ${streamMode === "streams" ? "bg-[#4834b8] text-white border-[#4834b8]" : "bg-white text-slate-700 border-slate-300"}`}>Has Streams</button>
               </div>
               {streamMode === "streams" && (
-                <div className="flex flex-wrap gap-2 mt-3">
-                  {["Science", "Commerce", "Arts", "Agriculture", "Sanskrit Sahitya"].map((name) => {
-                    const selected = selectedStreams.includes(name);
-                    return (
-                      <button
-                        key={name}
-                        type="button"
-                        onClick={() => {
-                          if (selected) setSelectedStreams(selectedStreams.filter((s) => s !== name));
-                          else setSelectedStreams([...selectedStreams, name]);
+                <div className="mt-3 space-y-3">
+                  <div className="rounded-lg border border-slate-200 bg-slate-50 p-2.5">
+                    <div className="flex items-center justify-between mb-2">
+                      <p className="text-[11px] font-semibold text-slate-600">
+                        Available streams for this class (live): {availableClassStreams.length}
+                      </p>
+                      <span className="text-[10px] text-slate-400">× remove · ☑ include</span>
+                    </div>
+                    {availableClassStreams.length === 0 ? (
+                      <p className="text-[11px] text-slate-400">No streams available. Add a new stream below.</p>
+                    ) : (
+                      <div className="space-y-1.5">
+                        {availableClassStreams.map((name) => (
+                          <div key={name} className="flex items-center gap-2 rounded-md border border-slate-200 bg-white px-2 py-1.5">
+                            <button
+                              type="button"
+                              onClick={() => removeClassStreamFromList(name)}
+                              className="w-5 h-5 rounded-full bg-rose-50 text-rose-600 hover:bg-rose-100 text-xs font-bold leading-none shrink-0"
+                              aria-label={`Remove ${name}`}
+                            >
+                              ×
+                            </button>
+                            <label className="flex items-center gap-2 flex-1 text-xs text-slate-700 cursor-pointer">
+                              <input
+                                type="checkbox"
+                                checked={isClassStreamSelected(name)}
+                                onChange={() => toggleClassStreamSelection(name)}
+                                className="w-3.5 h-3.5 accent-[#4834b8]"
+                              />
+                              <span className="truncate">{name}</span>
+                            </label>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                  <div>
+                    <p className="text-[11px] font-semibold text-slate-500 mb-1.5">
+                      Add a new stream (appears in the list immediately)
+                    </p>
+                    <div className="flex gap-2">
+                      <input
+                        type="text"
+                        value={customClassStreamName}
+                        onChange={(e) => setCustomClassStreamName(e.target.value)}
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter") {
+                            e.preventDefault();
+                            addNewClassStreamToList(customClassStreamName);
+                          }
                         }}
-                        className={`px-3 py-2 rounded-lg text-xs font-semibold border ${selected ? "bg-[#4834b8] text-white border-[#4834b8]" : "bg-white text-slate-700 border-slate-300 hover:bg-slate-50"}`}
+                        placeholder="Add new Stream name"
+                        className="flex-1 px-3 py-2 rounded-lg text-xs border border-slate-300 bg-white text-slate-700"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => addNewClassStreamToList(customClassStreamName)}
+                        disabled={!customClassStreamName.trim()}
+                        className="px-3 py-2 rounded-lg text-xs font-semibold bg-[#4834b8] text-white border border-[#4834b8] hover:bg-[#3a289c] disabled:opacity-50"
                       >
-                        {name}
+                        Add stream
                       </button>
-                    );
-                  })}
-                  <div className="flex gap-2 w-full mt-2">
-                    <input type="text" placeholder="Add custom Stream name" className="flex-1 px-3 py-2 rounded-lg text-xs border border-slate-300 bg-white text-slate-700" id="customStreamInput2" onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); const val = e.target.value.trim(); if (!val) return; if (!selectedStreams.includes(val)) setSelectedStreams([...selectedStreams, val]); e.target.value = ""; } }} />
-                    <button type="button" onClick={() => { const inp = document.getElementById("customStreamInput2"); const val = (inp?.value || "").trim(); if (!val) return; if (!selectedStreams.includes(val)) setSelectedStreams([...selectedStreams, val]); if (inp) inp.value = ""; }} className="px-3 py-2 rounded-lg text-xs font-semibold bg-[#4834b8] text-white border border-[#4834b8] hover:bg-[#3a289c]">Add stream</button>
+                    </div>
                   </div>
                 </div>
               )}
             </div>
           </div>
-          <div className="px-5 py-4 border-t border-slate-200 flex justify-end gap-2">
+          <div className="px-5 py-4 border-t border-slate-200 flex justify-end gap-2 shrink-0 bg-white">
             <button type="button" onClick={() => setNewClassOpen(false)} className="px-4 py-2 text-sm font-medium text-slate-700 bg-slate-100 rounded-lg">Cancel</button>
             <button type="button" onClick={() => { if (!newClassName.trim()) { toast.error("Class name is required"); return; } toast.info("Class creation requires the full Class editor."); setNewClassOpen(false); }} className="px-4 py-2 text-sm font-semibold text-white bg-[#4834b8] rounded-lg">Create Class</button>
           </div>

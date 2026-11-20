@@ -252,17 +252,6 @@ const Sidebar = ({ closeSidebar, unreadMessages = 0 }) => {
       ],
     },
     {
-      name: "Classes",
-      icon: <HiAcademicCap />,
-      module: "classes",
-      children: [
-        { name: "Class", path: "/school/class" },
-        { name: "Section", path: "/school/section" },
-        { name: "Streams", path: "/school/streams" },
-        { name: "Subjects", path: "/school/subject" },
-      ],
-    },
-    {
       name: "Classes & Subjects",
       icon: <HiAcademicCap />,
       path: "/school/classes-subjects",
@@ -1002,7 +991,7 @@ const Sidebar = ({ closeSidebar, unreadMessages = 0 }) => {
         />
       )}
 
-      <aside className="h-full w-full bg-[rgb(var(--sidebar))] border-r border-[rgb(var(--border))] flex flex-col shadow-sm text-[rgb(var(--sidebar-text))]">
+      <aside className="sidebar-classic-blue h-full w-full bg-[rgb(var(--sidebar))] border-r border-[rgb(var(--border))] flex flex-col shadow-sm text-[rgb(var(--sidebar-text))]">
         {/* MENU */}
         <div className="flex-1 overflow-y-auto px-2 py-2">
           {finalMenu.map((item, index) => {

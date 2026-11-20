@@ -129,12 +129,9 @@ const findRoomConflict = async (schoolId, rooms, excludeClassId = null) => {
 /** Validate that every detail has a room and no room repeats in the form. */
 const validateRooms = (details) => {
   const rooms = (details || []).map((d) => String(d.roomNumber || "").trim());
-  const emptyRoom = rooms.find((r) => !r);
-  if (emptyRoom !== undefined) {
-    return { error: "Room number required" };
-  }
+  const nonEmpty = rooms.filter(Boolean);
   const seen = new Map();
-  for (const room of rooms) {
+  for (const room of nonEmpty) {
     const key = room.toLowerCase();
     if (seen.has(key)) {
       return { error: `Room "${seen.get(key)}" cannot be used more than once` };

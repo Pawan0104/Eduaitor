@@ -219,11 +219,11 @@ export default function TeachersAssignment() {
   };
 
   const go = (key) => {
-    if (key === "subjects") window.location.href = "/school/subjects-master";
-    else if (key === "classes") window.location.href = "/school/classes-subjects";
-    else if (key === "compulsory") window.location.href = "/school/compulsory-subjects";
-    else if (key === "optional") window.location.href = "/school/optional-groups";
-    else if (key === "flow") window.location.href = "/school/flow-simulator";
+    if (key === "subjects") window.location.href = `${import.meta.env.BASE_URL}school/subjects-master`;
+    else if (key === "classes") window.location.href = `${import.meta.env.BASE_URL}school/classes-subjects`;
+    else if (key === "compulsory") window.location.href = `${import.meta.env.BASE_URL}school/compulsory-subjects`;
+    else if (key === "optional") window.location.href = `${import.meta.env.BASE_URL}school/optional-groups`;
+    else if (key === "flow") window.location.href = `${import.meta.env.BASE_URL}school/flow-simulator`;
   };
 
   if (loading) return <LoadingSpinner />;
@@ -379,7 +379,7 @@ export default function TeachersAssignment() {
                 </div>
 
                 <div className="flex flex-wrap items-center gap-2">
-                  <button type="button" onClick={() => (window.location.href = "/school/staff")} className="px-3 py-1.5 rounded-lg border border-indigo-200 bg-indigo-50 hover:bg-indigo-100 text-[#4834b8] text-[11px] font-bold inline-flex items-center gap-1.5 cursor-pointer"><BriefcaseIcon /><span>Manage Teachers in Staff Panel</span></button>
+                  <button type="button" onClick={() => (window.location.href = `${import.meta.env.BASE_URL}school/staff`)} className="px-3 py-1.5 rounded-lg border border-indigo-200 bg-indigo-50 hover:bg-indigo-100 text-[#4834b8] text-[11px] font-bold inline-flex items-center gap-1.5 cursor-pointer"><BriefcaseIcon /><span>Manage Teachers in Staff Panel</span></button>
                   <div className="flex items-center gap-1.5 bg-slate-50 p-1 rounded-lg border border-slate-200">
                     <select aria-label="Copy subject teachers from section" value={copyFrom} onChange={(e) => setCopyFrom(e.target.value)} className="px-2 py-1 border border-slate-300 rounded bg-white text-slate-700 text-[11px]">
                       <option value="">Copy from Section...</option>

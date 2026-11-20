@@ -6,21 +6,39 @@ export const UI_SKIN_EVENT = "uiSkinChange";
 export const UI_SKIN_OPTIONS = [
   {
     id: "classic",
-    label: "Classic",
-    helper: "Current Eduaitor purple control-center look",
-    swatch: ["#5B3DF5", "#F8F9FD", "#FFFFFF"],
+    label: "Classic Blue",
+    helper: "Professional & Clean",
+    swatch: ["#1E40AF", "#3B82F6", "#EFF6FF"],
   },
   {
-    id: "campus",
-    label: "Campus",
-    helper: "Navy academy shell with gold accents",
-    swatch: ["#0B1F3A", "#F5C518", "#F1F5F9"],
+    id: "fresh",
+    label: "Fresh Green",
+    helper: "Calm & Trustworthy",
+    swatch: ["#15803D", "#22C55E", "#F0FDF4"],
   },
   {
-    id: "forest",
-    label: "Forest",
-    helper: "Deep green academic panels and soft mint surfaces",
-    swatch: ["#0F3D2E", "#34D399", "#F0FDF4"],
+    id: "warm",
+    label: "Warm Purple",
+    helper: "Modern & Friendly",
+    swatch: ["#7E22CE", "#A855F7", "#FAF5FF"],
+  },
+  {
+    id: "sunrise",
+    label: "Sunrise Orange",
+    helper: "Energetic & Vibrant",
+    swatch: ["#C2410C", "#F97316", "#FFF7ED"],
+  },
+  {
+    id: "sky",
+    label: "Sky Teal",
+    helper: "Fresh & Modern",
+    swatch: ["#0891B2", "#06B6D4", "#ECFEFF"],
+  },
+  {
+    id: "nature",
+    label: "Nature Pastel",
+    helper: "Light & Soothing",
+    swatch: ["#4D7C0F", "#84CC16", "#F7FEE7"],
   },
 ];
 

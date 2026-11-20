@@ -423,6 +423,13 @@ html[data-skin="forest"] .student-home-header {
     rgb(var(--bg));
 }
 
+.sidebar-classic-blue {
+  --sidebar: 255 255 255; /* white */
+  --sidebar-text: 51 65 85; /* #334155 */
+  --sidebar-active: 37 99 235; /* #2563EB primary blue */
+  --border: 226 232 240;
+}
+
 /* =====================================================
    GLOBAL UI SKINS (data-skin on <html>)
    Totally different looks — login + all role screens
@@ -506,6 +513,131 @@ html[data-skin="forest"].theme-dark {
   --sidebar: 8 36 28;
   --sidebar-text: 236 253 245;
 }
+
+/* ---- Sunset ---- */
+html[data-skin="sunset"] {
+  --primary: 234 88 12;
+  --primary-light: 249 115 22;
+  --on-primary: 255 255 255;
+
+  --sidebar: 124 45 18;
+  --sidebar-text: 255 237 213;
+  --sidebar-active: 251 146 60;
+
+  --bg: 255 247 237;
+  --surface: 255 255 255;
+
+  --text: 67 20 7;
+  --text-muted: 124 45 18;
+
+  --accent: 251 146 60;
+
+  --border: 254 215 170;
+  --border-strong: 253 186 116;
+
+  --success: 22 163 74;
+  --warning: 217 119 6;
+  --danger: 220 38 38;
+}
+
+html[data-skin="sunset"].theme-dark {
+  --primary: 251 146 60;
+  --primary-light: 253 186 116;
+  --on-primary: 67 20 7;
+  --bg: 28 12 6;
+  --surface: 45 20 10;
+  --text: 255 237 213;
+  --text-muted: 253 186 116;
+  --border: 90 40 18;
+  --border-strong: 124 45 18;
+  --sidebar: 20 8 4;
+  --sidebar-text: 255 237 213;
+}
+
+/* ---- Ocean ---- */
+html[data-skin="ocean"] {
+  --primary: 8 145 178;
+  --primary-light: 6 182 212;
+  --on-primary: 255 255 255;
+
+  --sidebar: 8 51 68;
+  --sidebar-text: 207 250 254;
+  --sidebar-active: 34 211 238;
+
+  --bg: 236 254 255;
+  --surface: 255 255 255;
+
+  --text: 8 51 68;
+  --text-muted: 21 94 117;
+
+  --accent: 34 211 238;
+
+  --border: 165 243 252;
+  --border-strong: 103 232 249;
+
+  --success: 22 163 74;
+  --warning: 217 119 6;
+  --danger: 220 38 38;
+}
+
+html[data-skin="ocean"].theme-dark {
+  --primary: 34 211 238;
+  --primary-light: 103 232 249;
+  --on-primary: 8 51 68;
+  --bg: 6 24 30;
+  --surface: 12 45 55;
+  --text: 207 250 254;
+  --text-muted: 165 243 252;
+  --border: 15 70 85;
+  --border-strong: 21 94 117;
+  --sidebar: 4 28 38;
+  --sidebar-text: 207 250 254;
+}
+
+/* ---- Royal ---- */
+html[data-skin="royal"] {
+  --primary: 124 58 237;
+  --primary-light: 139 92 246;
+  --on-primary: 255 255 255;
+
+  --sidebar: 49 10 80;
+  --sidebar-text: 237 233 254;
+  --sidebar-active: 245 158 11;
+
+  --bg: 245 243 255;
+  --surface: 255 255 255;
+
+  --text: 30 10 60;
+  --text-muted: 76 29 149;
+
+  --accent: 245 158 11;
+
+  --border: 221 214 254;
+  --border-strong: 196 181 253;
+
+  --success: 22 163 74;
+  --warning: 217 119 6;
+  --danger: 220 38 38;
+}
+
+html[data-skin="royal"].theme-dark {
+  --primary: 167 139 250;
+  --primary-light: 196 181 253;
+  --on-primary: 30 10 60;
+  --bg: 18 10 32;
+  --surface: 30 16 50;
+  --text: 237 233 254;
+  --text-muted: 196 181 253;
+  --border: 55 30 80;
+  --border-strong: 76 29 149;
+  --sidebar: 12 6 22;
+  --sidebar-text: 237 233 254;
+}
+
+/* Login shell — driven by skin tokens */
+html[data-skin="sunset"] .login-shell { background: #9a3412; }
+html[data-skin="ocean"] .login-shell { background: #0891b2; }
+html[data-skin="royal"] .login-shell { background: #7c3aed; }
 
 /* Card geometry per skin */
 html[data-skin="campus"] .card {

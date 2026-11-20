@@ -375,18 +375,16 @@ export default function ClassPage() {
     const seenRooms = new Map();
     for (const d of form.details) {
       const room = String(d.roomNumber || "").trim();
-      if (!room) {
-        toast.error("Room number is required for every entry");
-        return;
+      if (room) {
+        const key = room.toLowerCase();
+        if (seenRooms.has(key)) {
+          toast.error(
+            `Room "${seenRooms.get(key)}" cannot be used more than once`,
+          );
+          return;
+        }
+        seenRooms.set(key, room);
       }
-      const key = room.toLowerCase();
-      if (seenRooms.has(key)) {
-        toast.error(
-          `Room "${seenRooms.get(key)}" cannot be used more than once`,
-        );
-        return;
-      }
-      seenRooms.set(key, room);
     }
     setConfirmSave(true);
   };

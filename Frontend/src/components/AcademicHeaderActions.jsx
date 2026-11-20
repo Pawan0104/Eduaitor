@@ -10,21 +10,21 @@ export default function AcademicHeaderActions() {
     <div className="flex items-center gap-2 shrink-0 flex-wrap">
       <button
         type="button"
-        onClick={() => (window.location.href = "/school/reports")}
+        onClick={() => (window.location.href = `${import.meta.env.BASE_URL}school/reports`)}
         className="px-3 py-2 rounded-lg border border-slate-300 bg-white hover:bg-slate-50 text-slate-700 text-xs font-semibold whitespace-nowrap cursor-pointer"
       >
         Student subject report
       </button>
       <button
         type="button"
-        onClick={() => (window.location.href = "/school/registrations")}
+        onClick={() => (window.location.href = `${import.meta.env.BASE_URL}school/registrations`)}
         className="px-3 py-2 rounded-lg border border-slate-300 bg-white hover:bg-slate-50 text-slate-700 text-xs font-semibold whitespace-nowrap cursor-pointer"
       >
         Registration Sync
       </button>
       <button
         type="button"
-        onClick={() => (window.location.href = "/school/admission-form")}
+        onClick={() => (window.location.href = `${import.meta.env.BASE_URL}school/admission-form`)}
         className="px-3.5 py-2 rounded-lg bg-[#2563eb] hover:bg-[#1d4ed8] text-white text-xs font-bold inline-flex items-center gap-1.5 whitespace-nowrap cursor-pointer"
       >
         <span>test in Admission form</span>
@@ -32,7 +32,7 @@ export default function AcademicHeaderActions() {
       </button>
       <button
         type="button"
-        onClick={() => (window.location.href = "/school/menu")}
+        onClick={() => (window.location.href = `${import.meta.env.BASE_URL}school/menu`)}
         className="px-3 py-2 rounded-lg border border-slate-300 bg-white hover:bg-slate-50 text-slate-700 text-xs font-semibold whitespace-nowrap cursor-pointer"
       >
         Dashboard

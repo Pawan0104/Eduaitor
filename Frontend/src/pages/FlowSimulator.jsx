@@ -123,11 +123,11 @@ export default function FlowSimulator() {
   }, [activeDetail, subjects, personOptions]);
 
   const go = (key) => {
-    if (key === "subjects") window.location.href = "/school/subjects-master";
-    else if (key === "classes") window.location.href = "/school/classes-subjects";
-    else if (key === "compulsory") window.location.href = "/school/compulsory-subjects";
-    else if (key === "optional") window.location.href = "/school/optional-groups";
-    else if (key === "teachers") window.location.href = "/school/teachers-assignment";
+    if (key === "subjects") window.location.href = `${import.meta.env.BASE_URL}school/subjects-master`;
+    else if (key === "classes") window.location.href = `${import.meta.env.BASE_URL}school/classes-subjects`;
+    else if (key === "compulsory") window.location.href = `${import.meta.env.BASE_URL}school/compulsory-subjects`;
+    else if (key === "optional") window.location.href = `${import.meta.env.BASE_URL}school/optional-groups`;
+    else if (key === "teachers") window.location.href = `${import.meta.env.BASE_URL}school/teachers-assignment`;
   };
 
   if (loading) return <LoadingSpinner />;
@@ -286,7 +286,7 @@ export default function FlowSimulator() {
                 <button type="button" onClick={() => go("teachers")} className="px-3.5 py-2 rounded-lg border border-slate-300 bg-white hover:bg-slate-50 text-slate-700 font-semibold inline-flex items-center gap-1.5 cursor-pointer"><ArrowLeft /><span>Step 4: Teachers Assignment</span></button>
               </div>
               <div className="flex items-center gap-2">
-                <button type="button" onClick={() => (window.location.href = "/school/registrations")} className="px-4 py-2 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white font-bold inline-flex items-center gap-1.5 cursor-pointer"><span>Test Live in Registration Portal</span><ArrowRight /></button>
+                <button type="button" onClick={() => (window.location.href = `${import.meta.env.BASE_URL}school/registrations`)} className="px-4 py-2 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white font-bold inline-flex items-center gap-1.5 cursor-pointer"><span>Test Live in Registration Portal</span><ArrowRight /></button>
               </div>
             </div>
           </div>

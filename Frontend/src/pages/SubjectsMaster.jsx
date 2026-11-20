@@ -140,7 +140,7 @@ export default function SubjectsMaster() {
               <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M5 12h14"></path><path d="M12 5v14"></path></svg>
               Add Subject
             </button>
-            <button type="button" onClick={() => (window.location.href = "/school/compulsory-subjects")} className="px-3 py-1.5 rounded-lg border border-indigo-200 bg-indigo-50 hover:bg-indigo-100 text-[#4834b8] font-semibold inline-flex items-center gap-1 whitespace-nowrap cursor-pointer text-xs">
+            <button type="button" onClick={() => (window.location.href = `${import.meta.env.BASE_URL}school/compulsory-subjects`)} className="px-3 py-1.5 rounded-lg border border-indigo-200 bg-indigo-50 hover:bg-indigo-100 text-[#4834b8] font-semibold inline-flex items-center gap-1 whitespace-nowrap cursor-pointer text-xs">
               Assign to Class
               <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M5 12h14"></path><path d="m12 5 7 7-7 7"></path></svg>
             </button>
@@ -242,7 +242,7 @@ export default function SubjectsMaster() {
         <span className="font-semibold text-slate-500">Subjects Master · Subject Catalog</span>
         <button
           type="button"
-          onClick={() => (window.location.href = "/school/classes-subjects")}
+          onClick={() => (window.location.href = `${import.meta.env.BASE_URL}school/classes-subjects`)}
           className="px-4 py-2 rounded-lg bg-[#4834b8] hover:bg-[#3a289c] text-white font-bold inline-flex items-center gap-1.5 cursor-pointer"
         >
           <span>Next: Step 1 . Class &amp; Section</span>

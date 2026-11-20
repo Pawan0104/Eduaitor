@@ -467,15 +467,9 @@ export default function SchoolMenu() {
       ],
     },
     {
-      name: "Classes",
+      name: "Academic Sessions",
       icon: <HiAcademicCap />,
-      children: [
-        { name: "Class", path: "/school/class" },
-        { name: "Section", path: "/school/section" },
-        { name: "Streams", path: "/school/streams" },
-        { name: "Subjects", path: "/school/subject" },
-        { name: "Academic Sessions", path: "/school/academic-sessions" },
-      ],
+      path: "/school/academic-sessions",
     },
     {
       name: "Classes & Subjects",

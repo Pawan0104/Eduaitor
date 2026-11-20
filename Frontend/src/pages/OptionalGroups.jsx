@@ -159,11 +159,11 @@ export default function OptionalGroups() {
   };
 
   const go = (key) => {
-    if (key === "subjects") window.location.href = "/school/subjects-master";
-    else if (key === "classes") window.location.href = "/school/classes-subjects";
-    else if (key === "compulsory") window.location.href = "/school/compulsory-subjects";
-    else if (key === "teachers") window.location.href = "/school/teachers-assignment";
-    else if (key === "flow") window.location.href = "/school/flow-simulator";
+    if (key === "subjects") window.location.href = `${import.meta.env.BASE_URL}school/subjects-master`;
+    else if (key === "classes") window.location.href = `${import.meta.env.BASE_URL}school/classes-subjects`;
+    else if (key === "compulsory") window.location.href = `${import.meta.env.BASE_URL}school/compulsory-subjects`;
+    else if (key === "teachers") window.location.href = `${import.meta.env.BASE_URL}school/teachers-assignment`;
+    else if (key === "flow") window.location.href = `${import.meta.env.BASE_URL}school/flow-simulator`;
   };
 
   if (loading) return <LoadingSpinner />;

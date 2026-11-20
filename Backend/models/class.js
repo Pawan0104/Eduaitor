@@ -10,8 +10,8 @@ const sectionDetailSchema = new mongoose.Schema(
 
     roomNumber: {
       type: String,
-      required: true,
       trim: true,
+      default: "",
     },
 
     teacherId: {
