@@ -297,7 +297,7 @@ app.get("/api/auth/me", authMiddleware, async (req, res) => {
     /* ---------- TEACHER ADMIN ---------- */
     if (req.user.role === "teacher_admin") {
       const teacherMember = await Teacher.findById(req.user.teacher_id)
-        .select("permissions status customRoleId photo firstTimeLogin")
+        .select("permissions submodulePermissions status customRoleId photo firstTimeLogin")
         .populate("customRoleId", "name");
 
       if (!teacherMember) {
@@ -325,6 +325,7 @@ app.get("/api/auth/me", authMiddleware, async (req, res) => {
             null,
           customRoleName: teacherMember.customRoleId?.name || null,
           permissions: teacherMember.permissions || [],
+          submodulePermissions: teacherMember.submodulePermissions || [],
           subscribed_modules,
           firstTimeLogin: teacherMember.firstTimeLogin ?? false,
         },
@@ -338,7 +339,7 @@ app.get("/api/auth/me", authMiddleware, async (req, res) => {
       // so if school admin updates permissions, takes effect on next refresh
       const staffMember = await Staff.findById(req.user.staff_id)
         .select(
-          "permissions status staffRole staffRoleCustom firstTimeLogin customRoleId photo",
+          "permissions submodulePermissions status staffRole staffRoleCustom firstTimeLogin customRoleId photo",
         )
         .populate("customRoleId", "name");
 
@@ -365,6 +366,7 @@ app.get("/api/auth/me", authMiddleware, async (req, res) => {
           customRoleName: staffMember.customRoleId?.name || null,
           firstTimeLogin: staffMember.firstTimeLogin,
           permissions: staffMember.permissions, // ← always fresh from DB
+          submodulePermissions: staffMember.submodulePermissions || [],
           subscribed_modules, // ← already fetched above
           school_name: school?.school_name,
           school_logo: school?.school_logo,

@@ -14,6 +14,12 @@ import {
 } from "react-icons/fa";
 import { useAuth } from "../context/AuthContext";
 import { MODULES } from "../constants/module.js";
+import ModulePermissionTree from "../components/ModulePermissionTree.jsx";
+import {
+  getSubmoduleIdsForModule,
+  SUBMODULE_BY_ID,
+} from "../constants/submodules.js";
+import { expandSubmoduleIds } from "../utils/submodulePermissions.js";
 
 const API = import.meta.env.VITE_API_URL;
 
@@ -21,6 +27,7 @@ const emptyForm = {
   name: "",
   description: "",
   permissions: [],
+  submodulePermissions: [],
   isActive: true,
 };
 
@@ -42,6 +49,11 @@ export default function SchoolStaffRoles() {
   const [showModal, setShowModal] = useState(false);
   const [editingId, setEditingId] = useState(null);
   const [form, setForm] = useState(emptyForm);
+
+  const effectiveSubmodules = useMemo(
+    () => expandSubmoduleIds(form.permissions, form.submodulePermissions),
+    [form.permissions, form.submodulePermissions],
+  );
 
   const load = async () => {
     try {
@@ -70,9 +82,13 @@ export default function SchoolStaffRoles() {
 
   const openCreate = () => {
     setEditingId(null);
+    const allModules = modules.map((m) => m.key);
     setForm({
       ...emptyForm,
-      permissions: modules.map((m) => m.key),
+      permissions: allModules,
+      submodulePermissions: allModules.flatMap((key) =>
+        getSubmoduleIdsForModule(key),
+      ),
     });
     setShowModal(true);
   };
@@ -83,28 +99,62 @@ export default function SchoolStaffRoles() {
       name: role.name || "",
       description: role.description || "",
       permissions: role.permissions || [],
+      submodulePermissions: role.submodulePermissions || [],
       isActive: role.isActive !== false,
     });
     setShowModal(true);
   };
 
   const togglePerm = (key) => {
+    setForm((f) => {
+      const enabled = f.permissions.includes(key);
+      const effective = expandSubmoduleIds(f.permissions, f.submodulePermissions);
+      const base = effective.filter(
+        (id) => SUBMODULE_BY_ID[id]?.module !== key,
+      );
+
+      return {
+        ...f,
+        permissions: enabled
+          ? f.permissions.filter((k) => k !== key)
+          : [...f.permissions, key],
+        submodulePermissions: enabled
+          ? base
+          : [...new Set([...base, ...getSubmoduleIdsForModule(key)])],
+      };
+    });
+  };
+
+  const toggleSubmodule = (id) => {
+    const current = effectiveSubmodules;
+    const next = current.includes(id)
+      ? current.filter((item) => item !== id)
+      : [...current, id];
+    const parent = SUBMODULE_BY_ID[id]?.module;
+    const parentStillGranted =
+      !parent || next.some((item) => SUBMODULE_BY_ID[item]?.module === parent);
+
     setForm((f) => ({
       ...f,
-      permissions: f.permissions.includes(key)
-        ? f.permissions.filter((k) => k !== key)
-        : [...f.permissions, key],
+      permissions: parentStillGranted
+        ? f.permissions
+        : f.permissions.filter((key) => key !== parent),
+      submodulePermissions: next,
     }));
   };
 
   const selectAll = () => {
-    setForm((f) => ({
-      ...f,
-      permissions:
-        f.permissions.length === modules.length
+    setForm((f) => {
+      const allSelected = f.permissions.length === modules.length;
+      const nextModules = allSelected ? [] : modules.map((m) => m.key);
+      return {
+        ...f,
+        permissions: nextModules,
+        submodulePermissions: allSelected
           ? []
-          : modules.map((m) => m.key),
-    }));
+          : nextModules.flatMap((key) => getSubmoduleIdsForModule(key)),
+      };
+    });
   };
 
   const save = async () => {
@@ -112,17 +162,21 @@ export default function SchoolStaffRoles() {
     if (form.permissions.length === 0) {
       return toast.error("Select at least one module");
     }
+    const payload = {
+      ...form,
+      submodulePermissions: effectiveSubmodules,
+    };
     try {
       setSaving(true);
       if (editingId) {
         await axios.put(
           `${API}/school-staff-roles/${editingId}`,
-          form,
+          payload,
           { withCredentials: true },
         );
         toast.success("Role updated — assigned staff permissions synced");
       } else {
-        await axios.post(`${API}/school-staff-roles`, form, {
+        await axios.post(`${API}/school-staff-roles`, payload, {
           withCredentials: true,
         });
         toast.success("Role created");
@@ -240,8 +294,9 @@ export default function SchoolStaffRoles() {
               </div>
 
               <p className="text-xs text-[rgb(var(--text-muted))] mt-3">
-                {(role.permissions || []).length} modules · {role.staffCount || 0}{" "}
-                staff
+                {(role.permissions || []).length} modules ·{" "}
+                {(role.submodulePermissions || []).length} sub-modules ·{" "}
+                {role.staffCount || 0} staff
               </p>
               <div className="mt-2 flex flex-wrap gap-1">
                 {(role.permissions || []).slice(0, 6).map((key) => {
@@ -262,6 +317,23 @@ export default function SchoolStaffRoles() {
                   </span>
                 ) : null}
               </div>
+              {Boolean(role.submodulePermissions?.length) && (
+                <div className="mt-2 flex flex-wrap gap-1">
+                  {role.submodulePermissions.slice(0, 5).map((id) => (
+                    <span
+                      key={id}
+                      className="text-[10px] px-2 py-0.5 rounded-lg bg-[rgba(var(--primary),0.08)] text-[rgb(var(--primary))]"
+                    >
+                      {SUBMODULE_BY_ID[id]?.label || id}
+                    </span>
+                  ))}
+                  {role.submodulePermissions.length > 5 ? (
+                    <span className="text-[10px] text-[rgb(var(--text-muted))]">
+                      +{role.submodulePermissions.length - 5} more
+                    </span>
+                  ) : null}
+                </div>
+              )}
 
               <div className="mt-4 flex flex-wrap gap-2">
                 <button
@@ -365,7 +437,7 @@ export default function SchoolStaffRoles() {
               <div>
                 <div className="flex items-center justify-between mb-2">
                   <p className="text-xs font-bold uppercase text-[rgb(var(--text-muted))]">
-                    Module access ({form.permissions.length}/{modules.length})
+                    Module &amp; sub-module access
                   </p>
                   <button
                     type="button"
@@ -378,33 +450,23 @@ export default function SchoolStaffRoles() {
                   </button>
                 </div>
                 <p className="text-[11px] text-[rgb(var(--text-muted))] mb-2">
-                  Only modules enabled for your school by Super Admin are listed.
+                  {form.permissions.length}/{modules.length} modules ·{" "}
+                  {effectiveSubmodules.length} sub-modules · only modules enabled
+                  for your school are listed.
                 </p>
-                <div className="grid grid-cols-2 gap-2">
-                  {modules.map((mod) => {
-                    const checked = form.permissions.includes(mod.key);
-                    return (
-                      <label
-                        key={mod.key}
-                        className={`flex items-center gap-2 rounded-xl border p-2.5 text-sm cursor-pointer ${
-                          checked
-                            ? "border-[rgb(var(--primary))] bg-[rgba(var(--primary),0.08)]"
-                            : "border-[rgb(var(--border))]"
-                        }`}
-                      >
-                        <input
-                          type="checkbox"
-                          checked={checked}
-                          onChange={() => togglePerm(mod.key)}
-                          className="accent-[rgb(var(--primary))]"
-                        />
-                        <span className="font-medium leading-tight">
-                          {mod.label}
-                        </span>
-                      </label>
-                    );
-                  })}
-                </div>
+
+                <ModulePermissionTree
+                  modules={modules}
+                  permissions={form.permissions}
+                  submodulePermissions={effectiveSubmodules}
+                  onToggleModule={togglePerm}
+                  onToggleSubmodule={toggleSubmodule}
+                />
+                <p className="mt-2 text-[10.5px] text-[rgb(var(--text-muted))]">
+                  Use <strong>+</strong> to expand a module and adjust its child
+                  sub-modules individually. The module checkbox grants or revokes
+                  every child at once.
+                </p>
               </div>
             </div>
 

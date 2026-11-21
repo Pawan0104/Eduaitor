@@ -38,6 +38,7 @@ import {
 import { COLOR_MAP as TEACHER_COLORS } from "./TeacherMenu";
 import { clearSessionKeepPrefs } from "../utils/clearSessionKeepPrefs";
 import { applyTheme, getTheme } from "../utils/theme";
+import { filterMenuBySubmoduleAccess } from "../utils/submodulePermissions.js";
 
 const COLOR_MAP = {
   ...TEACHER_COLORS,
@@ -250,11 +251,12 @@ export default function StaffMenu() {
       { name: "Calendar", icon: <FaCalendarAlt />, path: "/staff/calendar", module: "events" },
     ];
 
-    return all.filter((item) => {
+    const moduleFiltered = all.filter((item) => {
       if (!item.module) return true;
       return user?.permissions?.includes(item.module);
     });
-  }, [user?.permissions]);
+    return filterMenuBySubmoduleAccess(moduleFiltered, user);
+  }, [user]);
 
   return (
     <div className="min-h-screen font-nunito" style={{ background: "rgb(var(--bg))" }}>

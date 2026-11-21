@@ -1,8 +1,11 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import axios from "axios";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import { MODULES } from "../constants/module.js";
+import ModulePermissionTree from "../components/ModulePermissionTree.jsx";
+import { getSubmoduleIdsForModule, SUBMODULE_BY_ID } from "../constants/submodules.js";
+import { expandSubmoduleIds } from "../utils/submodulePermissions.js";
 import DummyFillBar from "../components/DummyFill.jsx";
 import { createDummyImageFile } from "../components/DummyFill.js";
 import { toast } from "react-toastify";
@@ -80,6 +83,7 @@ const StaffManagement = () => {
 
   const [form, setForm]                     = useState(emptyForm);
 const [permissions, setPermissions]       = useState([]);
+  const [submodulePermissions, setSubmodulePermissions] = useState([]);
     const [photoFile, setPhotoFile]           = useState(null);
   const [photoPreview, setPhotoPreview]     = useState(null);
   const [changePassword, setChangePassword] = useState(false);
@@ -101,6 +105,11 @@ const [permissions, setPermissions]       = useState([]);
   /* ── SCHOOL SUBSCRIBED MODULES ONLY ─────────────── */
   const schoolModules = MODULES.filter((m) =>
     user?.subscribed_modules?.includes(m.key)
+  );
+
+  const effectiveSubmodules = useMemo(
+    () => expandSubmoduleIds(permissions, submodulePermissions),
+    [permissions, submodulePermissions],
   );
 
   /* ── FETCH ──────────────────────────────────────── */
@@ -138,9 +147,36 @@ const [permissions, setPermissions]       = useState([]);
      Permissions are chosen per person, with no role indirection. */
   const togglePermission = (key) => {
     setDirty(true);
-    setPermissions((prev) =>
-      prev.includes(key) ? prev.filter((k) => k !== key) : [...prev, key],
+    const enabled = permissions.includes(key);
+    const base = effectiveSubmodules.filter((id) => {
+      const parent = SUBMODULE_BY_ID[id]?.module;
+      return parent !== key;
+    });
+
+    setPermissions(
+      enabled ? permissions.filter((k) => k !== key) : [...permissions, key],
     );
+    setSubmodulePermissions(
+      enabled
+        ? base
+        : [...new Set([...base, ...getSubmoduleIdsForModule(key)])],
+    );
+  };
+
+  const toggleSubmodulePermission = (id) => {
+    setDirty(true);
+    const current = effectiveSubmodules;
+    const next = current.includes(id)
+      ? current.filter((item) => item !== id)
+      : [...current, id];
+    const parent = SUBMODULE_BY_ID[id]?.module;
+    const parentStillGranted =
+      !parent || next.some((item) => SUBMODULE_BY_ID[item]?.module === parent);
+
+    setSubmodulePermissions(next);
+    if (!parentStillGranted) {
+      setPermissions(permissions.filter((key) => key !== parent));
+    }
   };
 
   /* Warden duty implies hostel module access; mirror the selection in the
@@ -149,10 +185,17 @@ const [permissions, setPermissions]       = useState([]);
     setDirty(true);
     const next = !form.isHostelWarden;
     setForm((p) => ({ ...p, isHostelWarden: next }));
+    const hostelChildren = getSubmoduleIdsForModule("hostel");
     setPermissions((prev) =>
       next
         ? prev.includes("hostel") ? prev : [...prev, "hostel"]
         : prev.filter((k) => k !== "hostel"),
+    );
+    const base = effectiveSubmodules.filter(
+      (id) => !hostelChildren.includes(id),
+    );
+    setSubmodulePermissions(
+      next ? [...new Set([...base, ...hostelChildren])] : base,
     );
   };
 
@@ -174,7 +217,11 @@ const [permissions, setPermissions]       = useState([]);
       password: "Test@1234",
       status: "Active",
     }));
-    setPermissions(MODULES.slice(0, 3).map((m) => m.key));
+    const dummyModules = MODULES.slice(0, 3).map((m) => m.key);
+    setPermissions(dummyModules);
+    setSubmodulePermissions(
+      dummyModules.flatMap((key) => getSubmoduleIdsForModule(key)),
+    );
     const photo = createDummyImageFile("staff-photo.png");
     setPhotoFile(photo);
     setPhotoPreview(URL.createObjectURL(photo));
@@ -207,6 +254,7 @@ const [permissions, setPermissions]       = useState([]);
     setShowTypePicker(false);
     setForm({ ...emptyForm });
     setPermissions([]);
+    setSubmodulePermissions([]);
     setPhotoFile(null);
     setPhotoPreview(null);
     setChangePassword(false);
@@ -245,6 +293,7 @@ const [permissions, setPermissions]       = useState([]);
       isHostelWarden:  Boolean(staff.isHostelWarden),
     });
     setPermissions(staff.permissions || []);
+    setSubmodulePermissions(staff.submodulePermissions || []);
     setPhotoPreview(staff.photo?.url  || null);
     setPhotoFile(null);
     setChangePassword(false);
@@ -305,6 +354,7 @@ if (form.staffRole === "other" && !form.staffRoleCustom.trim())
         });
 
         fd.append("permissions", JSON.stringify(permissions));
+        fd.append("submodulePermissions", JSON.stringify(effectiveSubmodules));
         if (form.customRoleId) {
           fd.append("customRoleId", form.customRoleId);
         } else if (editingId) {
@@ -417,6 +467,7 @@ if (form.staffRole === "other" && !form.staffRoleCustom.trim())
   const resetForm = () => {
     setForm(emptyForm);
     setPermissions([]);
+    setSubmodulePermissions([]);
     setPhotoFile(null);
     setPhotoPreview(null);
     setChangePassword(false);
@@ -1061,21 +1112,26 @@ if (form.staffRole === "other" && !form.staffRoleCustom.trim())
                   <div className="sm:col-span-2">
                     <label className="text-xs font-medium
                       text-[rgb(var(--text-muted))] mb-1 block">
-                      Module Access <span className="text-red-500">*</span>
+                      Module &amp; Sub-module Access <span className="text-red-500">*</span>
                     </label>
 
                     <div className="rounded-xl border border-[rgb(var(--border))]
                       bg-[rgb(var(--bg))] p-3">
                       <div className="flex items-center justify-between mb-2">
                         <span className="text-[11px] text-[rgb(var(--text-muted))]">
-                          {permissions.length} of {schoolModules.length} selected
+                          {permissions.length} of {schoolModules.length} modules ·{" "}
+                          {effectiveSubmodules.length} sub-modules selected
                         </span>
                         <div className="flex gap-3">
                           <button
                             type="button"
                             onClick={() => {
                               setDirty(true);
-                              setPermissions(schoolModules.map((m) => m.key));
+                              const allModules = schoolModules.map((m) => m.key);
+                              setPermissions(allModules);
+                              setSubmodulePermissions(
+                                allModules.flatMap((key) => getSubmoduleIdsForModule(key)),
+                              );
                             }}
                             className="text-[11px] font-semibold
                               text-[rgb(var(--primary))] underline"
@@ -1087,6 +1143,7 @@ if (form.staffRole === "other" && !form.staffRoleCustom.trim())
                             onClick={() => {
                               setDirty(true);
                               setPermissions([]);
+                              setSubmodulePermissions([]);
                             }}
                             className="text-[11px] font-semibold
                               text-[rgb(var(--text-muted))] underline"
@@ -1096,32 +1153,18 @@ if (form.staffRole === "other" && !form.staffRoleCustom.trim())
                         </div>
                       </div>
 
-                      <div className="grid grid-cols-1 sm:grid-cols-2
-                        lg:grid-cols-3 gap-2 max-h-56 overflow-y-auto">
-                        {schoolModules.map((m) => (
-                          <label
-                            key={m.key}
-                            className="flex items-center gap-2 text-xs
-                              cursor-pointer px-2 py-1.5 rounded-lg
-                              hover:bg-[rgba(var(--primary),0.06)]"
-                          >
-                            <input
-                              type="checkbox"
-                              checked={permissions.includes(m.key)}
-                              onChange={() => togglePermission(m.key)}
-                              className="w-4 h-4 accent-[rgb(var(--primary))]"
-                            />
-                            <span className="text-[rgb(var(--text))]">
-                              {m.label}
-                            </span>
-                          </label>
-                        ))}
-                        {schoolModules.length === 0 && (
-                          <p className="text-xs text-[rgb(var(--text-muted))]">
-                            No modules available for your school.
-                          </p>
-                        )}
-                      </div>
+                      <ModulePermissionTree
+                        modules={schoolModules}
+                        permissions={permissions}
+                        submodulePermissions={effectiveSubmodules}
+                        onToggleModule={togglePermission}
+                        onToggleSubmodule={toggleSubmodulePermission}
+                      />
+                      <p className="mt-2 text-[10.5px] text-[rgb(var(--text-muted))]">
+                        Use <strong>+</strong> to expand a module and adjust its child
+                        sub-modules individually. The module checkbox grants or revokes
+                        every child at once.
+                      </p>
                     </div>
 
 <label className="flex items-start gap-2 mt-3 px-3 py-2 rounded-lg border border-[rgb(var(--border))] cursor-pointer hover:bg-[rgba(var(--primary),0.05)]">
@@ -1292,7 +1335,7 @@ if (form.staffRole === "other" && !form.staffRoleCustom.trim())
                   Module access
                   <span className="text-xs font-normal
                     text-[rgb(var(--text-muted))]">
-                    ({permissions.length} selected)
+                    ({permissions.length} modules · {effectiveSubmodules.length} sub-modules)
                   </span>
                 </p>
                 {permissions.length > 0 ? (
@@ -1474,6 +1517,24 @@ if (form.staffRole === "other" && !form.staffRoleCustom.trim())
                         </span>
                       );
                     })}
+                  </div>
+                )}
+                {Boolean(viewStaff.submodulePermissions?.length) && (
+                  <div className="mt-3">
+                    <p className="text-[11px] font-semibold text-[rgb(var(--text-muted))] mb-1.5">
+                      Sub-modules ({viewStaff.submodulePermissions.length})
+                    </p>
+                    <div className="flex flex-wrap gap-1.5">
+                      {viewStaff.submodulePermissions.map((id) => (
+                        <span
+                          key={id}
+                          className="px-2 py-0.5 rounded-lg text-[10.5px] font-medium
+                            bg-[rgba(var(--primary),0.08)] text-[rgb(var(--primary))]"
+                        >
+                          {SUBMODULE_BY_ID[id]?.label || id}
+                        </span>
+                      ))}
+                    </div>
                   </div>
                 )}
               </div>

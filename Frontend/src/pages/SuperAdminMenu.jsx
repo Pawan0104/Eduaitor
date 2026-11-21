@@ -21,6 +21,7 @@ import {
 } from "../components/RoleMenuShell";
 import { clearSessionKeepPrefs } from "../utils/clearSessionKeepPrefs";
 import { applyTheme, getTheme } from "../utils/theme";
+import { filterMenuBySubmoduleAccess } from "../utils/submodulePermissions.js";
 
 /* ─── Color map ─────────────────────────────────────────────── */
 const COLOR_MAP = {
@@ -325,6 +326,8 @@ export default function SuperAdminMenu() {
     },
   ];
 
+  const visibleMenu = filterMenuBySubmoduleAccess(menu, user);
+
   useMenuExitGuard(setShowExit);
 
   return (
@@ -339,7 +342,7 @@ export default function SuperAdminMenu() {
           loginAs={user?.loginAs}
         />
         <ModuleGrid
-          menu={menu}
+          menu={visibleMenu}
           colorMap={COLOR_MAP}
           openItem={openItem}
           setOpenItem={setOpenItem}

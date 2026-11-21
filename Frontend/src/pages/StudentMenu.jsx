@@ -28,6 +28,7 @@ import StudentHomeHub, {
 } from "../components/StudentHomeHub";
 import { clearSessionKeepPrefs } from "../utils/clearSessionKeepPrefs";
 import { applyTheme } from "../utils/theme";
+import { filterMenuBySubmoduleAccess } from "../utils/submodulePermissions.js";
 
 export const COLOR_MAP = {
   Dashboard: { bg: "#EEF2FF", icon: "#6366F1", dot: "#C7D2FE" },
@@ -109,6 +110,7 @@ export default function StudentMenu() {
     { name: "Help / Support", icon: <FaHeadset />, path: "/student/help" },
   ];
 
+  const visibleMenu = filterMenuBySubmoduleAccess(menu, user);
   const displayName = user?.name || user?.school_name || "Student";
 
   return (
@@ -119,7 +121,7 @@ export default function StudentMenu() {
       <div className="flex flex-col gap-4">
         <StudentGreetingHeader name={displayName} />
         <StudentHomeHub
-          menu={menu}
+          menu={visibleMenu}
           colorMap={COLOR_MAP}
           openItem={openItem}
           setOpenItem={setOpenItem}

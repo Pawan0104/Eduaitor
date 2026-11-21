@@ -11,6 +11,7 @@ import {
   FaWallet,
 } from "react-icons/fa";
 import { useAuth } from "../context/AuthContext";
+import { canAccessRoute } from "../utils/submodulePermissions.js";
 
 const REPORT_GROUPS = [
   {
@@ -95,9 +96,10 @@ export default function ReportsHub() {
           .map((item) => ({
             ...item,
             href: `${basePath}/${item.path}`,
-          })),
+          }))
+          .filter((item) => canAccessRoute(user, item.href)),
       })).filter((group) => group.items.length > 0),
-    [basePath, isStaff],
+    [basePath, isStaff, user],
   );
 
   return (

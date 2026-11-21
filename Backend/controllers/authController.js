@@ -209,6 +209,7 @@ export const loginUser = async (req, res) => {
             customRoleId: teacher.customRoleId || null,
             customRoleName,
             permissions: teacher.permissions || [],
+            submodulePermissions: teacher.submodulePermissions || [],
             subscribed_modules,
             photo_url: teacher.photo?.url || null,
             firstTimeLogin: teacher.firstTimeLogin ?? false,
@@ -404,6 +405,7 @@ export const loginUser = async (req, res) => {
           customRoleId: staff.customRoleId || null,
           firstTimeLogin: staff.firstTimeLogin,
           permissions: staff.permissions, // ← staff personal module access
+          submodulePermissions: staff.submodulePermissions || [],
           subscribed_modules, // ← school level modules for sidebar
           photo_url: staff.photo?.url || null,
         },

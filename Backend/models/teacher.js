@@ -74,6 +74,12 @@ const teacherSchema = new mongoose.Schema(
       default: [],
     },
 
+    /** Granular sub-module grants. Empty means inherit all sub-modules under `permissions`. */
+    submodulePermissions: {
+      type: [String],
+      default: [],
+    },
+
     /**
      * Set when this teacher also acts as a hostel warden.
      * Warden duties are authorised through the "hostel" module permission,

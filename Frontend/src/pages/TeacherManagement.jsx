@@ -1,10 +1,13 @@
-import { useState, useEffect } from "react";
+import { useEffect, useMemo, useState } from "react";
 import axios from "axios";
 import { toast } from "react-toastify";
 import { useParams, useNavigate, useSearchParams } from "react-router-dom";
 import { FaArrowLeft, FaPlus } from "react-icons/fa";
 import { FiX } from "react-icons/fi";
 import { MODULES } from "../constants/module.js";
+import ModulePermissionTree from "../components/ModulePermissionTree.jsx";
+import { getSubmoduleIdsForModule, SUBMODULE_BY_ID } from "../constants/submodules.js";
+import { expandSubmoduleIds } from "../utils/submodulePermissions.js";
 import { useAuth } from "../context/AuthContext";
 import LoadingSpinner from "../components/LoadingSpinner";
 import DummyFillBar from "../components/DummyFill.jsx";
@@ -48,6 +51,7 @@ const emptyForm = {
 
   // Module access is granted per person, with no role indirection.
   permissions: [],
+  submodulePermissions: [],
 
   // A teacher may additionally act as a hostel warden.
   isHostelWarden: false,
@@ -151,17 +155,49 @@ const [classes, setClasses] = useState([]);
     (user?.subscribed_modules || []).includes(m.key),
   );
 
+  const effectiveSubmodules = useMemo(
+    () => expandSubmoduleIds(form.permissions, form.submodulePermissions),
+    [form.permissions, form.submodulePermissions],
+  );
+
   const togglePermission = (key) => {
     setForm((prev) => {
       const current = Array.isArray(prev.permissions) ? prev.permissions : [];
+      const children = getSubmoduleIdsForModule(key);
+      const enabled = current.includes(key);
+      const base = effectiveSubmodules.filter(
+        (id) => SUBMODULE_BY_ID[id]?.module !== key,
+      );
+
       return {
         ...prev,
-        permissions: current.includes(key)
+        permissions: enabled
           ? current.filter((k) => k !== key)
           : [...current, key],
+        submodulePermissions: enabled
+          ? base
+          : [...new Set([...base, ...children])],
       };
     });
     setErrors((prev) => ({ ...prev, permissions: undefined }));
+  };
+
+  const toggleSubmodulePermission = (id) => {
+    const current = effectiveSubmodules;
+    const next = current.includes(id)
+      ? current.filter((item) => item !== id)
+      : [...current, id];
+    const parent = SUBMODULE_BY_ID[id]?.module;
+    const parentStillGranted =
+      !parent || next.some((item) => SUBMODULE_BY_ID[item]?.module === parent);
+
+    setForm((prev) => ({
+      ...prev,
+      permissions: parentStillGranted
+        ? prev.permissions
+        : (prev.permissions || []).filter((key) => key !== parent),
+      submodulePermissions: next,
+    }));
   };
 
   /* Warden duty is authorised through the "hostel" module, so the checkbox
@@ -170,6 +206,11 @@ const [classes, setClasses] = useState([]);
     setForm((prev) => {
       const next = !prev.isHostelWarden;
       const perms = Array.isArray(prev.permissions) ? prev.permissions : [];
+      const hostelChildren = getSubmoduleIdsForModule("hostel");
+      const currentSubmodules = effectiveSubmodules;
+      const baseSubmodules = currentSubmodules.filter(
+        (id) => !hostelChildren.includes(id),
+      );
 
       return {
         ...prev,
@@ -177,6 +218,9 @@ const [classes, setClasses] = useState([]);
         permissions: next
           ? [...new Set([...perms, "hostel"])]
           : perms.filter((k) => k !== "hostel"),
+        submodulePermissions: next
+          ? [...new Set([...baseSubmodules, ...hostelChildren])]
+          : baseSubmodules,
       };
     });
   };
@@ -209,6 +253,9 @@ const [classes, setClasses] = useState([]);
       username: "test.teacher",
       password: "Test@1234",
       permissions: schoolModules.map((m) => m.key),
+      submodulePermissions: schoolModules.flatMap((m) =>
+        getSubmoduleIdsForModule(m.key),
+      ),
     }));
     toast.info("Teacher form filled with test data");
   };
@@ -279,6 +326,9 @@ dob: t.dob ? t.dob.split("T")[0] : "",
             joiningDate: t.joiningDate ? t.joiningDate.split("T")[0] : "",
             // Module access now lives on the teacher record itself.
             permissions: Array.isArray(t.permissions) ? t.permissions : [],
+            submodulePermissions: Array.isArray(t.submodulePermissions)
+              ? t.submodulePermissions
+              : [],
               isHostelWarden: Boolean(t.isHostelWarden),
 customRoleId: "",
             // Normalize to plain IDs in case they come back as populated objects
@@ -624,7 +674,12 @@ if (lowerErr.includes("job title")) errorMap.role = err;
         ];
         if (forbidden.includes(key)) return;
 
-if (key === "subjects" || key === "assignedClasses" || key === "permissions") {
+if (
+          key === "subjects" ||
+          key === "assignedClasses" ||
+          key === "permissions" ||
+          key === "submodulePermissions"
+        ) {
             data.append(key, JSON.stringify(value));
             return;
           }
@@ -1063,17 +1118,21 @@ if (key === "subjects" || key === "assignedClasses" || key === "permissions") {
                     <div className="flex items-center justify-between mb-2">
                       <p className="text-xs text-[rgb(var(--text-muted))]">
                         {(form.permissions || []).length} of {schoolModules.length}
-                        {" "}selected
+                        {" "}modules · {effectiveSubmodules.length} sub-modules selected
                       </p>
                       <div className="flex gap-2">
                         <button
                           type="button"
-                          onClick={() =>
+                          onClick={() => {
+                            const allModules = schoolModules.map((m) => m.key);
                             setForm((prev) => ({
                               ...prev,
-                              permissions: schoolModules.map((m) => m.key),
-                            }))
-                          }
+                              permissions: allModules,
+                              submodulePermissions: allModules.flatMap((key) =>
+                                getSubmoduleIdsForModule(key),
+                              ),
+                            }));
+                          }}
                           className="text-[11px] font-semibold text-[rgb(var(--primary))] underline"
                         >
                           Select all
@@ -1081,7 +1140,11 @@ if (key === "subjects" || key === "assignedClasses" || key === "permissions") {
                         <button
                           type="button"
                           onClick={() =>
-                            setForm((prev) => ({ ...prev, permissions: [] }))
+                            setForm((prev) => ({
+                              ...prev,
+                              permissions: [],
+                              submodulePermissions: [],
+                            }))
                           }
                           className="text-[11px] font-semibold text-gray-500 underline"
                         >
@@ -1090,34 +1153,18 @@ if (key === "subjects" || key === "assignedClasses" || key === "permissions") {
                       </div>
                     </div>
 
-                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2 max-h-64 overflow-y-auto">
-                      {schoolModules.map((m) => {
-                        const checked = (form.permissions || []).includes(
-                          m.key,
-                        );
-                        return (
-                          <label
-                            key={m.key}
-                            className="flex items-center gap-2 text-xs cursor-pointer px-2 py-1.5 rounded-lg hover:bg-[rgba(var(--primary),0.06)]"
-                          >
-                            <input
-                              type="checkbox"
-                              checked={checked}
-                              onChange={() => togglePermission(m.key)}
-                              className="w-4 h-4 accent-[rgb(var(--primary))]"
-                            />
-                            <span className="text-[rgb(var(--text))]">
-                              {m.label}
-                            </span>
-                          </label>
-                        );
-                      })}
-                      {schoolModules.length === 0 && (
-                        <p className="text-xs text-gray-500">
-                          No modules available for your school.
-                        </p>
-                      )}
-                    </div>
+                    <ModulePermissionTree
+                      modules={schoolModules}
+                      permissions={form.permissions || []}
+                      submodulePermissions={effectiveSubmodules}
+                      onToggleModule={togglePermission}
+                      onToggleSubmodule={toggleSubmodulePermission}
+                    />
+                    <p className="mt-2 text-[10.5px] text-[rgb(var(--text-muted))]">
+                      Use <strong>+</strong> to expand a module and adjust its child
+                      sub-modules individually. The module checkbox grants or revokes
+                      every child at once.
+                    </p>
                   </div>
 
                   {errors.permissions && (
@@ -1185,7 +1232,7 @@ if (key === "subjects" || key === "assignedClasses" || key === "permissions") {
                   <ReviewField label="Job Title" value={form.role} />
 <ReviewField
                       label="Module Access"
-                      value={`${(form.permissions || []).length} module(s) selected`}
+                      value={`${(form.permissions || []).length} modules · ${effectiveSubmodules.length} sub-modules`}
                     />
                   <ReviewField label="Username" value={form.username} />
                   <ReviewField

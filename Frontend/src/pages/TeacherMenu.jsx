@@ -32,6 +32,7 @@ import {
 } from "../components/RoleMenuShell";
 import { clearSessionKeepPrefs } from "../utils/clearSessionKeepPrefs";
 import { applyTheme, getTheme } from "../utils/theme";
+import { filterMenuBySubmoduleAccess } from "../utils/submodulePermissions.js";
 
 export const COLOR_MAP = {
   Dashboard: { bg: "#FFF7ED", icon: "#F97316", dot: "#FED7AA" },
@@ -158,7 +159,7 @@ export default function TeacherMenu() {
 
   const teacherPerms = user?.permissions || [];
   const schoolMods = user?.subscribed_modules || [];
-  const menu =
+  const moduleFilteredMenu =
     teacherPerms.length === 0
       ? allMenu
       : allMenu.filter((item) => {
@@ -166,6 +167,7 @@ export default function TeacherMenu() {
           if (!schoolMods.includes(item.module)) return false;
           return teacherPerms.includes(item.module);
         });
+  const menu = filterMenuBySubmoduleAccess(moduleFilteredMenu, user);
 
   return (
     <div className="min-h-screen font-nunito" style={{ background: "rgb(var(--bg))" }}>

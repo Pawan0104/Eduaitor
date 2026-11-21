@@ -36,6 +36,7 @@ import BlogFeed from "../components/BlogFeed";
 import { ModuleGrid, useMenuExitGuard } from "../components/RoleMenuShell";
 import { clearSessionKeepPrefs } from "../utils/clearSessionKeepPrefs";
 import { applyTheme, getTheme } from "../utils/theme";
+import { filterMenuBySubmoduleAccess } from "../utils/submodulePermissions.js";
 
 /* ─── Color map ─────────────────────────────────────────────── */
 export const COLOR_MAP = {
@@ -604,6 +605,8 @@ export default function SchoolMenu() {
     },
   ];
 
+  const visibleMenu = filterMenuBySubmoduleAccess(menu, user);
+
   useMenuExitGuard(setShowExit);
 
   return (
@@ -618,7 +621,7 @@ export default function SchoolMenu() {
           loginAs={greetingLoginAs}
         />
         <ModuleGrid
-          menu={menu}
+          menu={visibleMenu}
           colorMap={COLOR_MAP}
           openItem={openItem}
           setOpenItem={setOpenItem}

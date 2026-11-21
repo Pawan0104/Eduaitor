@@ -46,6 +46,7 @@ import { useLanguage } from "../context/LanguageContext";
 import axios from "axios";
 import { toast } from "react-toastify";
 import { clearSessionKeepPrefs as preservePrefsAndClear } from "../utils/clearSessionKeepPrefs";
+import { filterMenuBySubmoduleAccess } from "../utils/submodulePermissions.js";
 
 const API = import.meta.env.VITE_API_URL;
 
@@ -979,7 +980,7 @@ const Sidebar = ({ closeSidebar, unreadMessages = 0 }) => {
     } else {
       next = menu.filter((item) => !item.module || hasModule(item.module));
     }
-    return sortMenuAlpha(next);
+    return sortMenuAlpha(filterMenuBySubmoduleAccess(next, user));
   })();
 
   return (

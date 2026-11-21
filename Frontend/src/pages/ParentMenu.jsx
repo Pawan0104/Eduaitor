@@ -33,6 +33,7 @@ import {
 } from "../components/RoleMenuShell";
 import { clearSessionKeepPrefs } from "../utils/clearSessionKeepPrefs";
 import { applyTheme } from "../utils/theme";
+import { filterMenuBySubmoduleAccess } from "../utils/submodulePermissions.js";
 
 const COLOR_MAP = {
   Dashboard: { bg: "#FFF7ED", icon: "#F97316", dot: "#FED7AA" },
@@ -143,6 +144,8 @@ export default function ParentMenu() {
     { name: "Help / Support", icon: <FaHeadset />, path: "/parent/help" },
   ];
 
+  const visibleMenu = filterMenuBySubmoduleAccess(menu, user);
+
   return (
     <div className="min-h-screen font-nunito" style={{ background: "rgb(var(--bg))" }}>
       <div className="flex flex-col gap-3">
@@ -152,7 +155,7 @@ export default function ParentMenu() {
           loginAs={user?.loginAs}
         />
         <ModuleGrid
-          menu={menu}
+          menu={visibleMenu}
           colorMap={COLOR_MAP}
           openItem={openItem}
           setOpenItem={setOpenItem}

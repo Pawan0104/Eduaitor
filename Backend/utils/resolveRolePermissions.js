@@ -1,6 +1,10 @@
 import SchoolStaffRole from "../models/schoolStaffRole.js";
 import { MODULE_KEYS } from "../constants/module.js";
 import {
+  resolveSubmodulePermissions,
+  resolveRoleSubmodulePermissions,
+} from "./submodulePermissions.js";
+import {
   getSchoolWithModules,
   resolveSubscribedModules,
   ensureDefaultSchoolModules,
@@ -14,6 +18,7 @@ export async function resolveRolePermissions({
   schoolId,
   customRoleId,
   permissionsRaw,
+  submodulePermissionsRaw,
   requireRole = false,
   reqUser = {},
   entityLabel = "staff",
@@ -43,7 +48,17 @@ export async function resolveRolePermissions({
           "Selected role has no modules available for your school. Update the role first.",
       };
     }
-    return { permissions, customRoleId: role._id, role };
+    const submodulePermissions = resolveRoleSubmodulePermissions({
+      role,
+      modulePermissions: permissions,
+      schoolModules,
+    });
+    return {
+      permissions,
+      submodulePermissions,
+      customRoleId: role._id,
+      role,
+    };
   }
 
   if (requireRole) {
@@ -78,5 +93,19 @@ export async function resolveRolePermissions({
     };
   }
 
-  return { permissions: parsedPermissions, customRoleId: null, role: null };
+  const resolvedSubmodules = resolveSubmodulePermissions({
+    submodulePermissionsRaw,
+    modulePermissions: parsedPermissions,
+    schoolModules,
+  });
+  if (resolvedSubmodules.error) {
+    return { error: resolvedSubmodules.error };
+  }
+
+  return {
+    permissions: parsedPermissions,
+    submodulePermissions: resolvedSubmodules.submodulePermissions,
+    customRoleId: null,
+    role: null,
+  };
 }

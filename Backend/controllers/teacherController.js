@@ -14,6 +14,7 @@ import {
   removeTeacherFromClasses,
 } from "../utils/teacherClassSync.js";
 import { resolveRolePermissions } from "../utils/resolveRolePermissions.js";
+import { getSubmoduleIdsForModule } from "../constants/submodules.js";
 import { notifyCredentialsAsync } from "../services/credentials/notifyCredentials.js";
 import {
   normalizeEmail,
@@ -97,6 +98,7 @@ export const createTeacher = async (req, res) => {
       schoolId,
       customRoleId,
       permissionsRaw: req.body.permissions,
+      submodulePermissionsRaw: req.body.submodulePermissions,
       reqUser: req.user,
       entityLabel: "teacher",
     });
@@ -151,13 +153,22 @@ export const createTeacher = async (req, res) => {
     const {
       customRoleId: _omitRole,
       permissions: _omitPerms,
+      submodulePermissions: _omitSubPerms,
       ...restBody
     } = req.body;
 
     // A hostel warden must be able to act in the hostel module, so keep the
     // permission in sync with the flag even if the client omitted it.
-    if (restBody.isHostelWarden && !resolved.permissions.includes("hostel")) {
-      resolved.permissions = [...resolved.permissions, "hostel"];
+    if (restBody.isHostelWarden) {
+      if (!resolved.permissions.includes("hostel")) {
+        resolved.permissions = [...resolved.permissions, "hostel"];
+      }
+      resolved.submodulePermissions = [
+        ...new Set([
+          ...(resolved.submodulePermissions || []),
+          ...getSubmoduleIdsForModule("hostel"),
+        ]),
+      ];
     }
 
     const teacher = await Teacher.create({
@@ -170,6 +181,7 @@ export const createTeacher = async (req, res) => {
       schoolId,
       customRoleId: resolved.customRoleId,
       permissions: resolved.permissions,
+      submodulePermissions: resolved.submodulePermissions,
     });
 
     // Sync teacher groups based on assigned classes and subjects
@@ -185,7 +197,7 @@ export const createTeacher = async (req, res) => {
 
     const populated = await Teacher.findById(teacher._id)
       .select("-password -temp_password")
-      .populate("customRoleId", "name permissions isActive")
+      .populate("customRoleId", "name permissions submodulePermissions isActive")
       .lean();
 
     const schoolDoc = await School.findById(schoolId).select("school_name").lean();
@@ -256,7 +268,7 @@ export const getTeachers = async (req, res) => {
       .select("-password -temp_password")
       .populate("assignedClasses", "name className section")
       .populate("subjects", "name")
-      .populate("customRoleId", "name permissions isActive")
+      .populate("customRoleId", "name permissions submodulePermissions isActive")
       .sort({ createdAt: -1 })
       .lean();
 
@@ -295,7 +307,7 @@ export const getTeacher = async (req, res) => {
       .select("-password -temp_password")
       .populate("assignedClasses", "name className section")
       .populate("subjects", "name")
-      .populate("customRoleId", "name permissions isActive")
+      .populate("customRoleId", "name permissions submodulePermissions isActive")
       .lean();
 
     if (!teacher) {
@@ -417,6 +429,7 @@ export const updateTeacher = async (req, res) => {
     const {
       customRoleId: bodyRoleId,
       permissions: _bodyPerms,
+      submodulePermissions: _bodySubPerms,
       ...restSafe
     } = safeBody;
 
@@ -444,6 +457,7 @@ export const updateTeacher = async (req, res) => {
         schoolId: safeSchoolId,
         customRoleId: null,
         permissionsRaw: _bodyPerms,
+        submodulePermissionsRaw: _bodySubPerms,
         reqUser: req.user,
         entityLabel: "teacher",
       });
@@ -455,11 +469,13 @@ export const updateTeacher = async (req, res) => {
       }
       updateData.customRoleId = null;
       updateData.permissions = resolved.permissions;
+      updateData.submodulePermissions = resolved.submodulePermissions;
     } else if (bodyRoleId) {
       // Legacy role-driven access, kept for API back-compat only.
       const resolved = await resolveRolePermissions({
         schoolId: safeSchoolId,
         customRoleId: bodyRoleId,
+        submodulePermissionsRaw: _bodySubPerms,
         reqUser: req.user,
         entityLabel: "teacher",
       });
@@ -471,6 +487,7 @@ export const updateTeacher = async (req, res) => {
       }
       updateData.customRoleId = resolved.customRoleId;
       updateData.permissions = resolved.permissions;
+      updateData.submodulePermissions = resolved.submodulePermissions;
     } else if (teacher.customRoleId) {
       const resolved = await resolveRolePermissions({
         schoolId: safeSchoolId,
@@ -480,6 +497,7 @@ export const updateTeacher = async (req, res) => {
       });
       if (!resolved.error) {
         updateData.permissions = resolved.permissions;
+        updateData.submodulePermissions = resolved.submodulePermissions;
       }
     }
 
@@ -491,6 +509,16 @@ export const updateTeacher = async (req, res) => {
       !updateData.permissions.includes("hostel")
     ) {
       updateData.permissions = [...updateData.permissions, "hostel"];
+    }
+    if (updateData.isHostelWarden) {
+      const baseSubmodules = Array.isArray(updateData.submodulePermissions)
+        ? updateData.submodulePermissions
+        : Array.isArray(teacher.submodulePermissions)
+          ? teacher.submodulePermissions
+          : [];
+      updateData.submodulePermissions = [
+        ...new Set([...baseSubmodules, ...getSubmoduleIdsForModule("hostel")]),
+      ];
     }
 
     if (updateData.email !== undefined) {
@@ -529,7 +557,7 @@ export const updateTeacher = async (req, res) => {
     )
       .select("-password -temp_password")
       .populate("assignedClasses", "name className section")
-      .populate("customRoleId", "name permissions isActive");
+      .populate("customRoleId", "name permissions submodulePermissions isActive");
 
     const classesChanged =
       JSON.stringify(oldTeacher.assignedClasses) !==

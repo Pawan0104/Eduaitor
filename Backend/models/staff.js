@@ -93,6 +93,12 @@ const staffSchema = new mongoose.Schema(
       default: [],
     },
 
+    /** Granular sub-module grants. Empty means inherit all sub-modules under `permissions`. */
+    submodulePermissions: {
+      type: [String],
+      default: [],
+    },
+
     /** School-level custom role — source of truth for permissions when set */
     customRoleId: {
       type: mongoose.Schema.Types.ObjectId,

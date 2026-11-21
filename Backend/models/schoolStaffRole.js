@@ -1,5 +1,6 @@
 import mongoose from "mongoose";
 import { MODULE_KEYS } from "../constants/module.js";
+import { SUBMODULE_IDS } from "../constants/submodules.js";
 
 const schoolStaffRoleSchema = new mongoose.Schema(
   {
@@ -28,6 +29,10 @@ const schoolStaffRoleSchema = new mongoose.Schema(
     },
     permissions: {
       type: [{ type: String, enum: MODULE_KEYS }],
+      default: [],
+    },
+    submodulePermissions: {
+      type: [{ type: String, enum: SUBMODULE_IDS }],
       default: [],
     },
     isActive: {

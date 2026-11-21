@@ -1,4 +1,5 @@
 import jwt from "jsonwebtoken";
+import { enforceSubmoduleAccess } from "../utils/submoduleAccess.js";
 
 export const authMiddleware = (req, res, next) => {
   const token = req.cookies.token || req.headers.authorization?.split(" ")[1];
@@ -10,7 +11,10 @@ export const authMiddleware = (req, res, next) => {
   try {
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
     req.user = decoded; // contains role, school_id etc
-    next();
+
+    // Sub-module checks run after auth so every protected API route inherits
+    // them without needing a separate guard on each router.
+    return enforceSubmoduleAccess(req, res, next);
   } catch (err) {
     return res.status(401).json({ message: "Invalid token" });
   }

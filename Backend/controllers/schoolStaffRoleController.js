@@ -4,6 +4,11 @@ import Staff from "../models/staff.js";
 import Teacher from "../models/teacher.js";
 import { MODULES, MODULE_KEYS } from "../constants/module.js";
 import {
+  SUBMODULE_IDS,
+  SUBMODULES_BY_ID,
+  getSubmoduleIdsForModule,
+} from "../constants/submodules.js";
+import {
   getSchoolWithModules,
   resolveSubscribedModules,
   ensureDefaultSchoolModules,
@@ -31,6 +36,47 @@ const validatePermissions = (permissions, schoolModules) => {
   }
   return null;
 };
+
+const validateSubmodulePermissions = (
+  modulePermissions,
+  submodulePermissions,
+  schoolModules,
+) => {
+  if (submodulePermissions === undefined || submodulePermissions === null) {
+    return null;
+  }
+  if (!Array.isArray(submodulePermissions)) {
+    return "Invalid sub-module permissions format";
+  }
+
+  const invalid = submodulePermissions.filter((id) => !SUBMODULE_IDS.includes(id));
+  if (invalid.length) {
+    return `Invalid sub-module permission(s): ${invalid.join(", ")}`;
+  }
+
+  const notAllowed = submodulePermissions.filter((id) => {
+    const submodule = SUBMODULES_BY_ID[id];
+    if (!submodule?.module) return false;
+    if (!modulePermissions.includes(submodule.module)) return true;
+    if (schoolModules.length > 0 && !schoolModules.includes(submodule.module)) return true;
+    return false;
+  });
+  if (notAllowed.length) {
+    return `Sub-modules are not available for this role: ${notAllowed.join(", ")}`;
+  }
+
+  return null;
+};
+
+const deriveSubmodules = (modulePermissions, schoolModules) => [
+  ...new Set(
+    modulePermissions.flatMap((key) =>
+      schoolModules.length > 0 && !schoolModules.includes(key)
+        ? []
+        : getSubmoduleIdsForModule(key),
+    ),
+  ),
+];
 
 const STARTER_ROLES = [
   {
@@ -92,6 +138,7 @@ const seedStarterRoles = async (schoolId, schoolModules) => {
         nameKey: starter.name.trim().toLowerCase(),
         description: starter.description,
         permissions,
+        submodulePermissions: deriveSubmodules(permissions, schoolModules),
         isActive: true,
         isSystem: true,
       });
@@ -125,6 +172,7 @@ const ensureTeacherStarterRole = async (schoolId, schoolModules) => {
       nameKey: "teacher",
       description: starter.description,
       permissions,
+      submodulePermissions: deriveSubmodules(permissions, schoolModules),
       isActive: true,
       isSystem: true,
     });
@@ -142,6 +190,7 @@ const roleToJson = (doc, staffCount = 0) => ({
   name: doc.name,
   description: doc.description || "",
   permissions: doc.permissions || [],
+  submodulePermissions: doc.submodulePermissions || [],
   isActive: doc.isActive !== false,
   isSystem: !!doc.isSystem,
   staffCount,
@@ -225,7 +274,7 @@ export const listRoles = async (req, res, next) => {
 export const createRole = async (req, res, next) => {
   try {
     const schoolId = req.user.school_id;
-    const { name, description, permissions, isActive } = req.body;
+    const { name, description, permissions, submodulePermissions, isActive } = req.body;
 
     if (!name?.trim()) {
       return res.status(400).json({ success: false, message: "Role name is required" });
@@ -235,6 +284,14 @@ export const createRole = async (req, res, next) => {
     const permError = validatePermissions(permissions, schoolModules);
     if (permError) {
       return res.status(400).json({ success: false, message: permError });
+    }
+    const subPermError = validateSubmodulePermissions(
+      permissions,
+      submodulePermissions,
+      schoolModules,
+    );
+    if (subPermError) {
+      return res.status(400).json({ success: false, message: subPermError });
     }
 
     const existing = await SchoolStaffRole.findOne({
@@ -253,6 +310,10 @@ export const createRole = async (req, res, next) => {
       name: name.trim(),
       description: description?.trim() || "",
       permissions,
+      submodulePermissions:
+        submodulePermissions === undefined
+          ? deriveSubmodules(permissions, schoolModules)
+          : submodulePermissions,
       isActive: isActive !== false,
       isSystem: false,
     });
@@ -282,7 +343,7 @@ export const updateRole = async (req, res, next) => {
       return res.status(404).json({ success: false, message: "Role not found" });
     }
 
-    const { name, description, permissions, isActive } = req.body;
+    const { name, description, permissions, submodulePermissions, isActive } = req.body;
 
     if (name !== undefined) {
       if (!String(name).trim()) {
@@ -310,6 +371,9 @@ export const updateRole = async (req, res, next) => {
       role.isActive = Boolean(isActive);
     }
 
+    let permissionsChanged = false;
+    let submodulesChanged = false;
+
     if (permissions !== undefined) {
       const schoolModules = await getSchoolModules(schoolId, req.user);
       const permError = validatePermissions(permissions, schoolModules);
@@ -317,20 +381,58 @@ export const updateRole = async (req, res, next) => {
         return res.status(400).json({ success: false, message: permError });
       }
       role.permissions = permissions;
+      permissionsChanged = true;
+
+      const nextSubmodules =
+        submodulePermissions === undefined
+          ? deriveSubmodules(role.permissions, schoolModules)
+          : submodulePermissions;
+      const subPermError = validateSubmodulePermissions(
+        role.permissions,
+        nextSubmodules,
+        schoolModules,
+      );
+      if (subPermError) {
+        return res.status(400).json({ success: false, message: subPermError });
+      }
+      role.submodulePermissions = nextSubmodules;
+      submodulesChanged = true;
+    } else if (submodulePermissions !== undefined) {
+      const schoolModules = await getSchoolModules(schoolId, req.user);
+      const subPermError = validateSubmodulePermissions(
+        role.permissions,
+        submodulePermissions,
+        schoolModules,
+      );
+      if (subPermError) {
+        return res.status(400).json({ success: false, message: subPermError });
+      }
+      role.submodulePermissions = submodulePermissions;
+      submodulesChanged = true;
     }
 
     await role.save();
 
     // Live-sync: update all staff AND teachers assigned this role
-    if (permissions !== undefined) {
+    if (permissionsChanged || submodulesChanged) {
       await Promise.all([
         Staff.updateMany(
           { schoolId, customRoleId: role._id },
-          { $set: { permissions: role.permissions } },
+          {
+            $set: {
+              permissions: role.permissions,
+              submodulePermissions: role.submodulePermissions,
+            },
+          },
         ),
         Teacher.updateMany(
           { schoolId, customRoleId: role._id },
-          { $set: { permissions: role.permissions } },
+          {
+            $set: {
+              permissions: role.permissions,
+              submodulePermissions: role.submodulePermissions,
+            },
+          },
         ),
       ]);
     }

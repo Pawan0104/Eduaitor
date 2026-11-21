@@ -8,6 +8,11 @@ import { uploadToCloudinary } from "../utils/uploadToCloudinary.js";
 import { deleteFromCloudinary } from "../utils/deleteFromCloudinary.js";
 import { MODULE_KEYS } from "../constants/module.js";
 import {
+  resolveSubmodulePermissions,
+  resolveRoleSubmodulePermissions,
+} from "../utils/submodulePermissions.js";
+import { getSubmoduleIdsForModule } from "../constants/submodules.js";
+import {
   getSchoolWithModules,
   resolveSubscribedModules,
   ensureDefaultSchoolModules,
@@ -31,6 +36,7 @@ const resolveStaffPermissions = async ({
   schoolId,
   customRoleId,
   permissionsRaw,
+  submodulePermissionsRaw,
   requireRole = false,
   reqUser = {},
 }) => {
@@ -59,7 +65,17 @@ const resolveStaffPermissions = async ({
           "Selected role has no modules available for your school. Update the role first.",
       };
     }
-    return { permissions, customRoleId: role._id, role };
+    const submodulePermissions = resolveRoleSubmodulePermissions({
+      role,
+      modulePermissions: permissions,
+      schoolModules,
+    });
+    return {
+      permissions,
+      submodulePermissions,
+      customRoleId: role._id,
+      role,
+    };
   }
 
   if (requireRole) {
@@ -92,7 +108,21 @@ const resolveStaffPermissions = async ({
     };
   }
 
-  return { permissions: parsedPermissions, customRoleId: null, role: null };
+  const resolvedSubmodules = resolveSubmodulePermissions({
+    submodulePermissionsRaw,
+    modulePermissions: parsedPermissions,
+    schoolModules,
+  });
+  if (resolvedSubmodules.error) {
+    return { error: resolvedSubmodules.error };
+  }
+
+  return {
+    permissions: parsedPermissions,
+    submodulePermissions: resolvedSubmodules.submodulePermissions,
+    customRoleId: null,
+    role: null,
+  };
 };
 
 /* ── HELPER — auto generate staffId ─────────────────
@@ -138,6 +168,7 @@ export const createStaff = async (req, res, next) => {
       employmentType,
       salary,
       permissions,  // JSON string from FormData (ignored when customRoleId set)
+      submodulePermissions, // JSON string from FormData (ignored when customRoleId set)
       password,
       status,
       isHostelWarden,
@@ -197,6 +228,7 @@ export const createStaff = async (req, res, next) => {
       schoolId,
       customRoleId,
       permissionsRaw: permissions,
+      submodulePermissionsRaw: submodulePermissions,
       reqUser: req.user,
     });
     if (resolved.error) {
@@ -205,8 +237,14 @@ export const createStaff = async (req, res, next) => {
 
     // A hostel warden keeps "hostel" module access in sync with the flag even
     // if the client omitted the permission from the submitted module list.
-    if (isHostelWardenFlag && !resolved.permissions.includes("hostel")) {
-      resolved.permissions = [...resolved.permissions, "hostel"];
+    if (isHostelWardenFlag) {
+      if (!resolved.permissions.includes("hostel")) {
+        resolved.permissions = [...resolved.permissions, "hostel"];
+      }
+      const hostelSubmodules = getSubmoduleIdsForModule("hostel");
+      resolved.submodulePermissions = [
+        ...new Set([...(resolved.submodulePermissions || []), ...hostelSubmodules]),
+      ];
     }
 
     // ── 6. GENERATE IDs ───────────────────────────
@@ -242,6 +280,7 @@ export const createStaff = async (req, res, next) => {
       employmentType: employmentType || "Full-Time",
       salary:         salary     || null,
       permissions:    resolved.permissions,
+      submodulePermissions: resolved.submodulePermissions,
       staffId,
       username,
       password:       hashedPassword,
@@ -308,12 +347,12 @@ export const getStaff = async (req, res, next) => {
     const [staff, teachers, drivers] = await Promise.all([
       Staff.find({ schoolId })
         .select("-password -temp_password")
-        .populate("customRoleId", "name permissions isActive")
+        .populate("customRoleId", "name permissions submodulePermissions isActive")
         .sort({ createdAt: -1 })
         .lean(),
       Teacher.find({ schoolId })
         .select("-password -temp_password")
-        .populate("customRoleId", "name permissions isActive")
+        .populate("customRoleId", "name permissions submodulePermissions isActive")
         .sort({ createdAt: -1 })
         .lean(),
       Driver.find({ schoolId })
@@ -332,6 +371,7 @@ export const getStaff = async (req, res, next) => {
         teacher.customRoleId?._id || teacher.customRoleId || null,
       staffId: teacher.teacherId,
       permissions: teacher.permissions || [],
+      submodulePermissions: teacher.submodulePermissions || [],
       status: teacher.status === "Inactive" ? "Inactive" : "Active",
       model: "Teacher",
       personType: "Teaching",
@@ -355,6 +395,7 @@ export const getStaff = async (req, res, next) => {
       customRoleId: null,
       staffId: driver.driverId,
       permissions: [],
+      submodulePermissions: [],
       photo: driver.photo?.url
         ? {
             url: driver.photo.url,
@@ -393,7 +434,7 @@ export const getSingleStaff = async (req, res, next) => {
     const staff = await Staff
       .findOne({ _id: req.params.id, schoolId })
       .select("-password -temp_password")
-      .populate("customRoleId", "name permissions isActive");
+      .populate("customRoleId", "name permissions submodulePermissions isActive");
 
     if (!staff) {
       return res.status(404).json({ success: false, message: "Staff member not found" });
@@ -428,6 +469,7 @@ export const updateStaff = async (req, res, next) => {
       employmentType,
       salary,
       permissions,
+      submodulePermissions,
       password,
       status,
       isHostelWarden,
@@ -495,6 +537,7 @@ export const updateStaff = async (req, res, next) => {
         schoolId,
         customRoleId,
         permissionsRaw: permissions,
+        submodulePermissionsRaw: submodulePermissions,
         requireRole: false,
         reqUser: req.user,
       });
@@ -503,6 +546,7 @@ export const updateStaff = async (req, res, next) => {
       }
       updateData.customRoleId = resolved.customRoleId;
       updateData.permissions = resolved.permissions;
+      updateData.submodulePermissions = resolved.submodulePermissions;
     } else if (roleClearing) {
       updateData.customRoleId = null;
       if (permissions) {
@@ -510,12 +554,14 @@ export const updateStaff = async (req, res, next) => {
           schoolId,
           customRoleId: null,
           permissionsRaw: permissions,
+          submodulePermissionsRaw: submodulePermissions,
           reqUser: req.user,
         });
         if (resolved.error) {
           return res.status(400).json({ success: false, message: resolved.error });
         }
         updateData.permissions = resolved.permissions;
+        updateData.submodulePermissions = resolved.submodulePermissions;
       }
     } else if (staff.customRoleId) {
       // Keep role-driven permissions in sync (ignore client permission overrides)
@@ -526,18 +572,21 @@ export const updateStaff = async (req, res, next) => {
       });
       if (!resolved.error) {
         updateData.permissions = resolved.permissions;
+        updateData.submodulePermissions = resolved.submodulePermissions;
       }
     } else if (permissions) {
       const resolved = await resolveStaffPermissions({
         schoolId,
         customRoleId: null,
         permissionsRaw: permissions,
+        submodulePermissionsRaw: submodulePermissions,
         reqUser: req.user,
       });
       if (resolved.error) {
         return res.status(400).json({ success: false, message: resolved.error });
       }
-updateData.permissions = resolved.permissions;
+      updateData.permissions = resolved.permissions;
+      updateData.submodulePermissions = resolved.submodulePermissions;
     }
 
     // Keep "hostel" module access in sync with the warden flag: the flag is
@@ -552,6 +601,14 @@ updateData.permissions = resolved.permissions;
       if (!base.includes("hostel")) {
         updateData.permissions = [...base, "hostel"];
       }
+      const baseSubmodules = Array.isArray(updateData.submodulePermissions)
+        ? updateData.submodulePermissions
+        : Array.isArray(staff.submodulePermissions)
+          ? staff.submodulePermissions
+          : [];
+      updateData.submodulePermissions = [
+        ...new Set([...baseSubmodules, ...getSubmoduleIdsForModule("hostel")]),
+      ];
     }
 
     // ── 4. HANDLE PASSWORD ────────────────────────
@@ -577,7 +634,7 @@ updateData.permissions = resolved.permissions;
       { new: true, runValidators: true }
     )
       .select("-password -temp_password")
-      .populate("customRoleId", "name permissions isActive");
+      .populate("customRoleId", "name permissions submodulePermissions isActive");
 
     const data = updated.toObject();
     data.customRoleName = data.customRoleId?.name || null;

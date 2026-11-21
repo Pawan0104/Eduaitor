@@ -1,8 +1,9 @@
-import { useMemo, useState } from "react";
+import { Fragment, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import {
   Check,
   Eye,
+  Minus,
   Plus,
   RotateCcw,
   Search,
@@ -11,6 +12,7 @@ import {
   Users,
   X,
 } from "lucide-react";
+import { SUBMODULES_BY_MODULE } from "../constants/submodules.js";
 
 const ROLES = [
   { name: "School Admin", modules: 25, total: 25, category: "Admin", actions: 125, description: "Full school-wide administrator access to every ERP module and action." },
@@ -57,7 +59,59 @@ const MODULE_ACCESS = [
   { id: "reports_analytics", name: "Reports & Analytics", category: "Finance & Admin", description: "Optional subject student lists, class strength & exportable registers.", access: [1, 0, 0, 0, 1] },
 ];
 
+/** Link this screen's legacy module cards to the canonical sub-module registry. */
+const MODULE_KEY_BY_ACCESS_ID = {
+  student_management: "students",
+  admissions_registrations: "leads",
+  classes_sections: "classes",
+  subjects_groups: "classes",
+  staff_management: "staff",
+  access_control: "staff",
+  attendance: "attendance",
+  timetable: "timetable",
+  syllabus: "syllabus",
+  exam_management: "exams",
+  homework: "assignments",
+  assignments: "assignments",
+  diary: "diary",
+  certificates: "certificates",
+  fee_management: "fees",
+  payroll_accounts: "fees",
+  commerce_suite: "commerce",
+  transport_management: "transport",
+  bus_gps: "gpsTracking",
+  hostel_management: "hostel",
+  library: "library",
+  house_allocation: "house",
+  inventory_assets: null,
+  notices_communication: "notices",
+  reports_analytics: null,
+};
+
+const getChildrenForModule = (moduleId) => {
+  const key = MODULE_KEY_BY_ACCESS_ID[moduleId];
+  return key ? SUBMODULES_BY_MODULE[key] || [] : [];
+};
+
 const ACTION_LABELS = ["View", "Create", "Edit", "Delete", "Export"];
+
+const LEVELS = {
+  Full: [1, 1, 1, 1, 1],
+  Std: [1, 1, 1, 0, 1],
+  View: [1, 0, 0, 0, 0],
+  Off: [0, 0, 0, 0, 0],
+};
+
+/** Sub-modules inherit their parent module's action grants by default. */
+const defaultSubmoduleMatrix = (parentMatrix) =>
+  MODULE_ACCESS.reduce((acc, m) => {
+    const inherited = parentMatrix?.[m.id] ? [...parentMatrix[m.id]] : [...LEVELS.View];
+    acc[m.id] = getChildrenForModule(m.id).reduce((rows, child) => {
+      rows[child.id] = [...inherited];
+      return rows;
+    }, {});
+    return acc;
+  }, {});
 
 const STAFF = [
   ["STF-020", "Mrs. Meenakshi Sharma", "Teacher", true],
@@ -81,13 +135,6 @@ const STAFF = [
   ["STF-018", "Mr. Mohan Lal Jangid", "Accountant / Fee Desk", false],
   ["STF-019", "Mrs. Geeta Devi", "Librarian", false],
 ];
-
-const LEVELS = {
-  Full: [1, 1, 1, 1, 1],
-  Std: [1, 1, 1, 0, 1],
-  View: [1, 0, 0, 0, 0],
-  Off: [0, 0, 0, 0, 0],
-};
 
 const effectiveLabel = (a) => {
   if (a.every((v) => !v)) return "No Access";
@@ -123,7 +170,12 @@ const AccessControlRbac = () => {
   const [moduleFilter, setModuleFilter] = useState("All");
   const [moduleQuery, setModuleQuery] = useState("");
   const [roles, setRoles] = useState(ROLES);
-  const [matrix, setMatrix] = useState(() => defaultMatrixFor(ROLES[2]));
+  const initialMatrix = useMemo(() => defaultMatrixFor(ROLES[2]), []);
+  const [matrix, setMatrix] = useState(initialMatrix);
+  const [expandedModules, setExpandedModules] = useState(() => new Set());
+  const [submoduleMatrix, setSubmoduleMatrix] = useState(() =>
+    defaultSubmoduleMatrix(initialMatrix),
+  );
   const [createOpen, setCreateOpen] = useState(false);
   const [newRole, setNewRole] = useState({
     name: "",
@@ -151,15 +203,43 @@ const AccessControlRbac = () => {
   const enabledModules = Object.values(matrix).filter((a) => a.some(Boolean)).length;
   const actionGrants = Object.values(matrix).reduce((sum, a) => sum + a.filter(Boolean).length, 0);
 
+  const submoduleMatrixForLevel = (level) =>
+    MODULE_ACCESS.reduce((acc, m) => {
+      acc[m.id] = getChildrenForModule(m.id).reduce((rows, child) => {
+        rows[child.id] = [...LEVELS[level]];
+        return rows;
+      }, {});
+      return acc;
+    }, {});
+
+  const toggleExpanded = (moduleId) => {
+    setExpandedModules((current) => {
+      const next = new Set(current);
+      if (next.has(moduleId)) next.delete(moduleId);
+      else next.add(moduleId);
+      return next;
+    });
+  };
+
   const selectRole = (role) => {
+    const nextMatrix = defaultMatrixFor(role);
     setSelectedRoleName(role.name);
-    setMatrix(defaultMatrixFor(role));
+    setMatrix(nextMatrix);
+    setSubmoduleMatrix(defaultSubmoduleMatrix(nextMatrix));
     setModuleFilter("All");
     setModuleQuery("");
   };
 
-  const setLevel = (moduleId, level) =>
+  const setLevel = (moduleId, level) => {
     setMatrix((p) => ({ ...p, [moduleId]: [...LEVELS[level]] }));
+    setSubmoduleMatrix((p) => ({
+      ...p,
+      [moduleId]: getChildrenForModule(moduleId).reduce((rows, child) => {
+        rows[child.id] = [...LEVELS[level]];
+        return rows;
+      }, {}),
+    }));
+  };
 
   const toggleAction = (moduleId, index) =>
     setMatrix((p) => ({
@@ -167,12 +247,47 @@ const AccessControlRbac = () => {
       [moduleId]: p[moduleId].map((v, i) => (i === index ? (v ? 0 : 1) : v)),
     }));
 
-  const applyAll = (level) =>
+  const toggleSubmoduleAction = (moduleId, childId, index) =>
+    setSubmoduleMatrix((p) => ({
+      ...p,
+      [moduleId]: {
+        ...p[moduleId],
+        [childId]: (p[moduleId]?.[childId] || []).map((v, i) =>
+          i === index ? (v ? 0 : 1) : v,
+        ),
+      },
+    }));
+
+  const setSubmoduleLevel = (moduleId, childId, level) =>
+    setSubmoduleMatrix((p) => ({
+      ...p,
+      [moduleId]: {
+        ...p[moduleId],
+        [childId]: [...LEVELS[level]],
+      },
+    }));
+
+  const applySubmoduleLevel = (moduleId, level) =>
+    setSubmoduleMatrix((p) => ({
+      ...p,
+      [moduleId]: getChildrenForModule(moduleId).reduce((rows, child) => {
+        rows[child.id] = [...LEVELS[level]];
+        return rows;
+      }, {}),
+    }));
+
+  const applyAll = (level) => {
     setMatrix(
       MODULE_ACCESS.reduce((acc, m) => ({ ...acc, [m.id]: [...LEVELS[level]] }), {}),
     );
+    setSubmoduleMatrix(submoduleMatrixForLevel(level));
+  };
 
-  const resetDefault = () => setMatrix(defaultMatrixFor(selectedRole));
+  const resetDefault = () => {
+    const nextMatrix = defaultMatrixFor(selectedRole);
+    setMatrix(nextMatrix);
+    setSubmoduleMatrix(defaultSubmoduleMatrix(nextMatrix));
+  };
 
   const createRole = () => {
     const name = newRole.name.trim();
@@ -446,53 +561,182 @@ const AccessControlRbac = () => {
                     {visibleModules.map((m, i) => {
                       const a = matrix[m.id];
                       const label = effectiveLabel(a);
+                      const children = getChildrenForModule(m.id);
+                      const isOpen = expandedModules.has(m.id);
+                      const grantedChildren = children.filter((child) =>
+                        (submoduleMatrix[m.id]?.[child.id] || []).some(Boolean),
+                      ).length;
+
                       return (
-                        <tr
-                          key={m.id}
-                          data-testid={`matrix-row-${m.id}`}
-                          className={`hover:bg-indigo-50/25 transition ${i % 2 ? "bg-slate-50/60" : ""}`}
-                        >
-                          <td className="py-2.5 px-3.5">
-                            <div className="font-bold text-slate-900">{m.name}</div>
-                            <div className="text-[11px] text-slate-500">
-                              {m.category} · {m.description}
-                            </div>
-                          </td>
-                          <td className="py-2.5 px-3 whitespace-nowrap">
-                            <span
-                              className={`text-[11px] font-semibold ${
-                                label === "No Access" ? "text-slate-400" : "text-[#4834b8]"
-                              }`}
-                            >
-                              {label}
-                            </span>
-                          </td>
-                          {a.map((v, idx) => (
-                            <td key={idx} className="py-2.5 px-2.5 text-center">
-                              <input
-                                type="checkbox"
-                                checked={Boolean(v)}
-                                onChange={() => toggleAction(m.id, idx)}
-                                aria-label={`${selectedRole.name} ${m.name} ${ACTION_LABELS[idx]}`}
-                                className="w-4 h-4 rounded border-slate-300 text-[#4834b8] focus:ring-[#4834b8] cursor-pointer disabled:opacity-50"
-                              />
+                        <Fragment key={m.id}>
+                          <tr
+                            data-testid={`matrix-row-${m.id}`}
+                            className={`hover:bg-indigo-50/25 transition ${i % 2 ? "bg-slate-50/60" : ""}`}
+                          >
+                            <td className="py-2.5 px-3.5">
+                              <div className="flex items-start gap-2">
+                                {children.length > 0 && (
+                                  <button
+                                    type="button"
+                                    onClick={() => toggleExpanded(m.id)}
+                                    aria-label={`${isOpen ? "Collapse" : "Expand"} ${m.name} sub-modules`}
+                                    title={
+                                      isOpen
+                                        ? "Collapse sub-modules"
+                                        : "Expand sub-modules"
+                                    }
+                                    className="mt-0.5 h-5 w-5 shrink-0 inline-flex items-center justify-center rounded border border-slate-300 bg-white text-slate-600 hover:border-[#4834b8] hover:text-[#4834b8] cursor-pointer"
+                                  >
+                                    {isOpen ? (
+                                      <Minus className="w-3 h-3" />
+                                    ) : (
+                                      <Plus className="w-3 h-3" />
+                                    )}
+                                  </button>
+                                )}
+                                <div className="min-w-0">
+                                  <div className="font-bold text-slate-900">
+                                    {m.name}
+                                  </div>
+                                  <div className="text-[11px] text-slate-500">
+                                    {m.category} · {m.description}
+                                  </div>
+                                </div>
+                              </div>
                             </td>
-                          ))}
-                          <td className="py-2.5 px-3.5 text-right whitespace-nowrap">
-                            <div className="inline-flex items-center gap-1">
-                              {["Full", "Std", "View", "Off"].map((lvl) => (
-                                <button
-                                  key={lvl}
-                                  type="button"
-                                  onClick={() => setLevel(m.id, lvl)}
-                                  className="px-2 py-1 rounded border border-slate-200 bg-white hover:bg-indigo-50 hover:border-indigo-300 text-[11px] font-semibold text-slate-700 hover:text-[#4834b8] cursor-pointer disabled:opacity-50"
-                                >
-                                  {lvl}
-                                </button>
-                              ))}
-                            </div>
-                          </td>
-                        </tr>
+                            <td className="py-2.5 px-3 whitespace-nowrap">
+                              <span
+                                className={`text-[11px] font-semibold ${
+                                  label === "No Access" ? "text-slate-400" : "text-[#4834b8]"
+                                }`}
+                              >
+                                {label}
+                              </span>
+                            </td>
+                            {a.map((v, idx) => (
+                              <td key={idx} className="py-2.5 px-2.5 text-center">
+                                <input
+                                  type="checkbox"
+                                  checked={Boolean(v)}
+                                  onChange={() => toggleAction(m.id, idx)}
+                                  aria-label={`${selectedRole.name} ${m.name} ${ACTION_LABELS[idx]}`}
+                                  className="w-4 h-4 rounded border-slate-300 text-[#4834b8] focus:ring-[#4834b8] cursor-pointer disabled:opacity-50"
+                                />
+                              </td>
+                            ))}
+                            <td className="py-2.5 px-3.5 text-right whitespace-nowrap">
+                              <div className="inline-flex items-center gap-1">
+                                {["Full", "Std", "View", "Off"].map((lvl) => (
+                                  <button
+                                    key={lvl}
+                                    type="button"
+                                    onClick={() => setLevel(m.id, lvl)}
+                                    className="px-2 py-1 rounded border border-slate-200 bg-white hover:bg-indigo-50 hover:border-indigo-300 text-[11px] font-semibold text-slate-700 hover:text-[#4834b8] cursor-pointer disabled:opacity-50"
+                                  >
+                                    {lvl}
+                                  </button>
+                                ))}
+                              </div>
+                            </td>
+                          </tr>
+
+                          {isOpen && children.length > 0 && (
+                            <tr className={i % 2 ? "bg-slate-50/60" : ""}>
+                              <td colSpan={8} className="py-2.5 pl-10 pr-3.5">
+                                <div className="overflow-hidden rounded-lg border border-slate-200 bg-white">
+                                  <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-200 bg-slate-50 px-3 py-2">
+                                    <span className="text-[11px] font-bold text-slate-700">
+                                      Sub-modules ({grantedChildren}/{children.length})
+                                    </span>
+                                    <div className="inline-flex items-center gap-1">
+                                      {["Full", "Std", "View", "Off"].map((lvl) => (
+                                        <button
+                                          key={lvl}
+                                          type="button"
+                                          onClick={() => applySubmoduleLevel(m.id, lvl)}
+                                          className="px-2 py-0.5 rounded border border-slate-200 bg-white text-[10px] font-semibold text-slate-600 hover:border-[#4834b8] hover:text-[#4834b8] cursor-pointer"
+                                        >
+                                          All {lvl}
+                                        </button>
+                                      ))}
+                                    </div>
+                                  </div>
+                                  <div className="overflow-x-auto">
+                                    <table className="w-full text-left border-collapse text-[11px]">
+                                      <thead className="bg-slate-50 text-slate-600">
+                                        <tr>
+                                          <th className="py-1.5 pl-3 font-semibold">Sub-module</th>
+                                          <th className="py-1.5 px-2 font-semibold">Effective Access</th>
+                                          {ACTION_LABELS.map((label) => (
+                                            <th key={label} className="py-1.5 px-2 text-center font-semibold">
+                                              {label}
+                                            </th>
+                                          ))}
+                                          <th className="py-1.5 pr-3 text-right font-semibold">Quick Level</th>
+                                        </tr>
+                                      </thead>
+                                      <tbody className="divide-y divide-slate-100">
+                                        {children.map((child) => {
+                                          const childActions =
+                                            submoduleMatrix[m.id]?.[child.id] || [0, 0, 0, 0, 0];
+                                          const childLabel = effectiveLabel(childActions);
+                                          return (
+                                            <tr key={child.id} className="hover:bg-indigo-50/20">
+                                              <td className="py-1.5 pl-3 font-semibold text-slate-700">
+                                                <span className="mr-1 text-slate-400">↳</span>
+                                                {child.label}
+                                              </td>
+                                              <td className="py-1.5 px-2 whitespace-nowrap">
+                                                <span
+                                                  className={`font-semibold ${
+                                                    childLabel === "No Access"
+                                                      ? "text-slate-400"
+                                                      : "text-[#4834b8]"
+                                                  }`}
+                                                >
+                                                  {childLabel}
+                                                </span>
+                                              </td>
+                                              {childActions.map((v, idx) => (
+                                                <td key={idx} className="py-1.5 px-2 text-center">
+                                                  <input
+                                                    type="checkbox"
+                                                    checked={Boolean(v)}
+                                                    onChange={() =>
+                                                      toggleSubmoduleAction(m.id, child.id, idx)
+                                                    }
+                                                    aria-label={`${m.name} - ${child.label} ${ACTION_LABELS[idx]}`}
+                                                    className="w-3.5 h-3.5 rounded border-slate-300 text-[#4834b8] focus:ring-[#4834b8] cursor-pointer"
+                                                  />
+                                                </td>
+                                              ))}
+                                              <td className="py-1.5 pr-3 text-right whitespace-nowrap">
+                                                <div className="inline-flex items-center gap-1">
+                                                  {["Full", "Std", "View", "Off"].map((lvl) => (
+                                                    <button
+                                                      key={lvl}
+                                                      type="button"
+                                                      onClick={() =>
+                                                        setSubmoduleLevel(m.id, child.id, lvl)
+                                                      }
+                                                      className="px-1.5 py-0.5 rounded border border-slate-200 bg-white text-[10px] font-semibold text-slate-600 hover:border-[#4834b8] hover:text-[#4834b8] cursor-pointer"
+                                                    >
+                                                      {lvl}
+                                                    </button>
+                                                  ))}
+                                                </div>
+                                              </td>
+                                            </tr>
+                                          );
+                                        })}
+                                      </tbody>
+                                    </table>
+                                  </div>
+                                </div>
+                              </td>
+                            </tr>
+                          )}
+                        </Fragment>
                       );
                     })}
                     {visibleModules.length === 0 && (
