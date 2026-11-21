@@ -49,6 +49,32 @@ const streamIdsForClass = async (schoolId, classId) => {
   return rows.map((row) => String(row._id));
 };
 
+/** Add the derived streamIds list to class list responses. */
+const attachStreamIdsToClasses = async (classes = [], schoolId) => {
+  const classIds = classes.map((cls) => cls?._id).filter(Boolean);
+  if (!classIds.length) return classes;
+
+  const rows = await Stream.find({
+    schoolId,
+    classIds: { $in: classIds },
+  })
+    .select("_id classIds")
+    .lean();
+
+  const byClass = new Map(classIds.map((id) => [String(id), []]));
+  rows.forEach((row) => {
+    (row.classIds || []).forEach((classId) => {
+      const key = String(classId);
+      if (byClass.has(key)) byClass.get(key).push(String(row._id));
+    });
+  });
+
+  classes.forEach((cls) => {
+    cls.streamIds = byClass.get(String(cls?._id)) || [];
+  });
+  return classes;
+};
+
 /** Convert form values to ObjectId or null (never pass "" to mongoose). */
 const toIdOrNull = (value) => {
   if (value == null || value === "") return null;
@@ -434,6 +460,7 @@ export const getClasses = async (req, res) => {
       .lean();
 
     await attachLiveStudentCounts(classes, schoolId);
+    await attachStreamIdsToClasses(classes, schoolId);
 
     res.json({ success: true, classes });
   } catch (err) {
@@ -810,6 +837,7 @@ export const getTeacherClasses = async (req, res) => {
       .lean();
 
     await attachLiveStudentCounts(classes, schoolId);
+    await attachStreamIdsToClasses(classes, schoolId);
 
     res.json({ success: true, classes });
   } catch (err) {

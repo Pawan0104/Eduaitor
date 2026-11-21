@@ -2,11 +2,13 @@ import { useEffect, useState } from "react";
 import axios from "axios";
 import { useAuth } from "../context/AuthContext";
 import { toast } from "react-toastify";
+import PassBarcode from "../components/PassBarcode";
 import {
   FaSearch, FaFilter, FaTimes, FaEye,
   FaCheckCircle, FaTimesCircle, FaClock,
   FaBan, FaArrowLeft, FaUser, FaPhone,
   FaInfoCircle, FaCalendarAlt, FaChalkboardTeacher,
+  FaIdCard, FaBarcode,
 } from "react-icons/fa";
 
 const API = import.meta.env.VITE_API_URL;
@@ -44,6 +46,12 @@ const TeacherGatepass = () => {
   const [actionType, setActionType]         = useState(""); // "approved" | "rejected"
   const [actionNote, setActionNote]         = useState("");
   const [actioning, setActioning]           = useState(false);
+
+  // pickup code verification
+  const [verifyCode, setVerifyCode]         = useState("");
+  const [verifying, setVerifying]           = useState(false);
+  const [verifyError, setVerifyError]       = useState("");
+  const [verifiedPass, setVerifiedPass]     = useState(null);
 
   /* ── FETCH ──────────────────────────────────────── */
   const fetchGatepasses = async () => {
@@ -89,13 +97,93 @@ const TeacherGatepass = () => {
     setActionItem(item);
     setActionType(type);
     setActionNote("");
+    setVerifyCode("");
+    setVerifyError("");
+    setVerifiedPass(type === "approved" && item.verified ? item : null);
     setShowAction(true);
+  };
+
+  /* ── VERIFY PICKUP BARCODE / CODE ───────────────── */
+  const verifyPassCode = async (expectedId = null) => {
+    const code = String(verifyCode || "").trim();
+    if (!code) {
+      setVerifyError("Scan the barcode or enter the pickup code");
+      toast.error("Scan the barcode or enter the pickup code");
+      return null;
+    }
+
+    try {
+      setVerifying(true);
+      setVerifyError("");
+
+      const res = await axios.post(
+        `${API}/gatepass/verify`,
+        { code },
+        { withCredentials: true }
+      );
+
+      const pass = res.data?.data;
+      if (!pass?._id) {
+        throw new Error("Could not read the verification result");
+      }
+
+      if (expectedId && String(pass._id) !== String(expectedId)) {
+        const message = "This code belongs to a different gate pass";
+        setVerifyError(message);
+        toast.error(message);
+        return null;
+      }
+
+      setVerifiedPass(pass);
+      setActionItem((prev) =>
+        prev && prev._id === pass._id ? { ...prev, ...pass } : prev
+      );
+      setGatepasses((prev) =>
+        prev.map((g) => (g._id === pass._id ? { ...g, ...pass } : g))
+      );
+      setViewItem((prev) =>
+        prev && prev._id === pass._id ? { ...prev, ...pass } : prev
+      );
+
+      toast.success("Pickup barcode/code verified");
+      return pass;
+    } catch (err) {
+      const message =
+        err.response?.data?.message ||
+        err.message ||
+        "Could not verify the pickup code";
+      setVerifyError(message);
+      toast.error(message);
+      return null;
+    } finally {
+      setVerifying(false);
+    }
+  };
+
+  /* ── SCANNER / TOP VERIFY ───────────────────────── */
+  const handleVerifyFromScanner = async (e) => {
+    e?.preventDefault?.();
+    const pass = await verifyPassCode();
+    if (!pass) return;
+    openAction(pass, "approved");
+    setVerifyCode(pass.passCode || "");
+    setVerifiedPass(pass);
   };
 
   /* ── SUBMIT ACTION ──────────────────────────────── */
   const handleAction = async () => {
     if (actionType === "rejected" && !actionNote.trim()) {
       return toast.error("Please provide a reason for rejection");
+    }
+
+    if (actionType === "approved" && actionItem?.passCode) {
+      const isVerified =
+        verifiedPass && String(verifiedPass._id) === String(actionItem._id);
+      if (!isVerified && !actionItem.verified) {
+        return toast.error(
+          "Verify the pickup barcode or code before approving"
+        );
+      }
     }
 
     try {
@@ -112,6 +200,9 @@ const TeacherGatepass = () => {
       setShowAction(false);
       setActionItem(null);
       setActionNote("");
+      setVerifyCode("");
+      setVerifyError("");
+      setVerifiedPass(null);
 
       // update local state immediately — no refetch needed
       setGatepasses((prev) =>
@@ -187,6 +278,54 @@ const TeacherGatepass = () => {
         </p>
       </div>
 
+      {/* ── PICKUP CODE VERIFICATION ─────────────── */}
+      {!notClassTeacher && (
+        <form
+          onSubmit={handleVerifyFromScanner}
+          className="bg-[rgb(var(--surface))] border border-[rgb(var(--border))]
+            rounded-2xl p-4 mb-5"
+        >
+          <div className="flex flex-col sm:flex-row sm:items-end gap-3">
+            <div className="flex-1">
+              <label className="text-xs font-semibold
+                text-[rgb(var(--text-muted))] mb-1.5 block">
+                Verify Pickup Barcode / Code
+              </label>
+              <div className="relative">
+                <FaBarcode className="absolute left-3 top-1/2
+                  -translate-y-1/2 text-[rgb(var(--text-muted))]" size={13}/>
+                <input
+                  value={verifyCode}
+                  onChange={(e) => setVerifyCode(e.target.value)}
+                  placeholder="Scan barcode or enter GP-YYYYMMDD-XXXXXXXX"
+                  className="w-full pl-9 pr-3 py-2 text-sm rounded-lg
+                    border border-[rgb(var(--border))] font-mono
+                    bg-[rgb(var(--bg))] text-[rgb(var(--text))]
+                    focus:outline-none focus:ring-2
+                    focus:ring-[rgb(var(--primary))] transition"
+                />
+              </div>
+            </div>
+            <button
+              type="submit"
+              disabled={verifying}
+              className="px-4 py-2 rounded-lg bg-[rgb(var(--primary))]
+                text-white text-sm font-medium hover:opacity-90
+                transition disabled:opacity-50 whitespace-nowrap"
+            >
+              {verifying ? "Verifying…" : "Verify Code"}
+            </button>
+          </div>
+          {verifyError && !showAction && (
+            <p className="mt-2 text-xs text-red-500">{verifyError}</p>
+          )}
+          <p className="mt-2 text-[11px] text-[rgb(var(--text-muted))]">
+            A barcode scanner can type directly into this field. Verify first,
+            then approve the matching request.
+          </p>
+        </form>
+      )}
+
       {/* ── NOT CLASS TEACHER MESSAGE ─────────────── */}
       {notClassTeacher ? (
         <div className="flex flex-col items-center justify-center
@@ -223,7 +362,7 @@ const TeacherGatepass = () => {
               <input
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
-                placeholder="Search by student name..."
+                placeholder="Search student, code, pickup or ID..."
                 className="w-full pl-9 pr-3 py-2 text-sm rounded-lg
                   border border-[rgb(var(--border))]
                   bg-[rgb(var(--bg))] text-[rgb(var(--text))]
@@ -308,6 +447,21 @@ const TeacherGatepass = () => {
                           text-[rgb(var(--text-muted))]">
                           #{g._id.slice(-6).toUpperCase()}
                         </span>
+                        {g.verified && (
+                          <span className="px-2 py-0.5 rounded-full
+                            bg-green-50 text-green-600 text-[10px]
+                            font-semibold">
+                            Verified
+                          </span>
+                        )}
+                        {g.passCode && (
+                          <span className="px-2 py-0.5 rounded-full
+                            bg-[rgba(var(--primary),0.1)] text-[10px]
+                            font-mono font-semibold
+                            text-[rgb(var(--primary))]">
+                            {g.passCode}
+                          </span>
+                        )}
                       </div>
 
                       {/* student info */}
@@ -462,7 +616,27 @@ const TeacherGatepass = () => {
                     : viewItem.pickupPerson.relation}/>
                 <ViewRow icon={<FaPhone/>} label="Mobile"
                   value={viewItem.pickupPerson.mobile}/>
+                <ViewRow icon={<FaIdCard/>} label="Govt ID"
+                  value={`${viewItem.pickupPerson.idProofType || "—"} — ${viewItem.pickupPerson.idProofNumber || "—"}`}/>
               </ViewSection>
+
+              {/* barcode / code */}
+              {viewItem.passCode && (
+                <ViewSection title="Pickup Barcode & Code" color="green">
+                  <PassBarcode
+                    code={viewItem.passCode}
+                    studentName={`${viewItem.studentId?.firstName || ""} ${viewItem.studentId?.lastName || ""}`.trim()}
+                    pickupName={viewItem.pickupPerson.name}
+                    compact
+                    showActions={false}
+                  />
+                  <p className="mt-2 text-[11px] text-green-700">
+                    {viewItem.verified
+                      ? `Verified by ${viewItem.verifiedByName || "school"} on ${viewItem.verifiedAt ? new Date(viewItem.verifiedAt).toLocaleString() : "—"}`
+                      : "Not verified yet. Verify the barcode/code before approval."}
+                  </p>
+                </ViewSection>
+              )}
 
               {/* exit details */}
               <ViewSection title="Exit Details">
@@ -573,7 +747,7 @@ const TeacherGatepass = () => {
           flex items-center justify-center z-[60] p-4 overflow-y-auto">
           <div className="bg-[rgb(var(--surface))]
             text-[rgb(var(--text))] rounded-2xl
-            shadow-2xl w-full max-w-sm">
+            shadow-2xl w-full max-w-sm max-h-[94vh] overflow-y-auto">
 
             {/* header */}
             <div className="flex items-center justify-between
@@ -609,7 +783,76 @@ const TeacherGatepass = () => {
                   Exit: {new Date(actionItem.exitDate)
                     .toLocaleDateString()} at {actionItem.exitTime}
                 </p>
+                <p className="text-xs text-[rgb(var(--text-muted))] mt-1">
+                  Pickup: {actionItem.pickupPerson?.name} · {" "}
+                  {actionItem.pickupPerson?.idProofType} {" "}
+                  {actionItem.pickupPerson?.idProofNumber}
+                </p>
               </div>
+
+              {/* code verification — approvals only */}
+              {actionType === "approved" && actionItem.passCode && (
+                <div className="mb-4">
+                  {verifiedPass || actionItem.verified ? (
+                    <div className="p-3 rounded-xl border
+                      border-green-200 bg-green-50">
+                      <p className="text-xs font-semibold
+                        text-green-700 mb-2 flex items-center gap-1.5">
+                        <FaCheckCircle size={12}/>
+                        Pickup barcode/code verified
+                      </p>
+                      <PassBarcode
+                        code={actionItem.passCode}
+                        studentName={`${actionItem.studentId?.firstName || ""} ${actionItem.studentId?.lastName || ""}`.trim()}
+                        pickupName={actionItem.pickupPerson?.name}
+                        compact
+                        showActions={false}
+                      />
+                    </div>
+                  ) : (
+                    <div className="p-3 rounded-xl border
+                      border-yellow-200 bg-yellow-50">
+                      <p className="text-xs font-semibold
+                        text-yellow-700 mb-2 flex items-center gap-1.5">
+                        <FaBarcode size={12}/>
+                        Verify pickup barcode / code first
+                      </p>
+                      <div className="flex gap-2">
+                        <input
+                          value={verifyCode}
+                          onChange={(e) => setVerifyCode(e.target.value)}
+                          onKeyDown={(e) => {
+                            if (e.key === "Enter") {
+                              e.preventDefault();
+                              verifyPassCode(actionItem._id);
+                            }
+                          }}
+                          placeholder={actionItem.passCode}
+                          className="flex-1 min-w-0 px-3 py-2 rounded-lg
+                            border border-yellow-200 bg-white text-sm
+                            font-mono focus:outline-none focus:ring-2
+                            focus:ring-yellow-400"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => verifyPassCode(actionItem._id)}
+                          disabled={verifying}
+                          className="px-3 py-2 rounded-lg bg-yellow-600
+                            text-white text-xs font-semibold
+                            hover:opacity-90 disabled:opacity-50"
+                        >
+                          {verifying ? "Checking…" : "Verify"}
+                        </button>
+                      </div>
+                      {verifyError && (
+                        <p className="mt-2 text-xs text-red-500">
+                          {verifyError}
+                        </p>
+                      )}
+                    </div>
+                  )}
+                </div>
+              )}
 
               {/* note */}
               <div>
@@ -652,7 +895,13 @@ const TeacherGatepass = () => {
               </button>
               <button
                 onClick={handleAction}
-                disabled={actioning}
+                disabled={
+                  actioning ||
+                  (actionType === "approved" &&
+                    actionItem.passCode &&
+                    !verifiedPass &&
+                    !actionItem.verified)
+                }
                 className={`px-5 py-2 text-white rounded-lg
                   text-sm font-medium shadow-sm
                   hover:opacity-90 transition

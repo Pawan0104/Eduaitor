@@ -4,6 +4,8 @@ import { toast } from "react-toastify";
 import LoadingSpinner from "../components/LoadingSpinner";
 import NewClassModal from "../components/NewClassModal";
 import AcademicHeaderActions from "../components/AcademicHeaderActions";
+import EditClassModal from "../components/EditClassModal";
+import { sortClassesByName } from "../utils/sortClasses";
 
 const API = import.meta.env.VITE_API_URL;
 
@@ -58,6 +60,8 @@ export default function OptionalGroups() {
   // Rename modal
   const [renameOpen, setRenameOpen] = useState(false);
   const [renameClass, setRenameClass] = useState(null);
+  const [fullEditOpen, setFullEditOpen] = useState(false);
+  const [fullEditClass, setFullEditClass] = useState(null);
   const [renameName, setRenameName] = useState("");
 
   // Delete modal
@@ -82,7 +86,7 @@ export default function OptionalGroups() {
         axios.get(`${API}/subjects/all`, { withCredentials: true }),
         axios.get(`${API}/streams/all`, { params: { status: "Active" }, withCredentials: true }),
       ]);
-      const cls = clsRes.data.classes || clsRes.data.data || [];
+      const cls = sortClassesByName(clsRes.data.classes || clsRes.data.data || []);
       setClasses(cls);
       setSections(secRes.data.sections || secRes.data.data || []);
       setSubjects(subRes.data.subjects || subRes.data.data || []);
@@ -254,7 +258,7 @@ export default function OptionalGroups() {
                         </div>
                       </button>
                       <div className="flex items-center gap-0.5 shrink-0">
-                        <button type="button" aria-label={`Rename ${cls.name}`} onClick={(e) => { e.stopPropagation(); setRenameClass(cls); setRenameName(cls.name || ""); setRenameOpen(true); }} className="p-1 text-slate-400 hover:text-[#4834b8] rounded cursor-pointer"><PenIcon /></button>
+                        <button type="button" aria-label={`Edit ${cls.name}`} onClick={(e) => { e.stopPropagation(); setFullEditClass(cls); setFullEditOpen(true); }} className="p-1 text-slate-400 hover:text-[#4834b8] rounded cursor-pointer"><PenIcon /></button>
                         <button type="button" aria-label={`Delete ${cls.name}`} onClick={(e) => { e.stopPropagation(); setDeleteClass(cls); setDeleteOpen(true); }} className="p-1 text-slate-400 hover:text-rose-600 rounded cursor-pointer"><TrashIcon /></button>
                       </div>
                     </div>
@@ -326,6 +330,17 @@ export default function OptionalGroups() {
       </div>
 
       {/* Rename modal */}
+      <EditClassModal
+        open={fullEditOpen}
+        classData={fullEditClass}
+        sections={sections}
+        streams={streams}
+        onClose={() => {
+          setFullEditOpen(false);
+          setFullEditClass(null);
+        }}
+        onSaved={fetchAll}
+      />
       {renameOpen && (
         <div className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center p-4">
           <div className="bg-white rounded-2xl w-full max-w-md shadow-xl overflow-hidden">

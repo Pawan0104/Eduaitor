@@ -1,8 +1,92 @@
+import crypto from "crypto";
 import GatePass from "../models/gatepass.js";
 import Student from "../models/student.js";
 import Class from "../models/class.js";
 import { uploadToCloudinary } from "../utils/uploadToCloudinary.js";
 import { createNotificationHelper } from "./notificationController.js";
+
+const GOVT_ID_TYPES = {
+  AADHAAR: "Aadhaar",
+  AADHAR: "Aadhaar",
+  PAN: "PAN",
+  DL: "DL",
+  DRIVINGLICENCE: "DL",
+  "DRIVING LICENCE": "DL",
+  "DRIVING LICENSE": "DL",
+};
+
+const readablePassCode = (value) =>
+  String(value || "")
+    .trim()
+    .toUpperCase()
+    .replace(/\s+/g, "");
+
+const normalizePassCode = (value) =>
+  readablePassCode(value).replace(/[^A-Z0-9]/g, "");
+
+const normalizeIdNumber = (value) =>
+  String(value || "")
+    .trim()
+    .replace(/\s+/g, "");
+
+const validateGovtId = (rawType, rawNumber) => {
+  const typeKey = String(rawType || "")
+    .trim()
+    .toUpperCase();
+  const type = GOVT_ID_TYPES[typeKey];
+  if (!type) {
+    return { ok: false, message: "Select a valid government ID type" };
+  }
+
+  const number = normalizeIdNumber(rawNumber);
+  if (!number) {
+    return { ok: false, message: "Government ID number is required" };
+  }
+
+  if (type === "Aadhaar" && !/^\d{12}$/.test(number)) {
+    return { ok: false, message: "Aadhaar number must be 12 digits" };
+  }
+
+  if (type === "PAN" && !/^[A-Z]{5}\d{4}[A-Z]$/.test(number.toUpperCase())) {
+    return { ok: false, message: "PAN number is invalid" };
+  }
+
+  if (type === "DL" && !/^[A-Z0-9/-]{5,20}$/.test(number.toUpperCase())) {
+    return { ok: false, message: "Driving licence number is invalid" };
+  }
+
+  return {
+    ok: true,
+    type,
+    number: type === "Aadhaar" ? number : number.toUpperCase(),
+  };
+};
+
+const generatePassCodeCandidate = () => {
+  const now = new Date();
+  const datePart = [
+    now.getFullYear(),
+    String(now.getMonth() + 1).padStart(2, "0"),
+    String(now.getDate()).padStart(2, "0"),
+  ].join("");
+  const randomPart = crypto.randomBytes(4).toString("hex").toUpperCase();
+  return `GP-${datePart}-${randomPart}`;
+};
+
+const generateUniquePassCode = async (schoolId) => {
+  for (let attempt = 0; attempt < 8; attempt += 1) {
+    const candidate = generatePassCodeCandidate();
+    const existing = await GatePass.exists({
+      schoolId,
+      $or: [
+        { passCode: candidate },
+        { barcodeValue: normalizePassCode(candidate) },
+      ],
+    });
+    if (!existing) return candidate;
+  }
+  throw new Error("Could not generate a unique gate pass code");
+};
 
 /* ═══════════════════════════════════════════════════
    HELPER — get class teacher IDs for a student
@@ -39,6 +123,8 @@ export const createGatePass = async (req, res, next) => {
       pickupRelation,
       pickupCustomRelation,
       pickupMobile,
+      idProofType,
+      idProofNumber,
       exitDate,
       exitTime,
       expectedReturn,
@@ -57,6 +143,14 @@ export const createGatePass = async (req, res, next) => {
       return res.status(400).json({
         success: false,
         message: "Please specify the relation",
+      });
+    }
+
+    const govtId = validateGovtId(idProofType, idProofNumber);
+    if (!govtId.ok) {
+      return res.status(400).json({
+        success: false,
+        message: govtId.message,
       });
     }
 
@@ -84,24 +178,43 @@ export const createGatePass = async (req, res, next) => {
       };
     }
 
-    // ── 4. CREATE GATEPASS ────────────────────────
-    const gatepass = await GatePass.create({
-      schoolId,
-      studentId,
-      requestedBy,
-      pickupPerson: {
-        name:           pickupName,
-        relation:       pickupRelation,
-        customRelation: pickupRelation === "Other" ? pickupCustomRelation : null,
-        mobile:         pickupMobile,
-      },
-      exitDate,
-      exitTime,
-      expectedReturn: expectedReturn || null,
-      reason,
-      photo,
-      status: "pending",
-    });
+    // ── 4. CREATE GATEPASS WITH UNIQUE PICKUP CODE ─
+    let gatepass = null;
+    let passCode = "";
+
+    for (let attempt = 0; attempt < 5; attempt += 1) {
+      passCode = await generateUniquePassCode(schoolId);
+      try {
+        gatepass = await GatePass.create({
+          schoolId,
+          studentId,
+          requestedBy,
+          pickupPerson: {
+            name:           pickupName,
+            relation:       pickupRelation,
+            customRelation: pickupRelation === "Other" ? pickupCustomRelation : null,
+            mobile:         pickupMobile,
+            idProofType:    govtId.type,
+            idProofNumber:  govtId.number,
+          },
+          passCode,
+          barcodeValue: normalizePassCode(passCode),
+          exitDate,
+          exitTime,
+          expectedReturn: expectedReturn || null,
+          reason,
+          photo,
+          status: "pending",
+        });
+        break;
+      } catch (createErr) {
+        const isDuplicateCode =
+          createErr?.code === 11000 &&
+          Boolean(createErr?.keyPattern?.passCode || createErr?.keyPattern?.barcodeValue);
+        if (isDuplicateCode && attempt < 4) continue;
+        throw createErr;
+      }
+    }
 
     // ── 5. NOTIFY CLASS TEACHER + SCHOOL ADMIN ────
     try {
@@ -124,7 +237,7 @@ export const createGatePass = async (req, res, next) => {
 
       await createNotificationHelper({
         title:            "New Gate Pass Request",
-        message:          `A gate pass has been requested for ${student.firstName} ${student.lastName}.`,
+        message:          `A gate pass has been requested for ${student.firstName} ${student.lastName}. Pickup code: ${passCode}`,
         notificationType: "gatepass",
         eventType:        "PARENT.GATE_PASS",
         schoolId,
@@ -133,7 +246,8 @@ export const createGatePass = async (req, res, next) => {
         payloadExtras: {
           studentId: student._id,
           studentName: `${student.firstName} ${student.lastName}`.trim(),
-          message: `Gate pass requested for ${student.firstName} ${student.lastName}.`,
+          message: `Gate pass requested for ${student.firstName} ${student.lastName}. Pickup code: ${passCode}`,
+          passCode,
         },
       });
     } catch (notifErr) {
@@ -291,12 +405,17 @@ export const getManageGatePasses = async (req, res, next) => {
       .populate("studentId", "firstName lastName studentId classId sectionId")
       .sort({ createdAt: -1 });
 
-    // search by student name — after populate
+    // search by student, pickup, code or ID number — after populate
     if (search?.trim()) {
       const q = search.toLowerCase();
       gatepasses = gatepasses.filter((g) => {
-        const name = `${g.studentId?.firstName} ${g.studentId?.lastName}`.toLowerCase();
-        return name.includes(q);
+        const values = [
+          `${g.studentId?.firstName || ""} ${g.studentId?.lastName || ""}`,
+          g.passCode,
+          g.pickupPerson?.name,
+          g.pickupPerson?.idProofNumber,
+        ];
+        return values.some((value) => String(value || "").toLowerCase().includes(q));
       });
     }
 
@@ -314,6 +433,90 @@ export const getManageGatePasses = async (req, res, next) => {
    4. ACTION — approve or reject
    teacher_admin | school_admin | staff_admin
 ═══════════════════════════════════════════════════ */
+export const verifyGatePassCode = async (req, res, next) => {
+  try {
+    const schoolId = req.user.school_id;
+    const rawCode = readablePassCode(
+      req.body.code || req.params.code || req.query.code
+    );
+    const code = normalizePassCode(rawCode);
+
+    if (!code) {
+      return res.status(400).json({
+        success: false,
+        message: "Scan the barcode or enter the pickup code",
+      });
+    }
+
+    // accepts GP-20261121-XXXXXXXX, GP20261121XXXXXXXX,
+    // and spacing variants produced by manual typing or scanners
+    const spacedPattern = new RegExp(
+      `^${code.split("").join("[^A-Z0-9]*")}$`,
+      "i"
+    );
+
+    const gatepass = await GatePass
+      .findOne({
+        schoolId,
+        $or: [
+          { passCode: rawCode },
+          { passCode: spacedPattern },
+          { barcodeValue: rawCode },
+          { barcodeValue: code },
+        ],
+      })
+      .populate("studentId", "firstName lastName studentId classId sectionId");
+
+    if (!gatepass) {
+      return res.status(404).json({
+        success: false,
+        message: "No gate pass found for this code",
+      });
+    }
+
+    if (gatepass.status !== "pending") {
+      return res.status(400).json({
+        success: false,
+        message: `This gate pass is already ${gatepass.status}`,
+        data: gatepass,
+      });
+    }
+
+    // teachers can only verify gatepasses from their own class
+    if (req.user.role === "teacher_admin") {
+      const teacherId = req.user.teacher_id;
+      const classes = await Class.find({
+        schoolId,
+        "details.teacherId": teacherId,
+        "details.sectionId": gatepass.studentId?.sectionId,
+      });
+
+      if (!classes.length) {
+        return res.status(403).json({
+          success: false,
+          message: "You are not the class teacher of this student",
+        });
+      }
+    }
+
+    gatepass.verified         = true;
+    gatepass.verifiedAt       = new Date();
+    gatepass.verifiedBy       = req.user._id;
+    gatepass.verifiedByName   = req.user.name;
+    gatepass.verifiedByRole   = req.user.role;
+    gatepass.verificationNote = "Pickup barcode/code verified at school";
+    await gatepass.save();
+
+    return res.json({
+      success: true,
+      message: "Pickup barcode/code verified successfully",
+      data: gatepass,
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
 export const actionGatePass = async (req, res, next) => {
   try {
     const schoolId = req.user.school_id;
@@ -377,6 +580,15 @@ export const actionGatePass = async (req, res, next) => {
           message: "You are not the class teacher of this student",
         });
       }
+    }
+
+    // ── VERIFY BEFORE APPROVAL ────────────────────
+    // Legacy passes without a code can still be actioned normally.
+    if (action === "approved" && gatepass.passCode && !gatepass.verified) {
+      return res.status(400).json({
+        success: false,
+        message: "Verify the pickup barcode or code before approving",
+      });
     }
 
     // ── 5. UPDATE GATEPASS ────────────────────────

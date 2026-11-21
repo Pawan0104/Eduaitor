@@ -3,18 +3,16 @@ import axios from "axios";
 import { toast } from "react-toastify";
 import LoadingSpinner from "../components/LoadingSpinner";
 import AcademicHeaderActions from "../components/AcademicHeaderActions";
+import EditClassModal from "../components/EditClassModal";
+import QuickAddStreams from "../components/QuickAddStreams";
+import { sortClassesByName } from "../utils/sortClasses";
+import { getSchoolStreamNames, resolveClassStreams } from "../utils/streamNames";
 
 const API = import.meta.env.VITE_API_URL;
-const PRESET_CLASS_STREAM_NAMES = [
-  "Science",
-  "Commerce",
-  "Arts",
-  "Agriculture",
-  "Sanskrit Sahitya",
-];
 
 export default function CompulsorySubjects() {
   const [classes, setClasses] = useState([]);
+  const [sections, setSections] = useState([]);
   const [subjects, setSubjects] = useState([]);
   const [selectedClassId, setSelectedClassId] = useState("");
   const [loading, setLoading] = useState(true);
@@ -28,12 +26,16 @@ export default function CompulsorySubjects() {
   const [sectionNames, setSectionNames] = useState(["A", "B"]);
   const [maxStrength, setMaxStrength] = useState(40);
   const [streamMode, setStreamMode] = useState("direct");
-  const [availableClassStreams, setAvailableClassStreams] = useState([...PRESET_CLASS_STREAM_NAMES]);
+  const [availableClassStreams, setAvailableClassStreams] = useState([]);
   const [selectedStreams, setSelectedStreams] = useState([]);
   const [customClassStreamName, setCustomClassStreamName] = useState("");
+  const [streams, setStreams] = useState([]);
+  const [creatingClass, setCreatingClass] = useState(false);
   // Rename modal state
   const [renameOpen, setRenameOpen] = useState(false);
   const [renameClass, setRenameClass] = useState(null);
+  const [fullEditOpen, setFullEditOpen] = useState(false);
+  const [fullEditClass, setFullEditClass] = useState(null);
   const [renameName, setRenameName] = useState("");
   // Delete modal state
   const [deleteOpen, setDeleteOpen] = useState(false);
@@ -42,14 +44,19 @@ export default function CompulsorySubjects() {
   const fetchAll = async () => {
     try {
       setLoading(true);
-      const [clsRes, subRes] = await Promise.all([
+      const [clsRes, secRes, subRes, strmRes] = await Promise.all([
         axios.get(`${API}/classes/all`, { withCredentials: true }),
+        axios.get(`${API}/sections/all`, { withCredentials: true }).catch(() => ({ data: {} })),
         axios.get(`${API}/subjects/all`, { withCredentials: true }),
+        axios.get(`${API}/streams/all`, { params: { status: "Active" }, withCredentials: true }).catch(() => ({ data: {} })),
       ]);
-      const cls = clsRes.data.classes || clsRes.data.data || [];
+      const cls = sortClassesByName(clsRes.data.classes || clsRes.data.data || []);
       setClasses(cls);
+      setSections(secRes.data.sections || secRes.data.data || []);
       setSubjects(subRes.data.subjects || subRes.data.data || []);
+      setStreams(strmRes.data?.streams || strmRes.data?.data || []);
       if (cls.length && !selectedClassId) setSelectedClassId(cls[0]._id);
+      return cls;
     } catch {
       toast.error("Failed to load data");
     } finally {
@@ -105,7 +112,7 @@ export default function CompulsorySubjects() {
       toast.error(err?.response?.data?.message || "Failed to save common subjects.");
     }
   };
-  const streamsForClass = (cls) => (cls?.streamIds || []).map((s) => (typeof s === "object" ? s : { _id: s, name: s }));
+  const streamsForClass = (cls) => resolveClassStreams(cls?.streamIds || [], streams);
 
   const totalSeats = sectionNames.length * (maxStrength || 0);
 
@@ -116,28 +123,104 @@ export default function CompulsorySubjects() {
     setSectionNames(names);
   };
 
+  const updateSectionName = (index, value) => {
+    setSectionNames((prev) =>
+      prev.map((name, idx) => (idx === index ? value : name)),
+    );
+  };
+
   const isClassStreamSelected = (name) =>
     selectedStreams.some(
       (s) => String(s).toLowerCase() === String(name).trim().toLowerCase(),
     );
 
-  const addNewClassStreamToList = (value) => {
+  const findSchoolStream = (name) =>
+    streams.find(
+      (s) =>
+        String(s.name || "").trim().toLowerCase() ===
+        String(name || "").trim().toLowerCase(),
+    );
+
+  const addNewClassStreamToList = async (value) => {
     const trimmed = String(value || "").trim();
     if (!trimmed) return;
     const key = trimmed.toLowerCase();
-    setAvailableClassStreams((prev) => {
-      if (prev.some((s) => String(s).toLowerCase() === key)) return prev;
-      return [...prev, trimmed];
-    });
-    setSelectedStreams((prev) => {
-      if (prev.some((s) => String(s).toLowerCase() === key)) return prev;
-      return [...prev, trimmed];
-    });
+
+    let saved = findSchoolStream(trimmed);
+
+    if (!saved) {
+      try {
+        const response = await axios.post(
+          `${API}/streams/create`,
+          {
+            name: trimmed,
+            status: "Active",
+            compulsorySubjectIds: [],
+            allowEmptyCompulsorySubjects: true,
+          },
+          { withCredentials: true },
+        );
+        const created = response.data?.data || response.data?.stream;
+        if (!created?._id) throw new Error("Stream was not saved");
+        saved = created;
+        setStreams((prev) => [...prev, created]);
+      } catch (err) {
+        const message = String(err?.response?.data?.message || "");
+        if (/already exists/i.test(message)) {
+          const refreshed = await axios
+            .get(`${API}/streams/all`, {
+              params: { status: "Active" },
+              withCredentials: true,
+            })
+            .catch(() => ({ data: {} }));
+          const list = refreshed.data?.streams || refreshed.data?.data || [];
+          saved = list.find(
+            (s) => String(s.name || "").trim().toLowerCase() === key,
+          );
+          if (saved) setStreams(list);
+        } else {
+          toast.error(message || "Could not save stream to the school.");
+          return;
+        }
+      }
+    }
+
+    if (!saved) {
+      toast.error("Could not save stream to the school.");
+      return;
+    }
+
+    const canonical = String(saved.name || trimmed).trim();
+    setAvailableClassStreams((prev) =>
+      getSchoolStreamNames([...prev.map((name) => ({ name })), saved]),
+    );
+    setSelectedStreams((prev) =>
+      prev.some((s) => String(s).toLowerCase() === key)
+        ? prev
+        : [...prev, canonical],
+    );
     setCustomClassStreamName("");
   };
 
-  const removeClassStreamFromList = (name) => {
-    const key = String(name).toLowerCase();
+  const removeClassStreamFromList = async (name) => {
+    const key = String(name || "").trim().toLowerCase();
+    const saved = findSchoolStream(name);
+    if (saved?._id) {
+      try {
+        await axios.delete(`${API}/streams/delete/${saved._id}`, {
+          withCredentials: true,
+        });
+        setStreams((prev) => prev.filter((s) => s._id !== saved._id));
+        toast.success(`${name} deleted from school streams.`);
+      } catch (err) {
+        toast.error(
+          err?.response?.data?.message || `Could not delete ${name} from the school.`,
+        );
+        return;
+      }
+    } else {
+      toast.info(`${name} removed from this class only; no saved school stream found.`);
+    }
     setAvailableClassStreams((prev) =>
       prev.filter((s) => String(s).toLowerCase() !== key),
     );
@@ -156,6 +239,111 @@ export default function CompulsorySubjects() {
         availableClassStreams.find((s) => String(s).toLowerCase() === key) || name;
       return [...prev, canonical];
     });
+  };
+
+  const resolveClassSectionIds = async () => {
+    const { data } = await axios.get(`${API}/sections/all`, {
+      withCredentials: true,
+    });
+    const existing = data?.sections || data?.data || [];
+    const byName = new Map(
+      existing.map((s) => [String(s.name || "").trim().toLowerCase(), s._id]),
+    );
+    const ids = [];
+    for (const name of sectionNames) {
+      const trimmed = String(name || "").trim();
+      if (!trimmed) {
+        ids.push(null);
+        continue;
+      }
+      const key = trimmed.toLowerCase();
+      if (byName.has(key)) {
+        ids.push(byName.get(key));
+        continue;
+      }
+      const res = await axios.post(
+        `${API}/sections/create`,
+        { name: trimmed, status: "Active" },
+        { withCredentials: true },
+      );
+      const created = res.data?.section || res.data?.data;
+      if (created?._id) {
+        byName.set(key, created._id);
+        ids.push(created._id);
+      } else {
+        ids.push(null);
+      }
+    }
+    return ids;
+  };
+
+  const resetNewClassModal = () => {
+    setNewClassName("");
+    setSectionCount(2);
+    setSectionNames(["A", "B"]);
+    setMaxStrength(40);
+    setStreamMode("direct");
+    setAvailableClassStreams(getSchoolStreamNames(streams));
+    setSelectedStreams([]);
+    setCustomClassStreamName("");
+  };
+
+  const createClassFromModal = async (assignSubjects = false) => {
+    if (!newClassName.trim()) {
+      toast.error("Class name is required");
+      return;
+    }
+    if (sectionNames.some((n) => !String(n || "").trim())) {
+      toast.error("All section names are required");
+      return;
+    }
+    setCreatingClass(true);
+    try {
+      const sectionIds = await resolveClassSectionIds();
+      const streamIds = streams
+        .filter((s) => isClassStreamSelected(s.name))
+        .map((s) => s._id);
+      const response = await axios.post(
+        `${API}/classes/create`,
+        {
+          name: newClassName.trim(),
+          status: "Active",
+          streamIds,
+          details: sectionNames.map((name, i) => ({
+            sectionId: sectionIds[i] || null,
+            roomNumber: "",
+            teacherId: null,
+            capacity: maxStrength || 40,
+            subjectTeachers: [],
+          })),
+        },
+        { withCredentials: true },
+      );
+      const createdClass = response.data?.class || response.data?.data;
+      const createdName = newClassName.trim();
+      toast.success("Class created successfully!");
+      setNewClassOpen(false);
+      resetNewClassModal();
+      const refreshed = await fetchAll();
+      const createdId =
+        createdClass?._id ||
+        refreshed?.find(
+          (c) => String(c.name || "").trim().toLowerCase() === createdName.toLowerCase(),
+        )?._id;
+      if (createdId) setSelectedClassId(createdId);
+      if (assignSubjects) {
+        toast.info(`Now assign compulsory subjects for ${createdName}.`);
+        window.requestAnimationFrame(() =>
+          document
+            .getElementById("compulsory-subject-workspace")
+            ?.scrollIntoView({ behavior: "smooth", block: "start" }),
+        );
+      }
+    } catch (err) {
+      toast.error(err?.response?.data?.message || "Failed to create class.");
+    } finally {
+      setCreatingClass(false);
+    }
   };
 
   if (loading) return <LoadingSpinner />;
@@ -223,7 +411,7 @@ export default function CompulsorySubjects() {
         })}
       </nav>
 
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 items-start">
+      <div id="compulsory-subject-workspace" className="grid grid-cols-1 lg:grid-cols-12 gap-4 items-start">
         {/* Classes Directory */}
         <aside className="lg:col-span-3 space-y-4">
           <div className="bg-white border border-slate-200 rounded-xl p-4 space-y-3">
@@ -235,14 +423,7 @@ export default function CompulsorySubjects() {
               <button
                 type="button"
                 onClick={() => {
-                  setNewClassName("");
-                  setSectionCount(2);
-                  setSectionNames(["A", "B"]);
-                  setMaxStrength(40);
-                  setStreamMode("direct");
-                  setAvailableClassStreams([...PRESET_CLASS_STREAM_NAMES]);
-                  setSelectedStreams([]);
-                  setCustomClassStreamName("");
+                  resetNewClassModal();
                   setNewClassOpen(true);
                 }}
                 className="px-2.5 py-1.5 rounded-lg bg-[#4834b8] hover:bg-[#3a289c] text-white text-[11px] font-bold inline-flex items-center gap-1 whitespace-nowrap cursor-pointer"
@@ -269,12 +450,11 @@ export default function CompulsorySubjects() {
                     <div className="flex items-center gap-0.5 shrink-0">
                       <button
                         type="button"
-                        aria-label={`Rename ${cls.name}`}
+                        aria-label={`Edit ${cls.name}`}
                         onClick={(e) => {
                           e.stopPropagation();
-                          setRenameClass(cls);
-                          setRenameName(cls.name || "");
-                          setRenameOpen(true);
+                          setFullEditClass(cls);
+                          setFullEditOpen(true);
                         }}
                         className="p-1 text-slate-400 hover:text-[#4834b8] rounded cursor-pointer"
                       >
@@ -426,6 +606,17 @@ export default function CompulsorySubjects() {
         </section>
       </div>
     </div>
+    <EditClassModal
+      open={fullEditOpen}
+      classData={fullEditClass}
+      sections={sections}
+      streams={streams}
+      onClose={() => {
+        setFullEditOpen(false);
+        setFullEditClass(null);
+      }}
+      onSaved={fetchAll}
+    />
     {renameOpen && (
       <div className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center p-4">
         <div className="bg-white rounded-2xl w-full max-w-md shadow-xl overflow-hidden">
@@ -537,8 +728,22 @@ export default function CompulsorySubjects() {
                   );
                 })}
               </div>
-              <p className="text-[11px] text-slate-500">
-                Creating {sectionNames.length} section(s): {sectionNames.join(", ")} ({sectionNames.length * (maxStrength || 0)} total seats)
+              <div className="space-y-2 mt-2">
+                {sectionNames.map((name, idx) => (
+                  <div key={idx} className="flex items-center gap-2">
+                    <span className="text-[11px] font-semibold text-slate-500 w-16">Section {idx + 1}</span>
+                    <input
+                      type="text"
+                      value={name}
+                      onChange={(e) => updateSectionName(idx, e.target.value)}
+                      placeholder={`e.g. ${String.fromCharCode(65 + idx)}`}
+                      className="flex-1 border border-slate-300 rounded-lg px-3 py-2 text-sm"
+                    />
+                  </div>
+                ))}
+              </div>
+              <p className="text-[11px] text-slate-500 mt-2">
+                Creating {sectionNames.length} section(s): {sectionNames.filter(Boolean).join(", ")} ({sectionNames.length * (maxStrength || 0)} total seats)
               </p>
             </div>
             <div>
@@ -590,6 +795,10 @@ export default function CompulsorySubjects() {
                         ))}
                       </div>
                     )}
+                    <QuickAddStreams
+                      availableStreams={availableClassStreams}
+                      onAdd={addNewClassStreamToList}
+                    />
                   </div>
                   <div>
                     <p className="text-[11px] font-semibold text-slate-500 mb-1.5">
@@ -625,7 +834,15 @@ export default function CompulsorySubjects() {
           </div>
           <div className="px-5 py-4 border-t border-slate-200 flex justify-end gap-2 shrink-0 bg-white">
             <button type="button" onClick={() => setNewClassOpen(false)} className="px-4 py-2 text-sm font-medium text-slate-700 bg-slate-100 rounded-lg">Cancel</button>
-            <button type="button" onClick={() => { if (!newClassName.trim()) { toast.error("Class name is required"); return; } toast.info("Class creation requires the full Class editor."); setNewClassOpen(false); }} className="px-4 py-2 text-sm font-semibold text-white bg-[#4834b8] rounded-lg">Create Class</button>
+            <button type="button" onClick={() => createClassFromModal(false)} disabled={creatingClass} className="px-4 py-2 text-sm font-semibold text-[#4834b8] bg-white border border-[#4834b8] rounded-lg disabled:opacity-60">Create Class</button>
+            <button
+              type="button"
+              onClick={() => createClassFromModal(true)}
+              disabled={creatingClass}
+              className="px-4 py-2 text-sm font-semibold text-white bg-[#4834b8] rounded-lg inline-flex items-center gap-1.5 disabled:opacity-60"
+            >
+              {creatingClass ? "Creating…" : "Create Class & Assign Subjects →"}
+            </button>
           </div>
         </div>
       </div>

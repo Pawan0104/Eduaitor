@@ -4,6 +4,8 @@ import { toast } from "react-toastify";
 import LoadingSpinner from "../components/LoadingSpinner";
 import NewClassModal from "../components/NewClassModal";
 import AcademicHeaderActions from "../components/AcademicHeaderActions";
+import EditClassModal from "../components/EditClassModal";
+import { sortClassesByName } from "../utils/sortClasses";
 
 const API = import.meta.env.VITE_API_URL;
 
@@ -35,6 +37,7 @@ const ArrowLeft = () => (
 export default function TeachersAssignment() {
   const [classes, setClasses] = useState([]);
   const [sections, setSections] = useState([]);
+  const [streams, setStreams] = useState([]);
   const [subjects, setSubjects] = useState([]);
   const [teachers, setTeachers] = useState([]);
   const [staff, setStaff] = useState([]);
@@ -53,6 +56,8 @@ export default function TeachersAssignment() {
   // Rename / Delete class modals
   const [renameOpen, setRenameOpen] = useState(false);
   const [renameClass, setRenameClass] = useState(null);
+  const [fullEditOpen, setFullEditOpen] = useState(false);
+  const [fullEditClass, setFullEditClass] = useState(null);
   const [renameName, setRenameName] = useState("");
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [deleteClass, setDeleteClass] = useState(null);
@@ -60,16 +65,18 @@ export default function TeachersAssignment() {
   const fetchAll = async () => {
     try {
       setLoading(true);
-      const [clsRes, secRes, subRes, tchRes, stfRes] = await Promise.all([
+      const [clsRes, secRes, subRes, tchRes, stfRes, strmRes] = await Promise.all([
         axios.get(`${API}/classes/all`, { withCredentials: true }),
         axios.get(`${API}/sections/all`, { withCredentials: true }),
         axios.get(`${API}/subjects/all`, { withCredentials: true }),
         axios.get(`${API}/teachers`, { withCredentials: true }),
         axios.get(`${API}/staff`, { withCredentials: true }).catch(() => ({ data: {} })),
+        axios.get(`${API}/streams/all`, { params: { status: "Active" }, withCredentials: true }).catch(() => ({ data: {} })),
       ]);
-      const cls = clsRes.data.classes || clsRes.data.data || [];
+      const cls = sortClassesByName(clsRes.data.classes || clsRes.data.data || []);
       setClasses(cls);
       setSections(secRes.data.sections || secRes.data.data || []);
+      setStreams(strmRes.data?.streams || strmRes.data?.data || []);
       setSubjects(subRes.data.subjects || subRes.data.data || []);
       setTeachers(tchRes.data.data || tchRes.data.teachers || []);
       setStaff(stfRes.data.staff || stfRes.data.data || stfRes.data.staffs || []);
@@ -317,7 +324,7 @@ export default function TeachersAssignment() {
                         <div className="text-[10.5px] text-slate-500 mt-0.5 font-mono tabular-nums truncate">{cls.details?.length || 0} Sec · {(cls.streamIds || []).length > 0 ? `${cls.streamIds.length} Streams` : "Direct"} · {(() => { const ids = new Set(); (cls.details || []).forEach((d) => (d.subjectTeachers || []).forEach((st) => { const sid = st.subjectId?._id || st.subjectId; if (sid) ids.add(String(sid)); })); return ids.size; })()} Common</div>
                       </button>
                       <div className="flex items-center gap-0.5 shrink-0">
-                        <button type="button" aria-label={`Rename ${cls.name}`} onClick={(e) => { e.stopPropagation(); setRenameClass(cls); setRenameName(cls.name || ""); setRenameOpen(true); }} className="p-1 text-slate-400 hover:text-[#4834b8] rounded cursor-pointer"><PenIcon /></button>
+                        <button type="button" aria-label={`Edit ${cls.name}`} onClick={(e) => { e.stopPropagation(); setFullEditClass(cls); setFullEditOpen(true); }} className="p-1 text-slate-400 hover:text-[#4834b8] rounded cursor-pointer"><PenIcon /></button>
                         <button type="button" aria-label={`Delete ${cls.name}`} onClick={(e) => { e.stopPropagation(); setDeleteClass(cls); setDeleteOpen(true); }} className="p-1 text-slate-400 hover:text-rose-600 rounded cursor-pointer"><TrashIcon /></button>
                       </div>
                     </div>
@@ -457,6 +464,17 @@ export default function TeachersAssignment() {
       </div>
 
       {/* Rename modal */}
+      <EditClassModal
+        open={fullEditOpen}
+        classData={fullEditClass}
+        sections={sections}
+        streams={streams}
+        onClose={() => {
+          setFullEditOpen(false);
+          setFullEditClass(null);
+        }}
+        onSaved={fetchAll}
+      />
       {renameOpen && (
         <div className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center p-4">
           <div className="bg-white rounded-2xl w-full max-w-md shadow-xl overflow-hidden">

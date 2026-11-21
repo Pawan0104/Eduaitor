@@ -1,15 +1,10 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import axios from "axios";
 import { toast } from "react-toastify";
+import QuickAddStreams from "./QuickAddStreams";
+import { getSchoolStreamNames } from "../utils/streamNames";
 
 const API = import.meta.env.VITE_API_URL;
-const PRESET_STREAMS = [
-  "Science",
-  "Commerce",
-  "Arts",
-  "Agriculture",
-  "Sanskrit Sahitya",
-];
 
 export default function NewClassModal({ open, onClose, onCreated }) {
   const [newClassName, setNewClassName] = useState("");
@@ -17,10 +12,29 @@ export default function NewClassModal({ open, onClose, onCreated }) {
   const [sectionNames, setSectionNames] = useState(["A", "B"]);
   const [maxStrength, setMaxStrength] = useState(40);
   const [streamMode, setStreamMode] = useState("direct");
-  const [availableStreams, setAvailableStreams] = useState([...PRESET_STREAMS]);
+  const [availableStreams, setAvailableStreams] = useState([]);
+  const [schoolStreams, setSchoolStreams] = useState([]);
   const [selectedStreams, setSelectedStreams] = useState([]);
   const [customStreamName, setCustomStreamName] = useState("");
   const [creating, setCreating] = useState(false);
+
+  useEffect(() => {
+    if (!open) return;
+    axios
+      .get(`${API}/streams/all`, {
+        params: { status: "Active" },
+        withCredentials: true,
+      })
+      .then((res) => {
+        const list = res.data?.streams || res.data?.data || [];
+        setSchoolStreams(list);
+        setAvailableStreams(getSchoolStreamNames(list));
+      })
+      .catch(() => {
+        setSchoolStreams([]);
+        setAvailableStreams([]);
+      });
+  }, [open]);
 
   if (!open) return null;
 
@@ -31,23 +45,93 @@ export default function NewClassModal({ open, onClose, onCreated }) {
       (s) => String(s).toLowerCase() === String(name).trim().toLowerCase(),
     );
 
-  const addNewStreamToList = (value) => {
+  const findSchoolStream = (name) =>
+    schoolStreams.find(
+      (s) =>
+        String(s.name || "").trim().toLowerCase() ===
+        String(name || "").trim().toLowerCase(),
+    );
+
+  const addNewStreamToList = async (value) => {
     const trimmed = String(value || "").trim();
     if (!trimmed) return;
     const key = trimmed.toLowerCase();
-    setAvailableStreams((prev) => {
-      if (prev.some((s) => String(s).toLowerCase() === key)) return prev;
-      return [...prev, trimmed];
-    });
-    setSelectedStreams((prev) => {
-      if (prev.some((s) => String(s).toLowerCase() === key)) return prev;
-      return [...prev, trimmed];
-    });
+
+    let saved = findSchoolStream(trimmed);
+
+    if (!saved) {
+      try {
+        const response = await axios.post(
+          `${API}/streams/create`,
+          {
+            name: trimmed,
+            status: "Active",
+            compulsorySubjectIds: [],
+            allowEmptyCompulsorySubjects: true,
+          },
+          { withCredentials: true },
+        );
+        const created = response.data?.data || response.data?.stream;
+        if (!created?._id) throw new Error("Stream was not saved");
+        saved = created;
+        setSchoolStreams((prev) => [...prev, created]);
+      } catch (err) {
+        const message = String(err?.response?.data?.message || "");
+        if (/already exists/i.test(message)) {
+          const refreshed = await axios
+            .get(`${API}/streams/all`, {
+              params: { status: "Active" },
+              withCredentials: true,
+            })
+            .catch(() => ({ data: {} }));
+          const list = refreshed.data?.streams || refreshed.data?.data || [];
+          saved = list.find(
+            (s) => String(s.name || "").trim().toLowerCase() === key,
+          );
+          if (saved) setSchoolStreams(list);
+        } else {
+          toast.error(message || "Could not save stream to the school.");
+          return;
+        }
+      }
+    }
+
+    if (!saved) {
+      toast.error("Could not save stream to the school.");
+      return;
+    }
+
+    const canonical = String(saved.name || trimmed).trim();
+    setAvailableStreams((prev) =>
+      getSchoolStreamNames([...prev.map((name) => ({ name })), saved]),
+    );
+    setSelectedStreams((prev) =>
+      prev.some((s) => String(s).toLowerCase() === key)
+        ? prev
+        : [...prev, canonical],
+    );
     setCustomStreamName("");
   };
 
-  const removeStreamFromList = (name) => {
-    const key = String(name).toLowerCase();
+  const removeStreamFromList = async (name) => {
+    const key = String(name || "").trim().toLowerCase();
+    const saved = findSchoolStream(name);
+    if (saved?._id) {
+      try {
+        await axios.delete(`${API}/streams/delete/${saved._id}`, {
+          withCredentials: true,
+        });
+        setSchoolStreams((prev) => prev.filter((s) => s._id !== saved._id));
+        toast.success(`${name} deleted from school streams.`);
+      } catch (err) {
+        toast.error(
+          err?.response?.data?.message || `Could not delete ${name} from the school.`,
+        );
+        return;
+      }
+    } else {
+      toast.info(`${name} removed from this class only; no saved school stream found.`);
+    }
     setAvailableStreams((prev) =>
       prev.filter((s) => String(s).toLowerCase() !== key),
     );
@@ -92,7 +176,7 @@ export default function NewClassModal({ open, onClose, onCreated }) {
     setSectionNames(["A", "B"]);
     setMaxStrength(40);
     setStreamMode("direct");
-    setAvailableStreams([...PRESET_STREAMS]);
+    setAvailableStreams(getSchoolStreamNames(schoolStreams));
     setSelectedStreams([]);
     setCustomStreamName("");
     setCreating(false);
@@ -152,7 +236,9 @@ export default function NewClassModal({ open, onClose, onCreated }) {
         {
           name: newClassName.trim(),
           status: "Active",
-          streamIds: [],
+          streamIds: schoolStreams
+            .filter((s) => isSelected(s.name))
+            .map((s) => s._id),
           details: sectionNames.map((name, i) => ({
             sectionId: sectionIds[i] || null,
             roomNumber: "",
@@ -298,6 +384,10 @@ export default function NewClassModal({ open, onClose, onCreated }) {
                       ))}
                     </div>
                   )}
+                  <QuickAddStreams
+                    availableStreams={availableStreams}
+                    onAdd={addNewStreamToList}
+                  />
                 </div>
                 <div>
                   <p className="text-[11px] font-semibold text-slate-500 mb-1.5">
@@ -333,7 +423,7 @@ export default function NewClassModal({ open, onClose, onCreated }) {
         </div>
         <div className="px-5 py-4 border-t border-slate-200 flex justify-end gap-2 shrink-0 bg-white">
           <button type="button" onClick={close} className="px-4 py-2 text-sm font-medium text-slate-700 bg-white border border-slate-300 rounded-lg">Cancel</button>
-          <button type="button" onClick={createClass} disabled={creating} className="px-4 py-2 text-sm font-semibold text-[#4834b8] bg-white border border-[#4834b8] rounded-lg disabled:opacity-60">Create Class Only</button>
+          <button type="button" onClick={createClass} disabled={creating} className="px-4 py-2 text-sm font-semibold text-[#4834b8] bg-white border border-[#4834b8] rounded-lg disabled:opacity-60">Create Class</button>
           <button
             type="button"
             onClick={createClass}

@@ -32,7 +32,19 @@ const gatepassSchema = new mongoose.Schema(
       },
       customRelation: { type: String, default: null }, // if relation = Other
       mobile:         { type: String, required: true },
+      // Required for new requests via the create API; optional here so
+      // legacy gate passes can still be viewed, verified and actioned.
+      idProofType: {
+        type: String,
+        enum: ["Aadhaar", "PAN", "DL"],
+        trim: true,
+      },
+      idProofNumber: { type: String, trim: true },
     },
+
+    // ── UNIQUE PICKUP CODE / BARCODE ──────────────
+    passCode:     { type: String },
+    barcodeValue: { type: String },
 
     // ── GATEPASS DETAILS ─────────────────────────
     exitDate:       { type: Date,   required: true },
@@ -72,6 +84,14 @@ const gatepassSchema = new mongoose.Schema(
     actionNote:   { type: String, default: null  }, // rejection reason
     actionAt:     { type: Date,   default: null  },
 
+    // ── GATE VERIFICATION AUDIT ───────────────────
+    verified:        { type: Boolean, default: false },
+    verifiedAt:      { type: Date, default: null },
+    verifiedBy:      { type: mongoose.Schema.Types.ObjectId, default: null },
+    verifiedByName:  { type: String, default: null },
+    verifiedByRole:  { type: String, default: null },
+    verificationNote:{ type: String, default: null },
+
     // ── CANCEL ────────────────────────────────────
     cancelledAt:  { type: Date,   default: null  },
   },
@@ -83,5 +103,11 @@ gatepassSchema.index({ schoolId: 1, createdAt: -1 });
 
 // fetch parent's own gatepasses
 gatepassSchema.index({ studentId: 1, createdAt: -1 });
+
+// one active code can only exist once per school
+gatepassSchema.index(
+  { schoolId: 1, passCode: 1 },
+  { unique: true, sparse: true },
+);
 
 export default mongoose.model("GatePass", gatepassSchema);

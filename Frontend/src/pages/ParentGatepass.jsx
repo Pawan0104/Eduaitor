@@ -2,11 +2,13 @@ import { useEffect, useState } from "react";
 import axios from "axios";
 import { useAuth } from "../context/AuthContext";
 import { toast } from "react-toastify";
+import PassBarcode from "../components/PassBarcode";
 import {
   FaPlus, FaTimes, FaSearch, FaFilter,
   FaCheckCircle, FaTimesCircle, FaClock,
   FaBan, FaEye, FaArrowLeft, FaCamera,
   FaCalendarAlt, FaUser, FaPhone, FaInfoCircle,
+  FaIdCard, FaBarcode,
 } from "react-icons/fa";
 
 const API = import.meta.env.VITE_API_URL;
@@ -45,6 +47,8 @@ const ParentGatepass = () => {
   const [pickupName, setPickupName]         = useState("");
   const [pickupCustomRelation, setPickupCustomRelation] = useState("");
   const [pickupMobile, setPickupMobile]     = useState("");
+  const [idProofType, setIdProofType]       = useState("");
+  const [idProofNumber, setIdProofNumber]   = useState("");
   const [exitDate, setExitDate]             = useState("");
   const [exitTime, setExitTime]             = useState("");
   const [expectedReturn, setExpectedReturn] = useState("");
@@ -55,6 +59,7 @@ const ParentGatepass = () => {
   // confirm cancel
   const [confirmModal, setConfirmModal]   = useState(false);
   const [cancelId, setCancelId]           = useState(null);
+  const [createdPass, setCreatedPass]     = useState(null);
 
   /* ── FETCH STUDENT ──────────────────────────────── */
   const fetchStudent = async () => {
@@ -117,6 +122,8 @@ const ParentGatepass = () => {
     }
     setPickupCustomRelation("");
     setPickupMobile("");
+    setIdProofType("");
+    setIdProofNumber("");
   };
 
   /* ── PHOTO ──────────────────────────────────────── */
@@ -138,6 +145,8 @@ const ParentGatepass = () => {
     setPickupName("");
     setPickupCustomRelation("");
     setPickupMobile("");
+    setIdProofType("");
+    setIdProofNumber("");
     setExitDate("");
     setExitTime("");
     setExpectedReturn("");
@@ -155,6 +164,17 @@ const ParentGatepass = () => {
     if (!pickupMobile.trim())     return "Mobile number is required";
     if (!/^\d{10,15}$/.test(pickupMobile.replace(/\s/g, "")))
                                   return "Enter a valid mobile number";
+    if (!idProofType)             return "Select a government ID type";
+    if (!idProofNumber.trim())    return "Government ID number is required";
+    if (idProofType === "Aadhaar" &&
+        !/^\d{12}$/.test(idProofNumber.replace(/\s/g, "")))
+                                  return "Aadhaar number must be 12 digits";
+    if (idProofType === "PAN" &&
+        !/^[A-Za-z]{5}\d{4}[A-Za-z]$/.test(idProofNumber.replace(/\s/g, "")))
+                                  return "PAN number is invalid";
+    if (idProofType === "DL" &&
+        !/^[A-Za-z0-9/-]{5,20}$/.test(idProofNumber.replace(/\s/g, "")))
+                                  return "Driving licence number is invalid";
     if (!exitDate)                return "Exit date is required";
     if (!exitTime)                return "Exit time is required";
     if (!reason.trim())           return "Reason is required";
@@ -172,6 +192,8 @@ const ParentGatepass = () => {
       fd.append("pickupName",           pickupName);
       fd.append("pickupRelation",       pickupRelation);
       fd.append("pickupMobile",         pickupMobile);
+      fd.append("idProofType",          idProofType);
+      fd.append("idProofNumber",        idProofNumber.replace(/\s/g, ""));
       fd.append("exitDate",             exitDate);
       fd.append("exitTime",             exitTime);
       if (pickupRelation === "Other")
@@ -182,14 +204,18 @@ const ParentGatepass = () => {
       if (photoFile)
         fd.append("photo",              photoFile);
 
-      await axios.post(`${API}/gatepass`, fd, {
+      const response = await axios.post(`${API}/gatepass`, fd, {
         headers:         { "Content-Type": "multipart/form-data" },
         withCredentials: true,
       });
 
-      toast.success("Gate pass request submitted successfully");
+      const created = response.data?.data || response.data?.gatepass || null;
+      toast.success(created?.passCode
+        ? "Gate pass submitted. Pickup code generated!"
+        : "Gate pass request submitted successfully");
       setShowForm(false);
       resetForm();
+      setCreatedPass(created);
       fetchGatepasses();
     } catch (err) {
       toast.error(err.response?.data?.message || "Failed to submit request");
@@ -350,6 +376,14 @@ const ParentGatepass = () => {
                     <span className="text-xs text-[rgb(var(--text-muted))]">
                       #{g._id.slice(-6).toUpperCase()}
                     </span>
+                    {g.passCode && (
+                      <span className="flex items-center gap-1 px-2 py-0.5
+                        rounded-full bg-[rgba(var(--primary),0.1)]
+                        text-[10px] font-mono font-semibold
+                        text-[rgb(var(--primary))]">
+                        <FaBarcode size={9}/> {g.passCode}
+                      </span>
+                    )}
                   </div>
                   <p className="text-sm font-semibold
                     text-[rgb(var(--text))] mt-1.5">
@@ -557,6 +591,51 @@ const ParentGatepass = () => {
                       type="tel"
                     />
                   )}
+
+                  {/* government ID */}
+                  <div className="pt-1 border-t border-[rgb(var(--border))]">
+                    <p className="text-xs font-semibold
+                      text-[rgb(var(--text-muted))] mb-2">
+                      Government ID Details
+                    </p>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                      <div>
+                        <label className="text-xs font-medium
+                          text-[rgb(var(--text-muted))] mb-1 block">
+                          ID Type <span className="text-red-500">*</span>
+                        </label>
+                        <select
+                          value={idProofType}
+                          onChange={(e) => setIdProofType(e.target.value)}
+                          className="w-full border border-[rgb(var(--border))]
+                            rounded-lg px-3 py-2 text-sm
+                            bg-[rgb(var(--bg))] text-[rgb(var(--text))]
+                            focus:outline-none focus:ring-2
+                            focus:ring-[rgb(var(--primary))] transition"
+                        >
+                          <option value="">Select ID</option>
+                          <option value="Aadhaar">Aadhaar</option>
+                          <option value="PAN">PAN</option>
+                          <option value="DL">Driving Licence</option>
+                        </select>
+                      </div>
+                      <FInput
+                        label="ID Number"
+                        value={idProofNumber}
+                        onChange={(e) => setIdProofNumber(e.target.value)}
+                        placeholder={
+                          idProofType === "Aadhaar"
+                            ? "12-digit Aadhaar number"
+                            : idProofType === "PAN"
+                              ? "e.g. ABCDE1234F"
+                              : idProofType === "DL"
+                                ? "Driving licence number"
+                                : "Enter ID number"
+                        }
+                        required
+                      />
+                    </div>
+                  </div>
                 </div>
               </div>
 
@@ -685,6 +764,71 @@ const ParentGatepass = () => {
       )}
 
       {/* ══════════════════════════════════════════════
+          GENERATED PASS MODAL
+      ══════════════════════════════════════════════ */}
+      {createdPass && createdPass.passCode && (
+        <div className="fixed inset-0 bg-black/50 flex items-center
+          justify-center z-[65] p-4 overflow-y-auto">
+          <div className="bg-[rgb(var(--surface))] text-[rgb(var(--text))]
+            rounded-2xl shadow-2xl w-full max-w-md
+            max-h-[94vh] flex flex-col">
+            <div className="flex items-center justify-between
+              px-6 py-4 border-b border-[rgb(var(--border))] shrink-0">
+              <div>
+                <h2 className="text-lg font-semibold">
+                  Pickup Pass Generated
+                </h2>
+                <p className="text-xs text-[rgb(var(--text-muted))] mt-0.5">
+                  Share this code with the person coming to pick up your child.
+                </p>
+              </div>
+              <button
+                onClick={() => setCreatedPass(null)}
+                className="text-[rgb(var(--text-muted))]
+                  hover:text-red-400 transition">
+                <FaTimes size={18}/>
+              </button>
+            </div>
+
+            <div className="overflow-y-auto flex-1 px-6 py-5 space-y-4">
+              <PassBarcode
+                code={createdPass.passCode}
+                studentName={student
+                  ? `${student.firstName} ${student.lastName}`
+                  : ""}
+                pickupName={createdPass.pickupPerson?.name}
+              />
+
+              <ViewSection title="Pickup Summary">
+                <ViewRow icon={<FaUser/>} label="Person"
+                  value={createdPass.pickupPerson?.name}/>
+                <ViewRow icon={<FaIdCard/>} label="Govt ID"
+                  value={`${createdPass.pickupPerson?.idProofType} — ${createdPass.pickupPerson?.idProofNumber}`}/>
+                <ViewRow icon={<FaCalendarAlt/>} label="Pickup"
+                  value={`${new Date(createdPass.exitDate).toLocaleDateString()} at ${createdPass.exitTime}`}/>
+              </ViewSection>
+
+              <div className="px-3 py-2 rounded-lg bg-yellow-50
+                border border-yellow-100 text-xs text-yellow-700">
+                The school will scan this barcode or enter the code to verify
+                the pickup person before approving the gate pass.
+              </div>
+            </div>
+
+            <div className="px-6 py-4 border-t border-[rgb(var(--border))]
+              flex justify-end shrink-0">
+              <button
+                onClick={() => setCreatedPass(null)}
+                className="px-5 py-2 bg-[rgb(var(--primary))] text-white
+                  rounded-lg text-sm font-medium hover:opacity-90 transition">
+                Done
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ══════════════════════════════════════════════
           VIEW MODAL
       ══════════════════════════════════════════════ */}
       {showView && viewItem && (
@@ -726,7 +870,23 @@ const ParentGatepass = () => {
                     : viewItem.pickupPerson.relation}/>
                 <ViewRow icon={<FaPhone/>} label="Mobile"
                   value={viewItem.pickupPerson.mobile}/>
+                <ViewRow icon={<FaIdCard/>} label="Govt ID"
+                  value={`${viewItem.pickupPerson.idProofType || "—"} — ${viewItem.pickupPerson.idProofNumber || "—"}`}/>
               </ViewSection>
+
+              {/* barcode / code */}
+              {viewItem.passCode && (
+                <ViewSection title="Pickup Barcode & Code" color="green">
+                  <PassBarcode
+                    code={viewItem.passCode}
+                    studentName={student
+                      ? `${student.firstName} ${student.lastName}`
+                      : ""}
+                    pickupName={viewItem.pickupPerson.name}
+                    compact
+                  />
+                </ViewSection>
+              )}
 
               {/* exit details */}
               <ViewSection title="Exit Details">

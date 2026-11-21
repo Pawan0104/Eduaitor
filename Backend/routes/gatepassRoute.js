@@ -6,6 +6,7 @@ import {
   createGatePass,
   getMyGatePasses,
   getManageGatePasses,
+  verifyGatePassCode,
   actionGatePass,
   cancelGatePass,
 } from "../controllers/gatepassController.js";
@@ -27,6 +28,13 @@ router.get(
   authMiddleware,
 
   getMyGatePasses
+);
+
+// school scans the barcode or enters the unique pickup code
+router.post(
+  "/verify",
+  authMiddleware,
+  verifyGatePassCode
 );
 
 // parent cancels a pending gatepass

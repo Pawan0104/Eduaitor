@@ -176,7 +176,13 @@ export const createStream = async (req, res) => {
       schoolId,
       req.body?.compulsorySubjectIds,
     );
-    if (!compulsorySubjectIds.length) {
+    // The academic class setup can create lightweight school streams before
+    // subjects are configured, so only the full Stream Management form enforces
+    // the "at least one compulsory subject" rule.
+    if (
+      !compulsorySubjectIds.length &&
+      req.body?.allowEmptyCompulsorySubjects !== true
+    ) {
       return res.status(400).json({
         success: false,
         message: "Select at least one compulsory subject for this stream.",

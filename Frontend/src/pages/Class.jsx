@@ -20,6 +20,7 @@ import UserAvatar from "../components/UserAvatar";
 import ClassTimetablePreview from "../components/ClassTimetablePreview";
 import { useAuth } from "../context/AuthContext";
 import LoadingSpinner from "../components/LoadingSpinner";
+import { sortClassesByName } from "../utils/sortClasses";
 
 const API = import.meta.env.VITE_API_URL;
 
@@ -127,7 +128,7 @@ export default function ClassPage() {
           }),
           axios.get(`${API}/subjects/all`, { withCredentials: true }),
         ]);
-        setClasses(cls.data.classes || []);
+        setClasses(sortClassesByName(cls.data.classes || []));
         setSubjects(sub.data.subjects || []);
       } else {
         // Admin: fetch everything
@@ -141,7 +142,7 @@ export default function ClassPage() {
             withCredentials: true,
           }),
         ]);
-        setClasses(cls.data.classes || []);
+        setClasses(sortClassesByName(cls.data.classes || []));
         setSections(sec.data.sections || []);
         setSubjects(sub.data.subjects || []);
         setTeachers(tch.data.data || []);
